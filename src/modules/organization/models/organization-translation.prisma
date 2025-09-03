@@ -1,0 +1,10 @@
+
+model organization_translation {
+  id         String    @id @default(uuid())
+  lang       String   
+  title    String
+  description    String
+  organization    organization   @relation(fields: [organization_id], references: [id])
+  organization_id  String
+  created_at  DateTime  @default(now())
+}

@@ -1,0 +1,13 @@
+
+model employee {
+  id    String    @id @default(uuid())
+  first_name String
+  last_name String?
+  phone String @unique
+  password String
+  url String
+  status String
+  organization    organization   @relation(fields: [organization_id], references: [id])
+  organization_id  String
+  created_at  DateTime  @default(now())
+}
