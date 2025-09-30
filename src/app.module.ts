@@ -14,7 +14,7 @@ import { AuthModule } from './modules/auth/auth.module';
       cache: true,
     }),
     AuthModule,
-    EmployeeModule,
+    // EmployeeModule,
     OrganizationModule,
     UserModule
   ],

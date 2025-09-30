@@ -9,16 +9,16 @@ class UpdateOrganizationDto {
       })
       @IsOptional()
       @IsString()
-      readonly type: string
+      readonly type: any
   
       @ApiProperty({
-          description: `title`,
+          description: `name`,
           example: '',
           required: false,
       })
       @IsOptional()
       @IsString()
-      readonly title: string
+      readonly name: string
 }
 
 export default UpdateOrganizationDto

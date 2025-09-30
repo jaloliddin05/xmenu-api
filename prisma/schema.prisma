@@ -53,28 +53,33 @@ model organization_translation {
   organization_id  String
   created_at  DateTime  @default(now())
 }
-enum Role {
+enum OrganizationType {
   Restaurant    @map("restaurant")
+  Cafe    @map("cafe")
+  FastFood    @map("fast-food")
+  CoffeeShop    @map("coffee-shop")
   Other  @map("other")
 }
 
 model organization {
   id      String    @id @default(uuid())
-  title   String
-  type    String
+  name   String
+  type    OrganizationType  @default(Other)
   isActive  Boolean @default(false) 
   url     String? 
   created_at  DateTime  @default(now())
   translations    organization_translation[]
   employees employee[]
-}
-model user {
-  id String @id @default(uuid())
-  phone String @unique
-  password String?
-  email String?
+  owner_id    String?      @unique
+  owner       user?        @relation(fields: [owner_id], references: [id])
+}model user {
+  id          String      @id @default(uuid())
+  phone       String      @unique
+  password    String?
+  email       String?
   first_name  String?
-  last_name  String?
-  url  String?
-  created_at  DateTime @default(now())
+  last_name   String?
+  url         String?
+  created_at  DateTime    @default(now())
+  organization organization?
 }

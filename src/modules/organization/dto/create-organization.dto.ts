@@ -1,5 +1,6 @@
 import { ApiProperty } from "@nestjs/swagger"
-import { IsNotEmpty, IsOptional, IsString } from "class-validator"
+import { IsEnum, IsNotEmpty, IsOptional, IsString } from "class-validator"
+import { OrganizationTypeEnum } from "../models/organization.model"
 
 class CreateOrganizationDto {
     @ApiProperty({
@@ -8,17 +9,17 @@ class CreateOrganizationDto {
         required: false,
     })
     @IsNotEmpty()
-    @IsString()
-    readonly type: string
+    @IsEnum(OrganizationTypeEnum)
+    readonly type: any
 
     @ApiProperty({
-        description: `title`,
+        description: `name`,
         example: '',
         required: false,
     })
     @IsNotEmpty()
     @IsString()
-    readonly title: string
+    readonly name: string
 }
 
 export default CreateOrganizationDto

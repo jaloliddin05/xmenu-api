@@ -11,8 +11,8 @@ export class OrganizationService {
     private readonly prismaService:PrismaService
   ){}
 
-  async create(data: CreateOrganizationDto) {
-    return await this.prismaService.organization.create({data})
+  async create(data: CreateOrganizationDto,owner_id:string) {
+    return await this.prismaService.organization.create({data:{...data,owner_id}})
   }
 
   async findAll() {

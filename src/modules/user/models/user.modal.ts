@@ -1,3 +1,5 @@
+import { Organization } from "src/modules/organization/models/organization.model";
+
 export class User {
     id: string
     phone: string
@@ -7,4 +9,5 @@ export class User {
     last_name: string | null;
     url?: string | null;
     createdAt?:  string | Date
+    organization?: Organization
 }

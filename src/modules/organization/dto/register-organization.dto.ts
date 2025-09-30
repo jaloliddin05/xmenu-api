@@ -12,13 +12,13 @@ class RegisterOrganizationDto {
     readonly type: string
 
     @ApiProperty({
-        description: `title`,
+        description: `name`,
         example: '',
         required: false,
     })
     @IsNotEmpty()
     @IsString()
-    readonly title: string
+    readonly name: string
     
      @ApiProperty({
         description: `phone`,

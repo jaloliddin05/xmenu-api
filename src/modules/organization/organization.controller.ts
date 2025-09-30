@@ -22,12 +22,12 @@ export class OrganizationController {
     return await this.organizationService.findOne(id);
   }
 
-  @Post()
-  @ApiOperation({ summary: 'Method: create' })
-  @HttpCode(HttpStatus.CREATED)
-  async create(@Body() data: CreateOrganizationDto) {
-    return await this.organizationService.create(data);
-  }
+  // @Post()
+  // @ApiOperation({ summary: 'Method: create' })
+  // @HttpCode(HttpStatus.CREATED)
+  // async create(@Body() data: CreateOrganizationDto) {
+  //   return await this.organizationService.create(data);
+  // }
 
   @Put(':id')
   @ApiOperation({ summary: 'Method: update' })

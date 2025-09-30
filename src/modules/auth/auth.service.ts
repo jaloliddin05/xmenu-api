@@ -51,17 +51,17 @@ export class AuthService {
 
   async signup(value: RegisterOrganizationDto) {
 
-    await this.userService.create({ first_name: value?.first_name, phone: value.phone, last_name: value?.last_name }).catch((e) => {
+    const user = await this.userService.create({ first_name: value?.first_name, phone: value.phone, last_name: value?.last_name }).catch((e) => {
       throw new BadRequestException('Something went wrong from FE');
     })
 
-    await this.organizationService.create({ title: value.title, type: value.type })
+    await this.organizationService.create({ name: value.name, type: value.type }, user.id)
 
     const code = generateRandomCode(4);
 
     await sendOtpWithButton(code, value.phone)
 
-    return this.jwtTokenService.generateToken({ code });
+    return this.jwtTokenService.generateToken({ code, id: user.id });
   }
 
   getJWT(type: 'access' | 'refresh', sub: string) {
