@@ -1,0 +1,10 @@
+export class User {
+    id: string
+    phone: string
+    password?: string | null;
+    email: string | null;
+    first_name: string | null;
+    last_name: string | null;
+    url?: string | null;
+    createdAt?:  string | Date
+}

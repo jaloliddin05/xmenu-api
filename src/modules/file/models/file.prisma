@@ -1,0 +1,11 @@
+
+model file {
+  id    String    @id @default(uuid())
+  url String
+  path String
+  size Float?
+  width Float?
+  height Float?
+  fileName String?
+  created_at  DateTime  @default(now())
+}

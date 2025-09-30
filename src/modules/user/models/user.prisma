@@ -1,0 +1,11 @@
+
+model user {
+  id String @id @default(uuid())
+  phone String @unique
+  password String?
+  email String?
+  first_name  String?
+  last_name  String?
+  url  String?
+  created_at  DateTime @default(now())
+}

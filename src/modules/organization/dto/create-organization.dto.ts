@@ -3,22 +3,13 @@ import { IsNotEmpty, IsOptional, IsString } from "class-validator"
 
 class CreateOrganizationDto {
     @ApiProperty({
-        description: `phone`,
+        description: `type`,
         example: '',
         required: false,
     })
     @IsNotEmpty()
     @IsString()
-    readonly phone: string
-
-    @ApiProperty({
-        description: `password`,
-        example: '',
-        required: false,
-    })
-    @IsNotEmpty()
-    @IsString()
-    readonly password: string
+    readonly type: string
 
     @ApiProperty({
         description: `title`,

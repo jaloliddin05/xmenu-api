@@ -1,0 +1,80 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model category_translation {
+  id         String    @id @default(uuid())
+  lang       String   
+  title    String
+  category    category   @relation(fields: [category_id], references: [id])
+  category_id  String
+  created_at  DateTime  @default(now())
+}
+model category {
+  id         String    @id @default(uuid())
+  created_at  DateTime  @default(now())
+  translations    category_translation[]
+}
+model employee {
+  id    String    @id @default(uuid())
+  first_name String
+  last_name String?
+  phone String @unique
+  password String
+  url String
+  status String
+  organization    organization   @relation(fields: [organization_id], references: [id])
+  organization_id  String
+  created_at  DateTime  @default(now())
+}
+model file {
+  id    String    @id @default(uuid())
+  url String
+  path String
+  size Float?
+  width Float?
+  height Float?
+  fileName String?
+  created_at  DateTime  @default(now())
+}
+model organization_translation {
+  id         String    @id @default(uuid())
+  lang       String   
+  description    String
+  organization    organization   @relation(fields: [organization_id], references: [id])
+  organization_id  String
+  created_at  DateTime  @default(now())
+}
+enum Role {
+  Restaurant    @map("restaurant")
+  Other  @map("other")
+}
+
+model organization {
+  id      String    @id @default(uuid())
+  title   String
+  type    String
+  isActive  Boolean @default(false) 
+  url     String? 
+  created_at  DateTime  @default(now())
+  translations    organization_translation[]
+  employees employee[]
+}
+model user {
+  id String @id @default(uuid())
+  phone String @unique
+  password String?
+  email String?
+  first_name  String?
+  last_name  String?
+  url  String?
+  created_at  DateTime @default(now())
+}

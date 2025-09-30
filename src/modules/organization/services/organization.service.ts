@@ -12,8 +12,7 @@ export class OrganizationService {
   ){}
 
   async create(data: CreateOrganizationDto) {
-    const password = await hashPassword(data.password)
-    return await this.prismaService.organization.create({data:{...data,password}})
+    return await this.prismaService.organization.create({data})
   }
 
   async findAll() {
@@ -22,14 +21,6 @@ export class OrganizationService {
 
   async findOne(id: string) {
     return await this.prismaService.organization.findUnique({where:{id}})
-  }
-
-  async findByPhone(phone: string): Promise<Organization | null> {
-    return await this.prismaService.organization.findUnique({
-      where: {
-        phone
-      }
-    });
   }
 
   async update(id: string, data: UpdateOrganizationDto) {

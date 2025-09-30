@@ -3,13 +3,13 @@ import { IsString, IsOptional } from "class-validator"
 
 class UpdateOrganizationDto {
     @ApiProperty({
-          description: `phone`,
+          description: `type`,
           example: '',
           required: false,
       })
       @IsOptional()
       @IsString()
-      readonly phone: string
+      readonly type: string
   
       @ApiProperty({
           description: `title`,

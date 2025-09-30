@@ -1,9 +1,16 @@
 
+enum Role {
+  Restaurant    @map("restaurant")
+  Other  @map("other")
+}
+
 model organization {
-  id         String    @id @default(uuid())
-  url       String   
-  phone    String
-  password String
+  id      String    @id @default(uuid())
+  title   String
+  type    String
+  isActive  Boolean @default(false) 
+  url     String? 
   created_at  DateTime  @default(now())
   translations    organization_translation[]
+  employees employee[]
 }

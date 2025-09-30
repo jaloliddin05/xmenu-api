@@ -4,6 +4,8 @@ import { ConfigModule } from '@nestjs/config';
 import configuration from '../config'
 import { EmployeeModule } from './modules/employee/employee.module';
 import { OrganizationModule } from './modules/organization/organization.module';
+import { UserModule } from './modules/user/user.module';
+import { AuthModule } from './modules/auth/auth.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -11,8 +13,10 @@ import { OrganizationModule } from './modules/organization/organization.module';
       load: [configuration],
       cache: true,
     }),
+    AuthModule,
     EmployeeModule,
-    OrganizationModule
+    OrganizationModule,
+    UserModule
   ],
 })
 export class AppModule {}
