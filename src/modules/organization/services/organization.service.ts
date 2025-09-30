@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
+import { OrganizationType } from '@prisma/client';
+
 
 import { PrismaService } from '../../_prisma/prisma.service';
-import { Organization } from '../models/organization.model';
 import { CreateOrganizationDto, UpdateOrganizationDto } from '../dto';
-import { hashPassword } from 'src/infra/helper';
 
 @Injectable()
 export class OrganizationService {
@@ -12,7 +12,11 @@ export class OrganizationService {
   ){}
 
   async create(data: CreateOrganizationDto,owner_id:string) {
-    return await this.prismaService.organization.create({data:{...data,owner_id}})
+    return await this.prismaService.organization.create({data:{
+      ...data,
+      type:OrganizationType[data.type as keyof typeof OrganizationType],
+      owner_id
+    }})
   }
 
   async findAll() {
@@ -25,6 +29,10 @@ export class OrganizationService {
 
   async update(id: string, data: UpdateOrganizationDto) {
     return await this.prismaService.organization.update({data,where:{id}})
+  }
+
+  async updateIsActive(owner_id:string,isActive:boolean){
+    return await this.prismaService.organization.update({where:{owner_id},data:{isActive}})
   }
 
   async delete(id: string) {

@@ -7,6 +7,7 @@ export class User {
     email: string | null;
     first_name: string | null;
     last_name: string | null;
+    isActive: boolean
     url?: string | null;
     createdAt?:  string | Date
     organization?: Organization

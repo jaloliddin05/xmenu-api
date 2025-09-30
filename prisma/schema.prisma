@@ -80,6 +80,7 @@ model organization {
   first_name  String?
   last_name   String?
   url         String?
+  isActive  Boolean @default(false) 
   created_at  DateTime    @default(now())
   organization organization?
 }

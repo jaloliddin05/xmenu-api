@@ -9,7 +9,8 @@ import { OrganizationService } from '../organization/services/organization.servi
 import { RegisterOrganizationDto } from '../organization/dto';
 import { JwtTokenService } from './jwt.service';
 import generateRandomCode from 'src/infra/helper/auth/generate-random-code';
-import { sendOtpWithButton } from 'src/infra/helper/tg-bot/otp-bot';
+import { sendOtpWithButton, sendUserPassword } from 'src/infra/helper/tg-bot/otp-bot';
+import { generatePasswordWithHash } from 'src/infra/helper/hash-password';
 
 @Injectable()
 export class AuthService {
@@ -21,10 +22,11 @@ export class AuthService {
     private readonly jwtTokenService: JwtTokenService,
   ) { }
 
-  async validateUserByUsernamePassword(login: string, password: string) {
-    const user = await this.userService.findByPhone(login);
+  async validateUserByUsernamePassword(phone: string, password: string) {
+    const user = await this.userService.findByPhone(phone);
+  
     if (!user) {
-      throw new BadRequestException('Invalid username.');
+      throw new BadRequestException('Invalid phone.');
     }
 
     const isPasswordSame = await this.comparePasswordWithHash(
@@ -61,7 +63,7 @@ export class AuthService {
 
     await sendOtpWithButton(code, value.phone)
 
-    return this.jwtTokenService.generateToken({ code, id: user.id });
+    return this.jwtTokenService.generateToken({ code, id: user.id, title: value.name });
   }
 
   getJWT(type: 'access' | 'refresh', sub: string) {
@@ -79,7 +81,20 @@ export class AuthService {
   }
 
   async checkCode(token: string, code: number) {
-    const { code: tokenCode } = await this.jwtTokenService.decodeToken(token);
-    return code == tokenCode;
+    const { code: tokenCode, id, title } = await this.jwtTokenService.decodeToken(token);
+
+    if(tokenCode == code){
+      const {hash,password} = await generatePasswordWithHash(title)
+      await this.organizationService.updateIsActive(id,true)
+      const user = await this.userService.updateIsActiveAndPassword(id,true, hash)
+      await sendUserPassword(password, user.phone, user.first_name, user.last_name)
+
+      const accessToken = this.getJWT('access', user.id);
+      const refreshToken = this.getJWT('refresh', user.id);
+      return {success: code == tokenCode, user, accessToken, refreshToken}
+    }
+
+
+    return {success: code == tokenCode};
   }
 }

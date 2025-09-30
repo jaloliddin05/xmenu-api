@@ -12,6 +12,7 @@ export class Organization {
   id:string
   url:string
   name: string
+  isActive: boolean 
   created_at:string
   translations?:string
   owner_id?:string

@@ -1,8 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../_prisma/prisma.service';
-import { User } from './models/user.modal';
-import { hashPassword } from 'src/infra/helper';
 import { CreateUserDto, UpdateUserDto } from './dto';
 
 @Injectable()
@@ -33,7 +31,7 @@ export class UserService {
     return await this.prismaService.user.findUnique({where:{id}})
   }
 
-  async findByPhone([phone]: string): Promise<User | null> {
+  async findByPhone(phone: string) {
     return await this.prismaService.user.findUnique({
       where: {
         phone
@@ -43,6 +41,10 @@ export class UserService {
 
   async update(id: string, data: UpdateUserDto) {
     return await this.prismaService.user.update({data,where:{id}})
+  }
+
+  async updateIsActiveAndPassword(id:string,isActive:boolean,password:string){
+    return await this.prismaService.user.update({where:{id},data:{isActive,password}})
   }
 
   async delete(id: string) {

