@@ -25,6 +25,7 @@ import { User } from '../user/models/user.modal';
 import { LocalAuthGuard } from './passport-strategies/local/local-auth.guard';
 import { RefreshTokenUserGuard } from './passport-strategies/refresh-token-user/refresh-token-user.guard';
 import { RegisterOrganizationDto } from '../organization/dto';
+import PhoneDto from './dto/phone.dto';
 
 
 @ApiTags('Auth')
@@ -61,6 +62,12 @@ export class AuthController {
     return await this.authService.checkCode(token, data.code);
   }
 
+  @Public()
+  @Post('/resend-code')
+  @HttpCode(200)
+  async resendCode(@Body() data: PhoneDto) {
+    return await this.authService.resendCode(data.phone);
+  }
 
   @Public()
   @UseGuards(RefreshTokenUserGuard)

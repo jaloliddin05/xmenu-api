@@ -52,15 +52,24 @@ export class AuthService {
   }
 
   async signup(value: RegisterOrganizationDto) {
-
     const user = await this.userService.create({ first_name: value?.first_name, phone: value.phone, last_name: value?.last_name })
+
     await this.organizationService.create({ name: value.name, type: value.type }, user.id)
 
     const code = generateRandomCode(4);
 
     await sendOtpWithButton(code, value.phone)
 
-    return this.jwtTokenService.generateToken({ code, id: user.id, title: value.name });
+    return this.jwtTokenService.generateToken({ code, id: user.id });
+  }
+
+  async resendCode(phone:string){
+    const user = await this.userService.findByPhone(phone);
+    
+    const code = generateRandomCode(4);
+    await sendOtpWithButton(code, phone)
+
+    return this.jwtTokenService.generateToken({ code, id: user?.id });
   }
 
   getJWT(type: 'access' | 'refresh', sub: string) {
@@ -78,11 +87,11 @@ export class AuthService {
   }
 
   async checkCode(token: string, code: number) {
-    const { code: tokenCode, id, title } = await this.jwtTokenService.decodeToken(token);
+    const { code: tokenCode, id } = await this.jwtTokenService.decodeToken(token);
 
     if(tokenCode == code){
-      const {hash,password} = await generatePasswordWithHash(title)
-      await this.organizationService.updateIsActive(id,true)
+      const organization = await this.organizationService.updateIsActive(id,true)
+      const {hash,password} = await generatePasswordWithHash(organization.name)
       const user = await this.userService.updateIsActiveAndPassword(id,true, hash)
       await sendUserPassword(password, user.phone, user.first_name, user.last_name)
 
