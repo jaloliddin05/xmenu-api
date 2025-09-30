@@ -14,6 +14,8 @@ export class UserService {
       where: { phone: data.phone },
     });
 
+    if (existingUser && !existingUser?.isActive) return existingUser
+
     if (existingUser) {
       throw new BadRequestException('Phone already taken');
     }

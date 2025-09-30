@@ -12,6 +12,10 @@ export class OrganizationService {
   ){}
 
   async create(data: CreateOrganizationDto,owner_id:string) {
+    const organization = await this.prismaService.organization.findUnique({where:{owner_id}})
+
+    if(organization) return organization
+
     return await this.prismaService.organization.create({data:{
       ...data,
       type:OrganizationType[data.type as keyof typeof OrganizationType],

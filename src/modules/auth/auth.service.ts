@@ -65,7 +65,7 @@ export class AuthService {
 
   async resendCode(phone:string){
     const user = await this.userService.findByPhone(phone);
-    
+
     const code = generateRandomCode(4);
     await sendOtpWithButton(code, phone)
 
