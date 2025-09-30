@@ -53,10 +53,7 @@ export class AuthService {
 
   async signup(value: RegisterOrganizationDto) {
 
-    const user = await this.userService.create({ first_name: value?.first_name, phone: value.phone, last_name: value?.last_name }).catch((e) => {
-      throw new BadRequestException('Something went wrong from FE');
-    })
-
+    const user = await this.userService.create({ first_name: value?.first_name, phone: value.phone, last_name: value?.last_name })
     await this.organizationService.create({ name: value.name, type: value.type }, user.id)
 
     const code = generateRandomCode(4);
