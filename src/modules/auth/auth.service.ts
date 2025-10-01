@@ -24,7 +24,7 @@ export class AuthService {
 
   async validateUserByUsernamePassword(phone: string, password: string) {
     const user = await this.userService.findByPhone(phone);
-  
+
     if (!user) {
       throw new BadRequestException('Invalid phone.');
     }
@@ -63,7 +63,7 @@ export class AuthService {
     return this.jwtTokenService.generateToken({ code, id: user.id });
   }
 
-  async resendCode(phone:string){
+  async resendCode(phone: string) {
     const user = await this.userService.findByPhone(phone);
 
     const code = generateRandomCode(4);
@@ -89,18 +89,18 @@ export class AuthService {
   async checkCode(token: string, code: number) {
     const { code: tokenCode, id } = await this.jwtTokenService.decodeToken(token);
 
-    if(tokenCode == code){
-      const organization = await this.organizationService.updateIsActive(id,true)
-      const {hash,password} = await generatePasswordWithHash(organization.name)
-      const user = await this.userService.updateIsActiveAndPassword(id,true, hash)
+    if (tokenCode == code) {
+      const organization = await this.organizationService.updateIsActive(id, true)
+      const { hash, password } = await generatePasswordWithHash(organization.name)
+      const user = await this.userService.updateIsActiveAndPassword(id, true, hash)
       await sendUserPassword(password, user.phone, user.first_name, user.last_name)
 
       const accessToken = this.getJWT('access', user.id);
       const refreshToken = this.getJWT('refresh', user.id);
-      return {success: code == tokenCode, user, accessToken, refreshToken}
+      return { success: code == tokenCode, user, accessToken, refreshToken }
     }
 
 
-    return {success: code == tokenCode};
+    return { success: code == tokenCode };
   }
 }

@@ -72,6 +72,12 @@ model organization {
   employees employee[]
   owner_id    String?      @unique
   owner       user?        @relation(fields: [owner_id], references: [id])
+}
+model translation_prompt {
+  id        Int      @id @default(autoincrement())
+  title     String
+  context   String   
+  created_at DateTime @default(now())
 }model user {
   id          String      @id @default(uuid())
   phone       String      @unique

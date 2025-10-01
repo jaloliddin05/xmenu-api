@@ -1,0 +1,1 @@
+export { default as TranslationDto } from './translation.dto';

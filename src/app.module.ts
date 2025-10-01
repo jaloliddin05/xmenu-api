@@ -6,6 +6,7 @@ import { EmployeeModule } from './modules/employee/employee.module';
 import { OrganizationModule } from './modules/organization/organization.module';
 import { UserModule } from './modules/user/user.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { TranslationModule } from './modules/translation/translation.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -16,6 +17,7 @@ import { AuthModule } from './modules/auth/auth.module';
     AuthModule,
     // EmployeeModule,
     OrganizationModule,
+    TranslationModule,
     UserModule
   ],
 })
