@@ -6,16 +6,16 @@ import { CreateUserDto, UpdateUserDto } from './dto';
 @Injectable()
 export class UserService {
   constructor(
-    private readonly prismaService:PrismaService
-  ){}
+    private readonly prismaService: PrismaService
+  ) { }
 
   async create(data: CreateUserDto) {
-   const existingUser = await this.prismaService.user.findUnique({
+    const existingUser = await this.prismaService.user.findUnique({
       where: { phone: data.phone },
     });
 
-    if (existingUser && !existingUser?.isActive){
-      const updatedUser = await this.prismaService.user.update({where:{id:existingUser.id},data:{...data}})
+    if (existingUser && !existingUser?.isActive) {
+      const updatedUser = await this.prismaService.user.update({ where: { id: existingUser.id }, data: { ...data } })
       return updatedUser
     }
 
@@ -33,7 +33,8 @@ export class UserService {
   }
 
   async findOne(id: string) {
-    return await this.prismaService.user.findUnique({where:{id}})
+    const user = await this.prismaService.user.findUnique({ where: { id } })
+    return {...user,password:null}
   }
 
   async findByPhone(phone: string) {
@@ -45,14 +46,14 @@ export class UserService {
   }
 
   async update(id: string, data: UpdateUserDto) {
-    return await this.prismaService.user.update({data,where:{id}})
+    return await this.prismaService.user.update({ data, where: { id } })
   }
 
-  async updateIsActiveAndPassword(id:string,isActive:boolean,password:string){
-    return await this.prismaService.user.update({where:{id},data:{isActive,password}})
+  async updateIsActiveAndPassword(id: string, isActive: boolean, password: string) {
+    return await this.prismaService.user.update({ where: { id }, data: { isActive, password } })
   }
 
   async delete(id: string) {
-    return await this.prismaService.user.delete({where:{id}})
+    return await this.prismaService.user.delete({ where: { id } })
   }
 }

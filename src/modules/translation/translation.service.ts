@@ -21,7 +21,7 @@ export class TranslationService {
         const response = await this.openai.chat.completions.create({
             model: 'gpt-4o-mini',
             messages: [
-                { role: 'system', content: 'You are a helpful assistant specialized in restaurant menu translation.' },
+                { role: 'system', content: 'Ты переводчик меню для ресторана.' },
                 {
                     role: 'user',
                     content: prompt?.context + '  ' + text,

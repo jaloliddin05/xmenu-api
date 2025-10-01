@@ -14,14 +14,17 @@ model category_translation {
   id         String    @id @default(uuid())
   lang       String   
   title    String
-  category    category   @relation(fields: [category_id], references: [id])
+ category    category  @relation(fields: [category_id], references: [id], onDelete: Cascade)
   category_id  String
   created_at  DateTime  @default(now())
 }
 model category {
   id         String    @id @default(uuid())
   created_at  DateTime  @default(now())
+  isActive  Boolean? @default(true) 
   translations    category_translation[]
+  organization    organization   @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  organization_id  String
 }
 model employee {
   id    String    @id @default(uuid())
@@ -69,6 +72,7 @@ model organization {
   url     String? 
   created_at  DateTime  @default(now())
   translations    organization_translation[]
+  categories    category[]
   employees employee[]
   owner_id    String?      @unique
   owner       user?        @relation(fields: [owner_id], references: [id])

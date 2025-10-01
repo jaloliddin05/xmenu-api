@@ -15,6 +15,7 @@ model organization {
   url     String? 
   created_at  DateTime  @default(now())
   translations    organization_translation[]
+  categories    category[]
   employees employee[]
   owner_id    String?      @unique
   owner       user?        @relation(fields: [owner_id], references: [id])

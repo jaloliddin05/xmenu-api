@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Delete, Put, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Delete, Put, HttpCode, HttpStatus, Query } from '@nestjs/common';
 import { CreateCategoryDto, UpdateCategoryDto } from './dto';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CategoryService } from './services/category.service';
@@ -11,11 +11,11 @@ export class CategoryController {
   @Get()
   @ApiOperation({ summary: 'Method: get all' })
   @HttpCode(HttpStatus.OK)
-  async findAll() {
-    return await this.categoryService.findAll();
+  async findAll(@Query('lang') lang: string) {
+    return await this.categoryService.findAll(lang);
   }
 
-  @Get(':id')
+  @Get('/:id')
   @ApiOperation({ summary: 'Method: get one' })
   @HttpCode(HttpStatus.OK)
   async findOne(@Param('id') id: string) {
@@ -26,7 +26,7 @@ export class CategoryController {
   @ApiOperation({ summary: 'Method: create' })
   @HttpCode(HttpStatus.CREATED)
   async create(@Body() data: CreateCategoryDto) {
-    return await this.categoryService.create(data);
+    return await this.categoryService.createCategory(data);
   }
 
   @Put(':id')

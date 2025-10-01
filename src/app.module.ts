@@ -7,6 +7,7 @@ import { OrganizationModule } from './modules/organization/organization.module';
 import { UserModule } from './modules/user/user.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { TranslationModule } from './modules/translation/translation.module';
+import { CategoryModule } from './modules/category/category.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -15,6 +16,7 @@ import { TranslationModule } from './modules/translation/translation.module';
       cache: true,
     }),
     AuthModule,
+    CategoryModule,
     // EmployeeModule,
     OrganizationModule,
     TranslationModule,

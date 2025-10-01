@@ -1,7 +1,36 @@
 import { ApiProperty } from "@nestjs/swagger"
-import { IsNotEmpty, IsOptional, IsString } from "class-validator"
+import { IsArray, IsNotEmpty, IsOptional, IsString } from "class-validator"
 
-class CreateOrganizationDto {
+export class CreateCategoryDto {
+    @ApiProperty({
+        description: `title`,
+        example: [
+            {
+                title: 'string',
+                lang: 'en'
+            },
+            {
+                title: 'string',
+                lang: 'ru'
+            }
+        ],
+        required: false,
+    })
+    @IsNotEmpty()
+    @IsArray()
+    translations: CreateCategoryTranslationDto[];
+
+     @ApiProperty({
+        description: `organization_id`,
+        example: '',
+        required: false,
+    })
+    @IsNotEmpty()
+    @IsString()
+    readonly organization_id: string
+}
+
+class CreateCategoryTranslationDto {
     @ApiProperty({
         description: `title`,
         example: '',
@@ -10,6 +39,15 @@ class CreateOrganizationDto {
     @IsNotEmpty()
     @IsString()
     readonly title: string
+
+    @ApiProperty({
+        description: `key`,
+        example: '',
+        required: false,
+    })
+    @IsNotEmpty()
+    @IsString()
+    readonly lang: string;
 }
 
-export default CreateOrganizationDto
+export default CreateCategoryDto

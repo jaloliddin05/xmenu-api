@@ -3,7 +3,7 @@ model category_translation {
   id         String    @id @default(uuid())
   lang       String   
   title    String
-  category    category   @relation(fields: [category_id], references: [id])
+ category    category  @relation(fields: [category_id], references: [id], onDelete: Cascade)
   category_id  String
   created_at  DateTime  @default(now())
 }

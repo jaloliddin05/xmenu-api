@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Delete, Put, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Delete, Put, HttpCode, HttpStatus, Req } from '@nestjs/common';
 import { UserService } from './user.service';
 import { CreateUserDto, UpdateUserDto } from './dto';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -15,11 +15,11 @@ export class UserController {
     return this.userService.findAll();
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Method: get one' })
+  @Get('/me')
+  @ApiOperation({ summary: 'Method: returns user' })
   @HttpCode(HttpStatus.OK)
-  findOne(@Param('id') id: string) {
-    return this.userService.findOne(id);
+  async getMe(@Req() req) {
+    return await this.userService.findOne(req.user.id);
   }
 
   @Post()
