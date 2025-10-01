@@ -100,7 +100,6 @@ export class AuthService {
       return { success: code == tokenCode, user, accessToken, refreshToken }
     }
 
-
-    return { success: code == tokenCode };
+    throw new BadRequestException('Invalid code'); 
   }
 }

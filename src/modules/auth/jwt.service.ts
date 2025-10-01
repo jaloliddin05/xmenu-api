@@ -28,7 +28,7 @@ export class JwtTokenService {
 
     return this.jwtService.sign(payload, {
       secret: jwtConfig.accessTokenSecret,
-      expiresIn: 60 * 15,
+      expiresIn: 60 * 2,
     });
   }
 
