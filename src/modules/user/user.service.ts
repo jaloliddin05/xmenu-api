@@ -14,7 +14,10 @@ export class UserService {
       where: { phone: data.phone },
     });
 
-    if (existingUser && !existingUser?.isActive) return existingUser
+    if (existingUser && !existingUser?.isActive){
+      const updatedUser = await this.prismaService.user.update({where:{id:existingUser.id},data:{...data}})
+      return updatedUser
+    }
 
     if (existingUser) {
       throw new BadRequestException('Phone already taken');
