@@ -17,7 +17,6 @@ import { CategoryModule } from './modules/category/category.module';
     }),
     AuthModule,
     CategoryModule,
-    // EmployeeModule,
     OrganizationModule,
     TranslationModule,
     UserModule
