@@ -1,7 +1,10 @@
-import { Controller, Get, Post, Body, Param, Delete, Put, HttpCode, HttpStatus, Req } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Delete, Put, HttpCode, HttpStatus, Req, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { UserService } from './user.service';
 import { CreateUserDto, UpdateUserDto } from './dto';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { MulterStorage } from 'src/infra/helper/upload/multer-upload';
+import { FileUploadValidationForOptional } from 'src/infra/validators/file-upload-validation-update';
 
 @ApiTags('User')
 @Controller('user')
@@ -29,11 +32,20 @@ export class UserController {
     return this.userService.create(data);
   }
 
-  @Put(':id')
-  @ApiOperation({ summary: 'Method: update' })
+  @Put('/:id')
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Method: updating user' })
+  @UseInterceptors(
+    FileInterceptor('avatar', {
+      storage: MulterStorage('uploads/image/profile'),
+    }),
+  )
   @HttpCode(HttpStatus.OK)
-  update(@Param('id') id: string, @Body() data: UpdateUserDto) {
-    return this.userService.update(id, data);
+  async update(
+    @Body() data: UpdateUserDto,
+    @Param('id') id: string,
+    @UploadedFile(FileUploadValidationForOptional) file: Express.Multer.File){
+    return this.userService.update(id, data,file);
   }
 
   @Delete(':id')

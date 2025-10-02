@@ -2,11 +2,13 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../_prisma/prisma.service';
 import { CreateUserDto, UpdateUserDto } from './dto';
+import { FileService } from '../file/file.service';
 
 @Injectable()
 export class UserService {
   constructor(
-    private readonly prismaService: PrismaService
+    private readonly prismaService: PrismaService,
+    private readonly fileService: FileService,
   ) { }
 
   async create(data: CreateUserDto) {
@@ -33,8 +35,13 @@ export class UserService {
   }
 
   async findOne(id: string) {
-    const user = await this.prismaService.user.findUnique({ where: { id } })
-    return {...user,password:null}
+    const user = await this.prismaService.user.findUnique({ where: { id }, include: { organization: true } })
+    return { ...user, password: null }
+  }
+
+  async findById(id: string) {
+    const user = await this.prismaService.user.findUnique({ where: { id }, include: { avatar: true } })
+    return user
   }
 
   async findByPhone(phone: string) {
@@ -45,8 +52,19 @@ export class UserService {
     });
   }
 
-  async update(id: string, data: UpdateUserDto) {
-    return await this.prismaService.user.update({ data, where: { id } })
+  async update(id: string, data: UpdateUserDto, file?: Express.Multer.File,) {
+    const avatar:any = {}
+    if (file) {
+      const newAvatar = await this.uploadImage(file);
+      avatar.avatar_id = newAvatar.id;
+      avatar.url = newAvatar.url;
+    }
+
+    return await this.prismaService.user.update({
+      where: { id },
+      data:{ ...data, ...avatar },
+      include: { avatar: true }, // agar file ma'lumotini ham qaytarmoqchi bo'lsangiz
+    });
   }
 
   async updateIsActiveAndPassword(id: string, isActive: boolean, password: string) {
@@ -55,5 +73,23 @@ export class UserService {
 
   async delete(id: string) {
     return await this.prismaService.user.delete({ where: { id } })
+  }
+
+  async uploadImage(file: Express.Multer.File) {
+    const image = await this.fileService.uploadFile(file);
+    return image;
+  }
+
+  async updateImage(file: Express.Multer.File, id: string) {
+    const data = await this.findById(id);
+    const avatar = await this.fileService.updateFile(data?.avatar?.id || '', file);
+    return avatar;
+  }
+
+  async deleteImage(id: string) {
+    const data = await this.findById(id);
+    if (data?.avatar?.url) {
+      await this.fileService.removeFile(data.avatar.id);
+    }
   }
 }

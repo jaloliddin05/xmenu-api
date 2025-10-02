@@ -9,4 +9,6 @@ model user {
   isActive  Boolean @default(false) 
   created_at  DateTime    @default(now())
   organization organization?
+  avatar_id    String?      @unique
+  avatar       file?        @relation(fields: [avatar_id], references: [id])
 }

@@ -16,4 +16,5 @@ export default (): IConfig => ({
 
   newPasswordBytes: 4,
   codeBytes: 2,
+  serverUrlUpload: process.env.SERVER_URL_UPLOAD,
 });

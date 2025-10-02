@@ -42,11 +42,8 @@ model file {
   id    String    @id @default(uuid())
   url String
   path String
-  size Float?
-  width Float?
-  height Float?
-  fileName String?
   created_at  DateTime  @default(now())
+  user user?
 }
 model organization_translation {
   id         String    @id @default(uuid())
@@ -93,4 +90,6 @@ model translation_prompt {
   isActive  Boolean @default(false) 
   created_at  DateTime    @default(now())
   organization organization?
+  avatar_id    String?      @unique
+  avatar       file?        @relation(fields: [avatar_id], references: [id])
 }
