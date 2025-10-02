@@ -11,5 +11,4 @@ export interface IConfig {
   jwt: IJWT;
   newPasswordBytes: number;
   codeBytes: number;
-  serverUrlUpload: string | undefined;
 }

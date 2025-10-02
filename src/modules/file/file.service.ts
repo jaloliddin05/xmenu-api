@@ -6,14 +6,12 @@ import { PrismaService } from '../_prisma/prisma.service';
 @Injectable()
 export class FileService {
   constructor(
-    private readonly configService: ConfigService,
     private readonly prismaService:PrismaService
     
   ) {}
 
   async uploadFile(file: Express.Multer.File) {
-    const url =
-      this.configService.get('serverUrlUpload') + file.path.split('uploads')[1];
+    const url = file.path.split('uploads')[1];
     const path = file.path;
 
     return await this.prismaService.file.create({ data: { url, path } });
@@ -36,8 +34,7 @@ export class FileService {
       await this.deleteFileWithFs(changedFile.path);
     }
 
-    const url =
-      this.configService.get('serverUrlUpload') + file.path.split('uploads')[1];
+    const url = file.path.split('uploads')[1];
     const path = file.path;
 
     if (changedFile) {
