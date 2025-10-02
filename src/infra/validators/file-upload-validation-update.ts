@@ -5,7 +5,7 @@ export const FileUploadValidationForOptional = new ParseFilePipeBuilder()
   //   fileType: /(jpg|jpeg|png|pdf|mp3|doc|audio|mpeg)$/,
   // })
   .addMaxSizeValidator({
-    maxSize: 5 * 1024 * 1024,
+    maxSize: 20 * 1024 * 1024,
   })
   .build({
     fileIsRequired: false,
