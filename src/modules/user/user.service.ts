@@ -55,7 +55,7 @@ export class UserService {
   async update(id: string, data: UpdateUserDto, file?: Express.Multer.File,) {
     const avatar:any = {}
     if (file) {
-      const newAvatar = await this.uploadImage(file);
+      const newAvatar = await this.updateImage(file,id);
       avatar.avatar_id = newAvatar.id;
       avatar.url = newAvatar.url;
     }
