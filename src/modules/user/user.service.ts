@@ -50,7 +50,12 @@ export class UserService {
         phone
       },
       include:{
-        organization:true
+        organization:{
+          include:{
+            logo:true,
+            banner:true
+          }
+        }
       }
     });
   }
