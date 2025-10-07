@@ -1,7 +1,9 @@
-import { Controller, Get, Post, Body, Param, Delete, Put, HttpCode, HttpStatus } from '@nestjs/common';
-import { CreateOrganizationDto, UpdateOrganizationDto } from './dto';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Param, Delete, Put, HttpCode, HttpStatus, UseInterceptors, UploadedFiles } from '@nestjs/common';
+import { ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { OrganizationService } from './services/organization.service';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import { MulterStorage } from 'src/infra/helper/upload/multer-upload';
+import UpdateOrganizationDto from './dto/update-organization.dto';
 
 @ApiTags('Organization')
 @Controller('organization')
@@ -22,18 +24,30 @@ export class OrganizationController {
     return await this.organizationService.findOne(id);
   }
 
-  // @Post()
-  // @ApiOperation({ summary: 'Method: create' })
-  // @HttpCode(HttpStatus.CREATED)
-  // async create(@Body() data: CreateOrganizationDto) {
-  //   return await this.organizationService.create(data);
-  // }
-
-  @Put(':id')
-  @ApiOperation({ summary: 'Method: update' })
+  @Put('/:id')
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Method: updating organization' })
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
+        { name: 'banner', maxCount: 1 },
+        { name: 'logo', maxCount: 1 },
+      ],
+      {
+        storage: MulterStorage('uploads/image/organization'),
+      },
+    ),
+  )
   @HttpCode(HttpStatus.OK)
-  async update(@Param('id') id: string, @Body() data: UpdateOrganizationDto) {
-    return await this.organizationService.update(id, data);
+  async update(
+    @Param('id') id: string,
+    @Body() data: UpdateOrganizationDto,
+    @UploadedFiles() files: { banner?: Express.Multer.File[]; logo?: Express.Multer.File[] },
+    )
+    {
+    const banner = files?.banner?.[0];
+    const logo = files?.logo?.[0];
+    return await this.organizationService.update(id, data, logo,banner );
   }
 
   @Delete(':id')

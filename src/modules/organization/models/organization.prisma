@@ -8,15 +8,22 @@ enum OrganizationType {
 }
 
 model organization {
-  id      String    @id @default(uuid())
-  name   String
-  type    OrganizationType  @default(Other)
-  isActive  Boolean @default(false) 
-  url     String? 
-  created_at  DateTime  @default(now())
-  translations    organization_translation[]
-  categories    category[]
-  employees employee[]
-  owner_id    String?      @unique
-  owner       user?        @relation(fields: [owner_id], references: [id])
+  id           String            @id @default(uuid())
+  name         String
+  type         OrganizationType  @default(Other)
+  isActive     Boolean           @default(false)
+  url          String?
+  created_at   DateTime          @default(now())
+  translations organization_translation[]
+  categories   category[]
+  employees    employee[]
+
+  owner_id     String?           @unique
+  owner        user?             @relation(fields: [owner_id], references: [id])
+
+  logo_id      String?           @unique
+  logo         file?             @relation("OrganizationLogo", fields: [logo_id], references: [id])
+
+  banner_id    String?           @unique
+  banner       file?             @relation("OrganizationBanner", fields: [banner_id], references: [id])
 }

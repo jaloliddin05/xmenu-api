@@ -1,7 +1,7 @@
 import { ApiProperty } from "@nestjs/swagger"
 import { IsOptional, IsBoolean } from "class-validator"
 
-class UpdateOrganizationDto {
+class UpdateCategoryDto {
 
     @ApiProperty({ example: true, description: 'isActive' })
     @IsOptional()
@@ -9,4 +9,4 @@ class UpdateOrganizationDto {
     isActive: boolean
 }
 
-export default UpdateOrganizationDto
+export default UpdateCategoryDto

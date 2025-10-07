@@ -37,14 +37,17 @@ model employee {
   organization    organization   @relation(fields: [organization_id], references: [id])
   organization_id  String
   created_at  DateTime  @default(now())
+}model file {
+  id                     String           @id @default(uuid())
+  url                    String
+  path                   String
+  created_at             DateTime         @default(now())
+
+  user                   user?
+  organization_logo      organization?    @relation("OrganizationLogo")
+  organization_banner    organization?    @relation("OrganizationBanner")
 }
-model file {
-  id    String    @id @default(uuid())
-  url String
-  path String
-  created_at  DateTime  @default(now())
-  user user?
-}
+
 model organization_translation {
   id         String    @id @default(uuid())
   lang       String   
@@ -62,17 +65,24 @@ enum OrganizationType {
 }
 
 model organization {
-  id      String    @id @default(uuid())
-  name   String
-  type    OrganizationType  @default(Other)
-  isActive  Boolean @default(false) 
-  url     String? 
-  created_at  DateTime  @default(now())
-  translations    organization_translation[]
-  categories    category[]
-  employees employee[]
-  owner_id    String?      @unique
-  owner       user?        @relation(fields: [owner_id], references: [id])
+  id           String            @id @default(uuid())
+  name         String
+  type         OrganizationType  @default(Other)
+  isActive     Boolean           @default(false)
+  url          String?
+  created_at   DateTime          @default(now())
+  translations organization_translation[]
+  categories   category[]
+  employees    employee[]
+
+  owner_id     String?           @unique
+  owner        user?             @relation(fields: [owner_id], references: [id])
+
+  logo_id      String?           @unique
+  logo         file?             @relation("OrganizationLogo", fields: [logo_id], references: [id])
+
+  banner_id    String?           @unique
+  banner       file?             @relation("OrganizationBanner", fields: [banner_id], references: [id])
 }
 model translation_prompt {
   id        Int      @id @default(autoincrement())

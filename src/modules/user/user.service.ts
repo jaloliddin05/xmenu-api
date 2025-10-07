@@ -75,11 +75,6 @@ export class UserService {
     return await this.prismaService.user.delete({ where: { id } })
   }
 
-  async uploadImage(file: Express.Multer.File) {
-    const image = await this.fileService.uploadFile(file);
-    return image;
-  }
-
   async updateImage(file: Express.Multer.File, id: string) {
     const data = await this.findById(id);
     const avatar = await this.fileService.updateFile(data?.avatar?.id || '', file);

@@ -1,8 +1,10 @@
-
 model file {
-  id    String    @id @default(uuid())
-  url String
-  path String
-  created_at  DateTime  @default(now())
-  user user?
+  id                     String           @id @default(uuid())
+  url                    String
+  path                   String
+  created_at             DateTime         @default(now())
+
+  user                   user?
+  organization_logo      organization?    @relation("OrganizationLogo")
+  organization_banner    organization?    @relation("OrganizationBanner")
 }
