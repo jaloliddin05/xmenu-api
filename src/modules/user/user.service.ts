@@ -48,6 +48,9 @@ export class UserService {
     return await this.prismaService.user.findUnique({
       where: {
         phone
+      },
+      include:{
+        organization:true
       }
     });
   }
