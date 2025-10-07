@@ -6,6 +6,7 @@ import { PrismaService } from '../../_prisma/prisma.service';
 import { CreateOrganizationDto } from '../dto';
 import { FileService } from 'src/modules/file/file.service';
 import UpdateOrganizationDto from '../dto/update-organization.dto';
+import { parseOrganizationType } from '../models/organization.model';
 
 @Injectable()
 export class OrganizationService {
@@ -25,7 +26,7 @@ export class OrganizationService {
     return await this.prismaService.organization.create({
       data: {
         ...data,
-        type: OrganizationType[data.type as keyof typeof OrganizationType],
+        type: parseOrganizationType(data.type),
         owner_id
       }
     })
@@ -50,25 +51,25 @@ export class OrganizationService {
   }
 
   async update(id: string, data: UpdateOrganizationDto, logo?: Express.Multer.File, banner?: Express.Multer.File) {
-    const files:any = {}
-     if (logo) {
-      const newAvatar = await this.updateImage(logo,id,'logo');
+    const files: any = {}
+    if (logo) {
+      const newAvatar = await this.updateImage(logo, id, 'logo');
       files.logo_id = newAvatar.id;
     }
 
     if (banner) {
-      const newAvatar = await this.updateImage(banner,id,'banner');
+      const newAvatar = await this.updateImage(banner, id, 'banner');
       files.banner_id = newAvatar.id;
     }
 
-    if(data.type){
-      data.type = OrganizationType[data.type as keyof typeof OrganizationType]
+    if (data.type) {
+      data.type = parseOrganizationType(data.type);
     }
 
     return await this.prismaService.organization.update({
       where: { id },
-      data:{ ...data, ...files },
-      include: { logo: true , banner: true},
+      data: { ...data, ...files },
+      include: { logo: true, banner: true },
     });
   }
 
@@ -80,13 +81,13 @@ export class OrganizationService {
     return await this.prismaService.organization.delete({ where: { id } })
   }
 
-  async updateImage(file: Express.Multer.File, id: string,type:'logo'|'banner') {
+  async updateImage(file: Express.Multer.File, id: string, type: 'logo' | 'banner') {
     const data = await this.findById(id);
     const avatar = await this.fileService.updateFile(data?.[type]?.id || '', file);
     return avatar;
   }
 
-  async deleteImage(id: string,type) {
+  async deleteImage(id: string, type) {
     const data = await this.findById(id);
     if (data?.[type]?.url) {
       await this.fileService.removeFile(data?.[type].id);
