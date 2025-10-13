@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Body, Param, Delete, Put, HttpCode, HttpStatus, Query, Patch } from '@nestjs/common';
-import { CreateCategoryDto, UpdateCategoryDto } from './dto';
+import { CreateCategoryDto, MoveCategoryDto, UpdateCategoryDto } from './dto';
 import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CategoryService } from './services/category.service';
 
@@ -54,6 +54,13 @@ export class CategoryController {
   @HttpCode(HttpStatus.OK)
   async activateCategory(@Param('id') id: string, @Body('isActive') isActive: boolean) {
     return await this.categoryService.updateIsActive(id, isActive);
+  }
+
+  @Patch('/index')
+  @ApiOperation({ summary: 'Method: update index' })
+  @HttpCode(HttpStatus.OK)
+  async updateIndex(@Body() data: MoveCategoryDto) {
+    return await this.categoryService.moveCategory(data);
   }
 
   @Delete(':id')

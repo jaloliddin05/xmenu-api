@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../_prisma/prisma.service';
-import { CreateCategoryDto, UpdateCategoryDto } from '../dto';
+import { CreateCategoryDto, MoveCategoryDto, UpdateCategoryDto } from '../dto';
 
 @Injectable()
 export class CategoryService {
@@ -10,25 +10,38 @@ export class CategoryService {
   ) { }
 
   async createCategory(dto: CreateCategoryDto) {
-    return await this.prismaService.category.create({
-      data: {
-        organization: {
-          connect: { id: dto.organization_id }, // organization bilan bog‘lash
+    return await this.prismaService.$transaction(async (prisma) => {
+
+      const lastCategory = await prisma.category.findFirst({
+        where: { organization_id: dto.organization_id },
+        orderBy: { index: 'desc' },
+        select: { index: true },
+      });
+
+      const nextIndex = (lastCategory?.index || 0) + 1;
+
+      const newCategory = await prisma.category.create({
+        data: {
+          organization: {
+            connect: { id: dto.organization_id },
+          },
+          index: nextIndex,
+          translations: {
+            create: dto.translations.map((t) => ({
+              lang: t.lang,
+              title: t.title,
+            })),
+          },
         },
-        translations: {
-          create: dto.translations.map(t => ({
-            lang: t.lang,
-            title: t.title,
-          })),
+        include: {
+          translations: true,
+          organization: true,
         },
-      },
-      include: {
-        translations: true,
-        organization: true, // agar organization ma’lumotini qaytarmoqchi bo‘lsang
-      },
+      });
+
+      return newCategory;
     });
   }
-
 
   async findAll(lang: string) {
     const categories = await this.prismaService.category.findMany({
@@ -44,6 +57,7 @@ export class CategoryService {
     return categories.map(c => ({
       id: c.id,
       isActive: c.isActive,
+      index: c.index,
       translation: c.translations[0] || null
     }));
   }
@@ -51,7 +65,6 @@ export class CategoryService {
   async findOne(id: string) {
     return await this.prismaService.category.findUnique({ where: { id }, include: { translations: true } });
   }
-
 
   async update(id: string, data: UpdateCategoryDto) {
     const { translations } = data;
@@ -94,6 +107,51 @@ export class CategoryService {
       where: { id },
       include: { translations: true },
     });
+  }
+
+  async moveCategory(dto: MoveCategoryDto) {
+    const { categoryId, organizationId, newIndex } = dto;
+
+    // 1. Avval eski indexni topamiz
+    const category = await this.prismaService.category.findUnique({
+      where: { id: categoryId },
+    });
+
+    if (!category) throw new Error('Category not found');
+
+    const oldIndex = category.index || 0;
+
+    if (oldIndex === newIndex) return category; // hech narsa o‘zgarmaydi
+
+    // 2. Agar pastdan yuqoriga ko‘tarilsa (masalan 10 → 3)
+    if (oldIndex > newIndex) {
+      await this.prismaService.category.updateMany({
+        where: {
+          organization_id: organizationId,
+          index: { gte: newIndex, lt: oldIndex },
+        },
+        data: { index: { increment: 1 } }, // o‘rtadagilarni 1 taga oshiramiz
+      });
+    }
+
+    // 3. Agar yuqoridan pastga tushsa (masalan 3 → 10)
+    else {
+      await this.prismaService.category.updateMany({
+        where: {
+          organization_id: organizationId,
+          index: { gt: oldIndex, lte: newIndex },
+        },
+        data: { index: { decrement: 1 } }, // o‘rtadagilarni 1 taga kamaytiramiz
+      });
+    }
+
+    // 4. O‘zi esa yangi indexga o‘tadi
+    const updated = await this.prismaService.category.update({
+      where: { id: categoryId },
+      data: { index: newIndex },
+    });
+
+    return updated;
   }
 
   updateIsActive(id: string, isActive: boolean) {
