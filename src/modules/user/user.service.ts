@@ -37,7 +37,14 @@ export class UserService {
   }
 
   async findOne(id: string) {
-    const user = await this.prismaService.user.findUnique({ where: { id }, include: { organization: true } })
+    const user = await this.prismaService.user.findUnique({ 
+      where: { id }, 
+      include: { 
+        organization: {
+          include:{logo:true,banner:true}
+        } 
+      } 
+    })
     return { ...user, password: null }
   }
 
