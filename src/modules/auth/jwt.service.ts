@@ -44,4 +44,21 @@ export class JwtTokenService {
       });
     return payload;
   }
+
+
+  async decodeTokenForRegister(token: string) {
+
+    if(!token) return null
+
+    const jwtConfig = this.configService.getOrThrow('jwt');
+
+    const payload = await this.jwtService
+      .verifyAsync(token, {
+        secret: jwtConfig.accessTokenSecret,
+      })
+      .catch((err) => {
+        return null
+      });
+    return payload || null
+  }
 }

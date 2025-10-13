@@ -15,6 +15,7 @@ import {
   ApiForbiddenResponse,
   ApiNoContentResponse,
   ApiOkResponse,
+  ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
 
@@ -50,9 +51,10 @@ export class AuthController {
 
   @Public()
   @Post('/register')
+  @ApiQuery({ name: 'token', required: false, description: 'Optional token' })
   @HttpCode(HttpStatus.CREATED)
-  create(@Body() value: RegisterOrganizationDto) {
-    return this.authService.signup(value);
+  create(@Body() value: RegisterOrganizationDto,@Query('token') token?: string) {
+    return this.authService.signup(value,token);
   }
 
   @Public()

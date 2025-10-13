@@ -51,7 +51,11 @@ export class AuthService {
     return isSame;
   }
 
-  async signup(value: RegisterOrganizationDto) {
+  async signup(value: RegisterOrganizationDto, token) {
+    const tokenValue = await this.jwtTokenService.decodeTokenForRegister(token);
+
+    if(tokenValue?.id) return token 
+
     const user = await this.userService.create({ first_name: value?.first_name, phone: value.phone, last_name: value?.last_name })
 
     await this.organizationService.create({ name: value.name, type: value.type }, user.id)

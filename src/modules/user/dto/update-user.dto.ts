@@ -3,15 +3,6 @@ import { IsString, IsOptional } from "class-validator"
 
 class UpdateUserDto {
     @ApiProperty({
-        description: `phone`,
-        example: '',
-        required: false,
-    })
-    @IsOptional()
-    @IsString()
-    readonly phone: string
-
-    @ApiProperty({
         description: `email`,
         example: '',
         required: false,
