@@ -10,7 +10,7 @@ import { RegisterOrganizationDto } from '../organization/dto';
 import { JwtTokenService } from './jwt.service';
 import generateRandomCode from 'src/infra/helper/auth/generate-random-code';
 import { sendOtpWithButton, sendUserPassword } from 'src/infra/helper/tg-bot/otp-bot';
-import { generatePasswordWithHash } from 'src/infra/helper/hash-password';
+import { generatePasswordWithHash } from 'src/infra/helper/auth/generate-password';
 
 @Injectable()
 export class AuthService {

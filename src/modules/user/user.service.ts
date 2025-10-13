@@ -1,8 +1,10 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import * as bcrypt from 'bcrypt';
 
 import { PrismaService } from '../_prisma/prisma.service';
-import { CreateUserDto, UpdateUserDto } from './dto';
+import { ChangePasswordDto, CreateUserDto, UpdateUserDto } from './dto';
 import { FileService } from '../file/file.service';
+import { hashPassword } from 'src/infra/helper/auth/hash-password';
 
 @Injectable()
 export class UserService {
@@ -77,6 +79,33 @@ export class UserService {
 
   async updateIsActiveAndPassword(id: string, isActive: boolean, password: string) {
     return await this.prismaService.user.update({ where: { id }, data: { isActive, password } })
+  }
+
+   async changePassword(data: ChangePasswordDto, id: string) {
+    const user = await this.prismaService.user.findUnique({
+        where: { id },
+      })
+      .catch(() => {
+        throw new NotFoundException('data not found');
+      });
+
+    const isSamePassword = await await bcrypt.compare(data.oldPassword, user?.password)
+
+    if (!isSamePassword) {
+      throw new BadRequestException("Old password doesn't match");
+    }
+
+    return await this.updatePassword(id, data.newPassword);
+  }
+
+  async updatePassword(id: string, password: string) {
+    await this.prismaService.user.findUnique({ where: { id } }).catch(() => {
+      throw new NotFoundException('user not found');
+    });
+
+    const newPassword = await hashPassword(password);
+
+    return await this.prismaService.user.update({ where:{id} , data:{ password: newPassword }});
   }
 
   async delete(id: string) {

@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Body, Param, Delete, Put, HttpCode, HttpStatus, Req, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { UserService } from './user.service';
-import { CreateUserDto, UpdateUserDto } from './dto';
+import { ChangePasswordDto, CreateUserDto, UpdateUserDto } from './dto';
 import { ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { MulterStorage } from 'src/infra/helper/upload/multer-upload';
@@ -46,6 +46,16 @@ export class UserController {
     @Param('id') id: string,
     @UploadedFile(FileUploadValidationForOptional) file: Express.Multer.File){
     return this.userService.update(id, data,file);
+  }
+
+  @Put('/change-password/:id')
+  @ApiOperation({ summary: 'Method: updating user password' })
+  @HttpCode(HttpStatus.OK)
+  async changePassword(
+    @Body() data: ChangePasswordDto,
+    @Param('id') id: string,
+  ) {
+    return await this.userService.changePassword(data, id);
   }
 
   @Delete(':id')
