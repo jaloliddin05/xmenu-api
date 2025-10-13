@@ -1,12 +1,32 @@
 import { ApiProperty } from "@nestjs/swagger"
-import { IsOptional, IsBoolean } from "class-validator"
+import { IsArray, IsNotEmpty, IsOptional, IsString } from "class-validator"
+import { CreateCategoryTranslationDto } from "./create-category.dto";
 
-class UpdateCategoryDto {
-
-    @ApiProperty({ example: true, description: 'isActive' })
+export class UpdateCategoryDto {
+    @ApiProperty({
+        description: `title`,
+        example: [
+            {
+                id:'string',
+                title: 'string',
+                lang: 'en'
+            },
+            {
+                id:'string',
+                title: 'string',
+                lang: 'ru'
+            },
+             {
+                id:'string',
+                title: 'string',
+                lang: 'uz'
+            }
+        ],
+        required: false,
+    })
     @IsOptional()
-    @IsBoolean()
-    isActive: boolean
+    @IsArray()
+    translations: CreateCategoryTranslationDto[];
 }
 
 export default UpdateCategoryDto

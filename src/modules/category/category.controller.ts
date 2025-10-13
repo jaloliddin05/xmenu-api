@@ -1,6 +1,6 @@
-import { Controller, Get, Post, Body, Param, Delete, Put, HttpCode, HttpStatus, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Delete, Put, HttpCode, HttpStatus, Query, Patch } from '@nestjs/common';
 import { CreateCategoryDto, UpdateCategoryDto } from './dto';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CategoryService } from './services/category.service';
 
 @ApiTags('Category')
@@ -34,6 +34,26 @@ export class CategoryController {
   @HttpCode(HttpStatus.OK)
   async update(@Param('id') id: string, @Body() data: UpdateCategoryDto) {
     return await this.categoryService.update(id, data);
+  }
+
+  @Patch(':id/activate')
+  @ApiOperation({ summary: 'Method: activate/deactivate category' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        isActive: {
+          type: 'boolean',
+          example: true,
+          description: 'Set true to activate, false to deactivate category',
+        },
+      },
+      required: ['isActive'],
+    },
+  })
+  @HttpCode(HttpStatus.OK)
+  async activateCategory(@Param('id') id: string, @Body('isActive') isActive: boolean) {
+    return await this.categoryService.updateIsActive(id, isActive);
   }
 
   @Delete(':id')

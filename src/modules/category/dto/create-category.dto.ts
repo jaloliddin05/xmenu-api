@@ -12,6 +12,10 @@ export class CreateCategoryDto {
             {
                 title: 'string',
                 lang: 'ru'
+            },
+             {
+                title: 'string',
+                lang: 'uz'
             }
         ],
         required: false,
@@ -30,7 +34,9 @@ export class CreateCategoryDto {
     readonly organization_id: string
 }
 
-class CreateCategoryTranslationDto {
+export class CreateCategoryTranslationDto {
+    id?:string
+
     @ApiProperty({
         description: `title`,
         example: '',
