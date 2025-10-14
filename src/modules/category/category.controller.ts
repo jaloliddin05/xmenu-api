@@ -11,8 +11,8 @@ export class CategoryController {
   @Get()
   @ApiOperation({ summary: 'Method: get all' })
   @HttpCode(HttpStatus.OK)
-  async findAll(@Query('lang') lang: string) {
-    return await this.categoryService.findAll(lang);
+  async findAll(@Query('lang') lang: string,@Param('organizationId') organizationId: string) {
+    return await this.categoryService.findAll(lang,organizationId);
   }
 
   @Get('/:id')

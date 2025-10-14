@@ -43,15 +43,18 @@ export class CategoryService {
     });
   }
 
-  async findAll(lang: string) {
+  async findAll(lang: string,organizationId: string) {
     const categories = await this.prismaService.category.findMany({
-      where: {},
+      where: {
+        organization_id: organizationId
+      },
       include: {
         translations: {
           where: { lang }, // faqat berilgan til bo‘yicha translation
           select: { id: true, lang: true, title: true }
         }
       },
+      orderBy: { index: 'asc' }
     })
 
     return categories.map(c => ({
