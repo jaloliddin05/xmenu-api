@@ -10,6 +10,7 @@ import { CategoryModule } from './modules/category/category.module';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 import { FileModule } from './modules/file/file.module';
+import { ProductModule } from './modules/product/product.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -24,6 +25,7 @@ import { FileModule } from './modules/file/file.module';
     CategoryModule,
     FileModule,
     OrganizationModule,
+    ProductModule,
     TranslationModule,
     UserModule
   ],

@@ -5,6 +5,11 @@ model file {
   created_at             DateTime         @default(now())
 
   user                   user?
+
   organization_logo      organization?    @relation("OrganizationLogo")
+
   organization_banner    organization?    @relation("OrganizationBanner")
+
+  product             product?      @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  product_id          String?
 }

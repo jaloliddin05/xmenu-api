@@ -65,6 +65,24 @@ export class CategoryService {
     }));
   }
 
+  async getForSelect(organizationId: string, lang:string) {
+    const categories = await this.prismaService.category.findMany({
+      where: { organization_id: organizationId, isActive: true },
+      include: {
+        translations: {
+          where: { lang },
+          select: { id: true, lang: true, title: true }
+        }
+      },
+      orderBy: { index: 'asc' }
+    });
+
+    return categories.map(c => ({
+      id: c.id,
+      title: c.translations[0]?.title || 'No title',
+    }));
+  }
+
   async findOne(id: string) {
     return await this.prismaService.category.findUnique({ where: { id }, include: { translations: true } });
   }

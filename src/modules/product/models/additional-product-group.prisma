@@ -1,0 +1,21 @@
+
+
+enum additional_product_group_type {
+  checkbox
+  radio
+}
+
+
+model additional_product_group {
+  id         String    @id @default(uuid())
+  created_at  DateTime  @default(now())
+  is_required  Boolean? @default(false) 
+  type additional_product_group_type
+
+  translations    additional_product_group_translation[]
+
+  additional_products additional_product[]
+
+  product    product   @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  product_id  String
+}

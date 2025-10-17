@@ -11,8 +11,15 @@ export class CategoryController {
   @Get()
   @ApiOperation({ summary: 'Method: get all' })
   @HttpCode(HttpStatus.OK)
-  async findAll(@Query('lang') lang: string,@Param('organizationId') organizationId: string) {
+  async findAll(@Query('lang') lang: string,@Query('organizationId') organizationId: string) {
     return await this.categoryService.findAll(lang,organizationId);
+  }
+
+  @Get('/for-select/:organizationId')
+  @ApiOperation({ summary: 'Method: get all for select' })
+  @HttpCode(HttpStatus.OK)
+  async findAllForSelect(@Query('lang') lang: string,@Param('organizationId') organizationId: string) {
+    return await this.categoryService.getForSelect(organizationId,lang);
   }
 
   @Get('/:id')

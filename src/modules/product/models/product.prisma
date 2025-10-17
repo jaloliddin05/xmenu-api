@@ -1,0 +1,29 @@
+
+enum product_unit {
+  gr
+  ml
+}
+
+
+model product {
+  id         String    @id @default(uuid())
+  created_at  DateTime  @default(now())
+  isActive  Boolean? @default(true) 
+  index            Int?
+  price  Float
+  weight  Float?
+  protein Float?
+  kcal Float?
+  fat Float?
+  carbohydrate Float?
+  unit product_unit
+
+  translations    product_translation[]
+
+  additional_product_groups additional_product_group[]
+
+  category    category   @relation(fields: [category_id], references: [id], onDelete: Cascade)
+  category_id  String
+
+  images       file[]
+}

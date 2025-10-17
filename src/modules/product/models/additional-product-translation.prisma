@@ -1,0 +1,10 @@
+
+
+model additional_product_translation {
+  id         String    @id @default(uuid())
+  lang       String   
+  title    String
+  additional_product    additional_product  @relation(fields: [additional_product_id], references: [id], onDelete: Cascade)
+  additional_product_id  String
+  created_at  DateTime  @default(now())
+}

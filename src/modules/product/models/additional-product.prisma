@@ -1,0 +1,12 @@
+
+
+model additional_product {
+  id         String    @id @default(uuid())
+  created_at  DateTime  @default(now())
+  price Float
+
+  translations    additional_product_translation[]
+
+  additional_product_group    additional_product_group   @relation(fields: [additional_product_group_id], references: [id], onDelete: Cascade)
+  additional_product_group_id  String
+}

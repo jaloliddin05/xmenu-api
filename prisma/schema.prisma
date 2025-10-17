@@ -14,7 +14,7 @@ model category_translation {
   id         String    @id @default(uuid())
   lang       String   
   title    String
- category    category  @relation(fields: [category_id], references: [id], onDelete: Cascade)
+  category    category  @relation(fields: [category_id], references: [id], onDelete: Cascade)
   category_id  String
   created_at  DateTime  @default(now())
 }
@@ -23,9 +23,13 @@ model category {
   created_at  DateTime  @default(now())
   isActive  Boolean? @default(true) 
   index            Int?
+
   translations    category_translation[]
+
   organization    organization   @relation(fields: [organization_id], references: [id], onDelete: Cascade)
   organization_id  String
+
+  products product[]
 }
 model employee {
   id    String    @id @default(uuid())
@@ -45,8 +49,13 @@ model employee {
   created_at             DateTime         @default(now())
 
   user                   user?
+
   organization_logo      organization?    @relation("OrganizationLogo")
+
   organization_banner    organization?    @relation("OrganizationBanner")
+
+  product             product?      @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  product_id          String?
 }
 
 model organization_translation {
@@ -84,6 +93,93 @@ model organization {
 
   banner_id    String?           @unique
   banner       file?             @relation("OrganizationBanner", fields: [banner_id], references: [id])
+}
+
+model additional_product_group_translation {
+  id         String    @id @default(uuid())
+  lang       String   
+  title    String
+  additional_product_group    additional_product_group  @relation(fields: [additional_product_group_id], references: [id], onDelete: Cascade)
+  additional_product_group_id  String
+  created_at  DateTime  @default(now())
+}
+
+enum additional_product_group_type {
+  checkbox
+  radio
+}
+
+
+model additional_product_group {
+  id         String    @id @default(uuid())
+  created_at  DateTime  @default(now())
+  is_required  Boolean? @default(false) 
+  type additional_product_group_type
+
+  translations    additional_product_group_translation[]
+
+  additional_products additional_product[]
+
+  product    product   @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  product_id  String
+}
+
+model additional_product_translation {
+  id         String    @id @default(uuid())
+  lang       String   
+  title    String
+  additional_product    additional_product  @relation(fields: [additional_product_id], references: [id], onDelete: Cascade)
+  additional_product_id  String
+  created_at  DateTime  @default(now())
+}
+
+model additional_product {
+  id         String    @id @default(uuid())
+  created_at  DateTime  @default(now())
+  price Float
+
+  translations    additional_product_translation[]
+
+  additional_product_group    additional_product_group   @relation(fields: [additional_product_group_id], references: [id], onDelete: Cascade)
+  additional_product_group_id  String
+}
+
+model product_translation {
+  id         String    @id @default(uuid())
+  lang       String   
+  title    String
+  description    String?
+  product    product  @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  product_id  String
+  created_at  DateTime  @default(now())
+}
+enum product_unit {
+  gr
+  ml
+}
+
+
+model product {
+  id         String    @id @default(uuid())
+  created_at  DateTime  @default(now())
+  isActive  Boolean? @default(true) 
+  index            Int?
+  price  Float
+  weight  Float?
+  protein Float?
+  kcal Float?
+  fat Float?
+  carbohydrate Float?
+  unit product_unit
+
+  translations    product_translation[]
+
+  additional_product_groups additional_product_group[]
+
+  category    category   @relation(fields: [category_id], references: [id], onDelete: Cascade)
+  category_id  String
+
+  images       file[]
 }
 model translation_prompt {
   id        Int      @id @default(autoincrement())
