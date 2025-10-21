@@ -4,6 +4,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../_prisma/prisma.service';
 import { FileService } from 'src/modules/file/file.service';
 import { CreateProductDto } from '../dto/create-product.dto';
+import MoveProductDto from '../dto/move-product.dto';
 
 @Injectable()
 export class ProductService {
@@ -135,6 +136,51 @@ export class ProductService {
     async update() {
 
     }
+
+    async moveProduct(dto: MoveProductDto) {
+    const { categoryId, productId, newIndex } = dto;
+
+    // 1. Avval eski indexni topamiz
+    const product = await this.prismaService.product.findUnique({
+      where: { id: productId },
+    });
+
+    if (!product) throw new Error('Product not found');
+
+    const oldIndex = product.index || 0;
+
+    if (oldIndex === newIndex) return product; // hech narsa o‘zgarmaydi
+
+    // 2. Agar pastdan yuqoriga ko‘tarilsa (masalan 10 → 3)
+    if (oldIndex > newIndex) {
+      await this.prismaService.product.updateMany({
+        where: {
+          category_id: categoryId,
+          index: { gte: newIndex, lt: oldIndex },
+        },
+        data: { index: { increment: 1 } }, // o‘rtadagilarni 1 taga oshiramiz
+      });
+    }
+
+    // 3. Agar yuqoridan pastga tushsa (masalan 3 → 10)
+    else {
+      await this.prismaService.product.updateMany({
+        where: {
+          category_id: categoryId,
+          index: { gt: oldIndex, lte: newIndex },
+        },
+        data: { index: { decrement: 1 } }, // o‘rtadagilarni 1 taga kamaytiramiz
+      });
+    }
+
+    // 4. O‘zi esa yangi indexga o‘tadi
+    const updated = await this.prismaService.product.update({
+      where: { id: productId },
+      data: { index: newIndex },
+    });
+
+    return updated;
+  }
 
     async updateIsActive(owner_id: string, isActive: boolean) {
         return await this.prismaService.organization.update({ where: { owner_id }, data: { isActive } })
