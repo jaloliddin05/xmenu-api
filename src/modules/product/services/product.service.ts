@@ -12,9 +12,12 @@ export class ProductService {
         private readonly fileService: FileService
     ) { }
 
-    async findAll(id: string, lang: string) {
+    async findAll(category_id: string, lang: string) {
+        const where:any = {}
+        category_id ? where['category_id'] = category_id : null;
+        
         const products = await this.prismaService.product.findMany({
-            where: { category_id: id },
+            where,
             include: {
                 translations: {
                     where: { lang },

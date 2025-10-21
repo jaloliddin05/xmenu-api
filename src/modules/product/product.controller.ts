@@ -11,7 +11,7 @@ import {
     UsePipes,
     ValidationPipe
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiConsumes } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiConsumes, ApiQuery } from '@nestjs/swagger';
 import { ProductService } from './services/product.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { FilesInterceptor } from '@nestjs/platform-express';
@@ -24,6 +24,7 @@ export class ProductController {
 
     @Get()
     @ApiOperation({ summary: 'Method: get all' })
+    @ApiQuery({ name: 'categoryId', required: false, description: 'uuid' })
     @HttpCode(HttpStatus.OK)
     async findAll(@Query('lang') lang: string,@Query('categoryId') categroryId: string) {
       return await this.productService.findAll(categroryId,lang);
