@@ -4,6 +4,7 @@ import {
     Get,
     HttpCode,
     HttpStatus,
+    Param,
     Patch,
     Post,
     Query,
@@ -12,7 +13,7 @@ import {
     UsePipes,
     ValidationPipe
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiConsumes, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiConsumes, ApiQuery, ApiBody } from '@nestjs/swagger';
 import { ProductService } from './services/product.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { FilesInterceptor } from '@nestjs/platform-express';
@@ -47,4 +48,24 @@ export class ProductController {
     async updateIndex(@Body() data: MoveProductDto) {
         return await this.productService.moveProduct(data);
     }
+
+      @Patch(':id/activate')
+      @ApiOperation({ summary: 'Method: activate/deactivate product' })
+      @ApiBody({
+        schema: {
+          type: 'object',
+          properties: {
+            isActive: {
+              type: 'boolean',
+              example: true,
+              description: 'Set true to activate, false to deactivate product',
+            },
+          },
+          required: ['isActive'],
+        },
+      })
+      @HttpCode(HttpStatus.OK)
+      async activateProduct(@Param('id') id: string, @Body('isActive') isActive: boolean) {
+        return await this.productService.updateIsActive(id, isActive);
+      }
 }

@@ -175,8 +175,8 @@ export class CategoryService {
     return updated;
   }
 
-  updateIsActive(id: string, isActive: boolean) {
-    return this.prismaService.category.update({ where: { id }, data: { isActive } })
+  async updateIsActive(id: string, isActive: boolean) {
+    return await this.prismaService.category.update({ where: { id }, data: { isActive } })
   }
 
   async delete(id: string) {

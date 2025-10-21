@@ -182,9 +182,9 @@ export class ProductService {
     return updated;
   }
 
-    async updateIsActive(owner_id: string, isActive: boolean) {
-        return await this.prismaService.organization.update({ where: { owner_id }, data: { isActive } })
-    }
+  async updateIsActive(id: string, isActive: boolean) {
+    return await this.prismaService.product.update({ where: { id }, data: { isActive } })
+  }
 
     async delete(id: string) {
         return await this.prismaService.organization.delete({ where: { id } })
