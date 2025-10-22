@@ -105,7 +105,7 @@ export class ProductService {
 async createGroup(dto: CreateAdditionalProductGroupDto) {
     return this.prismaService.additional_product_group.create({
       data: {
-        type: dto.type,
+        is_multiple: dto.is_multiple ?? false,
         is_required: dto.is_required ?? false,
         translations: {
           create: dto.translations.map((t) => ({

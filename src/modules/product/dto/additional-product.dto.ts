@@ -9,7 +9,6 @@ import {
   ValidateNested,
 } from "class-validator";
 import { Type } from "class-transformer";
-import { additional_product_group_type } from "@prisma/client";
 
 //
 // 🔹 1. Additional product translation DTO
@@ -60,9 +59,9 @@ export class CreateAdditionalProductGroupTranslationDto {
 // 🔹 4. Additional product group create DTO
 //
 export class CreateAdditionalProductGroupDto {
-  @ApiProperty({ example: "checkbox", enum: additional_product_group_type })
-  @IsEnum(additional_product_group_type)
-  readonly type: additional_product_group_type;
+  @ApiProperty({ example: true, required: false })
+  @IsBoolean()
+  readonly is_multiple: boolean;
 
   @ApiProperty({ example: false, required: false })
   @IsOptional()

@@ -104,17 +104,12 @@ model additional_product_group_translation {
   created_at  DateTime  @default(now())
 }
 
-enum additional_product_group_type {
-  checkbox
-  radio
-}
-
 
 model additional_product_group {
   id         String    @id @default(uuid())
   created_at  DateTime  @default(now())
   is_required  Boolean? @default(false) 
-  type additional_product_group_type
+  is_multiple Boolean? @default(false)
 
   translations    additional_product_group_translation[]
 
