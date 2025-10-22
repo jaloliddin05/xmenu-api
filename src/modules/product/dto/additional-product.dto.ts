@@ -1,9 +1,19 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { IsArray, IsBoolean, IsEnum, IsNumber, IsOptional, IsString, ValidateNested } from "class-validator";
+import {
+  IsArray,
+  IsBoolean,
+  IsEnum,
+  IsNumber,
+  IsOptional,
+  IsString,
+  ValidateNested,
+} from "class-validator";
 import { Type } from "class-transformer";
 import { additional_product_group_type } from "@prisma/client";
 
-// 1️⃣ Additional Product Translation DTO
+//
+// 🔹 1. Additional product translation DTO
+//
 export class CreateAdditionalProductTranslationDto {
   @ApiProperty({ example: "en" })
   @IsString()
@@ -14,8 +24,14 @@ export class CreateAdditionalProductTranslationDto {
   readonly title: string;
 }
 
-// 2️⃣ Additional Product DTO
+//
+// 🔹 2. Additional product create DTO
+//
 export class CreateAdditionalProductDto {
+  @ApiProperty({ example: "uuid-of-group" })
+  @IsString()
+  readonly additional_product_group_id: string;
+
   @ApiProperty({ example: 5000 })
   @IsNumber()
   readonly price: number;
@@ -27,7 +43,9 @@ export class CreateAdditionalProductDto {
   readonly translations: CreateAdditionalProductTranslationDto[];
 }
 
-// 3️⃣ Additional Product Group Translation DTO
+//
+// 🔹 3. Additional product group translation DTO
+//
 export class CreateAdditionalProductGroupTranslationDto {
   @ApiProperty({ example: "en" })
   @IsString()
@@ -38,7 +56,9 @@ export class CreateAdditionalProductGroupTranslationDto {
   readonly title: string;
 }
 
-// 4️⃣ Additional Product Group DTO
+//
+// 🔹 4. Additional product group create DTO
+//
 export class CreateAdditionalProductGroupDto {
   @ApiProperty({ example: "checkbox", enum: additional_product_group_type })
   @IsEnum(additional_product_group_type)
@@ -54,10 +74,4 @@ export class CreateAdditionalProductGroupDto {
   @ValidateNested({ each: true })
   @Type(() => CreateAdditionalProductGroupTranslationDto)
   readonly translations: CreateAdditionalProductGroupTranslationDto[];
-
-  @ApiProperty({ type: [CreateAdditionalProductDto] })
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => CreateAdditionalProductDto)
-  readonly additional_products: CreateAdditionalProductDto[];
 }

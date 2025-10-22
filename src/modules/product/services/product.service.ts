@@ -5,7 +5,7 @@ import { PrismaService } from '../../_prisma/prisma.service';
 import { FileService } from 'src/modules/file/file.service';
 import { CreateProductDto } from '../dto/create-product.dto';
 import MoveProductDto from '../dto/move-product.dto';
-import { CreateAdditionalProductGroupDto } from '../dto/additional-product.dto';
+import { CreateAdditionalProductDto, CreateAdditionalProductGroupDto } from '../dto/additional-product.dto';
 
 @Injectable()
 export class ProductService {
@@ -102,35 +102,47 @@ export class ProductService {
         });
     }
 
-    async createGroup(dto: CreateAdditionalProductGroupDto) {
-        return this.prismaService.additional_product_group.create({
-            data: {
-                type: dto.type,
-                is_required: dto.is_required ?? false,
-                translations: {
-                    create: dto.translations.map(t => ({
-                        lang: t.lang,
-                        title: t.title,
-                    })),
-                },
-                additional_products: {
-                    create: dto.additional_products.map(ap => ({
-                        price: ap.price,
-                        translations: {
-                            create: ap.translations.map(t => ({
-                                lang: t.lang,
-                                title: t.title,
-                            })),
-                        },
-                    })),
-                },
-            },
-            include: {
-                translations: true,
-                additional_products: { include: { translations: true } },
-            },
-        });
-    }
+async createGroup(dto: CreateAdditionalProductGroupDto) {
+    return this.prismaService.additional_product_group.create({
+      data: {
+        type: dto.type,
+        is_required: dto.is_required ?? false,
+        translations: {
+          create: dto.translations.map((t) => ({
+            lang: t.lang,
+            title: t.title,
+          })),
+        },
+      },
+      include: {
+        translations: true,
+      },
+    });
+  }
+
+  // 🔹 2. Additional Product yaratish
+  async createAdditionalProduct(dto: CreateAdditionalProductDto) {
+    return this.prismaService.additional_product.create({
+      data: {
+        price: dto.price,
+        additional_product_group: {
+          connect: { id: dto.additional_product_group_id },
+        },
+        translations: {
+          create: dto.translations.map((t) => ({
+            lang: t.lang,
+            title: t.title,
+          })),
+        },
+      },
+      include: {
+        translations: true,
+        additional_product_group: {
+          include: { translations: true },
+        },
+      },
+    });
+  }
 
 
     async update() {
