@@ -5,6 +5,7 @@ import { PrismaService } from '../../_prisma/prisma.service';
 import { FileService } from 'src/modules/file/file.service';
 import { CreateProductDto } from '../dto/create-product.dto';
 import MoveProductDto from '../dto/move-product.dto';
+import { CreateAdditionalProductGroupDto } from '../dto/additional-product.dto';
 
 @Injectable()
 export class ProductService {
@@ -14,9 +15,9 @@ export class ProductService {
     ) { }
 
     async findAll(category_id: string, lang: string) {
-        const where:any = {}
+        const where: any = {}
         category_id ? where['category_id'] = category_id : null;
-        
+
         const products = await this.prismaService.product.findMany({
             where,
             include: {
@@ -54,81 +55,80 @@ export class ProductService {
     async findById(id: string) { }
 
     async createProduct(dto: CreateProductDto) {
-        return await this.prismaService.$transaction(async (prisma) => {
-            // 🧮 Oxirgi productni index bo‘yicha topamiz
+        return this.prismaService.$transaction(async (prisma) => {
             const lastProduct = await prisma.product.findFirst({
                 where: { category_id: dto.category_id },
-                orderBy: { index: 'desc' },
+                orderBy: { index: "desc" },
                 select: { index: true },
             });
 
             const nextIndex = (lastProduct?.index || 0) + 1;
 
-            // 🏗️ Product yaratish
-            const newProduct = await prisma.product.create({
+            return prisma.product.create({
                 data: {
                     price: dto.price,
+                    unit: dto.unit,
                     weight: dto.weight,
-                    protein: dto.protein,
                     kcal: dto.kcal,
+                    protein: dto.protein,
                     fat: dto.fat,
                     carbohydrate: dto.carbohydrate,
-                    unit: dto.unit,
                     index: nextIndex,
-
                     category: { connect: { id: dto.category_id } },
-
                     translations: {
-                        create: dto.translations.map((t) => ({
+                        create: dto.translations.map(t => ({
                             lang: t.lang,
                             title: t.title,
                             description: t.description,
                         })),
                     },
-
-                    // ➕ additional_product_groups ni yaratish
-                    additional_product_groups: dto.additional_product_groups
+                    additional_product_groups: dto.additional_product_group_ids
                         ? {
-                            create: dto.additional_product_groups.map((group) => ({
-                                type: group.type,
-                                is_required: group.is_required ?? false,
-                                translations: {
-                                    create: group.translations.map((t) => ({
-                                        lang: t.lang,
-                                        title: t.title,
-                                    })),
-                                },
-                                additional_products: {
-                                    create: group.additional_products.map((ap) => ({
-                                        price: ap.price,
-                                        translations: {
-                                            create: ap.translations.map((t) => ({
-                                                lang: t.lang,
-                                                title: t.title,
-                                            })),
-                                        },
-                                    })),
-                                },
-                            })),
+                            connect: dto.additional_product_group_ids.map(id => ({ id })),
                         }
                         : undefined,
                 },
                 include: {
                     translations: true,
                     category: true,
-                    images: true,
                     additional_product_groups: {
                         include: {
                             translations: true,
-                            additional_products: {
-                                include: { translations: true },
-                            },
+                            additional_products: { include: { translations: true } },
                         },
                     },
                 },
             });
+        });
+    }
 
-            return newProduct;
+    async createGroup(dto: CreateAdditionalProductGroupDto) {
+        return this.prismaService.additional_product_group.create({
+            data: {
+                type: dto.type,
+                is_required: dto.is_required ?? false,
+                translations: {
+                    create: dto.translations.map(t => ({
+                        lang: t.lang,
+                        title: t.title,
+                    })),
+                },
+                additional_products: {
+                    create: dto.additional_products.map(ap => ({
+                        price: ap.price,
+                        translations: {
+                            create: ap.translations.map(t => ({
+                                lang: t.lang,
+                                title: t.title,
+                            })),
+                        },
+                    })),
+                },
+            },
+            include: {
+                translations: true,
+                additional_products: { include: { translations: true } },
+            },
         });
     }
 
@@ -138,53 +138,53 @@ export class ProductService {
     }
 
     async moveProduct(dto: MoveProductDto) {
-    const { categoryId, productId, newIndex } = dto;
+        const { categoryId, productId, newIndex } = dto;
 
-    // 1. Avval eski indexni topamiz
-    const product = await this.prismaService.product.findUnique({
-      where: { id: productId },
-    });
+        // 1. Avval eski indexni topamiz
+        const product = await this.prismaService.product.findUnique({
+            where: { id: productId },
+        });
 
-    if (!product) throw new Error('Product not found');
+        if (!product) throw new Error('Product not found');
 
-    const oldIndex = product.index || 0;
+        const oldIndex = product.index || 0;
 
-    if (oldIndex === newIndex) return product; // hech narsa o‘zgarmaydi
+        if (oldIndex === newIndex) return product; // hech narsa o‘zgarmaydi
 
-    // 2. Agar pastdan yuqoriga ko‘tarilsa (masalan 10 → 3)
-    if (oldIndex > newIndex) {
-      await this.prismaService.product.updateMany({
-        where: {
-          category_id: categoryId,
-          index: { gte: newIndex, lt: oldIndex },
-        },
-        data: { index: { increment: 1 } }, // o‘rtadagilarni 1 taga oshiramiz
-      });
+        // 2. Agar pastdan yuqoriga ko‘tarilsa (masalan 10 → 3)
+        if (oldIndex > newIndex) {
+            await this.prismaService.product.updateMany({
+                where: {
+                    category_id: categoryId,
+                    index: { gte: newIndex, lt: oldIndex },
+                },
+                data: { index: { increment: 1 } }, // o‘rtadagilarni 1 taga oshiramiz
+            });
+        }
+
+        // 3. Agar yuqoridan pastga tushsa (masalan 3 → 10)
+        else {
+            await this.prismaService.product.updateMany({
+                where: {
+                    category_id: categoryId,
+                    index: { gt: oldIndex, lte: newIndex },
+                },
+                data: { index: { decrement: 1 } }, // o‘rtadagilarni 1 taga kamaytiramiz
+            });
+        }
+
+        // 4. O‘zi esa yangi indexga o‘tadi
+        const updated = await this.prismaService.product.update({
+            where: { id: productId },
+            data: { index: newIndex },
+        });
+
+        return updated;
     }
 
-    // 3. Agar yuqoridan pastga tushsa (masalan 3 → 10)
-    else {
-      await this.prismaService.product.updateMany({
-        where: {
-          category_id: categoryId,
-          index: { gt: oldIndex, lte: newIndex },
-        },
-        data: { index: { decrement: 1 } }, // o‘rtadagilarni 1 taga kamaytiramiz
-      });
+    async updateIsActive(id: string, isActive: boolean) {
+        return await this.prismaService.product.update({ where: { id }, data: { isActive } })
     }
-
-    // 4. O‘zi esa yangi indexga o‘tadi
-    const updated = await this.prismaService.product.update({
-      where: { id: productId },
-      data: { index: newIndex },
-    });
-
-    return updated;
-  }
-
-  async updateIsActive(id: string, isActive: boolean) {
-    return await this.prismaService.product.update({ where: { id }, data: { isActive } })
-  }
 
     async delete(id: string) {
         return await this.prismaService.organization.delete({ where: { id } })

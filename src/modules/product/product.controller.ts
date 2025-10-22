@@ -19,6 +19,7 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { MulterStorage } from 'src/infra/helper/upload/multer-upload';
 import MoveProductDto from './dto/move-product.dto';
+import { CreateAdditionalProductGroupDto } from './dto/additional-product.dto';
 
 @ApiTags('Products')
 @Controller('products')
@@ -40,6 +41,14 @@ export class ProductController {
         @Body() dto: CreateProductDto,
     ) {
         return await this.productService.createProduct(dto);
+    }
+
+    @Post('/additional-product-group')
+    @ApiOperation({ summary: 'Create new additional product group' })
+    async createGroup(
+        @Body() dto: CreateAdditionalProductGroupDto,
+    ) {
+        return await this.productService.createGroup(dto);
     }
 
     @Patch('/index')

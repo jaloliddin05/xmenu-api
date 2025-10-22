@@ -16,6 +16,6 @@ model additional_product_group {
 
   additional_products additional_product[]
 
-  product    product   @relation(fields: [product_id], references: [id], onDelete: Cascade)
-  product_id  String
+  product    product?   @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  product_id  String?
 }
