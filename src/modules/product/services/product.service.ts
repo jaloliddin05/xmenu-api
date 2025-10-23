@@ -51,8 +51,24 @@ export class ProductService {
         }));
     }
 
-
-    async findById(id: string) { }
+    async findById(id: string) {
+        return await this.prismaService.product.findUnique({
+            where: { id },
+            include: {
+                translations: true,
+                category: true,
+                images: true,
+                additional_product_groups:{
+                    include:{
+                        translations:true,
+                        additional_products:{
+                            include:{translations:true}
+                        }
+                    }
+                }
+            },
+        });
+    }
 
     async createProduct(dto: CreateProductDto) {
         return this.prismaService.$transaction(async (prisma) => {
@@ -101,49 +117,6 @@ export class ProductService {
             });
         });
     }
-
-async createGroup(dto: CreateAdditionalProductGroupDto) {
-    return this.prismaService.additional_product_group.create({
-      data: {
-        is_multiple: dto.is_multiple ?? false,
-        is_required: dto.is_required ?? false,
-        translations: {
-          create: dto.translations.map((t) => ({
-            lang: t.lang,
-            title: t.title,
-          })),
-        },
-      },
-      include: {
-        translations: true,
-      },
-    });
-  }
-
-  // 🔹 2. Additional Product yaratish
-  async createAdditionalProduct(dto: CreateAdditionalProductDto) {
-    return this.prismaService.additional_product.create({
-      data: {
-        price: dto.price,
-        additional_product_group: {
-          connect: { id: dto.additional_product_group_id },
-        },
-        translations: {
-          create: dto.translations.map((t) => ({
-            lang: t.lang,
-            title: t.title,
-          })),
-        },
-      },
-      include: {
-        translations: true,
-        additional_product_group: {
-          include: { translations: true },
-        },
-      },
-    });
-  }
-
 
     async update() {
 

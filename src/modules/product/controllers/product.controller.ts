@@ -14,15 +14,14 @@ import {
   ValidationPipe
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiConsumes, ApiQuery, ApiBody } from '@nestjs/swagger';
-import { ProductService } from './services/product.service';
-import { CreateProductDto } from './dto/create-product.dto';
+import { ProductService } from '../services/product.service';
+import { CreateProductDto } from '../dto/create-product.dto';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { MulterStorage } from 'src/infra/helper/upload/multer-upload';
-import MoveProductDto from './dto/move-product.dto';
-import { CreateAdditionalProductDto, CreateAdditionalProductGroupDto } from './dto/additional-product.dto';
+import MoveProductDto from '../dto/move-product.dto';
 
-@ApiTags('Products')
-@Controller('products')
+@ApiTags('Product')
+@Controller('product')
 export class ProductController {
   constructor(private readonly productService: ProductService) { }
 
@@ -34,6 +33,13 @@ export class ProductController {
     return await this.productService.findAll(categroryId, lang);
   }
 
+  @Get('/:id')
+  @ApiOperation({ summary: 'Method: get one' })
+  @HttpCode(HttpStatus.OK)
+  async findOne( @Param('id') id: string) {
+    return await this.productService.findById(id);
+  }
+
 
   @Post()
   @ApiOperation({ summary: 'Create new product with translations and options' })
@@ -41,22 +47,6 @@ export class ProductController {
     @Body() dto: CreateProductDto,
   ) {
     return await this.productService.createProduct(dto);
-  }
-
-  @Post('/additional-product-group')
-  @ApiOperation({ summary: 'Create new additional product group' })
-  async createAdditionalProductGroup(
-    @Body() dto: CreateAdditionalProductGroupDto,
-  ) {
-    return await this.productService.createGroup(dto);
-  }
-
-  @Post('/additional-product')
-  @ApiOperation({ summary: 'Create new additional product' })
-  async createAdditionalProduct(
-    @Body() dto: CreateAdditionalProductDto,
-  ) {
-    return await this.productService.createAdditionalProduct(dto);
   }
 
   @Patch('/index')
