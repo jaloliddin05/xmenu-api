@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -74,5 +75,12 @@ export class ProductController {
   @HttpCode(HttpStatus.OK)
   async activateProduct(@Param('id') id: string, @Body('isActive') isActive: boolean) {
     return await this.productService.updateIsActive(id, isActive);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Method: delete' })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async remove(@Param('id') id: string) {
+    return await this.productService.delete(id);
   }
 }

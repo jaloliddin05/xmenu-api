@@ -172,7 +172,7 @@ export class ProductService {
     }
 
     async delete(id: string) {
-        return await this.prismaService.organization.delete({ where: { id } })
+        return await this.prismaService.product.delete({ where: { id } })
     }
 
     // async handleUploadedImages(files?: Express.Multer.File[]): Promise<string[]> {
