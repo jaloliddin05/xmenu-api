@@ -6,6 +6,7 @@ import { FileService } from 'src/modules/file/file.service';
 import { CreateProductDto } from '../dto/create-product.dto';
 import MoveProductDto from '../dto/move-product.dto';
 import { CreateAdditionalProductDto, CreateAdditionalProductGroupDto } from '../dto/additional-product.dto';
+import { UpdateProductDto } from '../dto/update-product.dto';
 
 @Injectable()
 export class ProductService {
@@ -118,9 +119,63 @@ export class ProductService {
         });
     }
 
-    async update() {
+async updateProduct(id: string, dto: UpdateProductDto) {
+  return this.prismaService.$transaction(async (prisma) => {
+    const existingProduct = await prisma.product.findUnique({
+      where: { id },
+      include: {
+        translations: true,
+        additional_product_groups: true,
+      },
+    });
 
+    if (!existingProduct) {
+      throw new Error("Product not found");
     }
+
+    // Translationlar yangilanishi
+    if (dto.translations && dto.translations.length > 0) {
+      for (const t of dto.translations) {
+        await prisma.product_translation.update({
+          where: { id: t.id },
+          data: {
+            lang: t.lang,
+            title: t.title,
+            description: t.description,
+          },
+        });
+      }
+    }
+
+    // Product asosiy ma’lumotlarini yangilash
+    const updatedProduct = await prisma.product.update({
+      where: { id },
+      data: {
+        price: dto.price,
+        unit: dto.unit,
+        weight: dto.weight,
+        kcal: dto.kcal,
+        protein: dto.protein,
+        fat: dto.fat,
+        carbohydrate: dto.carbohydrate,
+        category: dto.category_id ? { connect: { id: dto.category_id } } : undefined,
+      },
+      include: {
+        translations: true,
+        category: true,
+        additional_product_groups: {
+          include: {
+            translations: true,
+            additional_products: { include: { translations: true } },
+          },
+        },
+      },
+    });
+
+    return updatedProduct;
+  });
+}
+
 
     async moveProduct(dto: MoveProductDto) {
         const { categoryId, productId, newIndex } = dto;

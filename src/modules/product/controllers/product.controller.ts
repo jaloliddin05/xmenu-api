@@ -8,6 +8,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   UploadedFiles,
   UseInterceptors,
@@ -20,6 +21,7 @@ import { CreateProductDto } from '../dto/create-product.dto';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { MulterStorage } from 'src/infra/helper/upload/multer-upload';
 import MoveProductDto from '../dto/move-product.dto';
+import { UpdateProductDto } from '../dto/update-product.dto';
 
 @ApiTags('Product')
 @Controller('product')
@@ -48,6 +50,12 @@ export class ProductController {
     @Body() dto: CreateProductDto,
   ) {
     return await this.productService.createProduct(dto);
+  }
+
+  @Put('/:id')
+  @ApiOperation({ summary: 'Update existing product' })
+  async update(@Param('id') id: string, @Body() dto: UpdateProductDto) {
+    return await this.productService.updateProduct(id, dto);
   }
 
   @Patch('/index')
