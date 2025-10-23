@@ -10,22 +10,31 @@ export class AdditionalProductService {
     ) { }
 
 async createGroup(dto: CreateAdditionalProductGroupDto) {
-    return this.prismaService.additional_product_group.create({
-      data: {
-        is_multiple: dto.is_multiple ?? false,
-        is_required: dto.is_required ?? false,
-        translations: {
-          create: dto.translations.map((t) => ({
-            lang: t.lang,
-            title: t.title,
-          })),
-        },
-      },
-      include: {
-        translations: true,
-      },
-    });
+  const data: any = {
+    is_multiple: dto.is_multiple ?? false,
+    is_required: dto.is_required ?? false,
+    translations: {
+      create: dto.translations.map((t) => ({
+        lang: t.lang,
+        title: t.title,
+      })),
+    },
+  };
+
+  // Agar product_id kelsa — shunda bog‘laymiz
+  if (dto.product_id) {
+    data.product = {
+      connect: { id: dto.product_id },
+    };
   }
+
+  return this.prismaService.additional_product_group.create({
+    data,
+    include: {
+      translations: true,
+    },
+  });
+}
 
   // 🔹 2. Additional Product yaratish
   async createAdditionalProduct(dto: CreateAdditionalProductDto) {

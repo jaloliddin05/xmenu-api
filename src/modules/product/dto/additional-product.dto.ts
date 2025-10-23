@@ -68,6 +68,10 @@ export class CreateAdditionalProductGroupDto {
   @IsBoolean()
   readonly is_required?: boolean;
 
+  @ApiProperty({ example: 'uuid', required: false })
+  @IsString()
+  readonly product_id?: string;
+
   @ApiProperty({ type: [CreateAdditionalProductGroupTranslationDto] })
   @IsArray()
   @ValidateNested({ each: true })
