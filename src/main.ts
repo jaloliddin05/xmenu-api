@@ -26,10 +26,10 @@ async function bootstrap() {
     }),
   );
 
-  // const reflector = app.get(Reflector);
-  // app.useGlobalGuards(
-  //   new AccessTokenUserGuard(reflector),
-  // );
+  const reflector = app.get(Reflector);
+  app.useGlobalGuards(
+    new AccessTokenUserGuard(reflector),
+  );
 
   const config = new DocumentBuilder()
     .setTitle('My Teacher')
