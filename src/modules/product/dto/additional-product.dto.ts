@@ -69,6 +69,7 @@ export class CreateAdditionalProductGroupDto {
   readonly is_required?: boolean;
 
   @ApiProperty({ example: 'uuid', required: false })
+  @IsOptional()
   @IsString()
   readonly product_id?: string;
 
