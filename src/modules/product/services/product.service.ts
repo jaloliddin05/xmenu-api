@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 
 
 import { PrismaService } from '../../_prisma/prisma.service';
@@ -230,6 +230,36 @@ async updateProduct(id: string, dto: UpdateProductDto) {
         return await this.prismaService.product.delete({ where: { id } })
     }
 
+    async addProductImages(productId: string, images: Express.Multer.File[]) {
+    // 🔸 1. Productni tekshirish
+    const product = await this.prismaService.product.findUnique({
+      where: { id: productId },
+    });
+    if (!product) throw new NotFoundException('Product not found');
+
+    // 🔸 2. Har bir rasmni FileService orqali yuklab olish
+    const uploadedFiles:any = [];
+    for (const image of images) {
+      const file = await this.uploadImage(image);
+      uploadedFiles.push(file);
+    }
+
+    // 🔸 3. Yuklangan fayllarni product bilan bog‘lash
+    await this.prismaService.product.update({
+      where: { id: productId },
+      data: {
+        images: {
+          connect: uploadedFiles.map((file) => ({ id: file.id })),
+        },
+      },
+    });
+
+    return {
+      message: 'Images successfully uploaded and linked to product',
+      images: uploadedFiles,
+    };
+  }
+
     // async handleUploadedImages(files?: Express.Multer.File[]): Promise<string[]> {
     //     const image_ids: string[] = [];
     //     if (files?.length) {
@@ -241,10 +271,10 @@ async updateProduct(id: string, dto: UpdateProductDto) {
     //     return image_ids;
     // }
 
-    // async uploadImage(file: Express.Multer.File) {
-    //     const image = await this.fileService.uploadFile(file);
-    //     return image;
-    // }
+    async uploadImage(file: Express.Multer.File) {
+        const image = await this.fileService.uploadFile(file);
+        return image;
+    }
 
     // async updateImage(file: Express.Multer.File, id: string, type: 'logo' | 'banner') {
     //     const data = await this.findById(id);
