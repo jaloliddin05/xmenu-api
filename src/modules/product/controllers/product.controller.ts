@@ -109,4 +109,11 @@ export class ProductController {
   async remove(@Param('id') id: string) {
     return await this.productService.delete(id);
   }
+
+  @Delete('/image/:id')
+  @ApiOperation({ summary: 'Method: delete image' })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async removeImage(@Param('id') id: string) {
+    return await this.productService.deleteImage(id);
+  }
 }

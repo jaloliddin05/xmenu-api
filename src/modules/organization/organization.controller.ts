@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Body, Param, Delete, Put, HttpCode, HttpStatus, UseInterceptors, UploadedFiles } from '@nestjs/common';
-import { ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { OrganizationService } from './services/organization.service';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { MulterStorage } from 'src/infra/helper/upload/multer-upload';
@@ -22,6 +22,33 @@ export class OrganizationController {
   @HttpCode(HttpStatus.OK)
   async findOne(@Param('id') id: string) {
     return await this.organizationService.findOne(id);
+  }
+
+  @Get('/slug/:slug')
+  @ApiOperation({ summary: 'Method: get one' })
+  @HttpCode(HttpStatus.OK)
+  async findOneBySlug(@Param('slug') slug: string) {
+    return await this.organizationService.findBySlug(slug);
+  }
+
+  @Post('check-slug')
+  @ApiOperation({ summary: 'Slug mavjudligini tekshirish' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        slug: {
+          type: 'string',
+          example: 'burger-king',
+          description: 'Tekshiriladigan slug nomi',
+        },
+      },
+      required: ['slug'],
+    },
+  })
+  async checkSlug(@Body('slug') slug: string) {
+    const exists = await this.organizationService.isSlugExists(slug);
+    return { exists };
   }
 
   @Put('/:id')

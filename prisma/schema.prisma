@@ -77,6 +77,7 @@ enum OrganizationType {
 model organization {
   id           String            @id @default(uuid())
   name         String
+  slug         String?           @unique
   type         OrganizationType  @default(Other)
   isActive     Boolean           @default(false)
   url          String?
