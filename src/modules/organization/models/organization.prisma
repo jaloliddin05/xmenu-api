@@ -9,6 +9,7 @@ enum OrganizationType {
 
 model organization {
   id           String            @id @default(uuid())
+  int_id       Int               @unique @default(autoincrement())
   name         String
   slug         String?           @unique
   type         OrganizationType  @default(Other)

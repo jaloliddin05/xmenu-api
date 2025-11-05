@@ -54,9 +54,19 @@ export class OrganizationService {
     return await this.prismaService.organization.findMany()
   }
 
-  async findOne(id: string) {
-    return await this.prismaService.organization.findUnique({ where: { id } })
+async findOne(id: string) {
+  const isNumber = !isNaN(Number(id));
+
+  if (isNumber) {
+    return await this.prismaService.organization.findUnique({
+      where: { int_id: Number(id) },
+    });
+  } else {
+    return await this.prismaService.organization.findUnique({
+      where: { id },
+    });
   }
+}
 
   async findBySlug(slug: string) {
     return await this.prismaService.organization.findUnique({ 
