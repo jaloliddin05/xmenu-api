@@ -32,9 +32,16 @@ export class ProductController {
   @Get()
   @ApiOperation({ summary: 'Method: get all' })
   @ApiQuery({ name: 'categoryId', required: false, description: 'uuid' })
+  @ApiQuery({ name: 'isActive', required: false, description: 'true' })
+  @ApiQuery({ name: 'title', required: false, description: '' })
   @HttpCode(HttpStatus.OK)
-  async findAll(@Query('lang') lang: string, @Query('categoryId') categroryId: string) {
-    return await this.productService.findAll(categroryId, lang);
+  async findAll(
+    @Query('lang') lang: string, 
+    @Query('categoryId') categoryId: string,
+    @Query('isActive') isActive: string,
+    @Query('title') title: string,
+  ) {
+    return await this.productService.findAll(categoryId, lang,isActive,title);
   }
 
   @Get('/:id')

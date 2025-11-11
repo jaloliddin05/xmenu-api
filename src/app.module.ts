@@ -11,6 +11,7 @@ import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 import { FileModule } from './modules/file/file.module';
 import { ProductModule } from './modules/product/product.module';
+import { ApplicationModule } from './modules/application-form/application.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -21,6 +22,7 @@ import { ProductModule } from './modules/product/product.module';
      ServeStaticModule.forRoot({
       rootPath: join(process.cwd(), 'uploads'),
     }),
+    ApplicationModule,
     AuthModule,
     CategoryModule,
     FileModule,

@@ -24,3 +24,22 @@ export async function sendUserPassword(password: string,phone, firstName, lastNa
 
   return password;
 }
+
+
+export async function sendApplicationToTelegram(data: {
+  fullName?: string;
+  phone?: string;
+  from?: string;
+  tarif?: string;
+  description?: string;
+}) {
+  let message = `📝 *Yangi zayavka!*`;
+
+  if (data.fullName) message += `\n👤 Ism: *${data.fullName}*`;
+  if (data.phone) message += `\n📞 Telefon: *${data.phone}*`;
+  if (data.from) message += `\n📍 Qayerdan: *${data.from}*`;
+  if (data.tarif) message += `\n💰 Tarif: *${data.tarif}*`;
+  if (data.description) message += `\n🗒️ Izoh: ${data.description}`;
+
+  await bot.sendMessage(CHAT_ID, message, { parse_mode: 'Markdown' });
+}

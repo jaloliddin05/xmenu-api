@@ -9,6 +9,19 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+enum ApplicationFrom {
+  admin
+  web
+}
+
+model application {
+  id         String           @id @default(uuid())
+  fullName   String?
+  phone      String?
+  from       ApplicationFrom
+  description String?          // qo‘shimcha maydon (agar kerak bo‘lsa)
+  created_at DateTime          @default(now())
+}
 
 model category_translation {
   id         String    @id @default(uuid())

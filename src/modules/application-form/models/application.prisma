@@ -1,0 +1,13 @@
+enum ApplicationFrom {
+  admin
+  web
+}
+
+model application {
+  id         String           @id @default(uuid())
+  fullName   String?
+  phone      String?
+  from       ApplicationFrom
+  description String?          // qo‘shimcha maydon (agar kerak bo‘lsa)
+  created_at DateTime          @default(now())
+}

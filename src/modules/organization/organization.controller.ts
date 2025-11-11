@@ -4,6 +4,7 @@ import { OrganizationService } from './services/organization.service';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { MulterStorage } from 'src/infra/helper/upload/multer-upload';
 import UpdateOrganizationDto from './dto/update-organization.dto';
+import { Public } from '../auth/decorators/public.decorator';
 
 @ApiTags('Organization')
 @Controller('organization')
@@ -17,6 +18,7 @@ export class OrganizationController {
     return await this.organizationService.findAll();
   }
 
+  @Public()
   @Get(':id')
   @ApiOperation({ summary: 'Method: get one' })
   @HttpCode(HttpStatus.OK)
@@ -24,6 +26,7 @@ export class OrganizationController {
     return await this.organizationService.findOne(id);
   }
 
+  @Public()
   @Get('/slug/:slug')
   @ApiOperation({ summary: 'Method: get one' })
   @HttpCode(HttpStatus.OK)
