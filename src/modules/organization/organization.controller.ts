@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Delete, Put, HttpCode, HttpStatus, UseInterceptors, UploadedFiles } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Delete, Put, HttpCode, HttpStatus, UseInterceptors, UploadedFiles, Query } from '@nestjs/common';
 import { ApiBody, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { OrganizationService } from './services/organization.service';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
@@ -18,7 +18,6 @@ export class OrganizationController {
     return await this.organizationService.findAll();
   }
 
-  @Public()
   @Get(':id')
   @ApiOperation({ summary: 'Method: get one' })
   @HttpCode(HttpStatus.OK)
@@ -27,11 +26,20 @@ export class OrganizationController {
   }
 
   @Public()
+  @Get('return-slug/:id')
+  @ApiOperation({ summary: 'Method: get slug' })
+  @HttpCode(HttpStatus.OK)
+  async getSlugById(@Param('id') id: string) {
+    const organization = await this.organizationService.findOne(id);
+    return organization?.slug;
+  }
+
+  @Public()
   @Get('/slug/:slug')
   @ApiOperation({ summary: 'Method: get one' })
   @HttpCode(HttpStatus.OK)
-  async findOneBySlug(@Param('slug') slug: string) {
-    return await this.organizationService.findBySlug(slug);
+  async findOneBySlug(@Param('slug') slug: string, @Query('lang') lang: string) {
+    return await this.organizationService.findBySlug(slug,lang);
   }
 
   @Post('check-slug')

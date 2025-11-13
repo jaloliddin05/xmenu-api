@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { OrganizationType } from '@prisma/client';
 
 
@@ -15,88 +15,140 @@ export class OrganizationService {
     private readonly fileService: FileService
   ) { }
 
-  async create(data: CreateOrganizationDto, owner_id: string) {
-    const organization = await this.prismaService.organization.findUnique({
+async create(data: CreateOrganizationDto, owner_id: string) {
+    const existingOrg = await this.prismaService.organization.findUnique({
       where: { owner_id },
     });
 
-    // type ni enum ga moslashtiramiz
     const type = parseOrganizationType(data.type);
-
-    // slug yaratamiz
     const slug = await this.generateUniqueSlug(data.name);
 
-    if (organization) {
-      // agar organization bor bo‘lsa, update qilamiz
-      const updatedOrganization = await this.prismaService.organization.update({
-        where: { id: organization.id },
+    // 🔁 agar organization allaqachon bor bo‘lsa — update qilamiz
+    if (existingOrg) {
+      const updatedOrg = await this.prismaService.organization.update({
+        where: { id: existingOrg.id },
         data: {
           ...data,
           slug,
           type,
         },
       });
-      return updatedOrganization;
+      return updatedOrg;
     }
 
-    // yangi organization yaratish
-    return await this.prismaService.organization.create({
+    // 🌍 organization yaratilganda 3 tilda translation create qilish
+    const organization = await this.prismaService.organization.create({
       data: {
         ...data,
         slug,
         type,
         owner_id,
+        translations: {
+          create: [
+            {
+              lang: 'uz',
+              description: '',
+            },
+            {
+              lang: 'en',
+              description: '',
+            },
+            {
+              lang: 'ru',
+              description: '',
+            },
+          ],
+        },
+      },
+      include: {
+        translations: true,
       },
     });
+
+    return organization;
   }
 
   async findAll() {
     return await this.prismaService.organization.findMany()
   }
 
-async findOne(id: string) {
-  const isNumber = !isNaN(Number(id));
+  async findOne(id: string) {
+    console.log(id);
+    
+    const isNumber = !isNaN(Number(id));
+    let organization
 
-  if (isNumber) {
-    return await this.prismaService.organization.findUnique({
-      where: { int_id: Number(id) },
-    });
-  } else {
-    return await this.prismaService.organization.findUnique({
-      where: { id },
-    });
+    if (isNumber) {
+      organization = await this.prismaService.organization.findUnique({
+        where: { int_id: Number(id) },
+      });
+    } else {
+      organization = await this.prismaService.organization.findUnique({
+        where: { id },
+      });
+    }
+
+      console.log(organization);
+      
+
+      if (!organization) {
+        throw new NotFoundException(`Organization not found`);
+      }
+
+      return organization;
   }
-}
 
-  async findBySlug(slug: string) {
-    return await this.prismaService.organization.findUnique({ 
+  async findBySlug(slug: string, lang) {
+    const organization = await this.prismaService.organization.findUnique({
       where: { slug },
-      include:{
+      include: {
         logo: true,
         banner: true,
-        translations: true,
+        translations: {
+          where: { lang },
+          select: { id: true, lang: true, description: true }
+        },
         categories: {
           include: {
-            translations: true,
+            translations: {
+              where: { lang },
+              select: { id: true, lang: true, title: true }
+            },
             products: {
               include: {
-                translations: true,
+                images: true,
+                translations: {
+                  where: { lang },
+                  select: { id: true, lang: true, title: true, description: true }
+                },
                 additional_product_groups: {
                   include: {
-                    translations: true,
+                    translations: {
+                      where: { lang },
+                      select: { id: true, lang: true, title: true, }
+                    },
                     additional_products: {
                       include: {
-                        translations: true
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      } 
-    })
+                        translations: {
+                          where: { lang },
+                          select: { id: true, lang: true, title: true }
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!organization) {
+      throw new NotFoundException(`Organization with slug "${slug}" not found`);
+    }
+
+    return organization;
   }
 
   async findById(id: string) {
@@ -109,68 +161,68 @@ async findOne(id: string) {
     return organization
   }
 
-async update(
-  id: string,
-  data: UpdateOrganizationDto,
-  logo?: Express.Multer.File,
-  banner?: Express.Multer.File,
-) {
-  const files: any = {};
+  async update(
+    id: string,
+    data: UpdateOrganizationDto,
+    logo?: Express.Multer.File,
+    banner?: Express.Multer.File,
+  ) {
+    const files: any = {};
 
-  // 1️⃣ logo va banner
-  if (logo) {
-    const newLogo = await this.updateImage(logo, id, 'logo');
-    files.logo_id = newLogo.id;
-  }
-
-  if (banner) {
-    const newBanner = await this.updateImage(banner, id, 'banner');
-    files.banner_id = newBanner.id;
-  }
-
-  // 2️⃣ mavjud organization ni topamiz
-  const existing = await this.prismaService.organization.findUnique({ where: { id } });
-  if (!existing) throw new Error('Organization not found');
-
-  // 3️⃣ type ni moslashtirish
-  if (data.type) data.type = parseOrganizationType(data.type);
-
-  // 4️⃣ agar name o‘zgargan bo‘lsa, slug qayta generatsiya qilamiz
-  let slug = existing.slug;
-  if (data.name && data.name !== existing.name) {
-    slug = await this.generateUniqueSlug(data.name, id);
-  }
-
-  // 5️⃣ asosiy organization yangilash
-  const updatedOrg = await this.prismaService.organization.update({
-    where: { id },
-    data: { ...data, slug, ...files },
-    include: { logo: true, banner: true },
-  });
-
-  // 6️⃣ translations ni yangilash
-  if (data.translations?.length) {
-    for (const t of data.translations) {
-      await this.prismaService.organization_translation.update({
-        where: { id: t.id },
-        data: {
-          lang: t.lang,
-          description: t.description,
-        },
-      });
+    // 1️⃣ logo va banner
+    if (logo) {
+      const newLogo = await this.updateImage(logo, id, 'logo');
+      files.logo_id = newLogo.id;
     }
-  }
 
-  // 7️⃣ yangilangan ma’lumotni qaytarish
-  return await this.prismaService.organization.findUnique({
-    where: { id },
-    include: {
-      logo: true,
-      banner: true,
-      translations: true,
-    },
-  });
-}
+    if (banner) {
+      const newBanner = await this.updateImage(banner, id, 'banner');
+      files.banner_id = newBanner.id;
+    }
+
+    // 2️⃣ mavjud organization ni topamiz
+    const existing = await this.prismaService.organization.findUnique({ where: { id } });
+    if (!existing) throw new Error('Organization not found');
+
+    // 3️⃣ type ni moslashtirish
+    if (data.type) data.type = parseOrganizationType(data.type);
+
+    // 4️⃣ agar name o‘zgargan bo‘lsa, slug qayta generatsiya qilamiz
+    let slug = existing.slug;
+    if (data.name && data.name !== existing.name) {
+      slug = await this.generateUniqueSlug(data.name, id);
+    }
+
+    // 5️⃣ asosiy organization yangilash
+    const updatedOrg = await this.prismaService.organization.update({
+      where: { id },
+      data: { ...data, slug, ...files },
+      include: { logo: true, banner: true },
+    });
+
+    // 6️⃣ translations ni yangilash
+    if (data.translations?.length) {
+      for (const t of data.translations) {
+        await this.prismaService.organization_translation.update({
+          where: { id: t.id },
+          data: {
+            lang: t.lang,
+            description: t.description,
+          },
+        });
+      }
+    }
+
+    // 7️⃣ yangilangan ma’lumotni qaytarish
+    return await this.prismaService.organization.findUnique({
+      where: { id },
+      include: {
+        logo: true,
+        banner: true,
+        translations: true,
+      },
+    });
+  }
 
 
   async updateIsActive(owner_id: string, isActive: boolean) {
