@@ -50,7 +50,8 @@ export class ProductService {
         images: true,
       },
       orderBy:{
-        index: "asc"
+        index: "asc",
+        created_at:"asc"
       }
     });
 
