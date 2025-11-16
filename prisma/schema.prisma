@@ -34,7 +34,7 @@ model category_translation {
 model category {
   id         String    @id @default(uuid())
   created_at  DateTime  @default(now())
-  isActive  Boolean? @default(true) 
+  is_active  Boolean? @default(true) 
   index            Int?
 
   translations    category_translation[]
@@ -93,7 +93,7 @@ model organization {
   name         String
   slug         String?           @unique
   type         OrganizationType  @default(Other)
-  isActive     Boolean           @default(false)
+  is_active     Boolean           @default(false)
   url          String?
   created_at   DateTime          @default(now())
   translations organization_translation[]
@@ -172,7 +172,7 @@ enum product_unit {
 model product {
   id         String    @id @default(uuid())
   created_at  DateTime  @default(now())
-  isActive  Boolean? @default(true) 
+  is_active  Boolean? @default(true) 
   index            Int?
   price  Float
   weight  Float?

@@ -55,12 +55,12 @@ export class CategoryController {
           description: 'Set true to activate, false to deactivate category',
         },
       },
-      required: ['isActive'],
+      required: ['is_active'],
     },
   })
   @HttpCode(HttpStatus.OK)
-  async activateCategory(@Param('id') id: string, @Body('isActive') isActive: boolean) {
-    return await this.categoryService.updateIsActive(id, isActive);
+  async activateCategory(@Param('id') id: string, @Body('is_active') is_active: boolean) {
+    return await this.categoryService.updateIsActive(id, is_active);
   }
 
   @Patch('/index')

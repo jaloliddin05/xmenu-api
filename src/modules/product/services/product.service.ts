@@ -58,7 +58,7 @@ export class ProductService {
     return products.map(p => ({
       id: p.id,
       index: p.index,
-      isActive: p.isActive,
+      is_active: p.is_active,
       price: p.price,
       product_title: p.translations[0]?.title || null,
       category_id: p.category.id,
@@ -237,8 +237,8 @@ export class ProductService {
     return updated;
   }
 
-  async updateIsActive(id: string, isActive: boolean) {
-    return await this.prismaService.product.update({ where: { id }, data: { isActive } })
+  async updateIsActive(id: string, is_active: boolean) {
+    return await this.prismaService.product.update({ where: { id }, data: { is_active } })
   }
 
   async delete(id: string) {

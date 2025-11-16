@@ -59,7 +59,7 @@ export class CategoryService {
 
     return categories.map(c => ({
       id: c.id,
-      isActive: c.isActive,
+      is_active: c.is_active,
       index: c.index,
       translation: c.translations[0] || null
     }));
@@ -67,7 +67,7 @@ export class CategoryService {
 
   async getForSelect(organizationId: string, lang:string) {
     const categories = await this.prismaService.category.findMany({
-      where: { organization_id: organizationId, isActive: true },
+      where: { organization_id: organizationId, is_active: true },
       include: {
         translations: {
           where: { lang },
@@ -175,8 +175,8 @@ export class CategoryService {
     return updated;
   }
 
-  async updateIsActive(id: string, isActive: boolean) {
-    return await this.prismaService.category.update({ where: { id }, data: { isActive } })
+  async updateIsActive(id: string, is_active: boolean) {
+    return await this.prismaService.category.update({ where: { id }, data: { is_active } })
   }
 
   async delete(id: string) {

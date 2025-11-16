@@ -85,12 +85,12 @@ export class ProductController {
           description: 'Set true to activate, false to deactivate product',
         },
       },
-      required: ['isActive'],
+      required: ['is_active'],
     },
   })
   @HttpCode(HttpStatus.OK)
-  async activateProduct(@Param('id') id: string, @Body('isActive') isActive: boolean) {
-    return await this.productService.updateIsActive(id, isActive);
+  async activateProduct(@Param('id') id: string, @Body('is_active') is_active: boolean) {
+    return await this.productService.updateIsActive(id, is_active);
   }
 
   @Patch('/:id/images')

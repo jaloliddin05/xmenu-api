@@ -2,7 +2,7 @@
 model category {
   id         String    @id @default(uuid())
   created_at  DateTime  @default(now())
-  isActive  Boolean? @default(true) 
+  is_active  Boolean? @default(true) 
   index            Int?
 
   translations    category_translation[]

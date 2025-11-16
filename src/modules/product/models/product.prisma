@@ -8,7 +8,7 @@ enum product_unit {
 model product {
   id         String    @id @default(uuid())
   created_at  DateTime  @default(now())
-  isActive  Boolean? @default(true) 
+  is_active  Boolean? @default(true) 
   index            Int?
   price  Float
   weight  Float?

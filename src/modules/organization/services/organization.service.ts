@@ -73,8 +73,6 @@ async create(data: CreateOrganizationDto, owner_id: string) {
   }
 
   async findOne(id: string) {
-    console.log(id);
-    
     const isNumber = !isNaN(Number(id));
     let organization
 
@@ -98,40 +96,65 @@ async create(data: CreateOrganizationDto, owner_id: string) {
       return organization;
   }
 
-  async findBySlug(slug: string, lang) {
-    const organization = await this.prismaService.organization.findUnique({
-      where: { slug },
-      include: {
-        logo: true,
-        banner: true,
-        translations: {
-          where: { lang },
-          select: { id: true, lang: true, description: true }
-        },
-        categories: {
-          include: {
-            translations: {
-              where: { lang },
-              select: { id: true, lang: true, title: true }
-            },
-            products: {
-              include: {
-                images: true,
-                translations: {
-                  where: { lang },
-                  select: { id: true, lang: true, title: true, description: true }
+async findBySlug(slug: string, lang) {
+  const organization = await this.prismaService.organization.findUnique({
+    where: { slug },
+    include: {
+      logo: true,
+      banner: true,
+      translations: {
+        where: { lang },
+        select: { id: true, lang: true, description: true },
+      },
+
+      // CATEGORY  
+      categories: {
+        where: { is_active: true },        // ← faqat active
+        orderBy: { index: 'asc' },         // ← sort
+
+        include: {
+          translations: {
+            where: { lang },
+            select: { id: true, lang: true, title: true },
+          },
+
+          // PRODUCT
+          products: {
+            where: { is_active: true },    // ← faqat active product
+            orderBy: { index: 'asc' },     // ← sort
+
+            include: {
+              images: true,
+
+              translations: {
+                where: { lang },
+                select: {
+                  id: true,
+                  lang: true,
+                  title: true,
+                  description: true,
                 },
-                additional_product_groups: {
-                  include: {
-                    translations: {
-                      where: { lang },
-                      select: { id: true, lang: true, title: true, }
+              },
+
+              additional_product_groups: {
+                include: {
+                  translations: {
+                    where: { lang },
+                    select: {
+                      id: true,
+                      lang: true,
+                      title: true,
                     },
-                    additional_products: {
-                      include: {
-                        translations: {
-                          where: { lang },
-                          select: { id: true, lang: true, title: true }
+                  },
+
+                  additional_products: {
+                    include: {
+                      translations: {
+                        where: { lang },
+                        select: {
+                          id: true,
+                          lang: true,
+                          title: true,
                         },
                       },
                     },
@@ -142,14 +165,16 @@ async create(data: CreateOrganizationDto, owner_id: string) {
           },
         },
       },
-    });
+    },
+  });
 
-    if (!organization) {
-      throw new NotFoundException(`Organization with slug "${slug}" not found`);
-    }
-
-    return organization;
+  if (!organization) {
+    throw new NotFoundException(`Organization with slug "${slug}" not found`);
   }
+
+  return organization;
+}
+
 
   async findById(id: string) {
     const organization = await this.prismaService.organization.findUnique({
@@ -225,8 +250,8 @@ async create(data: CreateOrganizationDto, owner_id: string) {
   }
 
 
-  async updateIsActive(owner_id: string, isActive: boolean) {
-    return await this.prismaService.organization.update({ where: { owner_id }, data: { isActive } })
+  async updateIsActive(owner_id: string, is_active: boolean) {
+    return await this.prismaService.organization.update({ where: { owner_id }, data: { is_active } })
   }
 
   async delete(id: string) {
