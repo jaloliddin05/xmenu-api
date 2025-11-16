@@ -14,21 +14,21 @@ export class ProductService {
     private readonly fileService: FileService
   ) { }
 
-  async findAll(category_id: string, lang: string, isActive?, title?:string) {
+  async findAll(category_id: string, lang: string, isActive?, title?: string) {
     const where: any = {}
     category_id ? where['category_id'] = category_id : null;
     isActive ? (isActive == 'true' ? where['isActive'] = true : where['isActive'] = false) : null
     if (title) {
-    where.translations = {
-      some: {
-        lang,
-        title: {
-          contains: title,
-          mode: 'insensitive'
+      where.translations = {
+        some: {
+          lang,
+          title: {
+            contains: title,
+            mode: 'insensitive'
+          }
         }
       }
     }
-  }
 
 
     const products = await this.prismaService.product.findMany({
@@ -49,10 +49,10 @@ export class ProductService {
         },
         images: true,
       },
-      orderBy:{
-        index: "asc",
-        created_at:"asc"
-      }
+      orderBy: [
+        { index: 'asc' },
+        { created_at: 'asc' }
+      ]
     });
 
     // Formatlash
