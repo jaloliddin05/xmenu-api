@@ -81,11 +81,11 @@ model organization_translation {
   created_at  DateTime  @default(now())
 }
 enum OrganizationType {
-  Restaurant    @map("restaurant")
-  Cafe    @map("cafe")
-  FastFood    @map("fast-food")
-  CoffeeShop    @map("coffee-shop")
-  Other  @map("other")
+  restaurant   @map("restaurant")
+  cafe         @map("cafe")
+  fast_food    @map("fast-food")
+  coffee_shop  @map("coffee-shop")
+  other        @map("other")
 }
 
 model organization {
@@ -93,7 +93,7 @@ model organization {
   int_id       Int               @unique @default(autoincrement())
   name         String
   slug         String?           @unique
-  type         OrganizationType  @default(Other)
+  type         OrganizationType  @default(other)
   is_active     Boolean           @default(false)
   url          String?
   created_at   DateTime          @default(now())
