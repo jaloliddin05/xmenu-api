@@ -41,7 +41,7 @@ export class UserService {
       where: { id }, 
       include: { 
         organization: {
-          include:{logo:true,banner:true}
+          include:{logo:true,banner:true,translations:true}
         } 
       } 
     })
@@ -85,7 +85,14 @@ export class UserService {
   }
 
   async updateIsActiveAndPassword(id: string, isActive: boolean, password: string) {
-    return await this.prismaService.user.update({ where: { id }, data: { isActive, password } })
+    return await this.prismaService.user.update({ 
+      where: { id }, data: { isActive, password }, 
+      include:{
+        organization:{
+          include:{
+            logo:true,banner:true,translations:true
+          }}}
+    })
   }
 
    async changePassword(data: ChangePasswordDto, id: string) {

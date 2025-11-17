@@ -19,6 +19,7 @@ model application {
   fullName   String?
   phone      String?
   from       ApplicationFrom
+  plan       String?
   description String?          // qo‘shimcha maydon (agar kerak bo‘lsa)
   created_at DateTime          @default(now())
 }

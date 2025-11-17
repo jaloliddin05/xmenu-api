@@ -10,6 +10,7 @@ import {
   Post,
   Put,
   Query,
+  Req,
   UploadedFiles,
   UseInterceptors,
   UsePipes,
@@ -38,10 +39,11 @@ export class ProductController {
   async findAll(
     @Query('lang') lang: string, 
     @Query('categoryId') categoryId: string,
-    @Query('isActive') isActive: string,
+    @Query('is_active') is_active: string,
     @Query('title') title: string,
+    @Req() req
   ) {
-    return await this.productService.findAll(categoryId, lang,isActive,title);
+    return await this.productService.findAll(req?.user?.organization?.id,categoryId, lang,is_active,title);
   }
 
   @Get('/:id')

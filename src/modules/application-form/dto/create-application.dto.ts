@@ -21,6 +21,15 @@ export class CreateApplicationDto {
   @IsOptional()
   phone: string;
 
+ @ApiProperty({
+        description: `plan`,
+        example: '',
+        required: false,
+  })
+  @IsString()
+  @IsOptional()
+  plan: string;
+
   @ApiProperty({
         description: `from`,
         example: '',

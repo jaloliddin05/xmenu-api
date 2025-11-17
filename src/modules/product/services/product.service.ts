@@ -14,7 +14,7 @@ export class ProductService {
     private readonly fileService: FileService
   ) { }
 
-  async findAll(category_id: string, lang: string, isActive?, title?: string) {
+  async findAll(organization_id:string, category_id: string, lang: string, isActive?, title?: string) {
     const where: any = {}
     category_id ? where['category_id'] = category_id : null;
     isActive ? (isActive == 'true' ? where['isActive'] = true : where['isActive'] = false) : null
@@ -27,6 +27,11 @@ export class ProductService {
             mode: 'insensitive'
           }
         }
+      }
+    }
+    if(organization_id){
+      where.category = {
+        organization_id: organization_id
       }
     }
 
