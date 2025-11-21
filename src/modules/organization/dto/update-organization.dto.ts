@@ -34,6 +34,11 @@ class UpdateOrganizationDto {
   @IsString()
   readonly name?: string;
 
+  @ApiProperty({ description: `slug`, required: false })
+  @IsOptional()
+  @IsString()
+  readonly slug?: string;
+
   @ApiProperty({
     description: `logo`,
     type: "string",

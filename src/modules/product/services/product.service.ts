@@ -6,15 +6,17 @@ import { FileService } from 'src/modules/file/file.service';
 import { CreateProductDto } from '../dto/create-product.dto';
 import MoveProductDto from '../dto/move-product.dto';
 import { UpdateProductDto } from '../dto/update-product.dto';
+import { RevalidateService } from 'src/modules/revalidate-queue/revalidate.service';
 
 @Injectable()
 export class ProductService {
   constructor(
     private readonly prismaService: PrismaService,
-    private readonly fileService: FileService
+    private readonly fileService: FileService,
+    private readonly revalidateService: RevalidateService
   ) { }
 
-  async findAll(organization_id:string, category_id: string, lang: string, isActive?, title?: string) {
+  async findAll(organization_id: string, category_id: string, lang: string, isActive?, title?: string) {
     const where: any = {}
     category_id ? where['category_id'] = category_id : null;
     isActive ? (isActive == 'true' ? where['isActive'] = true : where['isActive'] = false) : null
@@ -29,7 +31,7 @@ export class ProductService {
         }
       }
     }
-    if(organization_id){
+    if (organization_id) {
       where.category = {
         organization_id: organization_id
       }
@@ -140,8 +142,9 @@ export class ProductService {
     });
   }
 
-  async updateProduct(id: string, dto: UpdateProductDto) {
-    return this.prismaService.$transaction(async (prisma) => {
+  async updateProduct(id: string, dto: UpdateProductDto, slug: string) {
+    await this.revalidateService.addRevalidationJob(slug)
+    return await this.prismaService.$transaction(async (prisma) => {
       const existingProduct = await prisma.product.findUnique({
         where: { id },
         include: {
@@ -198,7 +201,7 @@ export class ProductService {
   }
 
 
-  async moveProduct(dto: MoveProductDto) {
+  async moveProduct(dto: MoveProductDto, slug: string) {
     const { categoryId, productId, newIndex } = dto;
 
     // 1. Avval eski indexni topamiz
@@ -240,10 +243,13 @@ export class ProductService {
       data: { index: newIndex },
     });
 
+    await this.revalidateService.addRevalidationJob(slug)
+
     return updated;
   }
 
-  async updateIsActive(id: string, is_active: boolean) {
+  async updateIsActive(id: string, is_active: boolean, slug: string) {
+    await this.revalidateService.addRevalidationJob(slug)
     return await this.prismaService.product.update({ where: { id }, data: { is_active } })
   }
 

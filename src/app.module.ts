@@ -12,6 +12,7 @@ import { join } from 'path';
 import { FileModule } from './modules/file/file.module';
 import { ProductModule } from './modules/product/product.module';
 import { ApplicationModule } from './modules/application-form/application.module';
+import { BullModule } from '@nestjs/bullmq';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -24,6 +25,7 @@ import { ApplicationModule } from './modules/application-form/application.module
     }),
     ApplicationModule,
     AuthModule,
+    BullModule,
     CategoryModule,
     FileModule,
     OrganizationModule,

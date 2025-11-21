@@ -2,11 +2,13 @@ import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../_prisma/prisma.service';
 import { CreateCategoryDto, MoveCategoryDto, UpdateCategoryDto } from '../dto';
+import { RevalidateService } from 'src/modules/revalidate-queue/revalidate.service';
 
 @Injectable()
 export class CategoryService {
   constructor(
-    private readonly prismaService: PrismaService
+    private readonly prismaService: PrismaService,
+    private readonly revalidateService: RevalidateService
   ) { }
 
   async createCategory(dto: CreateCategoryDto) {
@@ -87,7 +89,7 @@ export class CategoryService {
     return await this.prismaService.category.findUnique({ where: { id }, include: { translations: true } });
   }
 
-  async update(id: string, data: UpdateCategoryDto) {
+  async update(id: string, data: UpdateCategoryDto,slug:string) {
     const { translations } = data;
 
     if (!translations || translations.length === 0) {
@@ -124,13 +126,15 @@ export class CategoryService {
       })
     );
 
+    await this.revalidateService.addRevalidationJob(slug)
+
     return this.prismaService.category.findUnique({
       where: { id },
       include: { translations: true },
     });
   }
 
-  async moveCategory(dto: MoveCategoryDto) {
+  async moveCategory(dto: MoveCategoryDto, slug:string) {
     const { categoryId, organizationId, newIndex } = dto;
 
     // 1. Avval eski indexni topamiz
@@ -172,10 +176,13 @@ export class CategoryService {
       data: { index: newIndex },
     });
 
+    await this.revalidateService.addRevalidationJob(slug)
+
     return updated;
   }
 
-  async updateIsActive(id: string, is_active: boolean) {
+  async updateIsActive(id: string, is_active: boolean,slug:string) {
+    await this.revalidateService.addRevalidationJob(slug)
     return await this.prismaService.category.update({ where: { id }, data: { is_active } })
   }
 

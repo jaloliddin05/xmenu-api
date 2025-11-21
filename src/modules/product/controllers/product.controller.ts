@@ -64,15 +64,15 @@ export class ProductController {
 
   @Put('/:id')
   @ApiOperation({ summary: 'Update existing product' })
-  async update(@Param('id') id: string, @Body() dto: UpdateProductDto) {
-    return await this.productService.updateProduct(id, dto);
+  async update(@Param('id') id: string, @Body() dto: UpdateProductDto, @Req() req) {
+    return await this.productService.updateProduct(id, dto, req?.user?.organization?.slug);
   }
 
   @Patch('/index')
   @ApiOperation({ summary: 'Method: update index' })
   @HttpCode(HttpStatus.OK)
-  async updateIndex(@Body() data: MoveProductDto) {
-    return await this.productService.moveProduct(data);
+  async updateIndex(@Body() data: MoveProductDto, @Req() req) {
+    return await this.productService.moveProduct(data,req?.user?.organization?.slug);
   }
 
   @Patch(':id/activate')
@@ -91,8 +91,8 @@ export class ProductController {
     },
   })
   @HttpCode(HttpStatus.OK)
-  async activateProduct(@Param('id') id: string, @Body('is_active') is_active: boolean) {
-    return await this.productService.updateIsActive(id, is_active);
+  async activateProduct(@Param('id') id: string, @Body('is_active') is_active: boolean, @Req() req) {
+    return await this.productService.updateIsActive(id, is_active, req?.user?.organization?.slug);
   }
 
   @Patch('/:id/images')

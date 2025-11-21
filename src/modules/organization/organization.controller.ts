@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Delete, Put, HttpCode, HttpStatus, UseInterceptors, UploadedFiles, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Delete, Put, HttpCode, HttpStatus, UseInterceptors, UploadedFiles, Query, Req } from '@nestjs/common';
 import { ApiBody, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { OrganizationService } from './services/organization.service';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
@@ -81,11 +81,12 @@ export class OrganizationController {
     @Param('id') id: string,
     @Body() data: UpdateOrganizationDto,
     @UploadedFiles() files: { banner?: Express.Multer.File[]; logo?: Express.Multer.File[] },
+    @Req() req
     )
     {
     const banner = files?.banner?.[0];
     const logo = files?.logo?.[0];
-    return await this.organizationService.update(id, data, logo,banner );
+    return await this.organizationService.update(id, data, logo,banner, req?.user?.organization?.slug );
   }
 
   @Delete(':id')

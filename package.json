@@ -22,6 +22,8 @@
     "migrate": "npm run generate-schema && npx prisma migrate dev && npx prisma generate"
   },
   "dependencies": {
+    "@nestjs-modules/ioredis": "^2.0.2",
+    "@nestjs/bullmq": "^11.0.4",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.0.1",
@@ -32,6 +34,7 @@
     "@nestjs/swagger": "^11.2.0",
     "@prisma/client": "^6.15.0",
     "@types/multer": "^2.0.0",
+    "axios": "^1.13.2",
     "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",

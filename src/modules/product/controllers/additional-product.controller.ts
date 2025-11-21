@@ -7,6 +7,7 @@ import {
     Param,
     Post,
     Put,
+    Req,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { CreateAdditionalProductDto, CreateAdditionalProductGroupDto } from '../dto/additional-product.dto';
@@ -40,9 +41,10 @@ export class AdditionalProductController {
     @ApiOperation({ summary: "Update additional product group" })
     async updateGroup(
         @Param("id") id: string,
-        @Body() dto: UpdateAdditionalProductGroupDto
+        @Body() dto: UpdateAdditionalProductGroupDto,
+        @Req() req
     ) {
-        return this.additionalProductService.updateGroup(id, dto);
+        return this.additionalProductService.updateGroup(id, dto, req?.user?.organization?.slug);
     }
 
     // ✅ UPDATE ADDITIONAL PRODUCT
@@ -50,9 +52,10 @@ export class AdditionalProductController {
     @ApiOperation({ summary: "Update additional product" })
     async updateAdditionalProduct(
         @Param("id") id: string,
-        @Body() dto: UpdateAdditionalProductDto
+        @Body() dto: UpdateAdditionalProductDto,
+        @Req() req
     ) {
-        return this.additionalProductService.updateAdditionalProduct(id, dto);
+        return this.additionalProductService.updateAdditionalProduct(id, dto, req?.user?.organization?.slug);
     }
 
     @Delete('/group/:id')

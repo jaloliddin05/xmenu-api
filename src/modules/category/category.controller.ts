@@ -39,8 +39,8 @@ export class CategoryController {
   @Put(':id')
   @ApiOperation({ summary: 'Method: update' })
   @HttpCode(HttpStatus.OK)
-  async update(@Param('id') id: string, @Body() data: UpdateCategoryDto) {
-    return await this.categoryService.update(id, data);
+  async update(@Param('id') id: string, @Body() data: UpdateCategoryDto, @Req() req) {
+    return await this.categoryService.update(id, data, req.user?.organization?.slug);
   }
 
   @Patch(':id/activate')
@@ -59,15 +59,15 @@ export class CategoryController {
     },
   })
   @HttpCode(HttpStatus.OK)
-  async activateCategory(@Param('id') id: string, @Body('is_active') is_active: boolean) {
-    return await this.categoryService.updateIsActive(id, is_active);
+  async activateCategory(@Param('id') id: string, @Body('is_active') is_active: boolean, @Req() req) {
+    return await this.categoryService.updateIsActive(id, is_active,req.user?.organization?.slug);
   }
 
   @Patch('/index')
   @ApiOperation({ summary: 'Method: update index' })
   @HttpCode(HttpStatus.OK)
-  async updateIndex(@Body() data: MoveCategoryDto) {
-    return await this.categoryService.moveCategory(data);
+  async updateIndex(@Body() data: MoveCategoryDto, @Req() req) {
+    return await this.categoryService.moveCategory(data, req.user?.organization?.slug);
   }
 
   @Delete(':id')

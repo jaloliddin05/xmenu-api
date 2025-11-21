@@ -1,21 +1,21 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { OrganizationType } from '@prisma/client';
-
 
 import { PrismaService } from '../../_prisma/prisma.service';
 import { CreateOrganizationDto } from '../dto';
 import { FileService } from 'src/modules/file/file.service';
 import UpdateOrganizationDto from '../dto/update-organization.dto';
 import { parseOrganizationType } from '../models/organization.model';
+import { RevalidateService } from 'src/modules/revalidate-queue/revalidate.service';
 
 @Injectable()
 export class OrganizationService {
   constructor(
     private readonly prismaService: PrismaService,
-    private readonly fileService: FileService
+    private readonly fileService: FileService,
+    private readonly revalidateService: RevalidateService
   ) { }
 
-async create(data: CreateOrganizationDto, owner_id: string) {
+  async create(data: CreateOrganizationDto, owner_id: string) {
     const existingOrg = await this.prismaService.organization.findUnique({
       where: { owner_id },
     });
@@ -86,75 +86,76 @@ async create(data: CreateOrganizationDto, owner_id: string) {
       });
     }
 
-      console.log(organization);
-      
+    console.log(organization);
 
-      if (!organization) {
-        throw new NotFoundException(`Organization not found`);
-      }
 
-      return organization;
+    if (!organization) {
+      throw new NotFoundException(`Organization not found`);
+    }
+
+    return organization;
   }
 
-async findBySlug(slug: string, lang) {
-  const organization = await this.prismaService.organization.findUnique({
-    where: { slug },
-    include: {
-      logo: true,
-      banner: true,
-      translations: {
-        where: { lang },
-        select: { id: true, lang: true, description: true },
-      },
+  async findBySlug(slug: string, lang) {
+    const organization = await this.prismaService.organization.findUnique({
+      where: { slug },
+      include: {
+        logo: true,
+        banner: true,
+        translations: {
+          where: { lang },
+          select: { id: true, lang: true, description: true },
+        },
 
-      // CATEGORY  
-      categories: {
-        where: { is_active: true },        // ← faqat active
-        orderBy: { index: 'asc' },         // ← sort
+        // CATEGORY  
+        categories: {
+          where: { is_active: true },        // ← faqat active
+          orderBy: { index: 'asc' },         // ← sort
 
-        include: {
-          translations: {
-            where: { lang },
-            select: { id: true, lang: true, title: true },
-          },
+          include: {
+            translations: {
+              where: { lang },
+              select: { id: true, lang: true, title: true },
+            },
 
-          // PRODUCT
-          products: {
-            where: { is_active: true },    // ← faqat active product
-            orderBy: { index: 'asc' },     // ← sort
+            // PRODUCT
+            products: {
+              where: { is_active: true },    // ← faqat active product
+              orderBy: { index: 'asc' },     // ← sort
 
-            include: {
-              images: true,
+              include: {
+                images: true,
 
-              translations: {
-                where: { lang },
-                select: {
-                  id: true,
-                  lang: true,
-                  title: true,
-                  description: true,
-                },
-              },
-
-              additional_product_groups: {
-                include: {
-                  translations: {
-                    where: { lang },
-                    select: {
-                      id: true,
-                      lang: true,
-                      title: true,
-                    },
+                translations: {
+                  where: { lang },
+                  select: {
+                    id: true,
+                    lang: true,
+                    title: true,
+                    description: true,
                   },
+                },
 
-                  additional_products: {
-                    include: {
-                      translations: {
-                        where: { lang },
-                        select: {
-                          id: true,
-                          lang: true,
-                          title: true,
+                additional_product_groups: {
+                  include: {
+                    translations: {
+                      where: { lang },
+                      select: {
+                        id: true,
+                        lang: true,
+                        title: true,
+                      },
+                    },
+
+                    additional_products: {
+                      include: {
+                        translations: {
+                          where: { lang },
+                          select: {
+                            id: true,
+                            lang: true,
+                            title: true,
+                          },
                         },
                       },
                     },
@@ -165,15 +166,14 @@ async findBySlug(slug: string, lang) {
           },
         },
       },
-    },
-  });
+    });
 
-  if (!organization) {
-    throw new NotFoundException(`Organization with slug "${slug}" not found`);
+    if (!organization) {
+      throw new NotFoundException(`Organization with slug "${slug}" not found`);
+    }
+
+    return organization;
   }
-
-  return organization;
-}
 
 
   async findById(id: string) {
@@ -191,6 +191,7 @@ async findBySlug(slug: string, lang) {
     data: UpdateOrganizationDto,
     logo?: Express.Multer.File,
     banner?: Express.Multer.File,
+    slug?: string
   ) {
     const files: any = {};
 
@@ -212,16 +213,11 @@ async findBySlug(slug: string, lang) {
     // 3️⃣ type ni moslashtirish
     if (data.type) data.type = parseOrganizationType(data.type);
 
-    // 4️⃣ agar name o‘zgargan bo‘lsa, slug qayta generatsiya qilamiz
-    let slug = existing.slug;
-    if (data.name && data.name !== existing.name) {
-      slug = await this.generateUniqueSlug(data.name, id);
-    }
 
     // 5️⃣ asosiy organization yangilash
     const updatedOrg = await this.prismaService.organization.update({
       where: { id },
-      data: { ...data, slug, ...files },
+      data: { ...data, ...files },
       include: { logo: true, banner: true },
     });
 
@@ -238,6 +234,12 @@ async findBySlug(slug: string, lang) {
       }
     }
 
+    if (data?.slug) {
+      await this.revalidateService.addRevalidationJob(data.slug)
+    } else {
+      await this.revalidateService.addRevalidationJob(slug as string)
+    }
+
     // 7️⃣ yangilangan ma’lumotni qaytarish
     return await this.prismaService.organization.findUnique({
       where: { id },
@@ -251,7 +253,9 @@ async findBySlug(slug: string, lang) {
 
 
   async updateIsActive(owner_id: string, is_active: boolean) {
-    return await this.prismaService.organization.update({ where: { owner_id }, data: { is_active } })
+    const organization = await this.prismaService.organization.update({ where: { owner_id }, data: { is_active } })
+    await this.revalidateService.addRevalidationJob(organization.slug as string)
+    return organization
   }
 
   async delete(id: string) {
