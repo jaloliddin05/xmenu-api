@@ -143,7 +143,6 @@ export class ProductService {
   }
 
   async updateProduct(id: string, dto: UpdateProductDto, slug: string) {
-    await this.revalidateService.addRevalidationJob(slug)
     return await this.prismaService.$transaction(async (prisma) => {
       const existingProduct = await prisma.product.findUnique({
         where: { id },
@@ -170,7 +169,7 @@ export class ProductService {
           });
         }
       }
-
+      
       // Product asosiy ma’lumotlarini yangilash
       const updatedProduct = await prisma.product.update({
         where: { id },
@@ -195,7 +194,8 @@ export class ProductService {
           },
         },
       });
-
+      
+      await this.revalidateService.addRevalidationJob(slug)
       return updatedProduct;
     });
   }
