@@ -2,8 +2,8 @@
 enum OrganizationType {
   restaurant   @map("restaurant")
   cafe         @map("cafe")
-  fast_food    @map("fast-food")
-  coffee_shop  @map("coffee-shop")
+  fast_food    @map("fast_food")
+  coffee_shop  @map("coffee_shop")
   other        @map("other")
 }
 
