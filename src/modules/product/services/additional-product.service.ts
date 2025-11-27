@@ -12,7 +12,7 @@ export class AdditionalProductService {
     private readonly revalidateService: RevalidateService
   ) { }
 
-  async createGroup(dto: CreateAdditionalProductGroupDto) {
+  async createGroup(dto: CreateAdditionalProductGroupDto,slug: string) {
     const data: any = {
       is_multiple: dto.is_multiple ?? false,
       is_required: dto.is_required ?? false,
@@ -31,17 +31,23 @@ export class AdditionalProductService {
       };
     }
 
-    return this.prismaService.additional_product_group.create({
+    const add_prod_group = await this.prismaService.additional_product_group.create({
       data,
       include: {
         translations: true,
       },
     });
+
+    if(dto?.product_id){
+      await this.revalidateService.addRevalidationJob(slug)
+    }
+
+    return add_prod_group
   }
 
   // 🔹 2. Additional Product yaratish
-  async createAdditionalProduct(dto: CreateAdditionalProductDto) {
-    return this.prismaService.additional_product.create({
+  async createAdditionalProduct(dto: CreateAdditionalProductDto,slug: string) {
+    const add_prod = await this.prismaService.additional_product.create({
       data: {
         price: dto.price,
         additional_product_group: {
@@ -57,16 +63,22 @@ export class AdditionalProductService {
       include: {
         translations: true,
         additional_product_group: {
-          include: { translations: true },
+          include: { translations: true, product: true },
         },
       },
     });
+
+    if(add_prod?.additional_product_group?.product?.id){
+      await this.revalidateService.addRevalidationJob(slug)
+    }
+
+    return add_prod
   }
 
   async updateGroup(id: string, dto: UpdateAdditionalProductGroupDto, slug: string) {
     const group = await this.prismaService.additional_product_group.findUnique({
       where: { id },
-      include: { translations: true },
+      include: { translations: true, product: true },
     });
 
     if (!group) throw new NotFoundException("Additional product group not found");
@@ -84,10 +96,8 @@ export class AdditionalProductService {
       }
     }
 
-    await this.revalidateService.addRevalidationJob(slug)
-
     // 🔹 Asosiy group ma’lumotlarini yangilash
-    return this.prismaService.additional_product_group.update({
+    const add_prod_group = await this.prismaService.additional_product_group.update({
       where: { id },
       data: {
         is_multiple: dto.is_multiple,
@@ -98,13 +108,19 @@ export class AdditionalProductService {
         translations: true,
       },
     });
+
+    if(group?.product?.id){
+      await this.revalidateService.addRevalidationJob(slug)
+    }
+
+    return add_prod_group
   }
 
   // ✅ UPDATE ADDITIONAL PRODUCT
   async updateAdditionalProduct(id: string, dto: UpdateAdditionalProductDto, slug: string) {
     const product = await this.prismaService.additional_product.findUnique({
       where: { id },
-      include: { translations: true },
+      include: { translations: true, additional_product_group: { include : {product:true}} },
     });
 
     if (!product) throw new NotFoundException("Additional product not found");
@@ -122,10 +138,8 @@ export class AdditionalProductService {
       }
     }
 
-    await this.revalidateService.addRevalidationJob(slug)
-
     // 🔹 Asosiy product ma’lumotlarini yangilash
-    return this.prismaService.additional_product.update({
+    const add_prod = await this.prismaService.additional_product.update({
       where: { id },
       data: {
         price: dto.price,
@@ -140,14 +154,29 @@ export class AdditionalProductService {
         },
       },
     });
+
+    if(product?.additional_product_group?.product?.id){
+      await this.revalidateService.addRevalidationJob(slug)
+    }
+
+    return add_prod
   }
 
-  async deleteGroup(id: string) {
-    return await this.prismaService.additional_product_group.delete({ where: { id } })
+  async deleteGroup(id: string, slug: string) {
+    const add_prod_gr = await this.prismaService.additional_product_group.delete({ where: { id }, include: { product: true } })
+    if(add_prod_gr?.product?.id){
+      await this.revalidateService.addRevalidationJob(slug)
+    }
+    return add_prod_gr
+
   }
 
-  async delete(id: string) {
-    return await this.prismaService.additional_product.delete({ where: { id } })
+  async delete(id: string, slug: string) {
+    const add_prod = await this.prismaService.additional_product.delete({ where: { id }, include: { additional_product_group: { include: { product: true } } } })
+    if(add_prod?.additional_product_group?.product?.id){
+      await this.revalidateService.addRevalidationJob(slug)
+    }
+    return add_prod
   }
 
 }

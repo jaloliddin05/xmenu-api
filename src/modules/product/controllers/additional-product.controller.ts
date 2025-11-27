@@ -24,8 +24,9 @@ export class AdditionalProductController {
     @HttpCode(HttpStatus.CREATED)
     async createAdditionalProductGroup(
         @Body() dto: CreateAdditionalProductGroupDto,
+        @Req() req
     ) {
-        return await this.additionalProductService.createGroup(dto);
+        return await this.additionalProductService.createGroup(dto,req?.user?.organization?.slug);
     }
 
     @Post('/')
@@ -33,8 +34,9 @@ export class AdditionalProductController {
     @HttpCode(HttpStatus.CREATED)
     async createAdditionalProduct(
         @Body() dto: CreateAdditionalProductDto,
+        @Req() req
     ) {
-        return await this.additionalProductService.createAdditionalProduct(dto);
+        return await this.additionalProductService.createAdditionalProduct(dto,req?.user?.organization?.slug);
     }
 
     @Put("group/:id")
@@ -61,14 +63,14 @@ export class AdditionalProductController {
     @Delete('/group/:id')
     @ApiOperation({ summary: 'Method: delete' })
     @HttpCode(HttpStatus.NO_CONTENT)
-    async deleteGroup(@Param('id') id: string) {
-        return await this.additionalProductService.deleteGroup(id);
+    async deleteGroup(@Param('id') id: string, @Req() req) {
+        return await this.additionalProductService.deleteGroup(id,req?.user?.organization?.slug);
     }
 
     @Delete(':id')
     @ApiOperation({ summary: 'Method: delete' })
     @HttpCode(HttpStatus.NO_CONTENT)
-    async remove(@Param('id') id: string) {
-        return await this.additionalProductService.delete(id);
+    async remove(@Param('id') id: string, @Req() req) {
+        return await this.additionalProductService.delete(id,req?.user?.organization?.slug);
     }
 }

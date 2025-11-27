@@ -58,8 +58,9 @@ export class ProductController {
   @ApiOperation({ summary: 'Create new product with translations and options' })
   async create(
     @Body() dto: CreateProductDto,
+    @Req() req
   ) {
-    return await this.productService.createProduct(dto);
+    return await this.productService.createProduct(dto, req?.user?.organization?.slug);
   }
 
   @Put('/:id')
@@ -115,8 +116,8 @@ export class ProductController {
   @Delete(':id')
   @ApiOperation({ summary: 'Method: delete' })
   @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@Param('id') id: string) {
-    return await this.productService.delete(id);
+  async remove(@Param('id') id: string,@Req() req) {
+    return await this.productService.delete(id,req?.user?.organization?.slug);
   }
 
   @Delete('/image/:id')

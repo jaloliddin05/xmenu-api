@@ -32,8 +32,8 @@ export class CategoryController {
   @Post()
   @ApiOperation({ summary: 'Method: create' })
   @HttpCode(HttpStatus.CREATED)
-  async create(@Body() data: CreateCategoryDto) {
-    return await this.categoryService.createCategory(data);
+  async create(@Body() data: CreateCategoryDto,@Req() req) {
+    return await this.categoryService.createCategory(data,req.user?.organization?.slug);
   }
 
   @Put(':id')
@@ -73,7 +73,7 @@ export class CategoryController {
   @Delete(':id')
   @ApiOperation({ summary: 'Method: delete' })
   @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@Param('id') id: string) {
-    return await this.categoryService.delete(id);
+  async remove(@Param('id') id: string, @Req() req) {
+    return await this.categoryService.delete(id, req.user?.organization?.slug);
   }
 }

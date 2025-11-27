@@ -11,8 +11,8 @@ export class CategoryService {
     private readonly revalidateService: RevalidateService
   ) { }
 
-  async createCategory(dto: CreateCategoryDto) {
-    return await this.prismaService.$transaction(async (prisma) => {
+  async createCategory(dto: CreateCategoryDto, slug:string) {
+    const category = await this.prismaService.$transaction(async (prisma) => {
 
       const lastCategory = await prisma.category.findFirst({
         where: { organization_id: dto.organization_id },
@@ -43,6 +43,10 @@ export class CategoryService {
 
       return newCategory;
     });
+
+    await this.revalidateService.addRevalidationJob(slug)
+
+    return category;
   }
 
   async findAll(lang: string,organizationId: string) {
@@ -182,11 +186,14 @@ export class CategoryService {
   }
 
   async updateIsActive(id: string, is_active: boolean,slug:string) {
+    const category = await this.prismaService.category.update({ where: { id }, data: { is_active } })
     await this.revalidateService.addRevalidationJob(slug)
-    return await this.prismaService.category.update({ where: { id }, data: { is_active } })
+    return category
   }
 
-  async delete(id: string) {
-    return await this.prismaService.category.delete({ where: { id } })
+  async delete(id: string, slug:string) {
+    const category =  await this.prismaService.category.delete({ where: { id } })
+    await this.revalidateService.addRevalidationJob(slug)
+    return category
   }
 }

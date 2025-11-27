@@ -94,8 +94,8 @@ export class ProductService {
     });
   }
 
-  async createProduct(dto: CreateProductDto) {
-    return this.prismaService.$transaction(async (prisma) => {
+  async createProduct(dto: CreateProductDto,slug: string) {
+    const product = await this.prismaService.$transaction(async (prisma) => {
       const lastProduct = await prisma.product.findFirst({
         where: { category_id: dto.category_id },
         orderBy: { index: "desc" },
@@ -140,10 +140,13 @@ export class ProductService {
         },
       });
     });
+
+    await this.revalidateService.addRevalidationJob(slug)
+    return product
   }
 
   async updateProduct(id: string, dto: UpdateProductDto, slug: string) {
-    return await this.prismaService.$transaction(async (prisma) => {
+    const product = await this.prismaService.$transaction(async (prisma) => {
       const existingProduct = await prisma.product.findUnique({
         where: { id },
         include: {
@@ -171,7 +174,7 @@ export class ProductService {
       }
       
       // Product asosiy ma’lumotlarini yangilash
-      const updatedProduct = await prisma.product.update({
+      return await prisma.product.update({
         where: { id },
         data: {
           price: dto.price,
@@ -195,9 +198,10 @@ export class ProductService {
         },
       });
       
-      await this.revalidateService.addRevalidationJob(slug)
-      return updatedProduct;
     });
+    
+    await this.revalidateService.addRevalidationJob(slug)
+    return product
   }
 
 
@@ -249,12 +253,15 @@ export class ProductService {
   }
 
   async updateIsActive(id: string, is_active: boolean, slug: string) {
+    const product = await this.prismaService.product.update({ where: { id }, data: { is_active } })
     await this.revalidateService.addRevalidationJob(slug)
-    return await this.prismaService.product.update({ where: { id }, data: { is_active } })
+    return product;
   }
 
-  async delete(id: string) {
-    return await this.prismaService.product.delete({ where: { id } })
+  async delete(id: string, slug: string) {
+    const product = await this.prismaService.product.delete({ where: { id } })
+    await this.revalidateService.addRevalidationJob(slug)
+    return product
   }
 
   async addProductImages(productId: string, images: Express.Multer.File[]) {
