@@ -236,6 +236,7 @@ export class OrganizationService {
 
     if (data?.slug) {
       await this.revalidateService.addRevalidationJob(data.slug)
+      return { data : {id, newSlug:data?.slug, oldSlug: existing?.slug}, secret:process.env.REVALIDATE_SECRET}
     } else {
       await this.revalidateService.addRevalidationJob(slug as string)
     }
