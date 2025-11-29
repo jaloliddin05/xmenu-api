@@ -1,0 +1,28 @@
+name: CI/CD Pipeline (Test & Deploy) 🚀
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to Server via SSH 🚀
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          script: |
+            sudo -s
+            cd /home/xmenu/xmenu-backend
+            git pull origin main
+            npm i 
+            npm run build
+            pm2 reload xmenu-backend
