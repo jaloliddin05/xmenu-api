@@ -86,9 +86,6 @@ export class OrganizationService {
       });
     }
 
-    console.log(organization);
-
-
     if (!organization) {
       throw new NotFoundException(`Organization not found`);
     }
@@ -214,13 +211,6 @@ export class OrganizationService {
     if (data.type) data.type = parseOrganizationType(data.type);
 
 
-    // 5️⃣ asosiy organization yangilash
-    const updatedOrg = await this.prismaService.organization.update({
-      where: { id },
-      data: { ...data, ...files },
-      include: { logo: true, banner: true },
-    });
-
     // 6️⃣ translations ni yangilash
     if (data.translations?.length) {
       for (const t of data.translations) {
@@ -233,6 +223,15 @@ export class OrganizationService {
         });
       }
     }
+
+    delete data.translations;
+
+        // 5️⃣ asosiy organization yangilash
+    const updatedOrg = await this.prismaService.organization.update({
+      where: { id },
+      data: { ...data, ...files },
+      include: { logo: true, banner: true },
+    });
 
     if (data?.slug) {
       await this.revalidateService.addRevalidationJob(data.slug)
