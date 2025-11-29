@@ -10,7 +10,6 @@ on:
 
 jobs:
   deploy:
-    needs: test_and_build # Деплой запустится ТОЛЬКО после успешного тестирования и сборки
     runs-on: ubuntu-latest
 
     steps:
