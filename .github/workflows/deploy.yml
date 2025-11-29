@@ -1,0 +1,58 @@
+name: CI/CD Pipeline (Test & Deploy) 🚀
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  # =========================================================
+  # 1. CI (ИНТЕГРАЦИЯ И ТЕСТИРОВАНИЕ)
+  # =========================================================
+  test_and_build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code ⬇️
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js 22.x
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+
+    - name: Cache dependencies (npm)
+      uses: actions/cache@v4
+      with:
+        path: node_modules
+        key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
+        
+    - name: Install dependencies
+      run: npm install
+
+    - name: Build project 🛠️
+      run: npm run build
+      
+  # =========================================================
+  # 2. CD (ДЕПЛОЙМЕНТ)
+  # =========================================================
+  deploy:
+    needs: test_and_build # Деплой запустится ТОЛЬКО после успешного тестирования и сборки
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to Server via SSH 🚀
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          script: |
+            sudo -s
+            cd /home/xmenu/xmenu-backend
+            git pull origin main
+            npm i 
+            npm run build
+            pm2 reload xmenu-backend
