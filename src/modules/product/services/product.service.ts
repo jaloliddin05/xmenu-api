@@ -141,7 +141,7 @@ export class ProductService {
       });
     });
 
-    await this.revalidateService.addRevalidationJob(slug)
+    await this.revalidateService.addRevalidationJob({slug})
     return product
   }
 
@@ -200,7 +200,7 @@ export class ProductService {
       
     });
     
-    await this.revalidateService.addRevalidationJob(slug)
+    await this.revalidateService.addRevalidationJob({slug})
     return product
   }
 
@@ -247,20 +247,20 @@ export class ProductService {
       data: { index: newIndex },
     });
 
-    await this.revalidateService.addRevalidationJob(slug)
+    await this.revalidateService.addRevalidationJob({slug})
 
     return updated;
   }
 
   async updateIsActive(id: string, is_active: boolean, slug: string) {
     const product = await this.prismaService.product.update({ where: { id }, data: { is_active } })
-    await this.revalidateService.addRevalidationJob(slug)
+    await this.revalidateService.addRevalidationJob({slug})
     return product;
   }
 
   async delete(id: string, slug: string) {
     const product = await this.prismaService.product.delete({ where: { id } })
-    await this.revalidateService.addRevalidationJob(slug)
+    await this.revalidateService.addRevalidationJob({slug})
     return product
   }
 

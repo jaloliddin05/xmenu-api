@@ -15,7 +15,7 @@ export class RevalidateProcessor implements OnModuleDestroy {
 
         try {
           console.log(`🔄 Revalidating: ${url}`);
-          const response = await axios.post(`${process.env.NEXT_PUBLIC_URL}/api/revalidate`,{route:'menu',slug:url,secret:process.env.REVALIDATE_SECRET});
+          const response = await axios.post(`${process.env.NEXT_PUBLIC_URL}/api/revalidate`,{route:'menu',...url,secret:process.env.REVALIDATE_SECRET});
 
           if (response.status === 200) {
             console.log(`✅ Success: ${url}`);

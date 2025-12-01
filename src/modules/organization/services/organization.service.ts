@@ -234,10 +234,9 @@ export class OrganizationService {
     });
 
     if (data?.slug) {
-      await this.revalidateService.addRevalidationJob(data.slug)
-      return { data : {id, newSlug:data?.slug, oldSlug: existing?.slug}, secret:process.env.REVALIDATE_SECRET}
+      await this.revalidateService.addRevalidationJob({id, newSlug:data?.slug, oldSlug: existing?.slug})
     } else {
-      await this.revalidateService.addRevalidationJob(slug as string)
+      await this.revalidateService.addRevalidationJob({slug})
     }
 
     // 7️⃣ yangilangan ma’lumotni qaytarish
@@ -254,7 +253,7 @@ export class OrganizationService {
 
   async updateIsActive(owner_id: string, is_active: boolean) {
     const organization = await this.prismaService.organization.update({ where: { owner_id }, data: { is_active } })
-    await this.revalidateService.addRevalidationJob(organization.slug as string)
+    await this.revalidateService.addRevalidationJob({slug:organization.slug})
     return organization
   }
 

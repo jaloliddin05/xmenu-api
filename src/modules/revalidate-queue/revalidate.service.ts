@@ -14,7 +14,7 @@ export class RevalidateService implements OnModuleDestroy {
     },
   });
 
-  async addRevalidationJob(url: string) {
+  async addRevalidationJob(url) {
     const jobId = `revalidate-${url}`;
 
     try {
