@@ -234,7 +234,7 @@ export class OrganizationService {
     });
 
     if (data?.slug) {
-      await this.revalidateService.addRevalidationJob({id, newSlug:data?.slug, oldSlug: existing?.slug})
+      await this.revalidateService.addRevalidationJob({id, newSlug:data?.slug, oldSlug: existing?.slug, route: 'organization'})
     } else {
       await this.revalidateService.addRevalidationJob({slug})
     }
