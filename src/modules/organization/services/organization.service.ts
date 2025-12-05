@@ -86,9 +86,6 @@ export class OrganizationService {
       });
     }
 
-    console.log(organization);
-
-
     if (!organization) {
       throw new NotFoundException(`Organization not found`);
     }
@@ -214,13 +211,6 @@ export class OrganizationService {
     if (data.type) data.type = parseOrganizationType(data.type);
 
 
-    // 5️⃣ asosiy organization yangilash
-    const updatedOrg = await this.prismaService.organization.update({
-      where: { id },
-      data: { ...data, ...files },
-      include: { logo: true, banner: true },
-    });
-
     // 6️⃣ translations ni yangilash
     if (data.translations?.length) {
       for (const t of data.translations) {
@@ -234,11 +224,19 @@ export class OrganizationService {
       }
     }
 
+    delete data.translations;
+
+        // 5️⃣ asosiy organization yangilash
+    const updatedOrg = await this.prismaService.organization.update({
+      where: { id },
+      data: { ...data, ...files },
+      include: { logo: true, banner: true },
+    });
+
     if (data?.slug) {
-      await this.revalidateService.addRevalidationJob(data.slug)
-      return { data : {id, newSlug:data?.slug, oldSlug: existing?.slug}, secret:process.env.REVALIDATE_SECRET}
+      await this.revalidateService.addRevalidationJob({id, newSlug:data?.slug, oldSlug: existing?.slug, route: 'organization'})
     } else {
-      await this.revalidateService.addRevalidationJob(slug as string)
+      await this.revalidateService.addRevalidationJob({slug})
     }
 
     // 7️⃣ yangilangan ma’lumotni qaytarish
@@ -255,7 +253,7 @@ export class OrganizationService {
 
   async updateIsActive(owner_id: string, is_active: boolean) {
     const organization = await this.prismaService.organization.update({ where: { owner_id }, data: { is_active } })
-    await this.revalidateService.addRevalidationJob(organization.slug as string)
+    await this.revalidateService.addRevalidationJob({slug:organization.slug})
     return organization
   }
 

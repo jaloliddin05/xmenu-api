@@ -11,6 +11,7 @@ import { LocalStrategy } from './passport-strategies/local/local.strategy';
 import { RefreshTokenUserStrategy } from './passport-strategies/refresh-token-user/refresh-token-user.strategy'
 import { OrganizationModule } from '../organization/organization.module';
 import { JwtTokenService } from './jwt.service';
+import { SmsModule } from '../sms/sms.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { JwtTokenService } from './jwt.service';
       },
       inject: [ConfigService],
     }),
+    SmsModule
   ],
   providers: [
     AuthService,

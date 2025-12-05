@@ -11,6 +11,7 @@ import { JwtTokenService } from './jwt.service';
 import generateRandomCode from 'src/infra/helper/auth/generate-random-code';
 import { sendOtpWithButton, sendUserPassword } from 'src/infra/helper/tg-bot/otp-bot';
 import { generatePasswordWithHash } from 'src/infra/helper/auth/generate-password';
+import { SmsService } from '../sms/sms.service';
 
 @Injectable()
 export class AuthService {
@@ -20,6 +21,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly jwtTokenService: JwtTokenService,
+    private readonly smsService: SmsService
   ) { }
 
   async validateUserByUsernamePassword(phone: string, password: string) {
@@ -62,7 +64,8 @@ export class AuthService {
 
     const code = generateRandomCode(4);
 
-    await sendOtpWithButton(code, value.phone)
+    sendOtpWithButton(code, value.phone)
+    await this.smsService.sendOtp(value.phone, code);
 
     return this.jwtTokenService.generateToken({ code, id: user.id });
   }
@@ -71,7 +74,8 @@ export class AuthService {
     const user = await this.userService.findByPhone(phone);
 
     const code = generateRandomCode(4);
-    await sendOtpWithButton(code, phone)
+    sendOtpWithButton(code, phone)
+    await this.smsService.sendOtp(phone, code);
 
     return this.jwtTokenService.generateToken({ code, id: user?.id });
   }
@@ -97,7 +101,8 @@ export class AuthService {
       const organization = await this.organizationService.updateIsActive(id, true)
       const { hash, password } = await generatePasswordWithHash(organization.name)
       const user = await this.userService.updateIsActiveAndPassword(id, true, hash)
-      await sendUserPassword(password, user.phone, user.first_name, user.last_name)
+      sendUserPassword(password, user.phone, user.first_name, user.last_name)
+      await this.smsService.sendNewPassword(user.phone, password);
 
       const accessToken = this.getJWT('access', user.id);
       const refreshToken = this.getJWT('refresh', user.id);

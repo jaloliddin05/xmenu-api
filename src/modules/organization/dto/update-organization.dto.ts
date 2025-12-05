@@ -89,7 +89,7 @@ class UpdateOrganizationDto {
     return [];
   })
   @Type(() => UpdateOrganizationTranslationDto)
-  readonly translations?: UpdateOrganizationTranslationDto[];
+  translations?: UpdateOrganizationTranslationDto[];
 }
 
 export default UpdateOrganizationDto;
