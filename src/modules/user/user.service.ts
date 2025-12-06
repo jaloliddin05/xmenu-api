@@ -62,7 +62,8 @@ export class UserService {
         organization:{
           include:{
             logo:true,
-            banner:true
+            banner:true,
+            translations:true
           }
         }
       }
