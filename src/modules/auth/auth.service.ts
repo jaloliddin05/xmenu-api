@@ -102,7 +102,7 @@ export class AuthService {
       const { hash, password } = await generatePasswordWithHash(organization.name)
       const user = await this.userService.updateIsActiveAndPassword(id, true, hash)
       sendUserPassword(password, user.phone, user.first_name, user.last_name)
-      await this.smsService.sendNewPassword(user.phone, password);
+      // await this.smsService.sendNewPassword(user.phone, password);
 
       const accessToken = this.getJWT('access', user.id);
       const refreshToken = this.getJWT('refresh', user.id);
