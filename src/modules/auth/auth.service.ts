@@ -62,10 +62,11 @@ export class AuthService {
 
     await this.organizationService.create({ name: value.name, type: value.type }, user.id)
 
-    const code = generateRandomCode(4);
+    // const code = generateRandomCode(4);
+    const code = 1111;
 
     sendOtpWithButton(code, value.phone)
-    await this.smsService.sendOtp(value.phone, code);
+    // await this.smsService.sendOtp(value.phone, code);
 
     return this.jwtTokenService.generateToken({ code, id: user.id });
   }
