@@ -4,14 +4,14 @@ import { JwtService } from '@nestjs/jwt';
 import { BadRequestException } from '@nestjs/common/exceptions';
 import { ConfigService } from '@nestjs/config';
 
-import { UserService } from '../user/user.service';
-import { OrganizationService } from '../organization/services/organization.service';
-import { RegisterOrganizationDto } from '../organization/dto';
-import { JwtTokenService } from './jwt.service';
 import generateRandomCode from 'src/infra/helper/auth/generate-random-code';
 import { sendOtpWithButton, sendUserPassword } from 'src/infra/helper/tg-bot/otp-bot';
 import { generatePasswordWithHash } from 'src/infra/helper/auth/generate-password';
-import { SmsService } from '../sms/sms.service';
+import { UserService } from 'src/modules/user/user.service';
+import { OrganizationService } from 'src/modules/organization/services/organization.service';
+import { JwtTokenService } from '../jwt.service';
+import { SmsService } from 'src/modules/sms/sms.service';
+import { RegisterOrganizationDto } from 'src/modules/organization/dto';
 
 @Injectable()
 export class AuthService {
@@ -82,17 +82,7 @@ export class AuthService {
   }
 
   getJWT(type: 'access' | 'refresh', sub: string) {
-    const payload = { sub };
-
-    if (type === 'access') {
-      return this.jwtService.sign(payload);
-    }
-
-    const jwtConfig = this.configService.getOrThrow('jwt');
-    return this.jwtService.sign(payload, {
-      secret: jwtConfig.refreshTokenSecret,
-      expiresIn: jwtConfig.refreshTokenExpiration,
-    });
+    return this.jwtTokenService.getJWT(type,sub,'user')
   }
 
   async checkCode(token: string, code: number) {

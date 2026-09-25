@@ -1,0 +1,14 @@
+
+model customer {
+  id                 String   @id @default(uuid())
+  phone              String   @unique
+  telegram_id        String?  @unique
+
+  first_name         String?
+  last_name          String?
+
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
+
+  addresses          customer_address[]
+}

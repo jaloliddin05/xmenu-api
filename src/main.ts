@@ -32,8 +32,8 @@ async function bootstrap() {
   );
 
   const config = new DocumentBuilder()
-    .setTitle('My Teacher')
-    .setDescription('my teacher API description')
+    .setTitle('Xmenu')
+    .setDescription('Xmenu API description')
     .setVersion('0.2')
     .addBearerAuth(
       { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },

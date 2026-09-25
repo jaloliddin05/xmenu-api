@@ -11,22 +11,20 @@ import {
 } from '@nestjs/common';
 import express from 'express';
 import {
-  ApiBadRequestResponse,
   ApiForbiddenResponse,
   ApiNoContentResponse,
-  ApiOkResponse,
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
 
-import { AuthService } from './auth.service';
-import { LoginDto, SmsCodeDto } from './dto';
-import { Public } from './decorators/public.decorator';
-import { User } from '../user/models/user.modal';
-import { LocalAuthGuard } from './passport-strategies/local/local-auth.guard';
-import { RefreshTokenUserGuard } from './passport-strategies/refresh-token-user/refresh-token-user.guard';
-import { RegisterOrganizationDto } from '../organization/dto';
-import PhoneDto from './dto/phone.dto';
+import { AuthService } from '../services/auth.service';
+import { LoginDto, SmsCodeDto } from '../dto';
+import { Public } from '../decorators/public.decorator';
+import { User } from '../../user/models/user.modal';
+import { LocalAuthGuard } from '../passport-strategies/local/local-auth.guard';
+import { RefreshTokenUserGuard } from '../passport-strategies/refresh-token-user/refresh-token-user.guard';
+import { RegisterOrganizationDto } from '../../organization/dto';
+import PhoneDto from '../dto/phone.dto';
 
 
 @ApiTags('Auth')

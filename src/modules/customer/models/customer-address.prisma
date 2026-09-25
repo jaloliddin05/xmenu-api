@@ -1,0 +1,22 @@
+
+model customer_address {
+  id          String   @id @default(uuid())
+
+  customer_id String
+  customer    customer @relation(fields: [customer_id],references: [id],onDelete: Cascade)
+
+  title       String?  // Home, Work
+  address     String
+  latitude    Float?
+  longitude   Float?
+
+  apartment   String?
+  entrance    String?
+  floor       String?
+  comment     String?
+
+  is_default  Boolean  @default(false)
+
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+}

@@ -1,2 +1,5 @@
 export {default as LoginDto} from './login.dto'
 export {default as SmsCodeDto} from './sms-code.dto'
+export {default as CustomerPhoneVerifyDto} from './customer-phone-verify.dto'
+export {default as CustomerTelegramDto} from './customer-login.dto'
+export {default as CustomerTelegramRegisterDto} from './customer-registery.dto'
