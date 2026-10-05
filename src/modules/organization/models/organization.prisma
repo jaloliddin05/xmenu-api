@@ -19,6 +19,7 @@ model organization {
   translations organization_translation[]
   categories   category[]
   employees    employee[]
+  customers    customer[]
 
   owner_id     String?           @unique
   owner        user?             @relation(fields: [owner_id], references: [id])

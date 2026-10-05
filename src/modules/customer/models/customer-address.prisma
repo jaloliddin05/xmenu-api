@@ -1,4 +1,3 @@
-
 model customer_address {
   id          String   @id @default(uuid())
 

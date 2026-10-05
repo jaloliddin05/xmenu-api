@@ -1,0 +1,26 @@
+
+// Refresh-token sessiyalari. Faqat SHA-256 hash saqlanadi.
+// family_id — bitta login = bitta oila; har refresh yangi "avlod" qatori yaratadi.
+model customer_session {
+  id                String    @id @default(uuid())
+  family_id         String
+  family_started_at DateTime  // oilaning birinchi yaratilgan vaqti (absolyut limit uchun)
+
+  customer_id       String
+  customer          customer  @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+
+  organization_id   String
+  token_hash        Bytes     @unique
+  parent_id         String?
+
+  created_at        DateTime  @default(now())
+  expires_at        DateTime
+  used_at           DateTime?
+  revoked_at        DateTime?
+
+  user_agent        String?
+  ip                String?
+
+  @@index([family_id])
+  @@index([customer_id])
+}

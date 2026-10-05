@@ -1,14 +1,32 @@
 
+enum CustomerStatus {
+  active
+  blocked
+}
+
+// Mijoz bitta tenantga (organization) tegishli.
+// Bir xil telefon ikki tenantda = ikki xil customer.
+// (organization_id, phone) bo'yicha PARTIAL unique index (deleted_at IS NULL)
+// migration.sql ichida qo'lda yaratilgan — Prisma uni schema orqali ifodalay olmaydi.
 model customer {
-  id                 String   @id @default(uuid())
-  phone              String   @unique
-  telegram_id        String?  @unique
+  id              String         @id @default(uuid())
 
-  first_name         String?
-  last_name          String?
+  organization_id String
+  organization    organization   @relation(fields: [organization_id], references: [id], onDelete: Cascade)
 
-  created_at         DateTime @default(now())
-  updated_at         DateTime @updatedAt
+  phone           String         // E.164: +998XXXXXXXXX
+  telegram_id     String?
+  name            String
+  status          CustomerStatus @default(active)
 
-  addresses          customer_address[]
+  created_at      DateTime       @default(now())
+  updated_at      DateTime       @updatedAt
+  last_login_at   DateTime?
+  deleted_at      DateTime?
+
+  addresses       customer_address[]
+  sessions        customer_session[]
+
+  @@unique([organization_id, telegram_id])
+  @@index([organization_id, phone])
 }

@@ -1,57 +1,84 @@
-import {
-  Req,
-  Controller,
-  Post,
-  Body,
-  HttpCode,
-  HttpStatus,
-  Query,
-} from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Get, HttpCode, HttpStatus, Post, Req } from '@nestjs/common';
+import { ApiBearerAuth, ApiHeader, ApiTags } from '@nestjs/swagger';
+import type { Request } from 'express';
 
 import {
-  CustomerPhoneVerifyDto,
+  CustomerLogoutDto,
+  CustomerOtpRequestDto,
+  CustomerOtpVerifyDto,
+  CustomerRefreshDto,
+  CustomerRegisterDto,
   CustomerTelegramDto,
-  CustomerTelegramRegisterDto,
 } from '../dto';
-import { Public } from '../decorators/public.decorator';
-import PhoneDto from '../dto/phone.dto';
 import { CustomerAuthService } from '../services/customer-auth.service';
+import type { RequestCtx } from '../services/customer-auth-event.service';
+import {
+  CurrentCustomer,
+  CustomerProtectedRoute,
+  CustomerPublicRoute,
+} from '../decorators/customer-route.decorator';
+import type { CustomerPrincipal } from '../decorators/customer-route.decorator';
+import { CurrentTenant } from '../../tenant/current-tenant.decorator';
+import type { Tenant } from '../../tenant/tenant.service';
+
+const ctxOf = (req: Request): RequestCtx => ({
+  ip: req.ip || req.socket?.remoteAddress || '',
+  userAgent: String(req.headers['user-agent'] ?? '').slice(0, 255),
+});
 
 @ApiTags('Auth-Customer')
+@ApiHeader({ name: 'X-Tenant-Id', description: 'Organization slug', required: true })
 @Controller('auth-customer')
 export class AuthCustomerController {
-  constructor(private readonly customerAuthService: CustomerAuthService) {}
+  constructor(private readonly auth: CustomerAuthService) {}
 
-  @Public()
-  @Post('/login')
+  @CustomerPublicRoute()
+  @Post('otp/request')
   @HttpCode(200)
-  async login(@Body() data: CustomerTelegramDto) {
-    const res = await this.customerAuthService.telegramLogin(data.initData);
-    return res;
+  requestOtp(@CurrentTenant() tenant: Tenant, @Body() dto: CustomerOtpRequestDto, @Req() req: Request) {
+    return this.auth.requestOtp(tenant, dto.phone, ctxOf(req));
   }
 
-  @Public()
-  @Post('/telegram-register')
-  @HttpCode(HttpStatus.CREATED)
-  create(@Body() value: CustomerTelegramRegisterDto) {
-    return this.customerAuthService.registerWithTelegram(value.initData, value.phone);
+  @CustomerPublicRoute()
+  @Post('otp/verify')
+  @HttpCode(200)
+  verifyOtp(@CurrentTenant() tenant: Tenant, @Body() dto: CustomerOtpVerifyDto, @Req() req: Request) {
+    return this.auth.verifyOtp(tenant, dto, ctxOf(req));
   }
 
-  @Public()
-  @Post('/check-code')
+  @CustomerPublicRoute()
+  @Post('register')
   @HttpCode(200)
-  async checkCode(
-    @Body() data: CustomerPhoneVerifyDto,
-    @Query('token') token: string,
-  ) {
-    return await this.customerAuthService.verifyPhone(token, data.code, data.phone);
+  register(@CurrentTenant() tenant: Tenant, @Body() dto: CustomerRegisterDto, @Req() req: Request) {
+    return this.auth.register(tenant, dto, ctxOf(req));
   }
 
-  @Public()
-  @Post('/send-code')
+  @CustomerPublicRoute()
+  @Post('refresh')
   @HttpCode(200)
-  async resendCode(@Body() data: PhoneDto) {
-    return await this.customerAuthService.requestPhoneCode(data.phone);
+  refresh(@CurrentTenant() tenant: Tenant, @Body() dto: CustomerRefreshDto, @Req() req: Request) {
+    return this.auth.refresh(tenant, dto.refreshToken, ctxOf(req));
+  }
+
+  @CustomerPublicRoute()
+  @Post('logout')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async logout(@CurrentTenant() tenant: Tenant, @Body() dto: CustomerLogoutDto, @Req() req: Request) {
+    await this.auth.logout(tenant, dto?.refreshToken, ctxOf(req));
+  }
+
+  @CustomerProtectedRoute()
+  @ApiBearerAuth('access-token')
+  @Get('me')
+  me(@CurrentCustomer() me: CustomerPrincipal) {
+    return this.auth.me(me.tenantId, me.customerId);
+  }
+
+  /** Telegram strategiyasi: initData orqali kirish (oldin ulangan mijoz uchun). */
+  @CustomerPublicRoute()
+  @Post('login')
+  @HttpCode(200)
+  telegramLogin(@CurrentTenant() tenant: Tenant, @Body() dto: CustomerTelegramDto, @Req() req: Request) {
+    return this.auth.telegramLogin(tenant, dto.initData, ctxOf(req));
   }
 }

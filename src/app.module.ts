@@ -14,7 +14,8 @@ import { ProductModule } from './modules/product/product.module';
 import { ApplicationModule } from './modules/application-form/application.module';
 import { BullModule } from '@nestjs/bullmq';
 import { SmsModule } from './modules/sms/sms.module';
-import { CustomerModule } from './modules/customer/employee.module';
+import { CustomerModule } from './modules/customer/customer.module';
+import { RedisModule } from './infra/redis/redis.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -33,6 +34,7 @@ import { CustomerModule } from './modules/customer/employee.module';
     FileModule,
     OrganizationModule,
     ProductModule,
+    RedisModule,
     SmsModule,
     TranslationModule,
     UserModule

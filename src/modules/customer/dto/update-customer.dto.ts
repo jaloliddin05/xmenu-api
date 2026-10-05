@@ -1,15 +1,10 @@
-import { ApiProperty } from "@nestjs/swagger"
-import { IsString, IsOptional } from "class-validator"
+import { ApiProperty } from '@nestjs/swagger';
+import { IsString } from 'class-validator';
 
 class UpdateCustomerDto {
-    @ApiProperty({
-        description: `first_name`,
-        example: '',
-        required: false,
-    })
-    @IsOptional()
-    @IsString()
-    readonly first_name: string
+  @ApiProperty({ description: 'name (2-50 belgi)', example: 'Ali' })
+  @IsString()
+  readonly name: string;
 }
 
-export default UpdateCustomerDto
+export default UpdateCustomerDto;
