@@ -9,7 +9,7 @@ Swagger (`/docs`), Jest. Prettier: одинарные кавычки, trailing c
 
 ## Команды
 `npm run start:dev` · `npm run build` · `npm run lint` · `npm test` · `npm run test:e2e` · `npm run openapi`
-(`openapi` генерирует `docs/openapi.json` и таблицы в `docs/API.md`; запускается без БД и Redis).
+(`openapi` собирает проект и пишет `docs/openapi.json` из сборки, без БД и Redis; `docs/API.md` правится руками).
 Миграции: `npm run migrate` (собирает схему и запускает `prisma migrate dev`), на сервере `npx prisma migrate deploy`.
 Env: см. `.env.example`. Ключевые: `JWT_*`, `OTP_*`, `SMS_PROVIDER`, `PAYMENT_CONFIG_KEY`, `REDIS_URL`, `PUBLIC_API_URL`,
 `TENANT_ALLOW_SLUG`, `TELEGRAM_*`.
@@ -28,8 +28,8 @@ Env: см. `.env.example`. Ключевые: `JWT_*`, `OTP_*`, `SMS_PROVIDER`, `
 ## Контракт API
 Единое место: `docs/API.md` и `docs/openapi.json`. Подробности: `docs/ORDERS_API.md`, `docs/BRANCHES_API.md`,
 `docs/TELEGRAM_VERIFICATION.md`, `docs/BACKEND_ORDERS.md`. Меняешь контроллер или DTO: добавь `@ApiProperty` и
-`@ApiOperation`, запусти `npm run openapi`, закоммить результат вместе с кодом. CI (`.github/workflows/backend-ci.yml`)
-падает, если контракт не обновлён.
+`@ApiOperation`, запусти `npm run openapi`, закоммить результат вместе с кодом. Проверки контракта в CI пока нет
+(в `.github/workflows` только `deploy.yml`).
 
 ## Тенантность
 - Тенант = `organization`, идентификатор `organization.id` (UUID, не меняется). Клиентские эндпоинты определяют его по
@@ -58,13 +58,22 @@ Payme вручную через ops-чат.
 Telegram-пользователю из `initData`) и сайт (`code`, код приходит в чат бота только при совпадении номера). Сессии в
 Redis (`tgv:*`). Подробно: `docs/TELEGRAM_VERIFICATION.md`. Контакт принимается только если `contact.user_id == from.id`.
 
-## Авторизация владельцев (staff): целевая схема, ещё не реализована
-Регистрация не создаёт пользователя и организацию до подтверждения телефона (данные в Redis с TTL); код случайный, хеш
-в Redis, TTL, лимит попыток, пауза; в JWT кода нет; пароль задаёт владелец (минимум 8 символов), никакой автогенерации
-и отправки пароля в чат; вход по телефону и паролю с лимитами по телефону и IP, нарастающей блокировкой, одинаковым
-ответом на неизвестный номер и неверный пароль, событиями аудита. Доставка кода через `SmsProvider`; в проде `console`
-и dev-режим запрещены (как у клиентов). Сейчас в `auth.service.ts`: `signup` ставит код `1111`, код лежит в JWT,
-`checkCode` создаёт пароль из названия + `Math.random`.
+## Авторизация владельцев (staff)
+Контракт, ошибки и лимиты: `docs/API.md`. Код: `StaffAuthService` (регистрация и вход),
+`StaffLoginThrottleService` (блокировка), `StaffAuthEventService` (аудит в `staff_auth_event`).
+- `POST /auth/register` ничего не пишет в БД: заявка (с bcrypt-хешем пароля владельца, 8–72 символа) ждёт в Redis
+  под случайным `registrationId` 30 минут. `check-code {registrationId, code}` создаёт user и organization в одной
+  транзакции; «хвост» старой схемы (`isActive=false`) переиспользуется. Код привязан к заявке, а не к номеру: вторая
+  регистрация на тот же номер не может перехватить первую.
+- Код выдаёт `CustomerOtpService` со `scope: 'staff'` (ключи `sotp:*`, свои лимиты, те же `OTP_*`), доставка через
+  `SmsProvider`. `SMS_PROVIDER=console` и `OTP_DEV_MODE` в production не стартуют.
+- Вход: лимит по IP, нарастающая блокировка по телефону (60 с → 1 ч), единый `401 invalid_credentials` и одна
+  bcrypt-проверка на любую неудачу (фиктивный хеш для неизвестного номера).
+- Токены staff принимаются только для существующего пользователя с `isActive=true`; хеш пароля не уходит в ответы.
+- IP клиента: `trust proxy = loopback` в `main.ts`, nginx должен передавать `X-Forwarded-For`.
+- Ошибки staff идут через глобальный `ErrorFilter`, он добавляет `code` и `retryAfter` (+ `Retry-After`).
+- Владение данными: организация из `requireStaffOrganizationId(req)`; меню проверяется фрагментами из
+  `product/services/menu-ownership.ts`; чужой id в пути или в теле → 404. Новые эндпоинты админки делай так же.
 
 ## Что нужно построить
 - Статус публикации тенанта и флаги каналов (QR, доставка, режим: сайт, Mini App, оба). Публикация проверяет обязательное.
@@ -85,7 +94,13 @@ Telegram; на реальном боте (особенно `requestContact()` в
 `20261019120000_organization_telegram_bot` написана вручную и на живой БД не применялась.
 
 ## Известные долги
-- Staff-авторизация (см. выше). `additional-product*`: `update`, `delete`, `connect` без проверки организации сотрудника.
+- Refresh-токены staff без ротации и отзыва (выход не инвалидирует токен; удаление пользователя инвалидирует).
+  Восстановления пароля для владельцев нет.
+- Дашборд ещё на старом контракте регистрации (код `1111`, `?token=`): до его обновления регистрация в админке не
+  работает. Что поменять: `docs/API.md`, «Авторизация владельцев».
+- multer сохраняет загруженный файл на диск до проверки владельца: при 404 файл остаётся на диске без записи в БД.
+- Группы допов, созданные до миграции `additional_product_group_organization` и не привязанные к блюду, без владельца
+  (недоступны никому); можно удалить вручную.
 - Slug ещё принимается как ключ тенанта: после перехода фронтов и кабинетов Click/Payme на id выключить `TENANT_ALLOW_SLUG`.
 - Скомпилированные `.js/.d.ts/.js.map` в `src/config` (не должны быть в репозитории).
 
