@@ -637,7 +637,22 @@ model translation_prompt {
   title     String
   context   String   
   created_at DateTime @default(now())
-}model user {
+}// Audit log for owner (staff) auth. No FKs on purpose: records outlive deleted users and organizations.
+model staff_auth_event {
+  id              BigInt   @id @default(autoincrement())
+  user_id         String?
+  organization_id String?
+  type            String
+  phone_masked    String?
+  ip              String?
+  user_agent      String?
+  meta            Json?
+  created_at      DateTime @default(now())
+
+  @@index([created_at])
+  @@index([user_id])
+}
+model user {
   id          String      @id @default(uuid())
   phone       String      @unique
   password    String?

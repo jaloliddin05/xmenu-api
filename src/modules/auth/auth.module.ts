@@ -25,6 +25,7 @@ import { CustomerOtpService } from './services/customer-otp.service';
 import { CustomerSessionService } from './services/customer-session.service';
 import { CustomerTokenService } from './services/customer-token.service';
 import { CustomerAuthEventService } from './services/customer-auth-event.service';
+import { StaffAuthEventService } from './services/staff-auth-event.service';
 import { CustomerCleanupService } from './services/customer-cleanup.service';
 import { RateLimitService } from './services/rate-limit.service';
 import { TelegramInitDataService } from './services/telegram-init-data.service';
@@ -59,6 +60,7 @@ import { NoStoreMiddleware } from './middleware/no-store.middleware';
     CustomerSessionService,
     CustomerTokenService,
     CustomerAuthEventService,
+    StaffAuthEventService,
     CustomerCleanupService,
     RateLimitService,
     TelegramInitDataService,
