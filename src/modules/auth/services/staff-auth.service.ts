@@ -1,10 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
 import type Redis from 'ioredis';
-import { randomUUID } from 'crypto';
+import { randomBytes, randomUUID } from 'crypto';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
 import { REDIS } from 'src/infra/redis/redis.module';
 import { isValidPhone } from 'src/infra/helper/auth/customer-validators';
+import formatPhoneNumber from 'src/infra/helper/auth/format-phone';
 import { hashPassword } from 'src/infra/helper/auth/hash-password';
 import { toStaffUser } from 'src/infra/helper/auth/staff-user';
 import { OrganizationService } from 'src/modules/organization/services/organization.service';
@@ -17,11 +19,18 @@ import { CustomerOtpService } from './customer-otp.service';
 import type { RequestCtx } from './customer-auth-event.service';
 import { RateLimitService } from './rate-limit.service';
 import { StaffAuthEventService } from './staff-auth-event.service';
+import { StaffLoginThrottleService } from './staff-login-throttle.service';
 
 /** How long a signup waits for its phone code; every resend extends it. */
 export const PENDING_REGISTRATION_TTL_SECONDS = 1800;
 const OTP_BRAND = 'Xmenu';
 const SLUG_RETRIES = 3;
+export const LOGIN_IP_LIMIT = 20;
+const LOGIN_IP_WINDOW_SECONDS = 900;
+
+// Compared against when the phone is unknown, so both failures cost one bcrypt round of the same cost
+// as hashPassword(); the plaintext is random and thrown away.
+const DUMMY_HASH = bcrypt.hashSync(randomBytes(16).toString('hex'), 10);
 
 interface PendingRegistration {
   phone: string;
@@ -49,6 +58,7 @@ export class StaffAuthService {
     private readonly otp: CustomerOtpService,
     private readonly rateLimit: RateLimitService,
     private readonly events: StaffAuthEventService,
+    private readonly throttle: StaffLoginThrottleService,
     private readonly tokens: JwtTokenService,
     @Inject(REDIS) private readonly redis: Redis,
     @Inject(CUSTOMER_AUTH_CONFIG) private readonly cfg: CustomerAuthConfig,
@@ -142,6 +152,47 @@ export class StaffAuthService {
       user: toStaffUser(user),
       accessToken: this.tokens.getJWT('access', user.id, 'user'),
       refreshToken: this.tokens.getJWT('refresh', user.id, 'user'),
+    };
+  }
+
+  // ================= POST /auth/login =================
+
+  /**
+   * Unknown phone, unconfirmed account and wrong password are indistinguishable: same error, same
+   * status, one bcrypt comparison each, and the same lockout counters.
+   */
+  async login(dto: { login: string; password: string }, ctx: RequestCtx) {
+    const phone = formatPhoneNumber(String(dto.login ?? '')).slice(0, 20);
+    await this.rateLimit.hit([
+      { key: `staff:login:rl:ip:${ctx.ip}`, limit: LOGIN_IP_LIMIT, ttlSeconds: LOGIN_IP_WINDOW_SECONDS },
+    ]);
+    await this.throttle.assertNotLocked(phone);
+
+    const user = isValidPhone(phone)
+      ? await this.prisma.user.findUnique({ where: { phone }, include: USER_WITH_ORGANIZATION })
+      : null;
+    const hash = user?.isActive && user.password ? user.password : null;
+    const matches = await bcrypt.compare(String(dto.password ?? ''), hash ?? DUMMY_HASH);
+
+    if (!hash || !matches) {
+      const lockedFor = await this.throttle.registerFailure(phone);
+      await this.events.log('staff_login_failed', ctx, { phone, userId: user?.id });
+      if (lockedFor) {
+        await this.events.log('staff_login_locked', ctx, { phone, userId: user?.id, meta: { seconds: lockedFor } });
+      }
+      throw new CustomerAuthException('invalid_credentials', 'Invalid phone or password');
+    }
+
+    await this.throttle.reset(phone);
+    await this.events.log('staff_login', ctx, {
+      userId: user!.id,
+      organizationId: user!.organization?.id,
+      phone,
+    });
+    return {
+      accessToken: this.tokens.getJWT('access', user!.id, 'user'),
+      refreshToken: this.tokens.getJWT('refresh', user!.id, 'user'),
+      user: toStaffUser(user!),
     };
   }
 

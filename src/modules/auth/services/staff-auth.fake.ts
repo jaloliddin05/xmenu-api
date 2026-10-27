@@ -5,6 +5,7 @@ import type { CustomerAuthConfig } from '../customer-auth.config';
 import { CustomerOtpService } from './customer-otp.service';
 import { RateLimitService } from './rate-limit.service';
 import { StaffAuthEventService } from './staff-auth-event.service';
+import { StaffLoginThrottleService } from './staff-login-throttle.service';
 
 export const staffTestConfig = {
   otpHmacSecret: 'test-hmac-secret',
@@ -70,9 +71,10 @@ export class FakeStaffPrisma {
   }
 
   user = {
-    findUnique: async ({ where }: any) => {
+    findUnique: async ({ where, include }: any) => {
       const u = this.users.find((x) => (where.id ? x.id === where.id : x.phone === where.phone));
-      return u ? { ...u } : null;
+      if (!u) return null;
+      return include?.organization ? this.withOrg(u) : { ...u };
     },
     findUniqueOrThrow: async ({ where }: any) => {
       const u = this.users.find((x) => x.id === where.id);
@@ -157,5 +159,17 @@ export function makeStaffAuthDeps() {
   const rateLimit = new RateLimitService(r);
   const otp = new CustomerOtpService(r, staffTestConfig, sms, rateLimit);
   const events = new StaffAuthEventService(db as any);
-  return { redis, sms, db, r, rateLimit, otp, events, organizations: new FakeOrganizations(db), jwt: new FakeJwt() };
+  const throttle = new StaffLoginThrottleService(r);
+  return {
+    redis,
+    sms,
+    db,
+    r,
+    rateLimit,
+    otp,
+    events,
+    throttle,
+    organizations: new FakeOrganizations(db),
+    jwt: new FakeJwt(),
+  };
 }

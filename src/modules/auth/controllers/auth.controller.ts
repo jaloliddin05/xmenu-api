@@ -26,7 +26,6 @@ import {
 } from '../dto/staff-register.dto';
 import { Public } from '../decorators/public.decorator';
 import { User } from '../../user/models/user.modal';
-import { LocalAuthGuard } from '../passport-strategies/local/local-auth.guard';
 import { RefreshTokenUserGuard } from '../passport-strategies/refresh-token-user/refresh-token-user.guard';
 import { requestCtx } from 'src/infra/http/request-helpers';
 
@@ -40,17 +39,13 @@ export class AuthController {
   ) { }
 
   @Public()
-  @UseGuards(LocalAuthGuard)
   @Post('/login')
+  @ApiOperation({
+    summary: 'Owner login by phone and password (per-phone escalating lockout, per-IP limit)',
+  })
   @HttpCode(200)
-  async login(
-    @Req() { user }: { user: User },
-    @Res({ passthrough: true }) response: express.Response,
-    @Body() _: LoginDto,
-  ) {
-    const accessToken = this.authService.getJWT('access', user.id);
-    const refreshToken = this.authService.getJWT('refresh', user.id);
-    return { accessToken, refreshToken, user };
+  login(@Body() dto: LoginDto, @Req() req: express.Request) {
+    return this.staffAuth.login(dto, requestCtx(req));
   }
 
 

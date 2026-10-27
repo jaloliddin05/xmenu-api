@@ -1,14 +1,19 @@
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory, Reflector } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { ErrorFilter } from './infra/validators';
 import { AccessTokenUserGuard } from './modules/auth/passport-strategies/access-token-user/access-token-user.guard';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: ['log', 'warn', 'error'],
   });
+
+  // nginx on the same host proxies every request: trust X-Forwarded-For from loopback only, so
+  // req.ip is the client (per-IP auth limits) and a direct caller cannot spoof it.
+  app.set('trust proxy', 'loopback');
 
   // Bearer-token arxitektura: hech qaysi endpoint cookie ishlatmaydi
   // (grep -rn "res.cookie" src bo'sh natija beradi), shuning uchun

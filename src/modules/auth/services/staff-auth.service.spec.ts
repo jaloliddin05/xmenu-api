@@ -3,7 +3,19 @@ import { Logger } from '@nestjs/common';
 import { CustomerAuthException } from '../errors/customer-auth.exception';
 import { OrganizationTypeEnum } from 'src/modules/organization/models/organization.model';
 import { makeStaffAuthDeps, staffTestConfig } from './staff-auth.fake';
-import { PENDING_REGISTRATION_TTL_SECONDS, StaffAuthService } from './staff-auth.service';
+import {
+  LOGIN_IP_LIMIT,
+  PENDING_REGISTRATION_TTL_SECONDS,
+  StaffAuthService,
+} from './staff-auth.service';
+import { LOGIN_FAILS_BEFORE_LOCK } from './staff-login-throttle.service';
+
+// Same bcrypt everywhere, with compare observable (the service gets this mock too)
+jest.mock('bcrypt', () => {
+  const actual = jest.requireActual('bcrypt');
+  return { ...actual, compare: jest.fn(actual.compare) };
+});
+const compareMock = (jest.requireMock('bcrypt') as { compare: jest.Mock }).compare;
 
 const PHONE = '+998901234567';
 const CTX = { ip: '10.0.0.1', userAgent: 'jest' };
@@ -46,6 +58,7 @@ describe('StaffAuthService (signup)', () => {
       deps.otp,
       deps.rateLimit,
       deps.events,
+      deps.throttle,
       deps.jwt as any,
       deps.r,
       staffTestConfig,
@@ -242,6 +255,118 @@ describe('StaffAuthService (signup)', () => {
         'registration_expired',
       );
       expect(deps.sms.sent).toHaveLength(0);
+    });
+  });
+
+  describe('login', () => {
+    const PASSWORD = 'owner-password-1';
+
+    async function seedOwner(over: Partial<{ isActive: boolean; password: string | null }> = {}) {
+      const user = await deps.db.user.create({
+        data: {
+          phone: PHONE,
+          first_name: 'Aziz',
+          isActive: true,
+          password: await bcrypt.hash(PASSWORD, 4),
+          ...over,
+        },
+      });
+      await deps.organizations.create({ name: 'Mant', type: 'cafe' }, user.id);
+      return user;
+    }
+
+    async function failure(login: string, password: string, ip = CTX.ip) {
+      const err = await service.login({ login, password }, { ...CTX, ip }).then(
+        () => null,
+        (e) => e,
+      );
+      expect(err).toBeInstanceOf(CustomerAuthException);
+      return err as CustomerAuthException;
+    }
+
+    it('signs in with the right password and hides the hash', async () => {
+      const user = await seedOwner();
+      const res = await service.login({ login: PHONE, password: PASSWORD }, CTX);
+
+      expect(res.accessToken).toBe(`access:${user.id}`);
+      expect(res.refreshToken).toBe(`refresh:${user.id}`);
+      expect(res.user).not.toHaveProperty('password');
+      expect(res.user.organization?.name).toBe('Mant');
+      expect(deps.db.events.map((e) => e.type)).toContain('staff_login');
+    });
+
+    it('accepts the phone in the format the dashboard sends', async () => {
+      await seedOwner();
+      await expect(
+        service.login({ login: '998 90 123 45 67', password: PASSWORD }, CTX),
+      ).resolves.toHaveProperty('accessToken');
+    });
+
+    it('answers an unknown phone exactly like a wrong password', async () => {
+      await seedOwner();
+      compareMock.mockClear();
+      const wrongPassword = await failure(PHONE, 'not-the-password');
+      const comparesForWrong = compareMock.mock.calls.length;
+
+      compareMock.mockClear();
+      const unknownPhone = await failure('+998909999999', 'not-the-password');
+      const comparesForUnknown = compareMock.mock.calls.length;
+
+      expect(unknownPhone.getStatus()).toBe(401);
+      expect(unknownPhone.getStatus()).toBe(wrongPassword.getStatus());
+      expect(unknownPhone.getResponse()).toEqual(wrongPassword.getResponse());
+      expect(unknownPhone.getResponse()).toMatchObject({ code: 'invalid_credentials' });
+      // Same work on both paths: one bcrypt comparison
+      expect(comparesForWrong).toBe(1);
+      expect(comparesForUnknown).toBe(1);
+    });
+
+    it('treats an unconfirmed account and a malformed phone like any other failure', async () => {
+      await seedOwner({ isActive: false, password: null });
+      expect((await failure(PHONE, PASSWORD)).code).toBe('invalid_credentials');
+      expect((await failure('not a phone', PASSWORD)).code).toBe('invalid_credentials');
+    });
+
+    it('locks the phone after repeated failures, even for the right password', async () => {
+      await seedOwner();
+      for (let i = 0; i < LOGIN_FAILS_BEFORE_LOCK; i++) {
+        expect((await failure(PHONE, 'nope')).code).toBe('invalid_credentials');
+      }
+      const locked = await failure(PHONE, PASSWORD);
+      expect(locked.code).toBe('too_many_attempts');
+      expect(locked.getStatus()).toBe(429);
+      expect(locked.retryAfter).toBe(60);
+      expect(deps.db.events.map((e) => e.type)).toContain('staff_login_locked');
+
+      deps.redis.advance(60);
+      await expect(service.login({ login: PHONE, password: PASSWORD }, CTX)).resolves.toHaveProperty(
+        'accessToken',
+      );
+    });
+
+    it('locks an unknown phone the same way', async () => {
+      for (let i = 0; i < LOGIN_FAILS_BEFORE_LOCK; i++) await failure('+998909999999', 'nope');
+      expect((await failure('+998909999999', 'nope')).code).toBe('too_many_attempts');
+    });
+
+    it('a successful login clears earlier failures', async () => {
+      await seedOwner();
+      for (let i = 0; i < LOGIN_FAILS_BEFORE_LOCK - 1; i++) await failure(PHONE, 'nope');
+      await service.login({ login: PHONE, password: PASSWORD }, CTX);
+      // A fresh window: one more failure does not lock
+      expect((await failure(PHONE, 'nope')).code).toBe('invalid_credentials');
+      await expect(service.login({ login: PHONE, password: PASSWORD }, CTX)).resolves.toBeDefined();
+    });
+
+    it('limits attempts per IP across phones', async () => {
+      for (let i = 0; i < LOGIN_IP_LIMIT; i++) {
+        await failure(`+9989012345${String(i).padStart(2, '0')}`, 'nope', '10.9.9.9');
+      }
+      const limited = await failure('+998909999999', 'nope', '10.9.9.9');
+      expect(limited.code).toBe('rate_limited');
+      expect(limited.retryAfter).toBeGreaterThan(0);
+      // Another IP is unaffected
+      expect((await failure('+998909999999', 'nope', '10.0.0.2')).code).toBe('invalid_credentials');
     });
   });
 
