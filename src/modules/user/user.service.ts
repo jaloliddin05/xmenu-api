@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import * as bcrypt from 'bcrypt';
 
 import { PrismaService } from '../_prisma/prisma.service';
-import { ChangePasswordDto, CreateUserDto, UpdateUserDto } from './dto';
+import { ChangePasswordDto, UpdateUserDto } from './dto';
 import { FileService } from '../file/file.service';
 import { hashPassword } from 'src/infra/helper/auth/hash-password';
 import { toStaffUser } from 'src/infra/helper/auth/staff-user';
@@ -13,29 +13,6 @@ export class UserService {
     private readonly prismaService: PrismaService,
     private readonly fileService: FileService,
   ) { }
-
-  async create(data: CreateUserDto) {
-    const existingUser = await this.prismaService.user.findUnique({
-      where: { phone: data.phone },
-    });
-
-    if (existingUser && !existingUser?.isActive) {
-      const updatedUser = await this.prismaService.user.update({ where: { id: existingUser.id }, data: { ...data } })
-      return updatedUser
-    }
-
-    if (existingUser) {
-      throw new BadRequestException('Phone already taken');
-    }
-
-    return await this.prismaService.user.create({
-      data: { ...data },
-    });
-  }
-
-  async findAll() {
-    return await this.prismaService.user.findMany()
-  }
 
   async findOne(id: string) {
     const user = await this.prismaService.user.findUnique({
@@ -95,7 +72,7 @@ export class UserService {
         throw new NotFoundException('data not found');
       });
 
-    const isSamePassword = await await bcrypt.compare(data.oldPassword, user?.password)
+    const isSamePassword = !!user?.password && await bcrypt.compare(data.oldPassword, user.password)
 
     if (!isSamePassword) {
       throw new BadRequestException("Old password doesn't match");
