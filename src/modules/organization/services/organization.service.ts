@@ -7,6 +7,7 @@ import { FileService } from 'src/modules/file/file.service';
 import UpdateOrganizationDto from '../dto/update-organization.dto';
 import { parseOrganizationType } from '../models/organization.model';
 import { RevalidateService } from 'src/modules/revalidate-queue/revalidate.service';
+import { assertOwnTranslations } from 'src/modules/product/services/menu-ownership';
 
 @Injectable()
 export class OrganizationService {
@@ -70,8 +71,9 @@ export class OrganizationService {
     return organization;
   }
 
-  async findAll() {
-    return await this.prismaService.organization.findMany()
+  /** An owner may only act on their own organization; any other id looks like it does not exist. */
+  assertOwn(id: string, organizationId: string) {
+    if (id !== organizationId) throw new NotFoundException('Organization not found');
   }
 
   async findOne(id: string) {
@@ -187,11 +189,22 @@ export class OrganizationService {
 
   async update(
     id: string,
+    organizationId: string,
     data: UpdateOrganizationDto,
     logo?: Express.Multer.File,
     banner?: Express.Multer.File,
     slug?: string
   ) {
+    // Ownership first: nothing (not even the logo/banner files) is touched for someone else's venue
+    this.assertOwn(id, organizationId);
+    if (data.translations?.length) {
+      const own = await this.prismaService.organization_translation.findMany({
+        where: { organization_id: id },
+        select: { id: true },
+      });
+      assertOwnTranslations(own, data.translations);
+    }
+
     const files: any = {};
 
     // 1️⃣ logo va banner
@@ -253,13 +266,8 @@ export class OrganizationService {
   }
 
 
-  async updateIsActive(owner_id: string, is_active: boolean) {
-    const organization = await this.prismaService.organization.update({ where: { owner_id }, data: { is_active } })
-    await this.revalidateService.addRevalidationJob({slug:organization.slug})
-    return organization
-  }
-
-  async delete(id: string) {
+  async delete(id: string, organizationId: string) {
+    this.assertOwn(id, organizationId);
     return await this.prismaService.organization.delete({ where: { id } })
   }
 

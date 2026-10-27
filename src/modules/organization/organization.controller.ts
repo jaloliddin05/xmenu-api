@@ -5,24 +5,20 @@ import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { MulterStorage } from 'src/infra/helper/upload/multer-upload';
 import UpdateOrganizationDto from './dto/update-organization.dto';
 import { Public } from '../auth/decorators/public.decorator';
+import { requireStaffOrganizationId } from 'src/infra/http/request-helpers';
 
 @ApiTags('Organization')
 @Controller('organization')
 export class OrganizationController {
   constructor(private readonly organizationService: OrganizationService) { }
 
-  @Get()
-  @ApiOperation({ summary: 'Method: get all' })
-  @HttpCode(HttpStatus.OK)
-  async findAll() {
-    return await this.organizationService.findAll();
-  }
-
   @Get(':id')
-  @ApiOperation({ summary: 'Method: get one' })
+  @ApiOperation({ summary: 'Method: get one (your own organization only)' })
   @HttpCode(HttpStatus.OK)
-  async findOne(@Param('id') id: string) {
-    return await this.organizationService.findOne(id);
+  async findOne(@Param('id') id: string, @Req() req) {
+    const organization = await this.organizationService.findOne(id);
+    this.organizationService.assertOwn(organization.id, requireStaffOrganizationId(req));
+    return organization;
   }
 
   @Public()
@@ -86,13 +82,13 @@ export class OrganizationController {
     {
     const banner = files?.banner?.[0];
     const logo = files?.logo?.[0];
-    return await this.organizationService.update(id, data, logo,banner, req?.user?.organization?.slug );
+    return await this.organizationService.update(id, requireStaffOrganizationId(req), data, logo,banner, req?.user?.organization?.slug );
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Method: delete' })
   @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@Param('id') id: string) {
-    return await this.organizationService.delete(id);
+  async remove(@Param('id') id: string, @Req() req) {
+    return await this.organizationService.delete(id, requireStaffOrganizationId(req));
   }
 }

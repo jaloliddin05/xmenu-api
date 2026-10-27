@@ -11,8 +11,10 @@ const RELATIONS: Record<string, Record<string, Rel>> = {
   organization: {
     categories: { table: 'category', fk: 'organization_id', many: true },
     translations: { table: 'organization_translation', fk: 'organization_id', many: true },
+    logo: { table: 'file', fk: 'logo_id' },
+    banner: { table: 'file', fk: 'banner_id' },
   },
-  organization_translation: {},
+  organization_translation: { organization: { table: 'organization', fk: 'organization_id' } },
   category: {
     organization: { table: 'organization', fk: 'organization_id' },
     translations: { table: 'category_translation', fk: 'category_id', many: true },
@@ -140,7 +142,7 @@ export class FakeMenuPrisma {
   }
 
   /** Inserts a row as-is (test setup; not logged). */
-  seed(table: string, row: Row): Row {
+  seed(table: string, row: Row): Row & { id: string } {
     const r = { id: this.nextId(table), ...row };
     this.data[table].push(r);
     return r;
