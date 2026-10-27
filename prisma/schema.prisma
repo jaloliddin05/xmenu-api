@@ -467,6 +467,7 @@ model organization {
   orders       customer_order[]
   order_settings    organization_order_settings?
   payment_providers organization_payment_provider[]
+  additional_product_groups additional_product_group[]
   // Tenant ichidagi buyurtma raqami hisoblagichi (atomik UPDATE ... RETURNING)
   order_seq    Int               @default(1000)
 
@@ -571,6 +572,12 @@ model additional_product_group {
 
   product    product?   @relation(fields: [product_id], references: [id], onDelete: Cascade)
   product_id  String?
+
+  // Owner. Set on create, so a group made before its dish (product_id still empty) is not ownerless.
+  organization    organization? @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  organization_id String?
+
+  @@index([organization_id])
 }
 
 model additional_product_translation {

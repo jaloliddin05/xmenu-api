@@ -28,6 +28,7 @@ const RELATIONS: Record<string, Record<string, Rel>> = {
   product_translation: { product: { table: 'product', fk: 'product_id' } },
   additional_product_group: {
     product: { table: 'product', fk: 'product_id' },
+    organization: { table: 'organization', fk: 'organization_id' },
     translations: {
       table: 'additional_product_group_translation',
       fk: 'additional_product_group_id',
@@ -230,7 +231,11 @@ export function seedTwoTenants(db: FakeMenuPrisma) {
     const product = db.seed('product', { category_id: category.id, index: 1, price: 100, is_active: true });
     const productTr = db.seed('product_translation', { product_id: product.id, lang: 'ru', title: `${name} dish` });
     const image = db.seed('file', { product_id: product.id, url: `/img/${name}.png` });
-    const group = db.seed('additional_product_group', { product_id: product.id, is_multiple: false });
+    const group = db.seed('additional_product_group', {
+      product_id: product.id,
+      organization_id: org.id,
+      is_multiple: false,
+    });
     const groupTr = db.seed('additional_product_group_translation', {
       additional_product_group_id: group.id,
       lang: 'ru',

@@ -16,4 +16,10 @@ model additional_product_group {
 
   product    product?   @relation(fields: [product_id], references: [id], onDelete: Cascade)
   product_id  String?
+
+  // Owner. Set on create, so a group made before its dish (product_id still empty) is not ownerless.
+  organization    organization? @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  organization_id String?
+
+  @@index([organization_id])
 }

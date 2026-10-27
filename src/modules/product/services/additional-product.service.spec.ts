@@ -65,9 +65,28 @@ describe('AdditionalProductService: organization ownership (IDOR)', () => {
       );
     });
 
-    it('treats a group without a product as nobody’s', async () => {
-      const orphan = db.seed('additional_product_group', { product_id: null });
+    it('treats a legacy group without an owner as nobody’s', async () => {
+      const orphan = db.seed('additional_product_group', { product_id: null, organization_id: null });
       await refused(service.deleteGroup(orphan.id, ORG, 'mine'));
+    });
+
+    it('a group made before its dish belongs to me and takes options', async () => {
+      const g = await service.createGroup({ is_multiple: false, translations: TR }, ORG, 'mine');
+      const row = db.data.additional_product_group.find((r) => r.id === g.id)!;
+      expect(row.organization_id).toBe(ORG);
+      expect(row.product_id ?? null).toBeNull();
+      // Nothing public changed yet, so no revalidation
+      expect(revalidate.addRevalidationJob).not.toHaveBeenCalled();
+
+      await service.createAdditionalProduct(
+        { additional_product_group_id: g.id, price: 3, translations: TR },
+        ORG,
+        'mine',
+      );
+      // ...and is invisible to the other tenant
+      await expect(service.deleteGroup(g.id, t.theirs.org.id, 'theirs')).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
     });
 
     it('updates and deletes my own group', async () => {

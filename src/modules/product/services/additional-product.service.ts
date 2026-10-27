@@ -42,7 +42,7 @@ export class AdditionalProductService {
   }
 
   async createGroup(dto: CreateAdditionalProductGroupDto, organizationId: string, slug: string) {
-    await this.assertOwnProduct(dto.product_id, organizationId);
+    if (dto.product_id) await this.assertOwnProduct(dto.product_id, organizationId);
 
     const data: any = {
       is_multiple: dto.is_multiple ?? false,
@@ -55,8 +55,15 @@ export class AdditionalProductService {
           title: t.title,
         })),
       },
-      product: { connect: { id: dto.product_id } },
+      organization: { connect: { id: organizationId } },
     };
+
+    // Agar product_id kelsa — shunda bog‘laymiz (aks holda guruh POST /product da ulanadi)
+    if (dto.product_id) {
+      data.product = {
+        connect: { id: dto.product_id },
+      };
+    }
 
     const add_prod_group = await this.prismaService.additional_product_group.create({
       data,
@@ -65,7 +72,9 @@ export class AdditionalProductService {
       },
     });
 
-    await this.revalidateService.addRevalidationJob({slug})
+    if(dto?.product_id){
+      await this.revalidateService.addRevalidationJob({slug})
+    }
 
     return add_prod_group
   }
