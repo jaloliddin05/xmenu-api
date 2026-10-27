@@ -1,0 +1,3572 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/application": {
+      "post": {
+        "operationId": "ApplicationController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateApplicationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Method: create",
+        "tags": [
+          "Application"
+        ]
+      },
+      "get": {
+        "operationId": "ApplicationController_findAll",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Application"
+        ]
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "operationId": "AuthController_login",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Owner login by phone and password (per-phone escalating lockout, per-IP limit)",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/register": {
+      "post": {
+        "operationId": "AuthController_register",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StaffRegisterDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Start owner signup: nothing is stored in the DB until the SMS code is confirmed",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/check-code": {
+      "post": {
+        "operationId": "AuthController_checkCode",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StaffCheckCodeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Confirm the signup code; creates the owner and the venue and signs in",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/resend-code": {
+      "post": {
+        "operationId": "AuthController_resendCode",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StaffRegistrationRefDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Send a new signup code (respects the resend cooldown)",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "operationId": "AuthController_refresh",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "New access, refresh tokens have been saved."
+          },
+          "403": {
+            "description": "Unauthorized Request"
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/customer/otp/request": {
+      "post": {
+        "operationId": "AuthCustomerController_requestOtp",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "Organization slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerOtpRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Auth-Customer"
+        ]
+      }
+    },
+    "/auth/customer/otp/verify": {
+      "post": {
+        "operationId": "AuthCustomerController_verifyOtp",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "Organization slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerOtpVerifyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Auth-Customer"
+        ]
+      }
+    },
+    "/auth/customer/register": {
+      "post": {
+        "operationId": "AuthCustomerController_register",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "Organization slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerRegisterDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Auth-Customer"
+        ]
+      }
+    },
+    "/auth/customer/refresh": {
+      "post": {
+        "operationId": "AuthCustomerController_refresh",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "Organization slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerRefreshDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Auth-Customer"
+        ]
+      }
+    },
+    "/auth/customer/logout": {
+      "post": {
+        "operationId": "AuthCustomerController_logout",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "Organization slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerLogoutDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Auth-Customer"
+        ]
+      }
+    },
+    "/auth/customer/me": {
+      "get": {
+        "operationId": "AuthCustomerController_me",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "Organization slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "tags": [
+          "Auth-Customer"
+        ]
+      }
+    },
+    "/auth/customer/login": {
+      "post": {
+        "operationId": "AuthCustomerController_telegramLogin",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "Organization slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerTelegramDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Auth-Customer"
+        ]
+      }
+    },
+    "/user/me": {
+      "get": {
+        "operationId": "UserController_getMe",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Method: returns user",
+        "tags": [
+          "User"
+        ]
+      }
+    },
+    "/user/{id}": {
+      "put": {
+        "operationId": "UserController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Method: updating user",
+        "tags": [
+          "User"
+        ]
+      },
+      "delete": {
+        "operationId": "UserController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Method: delete",
+        "tags": [
+          "User"
+        ]
+      }
+    },
+    "/user/change-password/{id}": {
+      "put": {
+        "operationId": "UserController_changePassword",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Method: updating user password",
+        "tags": [
+          "User"
+        ]
+      }
+    },
+    "/organization/{id}": {
+      "get": {
+        "operationId": "OrganizationController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Method: get one (your own organization only)",
+        "tags": [
+          "Organization"
+        ]
+      },
+      "put": {
+        "operationId": "OrganizationController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOrganizationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Method: updating organization",
+        "tags": [
+          "Organization"
+        ]
+      },
+      "delete": {
+        "operationId": "OrganizationController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Method: delete",
+        "tags": [
+          "Organization"
+        ]
+      }
+    },
+    "/organization/return-slug/{id}": {
+      "get": {
+        "operationId": "OrganizationController_getSlugById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Method: get slug",
+        "tags": [
+          "Organization"
+        ]
+      }
+    },
+    "/organization/slug/{slug}": {
+      "get": {
+        "operationId": "OrganizationController_findOneBySlug",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "lang",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Method: get one",
+        "tags": [
+          "Organization"
+        ]
+      }
+    },
+    "/organization/check-slug": {
+      "post": {
+        "operationId": "OrganizationController_checkSlug",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "slug": {
+                    "type": "string",
+                    "example": "burger-king",
+                    "description": "Tekshiriladigan slug nomi"
+                  }
+                },
+                "required": [
+                  "slug"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Slug mavjudligini tekshirish",
+        "tags": [
+          "Organization"
+        ]
+      }
+    },
+    "/customers/me": {
+      "get": {
+        "operationId": "CustomerController_getMe",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "Organization slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Get current customer",
+        "tags": [
+          "Customers"
+        ]
+      },
+      "patch": {
+        "operationId": "CustomerController_updateMe",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "Organization slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCustomerDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Update current customer name",
+        "tags": [
+          "Customers"
+        ]
+      }
+    },
+    "/customers/me/addresses": {
+      "get": {
+        "operationId": "CustomerAddressController_list",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "Organization slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Saqlangan manzillar (asosiy birinchi, keyin yangidan eskiga)",
+        "tags": [
+          "Customer addresses"
+        ]
+      },
+      "post": {
+        "operationId": "CustomerAddressController_create",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "Organization slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAddressDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Manzil saqlash. Birinchi manzil avtomatik asosiy bo'ladi",
+        "tags": [
+          "Customer addresses"
+        ]
+      }
+    },
+    "/customers/me/addresses/{id}/default": {
+      "post": {
+        "operationId": "CustomerAddressController_setDefault",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "Organization slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Manzilni asosiy qilish (allaqachon asosiy bo'lsa ham xato emas)",
+        "tags": [
+          "Customer addresses"
+        ]
+      }
+    },
+    "/customers/me/addresses/{id}": {
+      "delete": {
+        "operationId": "CustomerAddressController_remove",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "Organization slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Manzilni o'chirish. Asosiy o'chirilsa, eng yangisi asosiy bo'ladi",
+        "tags": [
+          "Customer addresses"
+        ]
+      }
+    },
+    "/branches": {
+      "get": {
+        "operationId": "BranchController_list",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "Organization slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Faol filiallar (hours/isOpen/opensAt serverda hisoblanadi)",
+        "tags": [
+          "Branches (customer)"
+        ]
+      }
+    },
+    "/branch": {
+      "get": {
+        "operationId": "BranchAdminController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Barcha filiallar (yashirinlari ham) jadvali bilan",
+        "tags": [
+          "Branch"
+        ]
+      },
+      "post": {
+        "operationId": "BranchAdminController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBranchDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Filial yaratish",
+        "tags": [
+          "Branch"
+        ]
+      }
+    },
+    "/branch/{id}": {
+      "patch": {
+        "operationId": "BranchAdminController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBranchDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Filial maydonlarini o'zgartirish (isActive=false — yashirish)",
+        "tags": [
+          "Branch"
+        ]
+      },
+      "delete": {
+        "operationId": "BranchAdminController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "O'chirish (buyurtmasi bor filial faqat yashiriladi)",
+        "tags": [
+          "Branch"
+        ]
+      }
+    },
+    "/branch/{id}/working-hours": {
+      "put": {
+        "operationId": "BranchAdminController_setWorkingHours",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetWorkingHoursDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Haftalik ish jadvalini to'liq almashtirish",
+        "tags": [
+          "Branch"
+        ]
+      }
+    },
+    "/branch/{id}/exceptions": {
+      "post": {
+        "operationId": "BranchAdminController_addException",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateHoursExceptionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Sana uchun istisno (bayram, ta'mir) qo'shish/yangilash",
+        "tags": [
+          "Branch"
+        ]
+      }
+    },
+    "/branch/{id}/exceptions/{exceptionId}": {
+      "delete": {
+        "operationId": "BranchAdminController_removeException",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "exceptionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Istisnoni o'chirish",
+        "tags": [
+          "Branch"
+        ]
+      }
+    },
+    "/category": {
+      "get": {
+        "operationId": "CategoryController_findAll",
+        "parameters": [
+          {
+            "name": "lang",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Method: get all",
+        "tags": [
+          "Category"
+        ]
+      },
+      "post": {
+        "operationId": "CategoryController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCategoryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Method: create",
+        "tags": [
+          "Category"
+        ]
+      }
+    },
+    "/category/for-select/{organizationId}": {
+      "get": {
+        "operationId": "CategoryController_findAllForSelect",
+        "parameters": [
+          {
+            "name": "lang",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Method: get all for select (only your own organization id)",
+        "tags": [
+          "Category"
+        ]
+      }
+    },
+    "/category/{id}": {
+      "get": {
+        "operationId": "CategoryController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Method: get one",
+        "tags": [
+          "Category"
+        ]
+      },
+      "put": {
+        "operationId": "CategoryController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCategoryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Method: update",
+        "tags": [
+          "Category"
+        ]
+      },
+      "delete": {
+        "operationId": "CategoryController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Method: delete",
+        "tags": [
+          "Category"
+        ]
+      }
+    },
+    "/category/{id}/activate": {
+      "patch": {
+        "operationId": "CategoryController_activateCategory",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "isActive": {
+                    "type": "boolean",
+                    "example": true,
+                    "description": "Set true to activate, false to deactivate category"
+                  }
+                },
+                "required": [
+                  "is_active"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Method: activate/deactivate category",
+        "tags": [
+          "Category"
+        ]
+      }
+    },
+    "/category/index": {
+      "patch": {
+        "operationId": "CategoryController_updateIndex",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveCategoryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Method: update index",
+        "tags": [
+          "Category"
+        ]
+      }
+    },
+    "/file/upload": {
+      "post": {
+        "operationId": "FileController_uploadFile",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "File"
+        ]
+      }
+    },
+    "/menu": {
+      "get": {
+        "operationId": "MenuController_get",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "Organization slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Menyu: kategoriyalar → taomlar → modifikator guruhlari",
+        "tags": [
+          "Menu (customer)"
+        ]
+      }
+    },
+    "/orders": {
+      "post": {
+        "operationId": "CustomerOrderController_create",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "Organization slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Har bir buyurtma urinishi uchun noyob kalit (8-128 belgi). Takrorda o'sha buyurtma qaytadi.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOrderDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Buyurtma yaratish",
+        "tags": [
+          "Orders (customer)"
+        ]
+      },
+      "get": {
+        "operationId": "CustomerOrderController_list",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "Organization slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Mijoz buyurtmalari (yangilari birinchi, 50 tagacha). ?status=active — tugallanmaganlari",
+        "tags": [
+          "Orders (customer)"
+        ]
+      }
+    },
+    "/orders/{id}": {
+      "get": {
+        "operationId": "CustomerOrderController_get",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "Organization slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Bitta buyurtma (ekran shuni so'rab turadi)",
+        "tags": [
+          "Orders (customer)"
+        ]
+      }
+    },
+    "/orders/{id}/cancel": {
+      "post": {
+        "operationId": "CustomerOrderController_cancel",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "Organization slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Bekor qilish (faqat tayyorlash boshlanguncha)",
+        "tags": [
+          "Orders (customer)"
+        ]
+      }
+    },
+    "/orders/{id}/payment/retry": {
+      "post": {
+        "operationId": "CustomerOrderController_retryPayment",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "Organization slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "To'lov muvaffaqiyatsiz bo'lgan buyurtma uchun yangi to'lov havolasi",
+        "tags": [
+          "Orders (customer)"
+        ]
+      }
+    },
+    "/order": {
+      "get": {
+        "operationId": "StaffOrderController_list",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Vergul bilan: pending_acceptance,accepted",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Buyurtmalar ro'yxati (yangilari birinchi, cursor pagination)",
+        "tags": [
+          "Orders (staff)"
+        ]
+      }
+    },
+    "/order/{id}": {
+      "get": {
+        "operationId": "StaffOrderController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Buyurtma tafsiloti (mijoz, status tarixi bilan)",
+        "tags": [
+          "Orders (staff)"
+        ]
+      }
+    },
+    "/order/{id}/accept": {
+      "post": {
+        "operationId": "StaffOrderController_accept",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptOrderDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Qabul qilish (ixtiyoriy: ETA)",
+        "tags": [
+          "Orders (staff)"
+        ]
+      }
+    },
+    "/order/{id}/reject": {
+      "post": {
+        "operationId": "StaffOrderController_reject",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectOrderDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Rad etish (to'langan bo'lsa pul qaytariladi)",
+        "tags": [
+          "Orders (staff)"
+        ]
+      }
+    },
+    "/order/{id}/advance": {
+      "post": {
+        "operationId": "StaffOrderController_advance",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Keyingi bosqichga o'tkazish (tayyorlanmoqda → yo'lda/tayyor → yakunlandi)",
+        "tags": [
+          "Orders (staff)"
+        ]
+      }
+    },
+    "/order/{id}/status": {
+      "post": {
+        "operationId": "StaffOrderController_setStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetOrderStatusDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Aniq holatga o'tkazish (holatlar mashinasi ruxsat bergan taqdirda)",
+        "tags": [
+          "Orders (staff)"
+        ]
+      }
+    },
+    "/order-settings": {
+      "get": {
+        "operationId": "OrderSettingsController_get",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Joriy sozlamalar (qator bo'lmasa standartlar)",
+        "tags": [
+          "Order settings"
+        ]
+      },
+      "put": {
+        "operationId": "OrderSettingsController_update",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOrderSettingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Sozlamalarni saqlash (faqat yuborilgan maydonlar o'zgaradi)",
+        "tags": [
+          "Order settings"
+        ]
+      }
+    },
+    "/checkout-config": {
+      "get": {
+        "operationId": "CheckoutConfigController_get",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "Organization slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Savat sozlamalari: yetkazib berish narxi, minimal summa, ETA, to'lov usullari",
+        "tags": [
+          "Checkout config (customer)"
+        ]
+      }
+    },
+    "/payment-provider": {
+      "get": {
+        "operationId": "PaymentProviderController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Yoqilgan/sozlangan provayderlar + kabinetga kiritiladigan webhook manzillari",
+        "tags": [
+          "Payment providers"
+        ]
+      }
+    },
+    "/payment-provider/{provider}": {
+      "put": {
+        "operationId": "PaymentProviderController_upsert",
+        "parameters": [
+          {
+            "name": "provider",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertPaymentProviderDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Provayder kalitlarini saqlash (shifrlanadi) va yoqish",
+        "tags": [
+          "Payment providers"
+        ]
+      }
+    },
+    "/payment-provider/{provider}/disable": {
+      "post": {
+        "operationId": "PaymentProviderController_disable",
+        "parameters": [
+          {
+            "name": "provider",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Provayderni o'chirish (kalitlar saqlanadi)",
+        "tags": [
+          "Payment providers"
+        ]
+      }
+    },
+    "/product": {
+      "get": {
+        "operationId": "ProductController_findAll",
+        "parameters": [
+          {
+            "name": "lang",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "categoryId",
+            "required": false,
+            "in": "query",
+            "description": "uuid",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "is_active",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "title",
+            "required": false,
+            "in": "query",
+            "description": "",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "isActive",
+            "required": false,
+            "in": "query",
+            "description": "true",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Method: get all",
+        "tags": [
+          "Product"
+        ]
+      },
+      "post": {
+        "operationId": "ProductController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateProductDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Create new product with translations and options",
+        "tags": [
+          "Product"
+        ]
+      }
+    },
+    "/product/{id}": {
+      "get": {
+        "operationId": "ProductController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Method: get one",
+        "tags": [
+          "Product"
+        ]
+      },
+      "put": {
+        "operationId": "ProductController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProductDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Update existing product",
+        "tags": [
+          "Product"
+        ]
+      },
+      "delete": {
+        "operationId": "ProductController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Method: delete",
+        "tags": [
+          "Product"
+        ]
+      }
+    },
+    "/product/index": {
+      "patch": {
+        "operationId": "ProductController_updateIndex",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveProductDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Method: update index",
+        "tags": [
+          "Product"
+        ]
+      }
+    },
+    "/product/{id}/activate": {
+      "patch": {
+        "operationId": "ProductController_activateProduct",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "isActive": {
+                    "type": "boolean",
+                    "example": true,
+                    "description": "Set true to activate, false to deactivate product"
+                  }
+                },
+                "required": [
+                  "is_active"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Method: activate/deactivate product",
+        "tags": [
+          "Product"
+        ]
+      }
+    },
+    "/product/{id}/images": {
+      "patch": {
+        "operationId": "ProductController_uploadImages",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadProductImagesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Upload images for a product",
+        "tags": [
+          "Product"
+        ]
+      }
+    },
+    "/product/image/{id}": {
+      "delete": {
+        "operationId": "ProductController_removeImage",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Method: delete image",
+        "tags": [
+          "Product"
+        ]
+      }
+    },
+    "/additional-product/group": {
+      "post": {
+        "operationId": "AdditionalProductController_createAdditionalProductGroup",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAdditionalProductGroupDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Create new additional product group",
+        "tags": [
+          "Additional-Product"
+        ]
+      }
+    },
+    "/additional-product": {
+      "post": {
+        "operationId": "AdditionalProductController_createAdditionalProduct",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAdditionalProductDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Create new additional product",
+        "tags": [
+          "Additional-Product"
+        ]
+      }
+    },
+    "/additional-product/group/{id}": {
+      "put": {
+        "operationId": "AdditionalProductController_updateGroup",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAdditionalProductGroupDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Update additional product group",
+        "tags": [
+          "Additional-Product"
+        ]
+      },
+      "delete": {
+        "operationId": "AdditionalProductController_deleteGroup",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Method: delete",
+        "tags": [
+          "Additional-Product"
+        ]
+      }
+    },
+    "/additional-product/{id}": {
+      "put": {
+        "operationId": "AdditionalProductController_updateAdditionalProduct",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAdditionalProductDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Update additional product",
+        "tags": [
+          "Additional-Product"
+        ]
+      },
+      "delete": {
+        "operationId": "AdditionalProductController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Method: delete",
+        "tags": [
+          "Additional-Product"
+        ]
+      }
+    },
+    "/translation": {
+      "post": {
+        "operationId": "TranslationController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TranslationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Method: create",
+        "tags": [
+          "Translation"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "Xmenu",
+    "description": "Xmenu API description",
+    "version": "0.2",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "access-token": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http"
+      }
+    },
+    "schemas": {
+      "CreateApplicationDto": {
+        "type": "object",
+        "properties": {
+          "fullName": {
+            "type": "string",
+            "description": "fullName",
+            "example": ""
+          },
+          "phone": {
+            "type": "string",
+            "description": "phone",
+            "example": ""
+          },
+          "plan": {
+            "type": "string",
+            "description": "plan",
+            "example": ""
+          },
+          "from": {
+            "type": "string",
+            "description": "from",
+            "example": ""
+          },
+          "description": {
+            "type": "string",
+            "description": "description",
+            "example": ""
+          }
+        }
+      },
+      "LoginDto": {
+        "type": "object",
+        "properties": {
+          "login": {
+            "type": "string",
+            "description": "login",
+            "example": "admin"
+          },
+          "password": {
+            "type": "string",
+            "description": "password",
+            "example": "admin"
+          }
+        },
+        "required": [
+          "login",
+          "password"
+        ]
+      },
+      "StaffRegisterDto": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "example": "+998901234567",
+            "description": "Owner phone, E.164 (+998...)"
+          },
+          "password": {
+            "type": "string",
+            "example": "correct horse battery",
+            "minLength": 8,
+            "maxLength": 72
+          },
+          "name": {
+            "type": "string",
+            "example": "Mant",
+            "description": "Venue name; the slug is derived from it"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "restaurant",
+              "cafe",
+              "fast_food",
+              "coffee_shop",
+              "other"
+            ],
+            "example": "cafe"
+          },
+          "first_name": {
+            "type": "string",
+            "example": "Aziz"
+          },
+          "last_name": {
+            "type": "string",
+            "example": "Karimov"
+          }
+        },
+        "required": [
+          "phone",
+          "password",
+          "name",
+          "type",
+          "first_name"
+        ]
+      },
+      "StaffCheckCodeDto": {
+        "type": "object",
+        "properties": {
+          "registrationId": {
+            "type": "string",
+            "example": "6f1c2a3e-1b2c-4d5e-8f90-1a2b3c4d5e6f",
+            "description": "From POST /auth/register"
+          },
+          "code": {
+            "type": "string",
+            "example": "123456",
+            "description": "SMS code, digits as a string (length = OTP_LENGTH)"
+          }
+        },
+        "required": [
+          "registrationId",
+          "code"
+        ]
+      },
+      "StaffRegistrationRefDto": {
+        "type": "object",
+        "properties": {
+          "registrationId": {
+            "type": "string",
+            "example": "6f1c2a3e-1b2c-4d5e-8f90-1a2b3c4d5e6f",
+            "description": "From POST /auth/register"
+          }
+        },
+        "required": [
+          "registrationId"
+        ]
+      },
+      "CustomerOtpRequestDto": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "example": "+998901234567"
+          }
+        },
+        "required": [
+          "phone"
+        ]
+      },
+      "CustomerOtpVerifyDto": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "example": "+998901234567"
+          },
+          "code": {
+            "type": "string",
+            "example": "123456"
+          },
+          "initData": {
+            "type": "string",
+            "description": "Telegram WebApp initData — mavjud mijozga Telegram ulash uchun"
+          }
+        },
+        "required": [
+          "phone",
+          "code"
+        ]
+      },
+      "CustomerRegisterDto": {
+        "type": "object",
+        "properties": {
+          "registrationToken": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "example": "Ali"
+          },
+          "initData": {
+            "type": "string",
+            "description": "Telegram WebApp initData — yangi mijozga Telegram ulash uchun"
+          }
+        },
+        "required": [
+          "registrationToken",
+          "name"
+        ]
+      },
+      "CustomerRefreshDto": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "refreshToken"
+        ]
+      },
+      "CustomerLogoutDto": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string"
+          }
+        }
+      },
+      "CustomerTelegramDto": {
+        "type": "object",
+        "properties": {
+          "initData": {
+            "type": "string",
+            "description": "Telegram WebApp initData",
+            "example": "query_id=AA...&user=%7B...%7D&auth_date=...&hash=..."
+          }
+        },
+        "required": [
+          "initData"
+        ]
+      },
+      "UpdateUserDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "email",
+            "example": ""
+          },
+          "first_name": {
+            "type": "string",
+            "description": "first_name",
+            "example": ""
+          },
+          "last_name": {
+            "type": "string",
+            "description": "last_name",
+            "example": ""
+          },
+          "avatar": {
+            "type": "string",
+            "description": "image",
+            "example": "image",
+            "format": "binary"
+          }
+        }
+      },
+      "ChangePasswordDto": {
+        "type": "object",
+        "properties": {
+          "oldPassword": {
+            "type": "string",
+            "description": "old password",
+            "example": "12345"
+          },
+          "newPassword": {
+            "type": "string",
+            "description": "new password, 8-72 characters",
+            "example": "correct horse battery",
+            "minLength": 8,
+            "maxLength": 72
+          }
+        },
+        "required": [
+          "oldPassword",
+          "newPassword"
+        ]
+      },
+      "UpdateOrganizationDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "type"
+          },
+          "name": {
+            "type": "string",
+            "description": "name"
+          },
+          "slug": {
+            "type": "string",
+            "description": "slug"
+          },
+          "logo": {
+            "type": "string",
+            "description": "logo",
+            "format": "binary"
+          },
+          "banner": {
+            "type": "string",
+            "description": "banner",
+            "format": "binary"
+          },
+          "translations": {
+            "example": [
+              {
+                "id": "uuid1",
+                "lang": "en",
+                "description": "Fresh and healthy"
+              },
+              {
+                "id": "uuid2",
+                "lang": "uz",
+                "description": "Yangi va foydali"
+              },
+              {
+                "id": "uuid3",
+                "lang": "ru",
+                "description": "Свежий и полезный"
+              }
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "UpdateCustomerDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "name (2-50 belgi)",
+            "example": "Ali"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "CreateAddressDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Nom: Uy, Ish... (1-50 belgi)",
+            "example": "Uy"
+          },
+          "address": {
+            "type": "string",
+            "description": "Ko'cha va uy (3-200 belgi)",
+            "example": "Shamol oti ko‘chasi 42"
+          },
+          "latitude": {
+            "type": "number",
+            "description": "latitude -90..90; longitude bilan birga",
+            "example": 41.311081
+          },
+          "longitude": {
+            "type": "number",
+            "description": "longitude -180..180; latitude bilan birga",
+            "example": 69.240562
+          },
+          "entrance": {
+            "type": "string",
+            "description": "Pod'ezd (<=20 belgi)",
+            "example": "2"
+          },
+          "floor": {
+            "type": "string",
+            "description": "Qavat (<=20 belgi)",
+            "example": "5"
+          },
+          "apartment": {
+            "type": "string",
+            "description": "Xonadon/ofis (<=20 belgi)",
+            "example": "17"
+          },
+          "comment": {
+            "type": "string",
+            "description": "Mo‘ljal va tafsilotlar (<=250 belgi)",
+            "example": "Darvoza ko'k rangda"
+          },
+          "isDefault": {
+            "type": "boolean",
+            "description": "Asosiy manzil qilish. Birinchi saqlangan manzil har doim asosiy bo'ladi",
+            "example": false
+          }
+        },
+        "required": [
+          "address"
+        ]
+      },
+      "CreateBranchDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "example": "Mant 24/7 — Chilonzor"
+          },
+          "address": {
+            "type": "string",
+            "example": "г. Ташкент, Чиланзарский р-н, ул. Бунёдкор, 12"
+          },
+          "latitude": {
+            "type": "number",
+            "example": 41.2856
+          },
+          "longitude": {
+            "type": "number",
+            "example": 69.2034
+          },
+          "phone": {
+            "type": "string",
+            "example": "+998711234567",
+            "description": "Filial telefoni (eskalatsiya SMS'i shu raqamga)"
+          },
+          "timezone": {
+            "type": "string",
+            "example": "Asia/Tashkent"
+          },
+          "sortOrder": {
+            "type": "number",
+            "example": 0
+          },
+          "acceptsPickup": {
+            "type": "boolean"
+          },
+          "acceptsDelivery": {
+            "type": "boolean"
+          },
+          "telegramChatId": {
+            "type": "string",
+            "example": "-1001234567890",
+            "description": "Buyurtma xabarlari yuboriladigan Telegram guruh id'si (bot a'zo bo'lishi shart)"
+          }
+        },
+        "required": [
+          "title",
+          "address",
+          "latitude",
+          "longitude"
+        ]
+      },
+      "UpdateBranchDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          },
+          "latitude": {
+            "type": "number"
+          },
+          "longitude": {
+            "type": "number"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "sortOrder": {
+            "type": "number"
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "false — mijozlarga ko'rinmaydi va buyurtma qabul qilmaydi"
+          },
+          "acceptsPickup": {
+            "type": "boolean"
+          },
+          "acceptsDelivery": {
+            "type": "boolean"
+          },
+          "telegramChatId": {
+            "type": "string"
+          }
+        }
+      },
+      "WorkingDayDto": {
+        "type": "object",
+        "properties": {
+          "weekday": {
+            "type": "number",
+            "example": 1,
+            "description": "1 = dushanba ... 7 = yakshanba"
+          },
+          "opensAt": {
+            "type": "string",
+            "example": "09:00"
+          },
+          "closesAt": {
+            "type": "string",
+            "example": "23:00",
+            "description": "opensAt dan kichik/teng bo'lsa — ertasi kuni yopiladi"
+          },
+          "is24h": {
+            "type": "boolean"
+          },
+          "isClosed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "weekday"
+        ]
+      },
+      "SetWorkingHoursDto": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkingDayDto"
+            }
+          }
+        },
+        "required": [
+          "days"
+        ]
+      },
+      "CreateHoursExceptionDto": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "example": "2026-12-31",
+            "description": "Filial vaqt zonasidagi sana"
+          },
+          "opensAt": {
+            "type": "string"
+          },
+          "closesAt": {
+            "type": "string"
+          },
+          "is24h": {
+            "type": "boolean"
+          },
+          "isClosed": {
+            "type": "boolean"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "date"
+        ]
+      },
+      "CreateCategoryDto": {
+        "type": "object",
+        "properties": {
+          "translations": {
+            "description": "title",
+            "example": [
+              {
+                "title": "string",
+                "lang": "en"
+              },
+              {
+                "title": "string",
+                "lang": "ru"
+              },
+              {
+                "title": "string",
+                "lang": "uz"
+              }
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "organization_id": {
+            "type": "string",
+            "description": "Deprecated: the category always goes to your own organization; another id is 404",
+            "example": ""
+          }
+        }
+      },
+      "UpdateCategoryDto": {
+        "type": "object",
+        "properties": {
+          "translations": {
+            "description": "title",
+            "example": [
+              {
+                "id": "string",
+                "title": "string",
+                "lang": "en"
+              },
+              {
+                "id": "string",
+                "title": "string",
+                "lang": "ru"
+              },
+              {
+                "id": "string",
+                "title": "string",
+                "lang": "uz"
+              }
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "MoveCategoryDto": {
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "type": "string",
+            "description": "categoryId",
+            "example": ""
+          },
+          "organizationId": {
+            "type": "string",
+            "description": "Deprecated: always your own organization; another id is 404",
+            "example": ""
+          },
+          "newIndex": {
+            "type": "number",
+            "description": "title",
+            "example": ""
+          }
+        }
+      },
+      "OrderModifierDto": {
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": "string"
+          },
+          "optionIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "groupId",
+          "optionIds"
+        ]
+      },
+      "OrderItemDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 50
+          },
+          "modifiers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderModifierDto"
+            }
+          }
+        },
+        "required": [
+          "itemId",
+          "quantity"
+        ]
+      },
+      "CreateOrderDto": {
+        "type": "object",
+        "properties": {
+          "fulfillmentMode": {
+            "type": "string",
+            "enum": [
+              "delivery",
+              "pickup"
+            ]
+          },
+          "branchId": {
+            "type": "string",
+            "description": "pickup: majburiy (olib ketish filiali). delivery: maslahat — server boshqa filialga yo'naltirishi mumkin"
+          },
+          "addressId": {
+            "type": "string",
+            "description": "delivery uchun majburiy: mijozning saqlangan manzili"
+          },
+          "phone": {
+            "type": "string",
+            "example": "+998901234567"
+          },
+          "comment": {
+            "type": "string"
+          },
+          "paymentMethod": {
+            "type": "string",
+            "enum": [
+              "cash",
+              "click",
+              "payme"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderItemDto"
+            }
+          },
+          "expectedTotal": {
+            "type": "number",
+            "description": "Mijoz ko'rgan jami summa. Serverdagi bilan farq qilsa 409 price_changed"
+          }
+        },
+        "required": [
+          "fulfillmentMode",
+          "phone",
+          "paymentMethod",
+          "items"
+        ]
+      },
+      "AcceptOrderDto": {
+        "type": "object",
+        "properties": {
+          "etaMin": {
+            "type": "number",
+            "description": "ETA ni o'zgartirish (daqiqa)"
+          },
+          "etaMax": {
+            "type": "number"
+          }
+        }
+      },
+      "RejectOrderDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "example": "out_of_stock"
+          }
+        }
+      },
+      "SetOrderStatusDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "accepted",
+              "preparing",
+              "on_the_way",
+              "ready",
+              "completed"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "UpdateOrderSettingsDto": {
+        "type": "object",
+        "properties": {
+          "deliveryServiceFee": {
+            "type": "number",
+            "description": "Yetkazib berish uchun xizmat to'lovi (so'm)"
+          },
+          "minOrderDelivery": {
+            "type": "number"
+          },
+          "minOrderPickup": {
+            "type": "number"
+          },
+          "etaMin": {
+            "type": "number"
+          },
+          "etaMax": {
+            "type": "number"
+          },
+          "acceptanceTimeoutSeconds": {
+            "type": "number",
+            "description": "Restoran qabul qilmasa avto-bekor (soniya), 60..3600"
+          },
+          "paymentTimeoutSeconds": {
+            "type": "number",
+            "description": "Onlayn to'lov oynasi (soniya), 120..7200"
+          },
+          "maxActiveOrders": {
+            "type": "number"
+          },
+          "deliveryZone": {
+            "type": "object",
+            "description": "[[lat,lng], ...] kamida 3 nuqta; null — zona tekshirilmaydi",
+            "nullable": true
+          }
+        }
+      },
+      "UpsertPaymentProviderDto": {
+        "type": "object",
+        "properties": {
+          "config": {
+            "type": "object",
+            "description": "click: { merchantId, serviceId, merchantUserId, secretKey } · payme: { merchantId, key }. Javoblarda hech qachon qaytarilmaydi.",
+            "example": {
+              "merchantId": "12345",
+              "key": "payme-secret-key"
+            }
+          },
+          "isEnabled": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "required": [
+          "config"
+        ]
+      },
+      "CreateProductDto": {
+        "type": "object",
+        "properties": {
+          "price": {
+            "type": "number",
+            "example": 15000
+          },
+          "unit": {
+            "type": "string",
+            "example": "gr",
+            "enum": [
+              "gr",
+              "ml"
+            ]
+          },
+          "weight": {
+            "type": "number",
+            "example": 250
+          },
+          "kcal": {
+            "type": "number",
+            "example": 200
+          },
+          "protein": {
+            "type": "number",
+            "example": 12
+          },
+          "fat": {
+            "type": "number",
+            "example": 8
+          },
+          "carbohydrate": {
+            "type": "number",
+            "example": 30
+          },
+          "category_id": {
+            "type": "string",
+            "example": "category-uuid"
+          },
+          "translations": {
+            "example": [
+              {
+                "lang": "en",
+                "title": "Chicken salad",
+                "description": "Fresh and healthy"
+              },
+              {
+                "lang": "uz",
+                "title": "Tovuq salati",
+                "description": "Yangi va foydali"
+              }
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "additional_product_group_ids": {
+            "example": [
+              "uuid-group-1",
+              "uuid-group-2"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "price",
+          "unit",
+          "category_id",
+          "translations"
+        ]
+      },
+      "UpdateProductDto": {
+        "type": "object",
+        "properties": {
+          "price": {
+            "type": "number",
+            "example": 15000
+          },
+          "unit": {
+            "type": "string",
+            "example": "gr",
+            "enum": [
+              "gr",
+              "ml"
+            ]
+          },
+          "weight": {
+            "type": "number",
+            "example": 250
+          },
+          "kcal": {
+            "type": "number",
+            "example": 200
+          },
+          "protein": {
+            "type": "number",
+            "example": 12
+          },
+          "fat": {
+            "type": "number",
+            "example": 8
+          },
+          "carbohydrate": {
+            "type": "number",
+            "example": 30
+          },
+          "category_id": {
+            "type": "string",
+            "example": "category-uuid"
+          },
+          "translations": {
+            "example": [
+              {
+                "id": "uuid1",
+                "lang": "en",
+                "title": "Chicken salad",
+                "description": "Fresh and healthy"
+              },
+              {
+                "id": "uuid2",
+                "lang": "uz",
+                "title": "Tovuq salati",
+                "description": "Yangi va foydali"
+              },
+              {
+                "id": "uuid3",
+                "lang": "ru",
+                "title": "Куриный салат",
+                "description": "Свежий и полезный"
+              }
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "MoveProductDto": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string",
+            "description": "productId",
+            "example": ""
+          },
+          "categoryId": {
+            "type": "string",
+            "description": "categoryId",
+            "example": ""
+          },
+          "newIndex": {
+            "type": "number",
+            "description": "title",
+            "example": ""
+          }
+        }
+      },
+      "UploadProductImagesDto": {
+        "type": "object",
+        "properties": {
+          "images": {
+            "description": "Product images",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "binary"
+            }
+          }
+        },
+        "required": [
+          "images"
+        ]
+      },
+      "CreateAdditionalProductGroupTranslationDto": {
+        "type": "object",
+        "properties": {
+          "lang": {
+            "type": "string",
+            "example": "en"
+          },
+          "title": {
+            "type": "string",
+            "example": "Sauce type"
+          }
+        },
+        "required": [
+          "lang",
+          "title"
+        ]
+      },
+      "CreateAdditionalProductGroupDto": {
+        "type": "object",
+        "properties": {
+          "is_multiple": {
+            "type": "boolean",
+            "example": true
+          },
+          "is_required": {
+            "type": "boolean",
+            "example": false
+          },
+          "min_selected": {
+            "type": "number",
+            "example": 2,
+            "description": "Kamida nechta variant tanlanishi kerak (bo'sh — is_required bo'yicha)"
+          },
+          "max_selected": {
+            "type": "number",
+            "example": 4,
+            "description": "Ko'pi bilan nechta variant (bo'sh — is_multiple bo'yicha)"
+          },
+          "product_id": {
+            "type": "string",
+            "example": "uuid",
+            "description": "Your own dish; omit when the dish does not exist yet and pass the group id in POST /product"
+          },
+          "translations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreateAdditionalProductGroupTranslationDto"
+            }
+          }
+        },
+        "required": [
+          "translations"
+        ]
+      },
+      "CreateAdditionalProductTranslationDto": {
+        "type": "object",
+        "properties": {
+          "lang": {
+            "type": "string",
+            "example": "en"
+          },
+          "title": {
+            "type": "string",
+            "example": "Ketchup"
+          }
+        },
+        "required": [
+          "lang",
+          "title"
+        ]
+      },
+      "CreateAdditionalProductDto": {
+        "type": "object",
+        "properties": {
+          "additional_product_group_id": {
+            "type": "string",
+            "example": "uuid-of-group"
+          },
+          "price": {
+            "type": "number",
+            "example": 5000
+          },
+          "translations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreateAdditionalProductTranslationDto"
+            }
+          }
+        },
+        "required": [
+          "additional_product_group_id",
+          "price",
+          "translations"
+        ]
+      },
+      "UpdateAdditionalProductGroupTranslationDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "uuid-of-translation"
+          },
+          "lang": {
+            "type": "string",
+            "example": "en"
+          },
+          "title": {
+            "type": "string",
+            "example": "Sauce type"
+          }
+        },
+        "required": [
+          "id",
+          "lang",
+          "title"
+        ]
+      },
+      "UpdateAdditionalProductGroupDto": {
+        "type": "object",
+        "properties": {
+          "is_multiple": {
+            "type": "boolean",
+            "example": true
+          },
+          "is_required": {
+            "type": "boolean",
+            "example": false
+          },
+          "min_selected": {
+            "type": "number",
+            "example": 2,
+            "description": "Kamida nechta variant tanlanishi kerak (bo'sh — is_required bo'yicha)"
+          },
+          "max_selected": {
+            "type": "number",
+            "example": 4,
+            "description": "Ko'pi bilan nechta variant (bo'sh — is_multiple bo'yicha)"
+          },
+          "product_id": {
+            "type": "string",
+            "example": "uuid-of-product"
+          },
+          "translations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UpdateAdditionalProductGroupTranslationDto"
+            }
+          }
+        }
+      },
+      "UpdateAdditionalProductTranslationDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "uuid-of-translation"
+          },
+          "lang": {
+            "type": "string",
+            "example": "en"
+          },
+          "title": {
+            "type": "string",
+            "example": "Ketchup"
+          }
+        },
+        "required": [
+          "id",
+          "lang",
+          "title"
+        ]
+      },
+      "UpdateAdditionalProductDto": {
+        "type": "object",
+        "properties": {
+          "price": {
+            "type": "number",
+            "example": 4000
+          },
+          "additional_product_group_id": {
+            "type": "string",
+            "example": "uuid-of-group"
+          },
+          "translations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UpdateAdditionalProductTranslationDto"
+            }
+          }
+        }
+      },
+      "TranslationDto": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "text",
+            "example": ""
+          },
+          "promptName": {
+            "type": "string",
+            "description": "promptName",
+            "example": ""
+          }
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "access-token": []
+    }
+  ]
+}
