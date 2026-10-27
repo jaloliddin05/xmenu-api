@@ -25,13 +25,13 @@ export class CreateCategoryDto {
     translations: CreateCategoryTranslationDto[];
 
      @ApiProperty({
-        description: `organization_id`,
+        description: `Deprecated: the category always goes to your own organization; another id is 404`,
         example: '',
         required: false,
     })
-    @IsNotEmpty()
+    @IsOptional()
     @IsString()
-    readonly organization_id: string
+    readonly organization_id?: string
 }
 
 export class CreateCategoryTranslationDto {

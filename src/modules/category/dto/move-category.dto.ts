@@ -13,13 +13,13 @@ class MoveCategoryDto {
   categoryId: string;
 
   @ApiProperty({
-        description: `organizationId`,
+        description: `Deprecated: always your own organization; another id is 404`,
         example: '',
         required: false,
   })
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
-  organizationId: string;
+  organizationId?: string;
 
   @ApiProperty({
         description: `title`,

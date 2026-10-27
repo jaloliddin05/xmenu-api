@@ -1,8 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 
 import { PrismaService } from '../../_prisma/prisma.service';
 import { CreateCategoryDto, MoveCategoryDto, UpdateCategoryDto } from '../dto';
 import { RevalidateService } from 'src/modules/revalidate-queue/revalidate.service';
+import { ownCategory } from 'src/modules/product/services/menu-ownership';
 
 @Injectable()
 export class CategoryService {
@@ -11,11 +12,28 @@ export class CategoryService {
     private readonly revalidateService: RevalidateService
   ) { }
 
-  async createCategory(dto: CreateCategoryDto, slug:string) {
+  // Every id from the URL or the body must belong to the caller's organization; anything else is 404.
+
+  private async findOwnCategory(id: string, organizationId: string) {
+    const category = await this.prismaService.category.findFirst({
+      where: { id, ...ownCategory(organizationId) },
+    });
+    if (!category) throw new NotFoundException('Category not found');
+    return category;
+  }
+
+  /** Legacy body/URL field: tolerated only when it names the caller's own organization. */
+  private assertSameOrganization(sent: string | undefined, organizationId: string) {
+    if (sent !== undefined && sent !== organizationId) throw new NotFoundException('Organization not found');
+  }
+
+  async createCategory(dto: CreateCategoryDto, organizationId: string, slug:string) {
+    this.assertSameOrganization(dto.organization_id, organizationId);
+
     const category = await this.prismaService.$transaction(async (prisma) => {
 
       const lastCategory = await prisma.category.findFirst({
-        where: { organization_id: dto.organization_id },
+        where: { organization_id: organizationId },
         orderBy: { index: 'desc' },
         select: { index: true },
       });
@@ -25,7 +43,7 @@ export class CategoryService {
       const newCategory = await prisma.category.create({
         data: {
           organization: {
-            connect: { id: dto.organization_id },
+            connect: { id: organizationId },
           },
           index: nextIndex,
           translations: {
@@ -71,7 +89,8 @@ export class CategoryService {
     }));
   }
 
-  async getForSelect(organizationId: string, lang:string) {
+  async getForSelect(requestedOrganizationId: string, organizationId: string, lang:string) {
+    this.assertSameOrganization(requestedOrganizationId, organizationId);
     const categories = await this.prismaService.category.findMany({
       where: { organization_id: organizationId, is_active: true },
       include: {
@@ -89,11 +108,17 @@ export class CategoryService {
     }));
   }
 
-  async findOne(id: string) {
-    return await this.prismaService.category.findUnique({ where: { id }, include: { translations: true } });
+  async findOne(id: string, organizationId: string) {
+    const category = await this.prismaService.category.findFirst({
+      where: { id, ...ownCategory(organizationId) },
+      include: { translations: true },
+    });
+    if (!category) throw new NotFoundException('Category not found');
+    return category;
   }
 
-  async update(id: string, data: UpdateCategoryDto,slug:string) {
+  async update(id: string, data: UpdateCategoryDto, organizationId: string, slug:string) {
+    await this.findOwnCategory(id, organizationId);
     const { translations } = data;
 
     if (!translations || translations.length === 0) {
@@ -138,15 +163,13 @@ export class CategoryService {
     });
   }
 
-  async moveCategory(dto: MoveCategoryDto, slug:string) {
-    const { categoryId, organizationId, newIndex } = dto;
+  async moveCategory(dto: MoveCategoryDto, organizationId: string, slug:string) {
+    const { categoryId, newIndex } = dto;
+    // The reindex below runs over the whole organization, so it must be the caller's own
+    this.assertSameOrganization(dto.organizationId, organizationId);
 
     // 1. Avval eski indexni topamiz
-    const category = await this.prismaService.category.findUnique({
-      where: { id: categoryId },
-    });
-
-    if (!category) throw new Error('Category not found');
+    const category = await this.findOwnCategory(categoryId, organizationId);
 
     const oldIndex = category.index || 0;
 
@@ -185,13 +208,15 @@ export class CategoryService {
     return updated;
   }
 
-  async updateIsActive(id: string, is_active: boolean,slug:string) {
+  async updateIsActive(id: string, is_active: boolean, organizationId: string, slug:string) {
+    await this.findOwnCategory(id, organizationId);
     const category = await this.prismaService.category.update({ where: { id }, data: { is_active } })
     await this.revalidateService.addRevalidationJob({slug})
     return category
   }
 
-  async delete(id: string, slug:string) {
+  async delete(id: string, organizationId: string, slug:string) {
+    await this.findOwnCategory(id, organizationId);
     const category =  await this.prismaService.category.delete({ where: { id } })
     await this.revalidateService.addRevalidationJob({slug})
     return category
