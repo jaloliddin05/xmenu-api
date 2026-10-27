@@ -6,6 +6,9 @@ model additional_product_group {
   created_at  DateTime  @default(now())
   is_required  Boolean? @default(false) 
   is_multiple Boolean? @default(false)
+  // Tanlov chegaralari (null = is_required/is_multiple bo'yicha standart)
+  min_selected Int?
+  max_selected Int?
 
   translations    additional_product_group_translation[]
 

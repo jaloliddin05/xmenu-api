@@ -10,9 +10,13 @@ async function bootstrap() {
     logger: ['log', 'warn', 'error'],
   });
 
+  // Bearer-token arxitektura: hech qaysi endpoint cookie ishlatmaydi
+  // (grep -rn "res.cookie" src bo'sh natija beradi), shuning uchun
+  // credentials:true kerak emas va faqat xavfni oshiradi — origin:true
+  // bilan birga u istalgan saytga Authorization sarlavhali so'rovlarni
+  // credentialed rejimda yuborish imkonini beradi.
   app.enableCors({
     origin: true,
-    credentials: true,
   });
 
   app.useGlobalFilters(new ErrorFilter());
@@ -27,9 +31,7 @@ async function bootstrap() {
   );
 
   const reflector = app.get(Reflector);
-  app.useGlobalGuards(
-    new AccessTokenUserGuard(reflector),
-  );
+  app.useGlobalGuards(new AccessTokenUserGuard(reflector));
 
   const config = new DocumentBuilder()
     .setTitle('Xmenu')

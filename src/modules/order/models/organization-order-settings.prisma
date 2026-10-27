@@ -1,0 +1,25 @@
+// Tenantning buyurtma sozlamalari (bitta qator). Qator bo'lmasa kod standart
+// qiymatlarni ishlatadi (order-settings.service.ts).
+model organization_order_settings {
+  organization_id String   @id
+  organization    organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+
+  delivery_service_fee Int @default(0)
+  min_order_delivery   Int @default(0)
+  min_order_pickup     Int @default(0)
+  eta_min              Int @default(20)
+  eta_max              Int @default(30)
+
+  // Restoran buyurtmani qabul qilmasa — shu vaqtdan keyin avtomatik bekor (soniya)
+  acceptance_timeout_seconds Int @default(300)
+  // Onlayn to'lov oynasi (soniya)
+  payment_timeout_seconds    Int @default(900)
+  // Bir vaqtda faol buyurtmalar soni chegarasi (suiiste'moldan himoya)
+  max_active_orders          Int @default(5)
+
+  // Yetkazib berish zonasi: [[lat, lng], ...] — kamida 3 nuqta. null = tekshirilmaydi.
+  delivery_zone Json?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}

@@ -16,6 +16,10 @@ import { BullModule } from '@nestjs/bullmq';
 import { SmsModule } from './modules/sms/sms.module';
 import { CustomerModule } from './modules/customer/customer.module';
 import { RedisModule } from './infra/redis/redis.module';
+import { BranchModule } from './modules/branch/branch.module';
+import { MenuModule } from './modules/menu/menu.module';
+import { OrderModule } from './modules/order/order.module';
+import { PaymentModule } from './modules/payment/payment.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -28,11 +32,15 @@ import { RedisModule } from './infra/redis/redis.module';
     }),
     ApplicationModule,
     AuthModule,
+    BranchModule,
     BullModule,
     CategoryModule,
     CustomerModule,
     FileModule,
+    MenuModule,
+    OrderModule,
     OrganizationModule,
+    PaymentModule,
     ProductModule,
     RedisModule,
     SmsModule,

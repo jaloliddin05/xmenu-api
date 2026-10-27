@@ -7,7 +7,10 @@ enum CustomerStatus {
 // Mijoz bitta tenantga (organization) tegishli.
 // Bir xil telefon ikki tenantda = ikki xil customer.
 // (organization_id, phone) bo'yicha PARTIAL unique index (deleted_at IS NULL)
-// migration.sql ichida qo'lda yaratilgan — Prisma uni schema orqali ifodalay olmaydi.
+// migration 20261006120000_customer_phone_partial_unique ichida qo'lda
+// yaratilgan — Prisma buni schema orqali ifodalay olmaydi (filtered index
+// emas). Shu YAGONA constraint CustomerAuthService.register() dagi P2002
+// race-recovery filialini ishga tushiradi — uni olib tashlamang.
 model customer {
   id              String         @id @default(uuid())
 
@@ -26,6 +29,7 @@ model customer {
 
   addresses       customer_address[]
   sessions        customer_session[]
+  orders          customer_order[]
 
   @@unique([organization_id, telegram_id])
   @@index([organization_id, phone])

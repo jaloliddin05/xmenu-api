@@ -20,7 +20,26 @@ export type CustomerErrorCode =
   | 'tenant_mismatch'
   | 'sms_unavailable'
   | 'invalid_telegram_data'
+  | 'invalid_address'
+  | 'address_not_found'
+  | 'address_limit_reached'
   | 'validation_error'
+  // Buyurtmalar (docs/ORDERS_API.md)
+  | 'invalid_order'
+  | 'invalid_modifiers'
+  | 'item_unavailable'
+  | 'price_changed'
+  | 'min_order_not_reached'
+  | 'out_of_delivery_zone'
+  | 'fulfillment_unavailable'
+  | 'branch_closed'
+  | 'payment_method_unavailable'
+  | 'idempotency_key_required'
+  | 'idempotency_key_reused'
+  | 'too_many_active_orders'
+  | 'cancel_not_allowed'
+  | 'payment_not_retryable'
+  | 'order_not_found'
   | 'internal_error';
 
 const STATUS: Record<CustomerErrorCode, number> = {
@@ -43,7 +62,25 @@ const STATUS: Record<CustomerErrorCode, number> = {
   tenant_mismatch: 403,
   sms_unavailable: 503,
   invalid_telegram_data: 401,
+  invalid_address: 400,
+  address_not_found: 404,
+  address_limit_reached: 409,
   validation_error: 400,
+  invalid_order: 400,
+  invalid_modifiers: 422,
+  item_unavailable: 409,
+  price_changed: 409,
+  min_order_not_reached: 422,
+  out_of_delivery_zone: 422,
+  fulfillment_unavailable: 422,
+  branch_closed: 409,
+  payment_method_unavailable: 422,
+  idempotency_key_required: 400,
+  idempotency_key_reused: 409,
+  too_many_active_orders: 429,
+  cancel_not_allowed: 409,
+  payment_not_retryable: 409,
+  order_not_found: 404,
   internal_error: 500,
 };
 
@@ -52,7 +89,9 @@ export class CustomerAuthException extends HttpException {
     public readonly code: CustomerErrorCode,
     message?: string,
     public readonly retryAfter?: number,
+    /** Ekran amal qila oladigan tuzilgan ma'lumot (qaysi pozitsiyalar yo'q, yangi narxlar...). */
+    public readonly details?: Record<string, unknown>,
   ) {
-    super({ code, message: message ?? code, retryAfter }, STATUS[code]);
+    super({ code, message: message ?? code, retryAfter, details }, STATUS[code]);
   }
 }

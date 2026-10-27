@@ -1,3 +1,10 @@
+// Mijozning saqlangan yetkazib berish manzillari. Tenant alohida ustun emas:
+// customer_id orqali customer.organization_id ga bog'langan, shuning uchun
+// har bir so'rov customer orqali tenantni ham tekshiradi.
+//
+// Migration 20261007100000_customer_address_integrity qo'lda qo'shgan, Prisma
+// ifodalay olmaydigan qoidalar: har bir mijozga BITTA is_default=true
+// (partial unique index) va latitude/longitude juftligi CHECK constraint.
 model customer_address {
   id          String   @id @default(uuid())
 
@@ -18,4 +25,6 @@ model customer_address {
 
   created_at  DateTime @default(now())
   updated_at  DateTime @updatedAt
+
+  @@index([customer_id])
 }

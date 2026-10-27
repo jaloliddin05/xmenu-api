@@ -1,0 +1,123 @@
+// Mijoz buyurtmasi. Barcha narxlar butun so'mda (UZS). Pozitsiyalar, manzil va
+// filial nomlari buyurtma vaqtidagi SNAPSHOT: menyu yoki manzil keyin
+// o'zgarsa ham buyurtma o'zgarmaydi.
+//
+// Dublikat himoyasi: (customer_id, idempotency_key) unique — bir xil kalit
+// bilan takror so'rov yangi buyurtma yaratmaydi.
+// Optimistik blok: `version` har status o'zgarishida oshadi (OrderTransitionService).
+model customer_order {
+  id              String   @id @default(uuid())
+  // Tenant ichidagi ko'rinadigan raqam (organization.order_seq dan)
+  number          Int
+
+  organization_id String
+  organization    organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  customer_id     String
+  customer        customer     @relation(fields: [customer_id], references: [id], onDelete: Restrict)
+  branch_id       String
+  branch          branch       @relation(fields: [branch_id], references: [id], onDelete: Restrict)
+
+  status          OrderStatus
+  fulfillment     OrderFulfillment
+  version         Int      @default(0)
+
+  idempotency_key String
+  request_hash    String
+
+  phone           String
+  comment         String?
+  // Yetkazib berish manzili snapshot'i (pickup uchun null)
+  address_snapshot Json?
+
+  payment_method     OrderPaymentMethod
+  payment_status     OrderPaymentStatus
+  payment_expires_at DateTime?
+
+  currency        String   @default("UZS")
+  subtotal        Int
+  service_fee     Int      @default(0)
+  discount        Int      @default(0)
+  total           Int
+
+  eta_min         Int
+  eta_max         Int
+
+  cancelled_by    OrderActor?
+  cancel_reason   String?
+  cancelled_at    DateTime?
+
+  // Restoran buyurtmani qabul qilish uchun olgan payt (to'langan yoki naqd)
+  placed_at       DateTime?
+  accepted_at     DateTime?
+  completed_at    DateTime?
+
+  // Restoran guruhiga yuborilgan xabar (keyin tahrirlash uchun)
+  tg_chat_id      String?
+  tg_message_id   Int?
+
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  items           customer_order_item[]
+  payments        order_payment[]
+  events          order_status_event[]
+
+  @@unique([organization_id, number])
+  @@unique([customer_id, idempotency_key])
+  @@index([organization_id, status, created_at])
+  @@index([customer_id, created_at])
+  @@index([branch_id, status])
+}
+
+model customer_order_item {
+  id          String  @id @default(uuid())
+  order_id    String
+  order       customer_order @relation(fields: [order_id], references: [id], onDelete: Cascade)
+
+  // Mahsulot keyin o'chirilsa ham pozitsiya qoladi
+  product_id  String?
+  product     product? @relation(fields: [product_id], references: [id], onDelete: SetNull)
+
+  name        String
+  image       String?
+  weight      String?
+  base_price  Int
+  unit_price  Int
+  quantity    Int
+  position    Int
+
+  options     customer_order_item_option[]
+
+  @@index([order_id])
+}
+
+model customer_order_item_option {
+  id          String  @id @default(uuid())
+  item_id     String
+  item        customer_order_item @relation(fields: [item_id], references: [id], onDelete: Cascade)
+
+  group_id    String?
+  group_title String
+  option_id   String?
+  name        String
+  price       Int
+  position    Int
+
+  @@index([item_id])
+}
+
+// Status o'zgarishlari audit jurnali (faqat qo'shiladi).
+model order_status_event {
+  id          BigInt      @id @default(autoincrement())
+  order_id    String
+  order       customer_order @relation(fields: [order_id], references: [id], onDelete: Cascade)
+
+  from_status OrderStatus?
+  to_status   OrderStatus
+  actor       OrderActor
+  actor_id    String?
+  note        String?
+  created_at  DateTime    @default(now())
+
+  @@index([order_id, created_at])
+}

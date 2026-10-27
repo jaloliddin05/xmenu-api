@@ -23,6 +23,73 @@ model application {
   description String?          // qo‘shimcha maydon (agar kerak bo‘lsa)
   created_at DateTime          @default(now())
 }
+// Restoran filiallari. Mijoz ilovasida pickup tanlash, buyurtma qabul qilish
+// va buyurtma xabarnomalari (Telegram guruhi) shu yerdan.
+//
+// Ish vaqti jadvali (branch_working_hours) va istisnolar (branch_hours_exception)
+// dan serverda hours / isOpen / opensAt hisoblanadi — kontrakt: docs/BRANCHES_API.md.
+model branch {
+  id              String   @id @default(uuid())
+
+  organization_id String
+  organization    organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+
+  title           String
+  address         String
+  latitude        Float
+  longitude       Float
+  phone           String?
+
+  is_active       Boolean  @default(true)
+  sort_order      Int      @default(0)
+  timezone        String   @default("Asia/Tashkent")
+  accepts_pickup   Boolean @default(true)
+  accepts_delivery Boolean @default(true)
+
+  // Buyurtma xabarnomalari yuboriladigan Telegram guruh/chat (bot a'zo bo'lishi shart)
+  telegram_chat_id String?
+
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  working_hours   branch_working_hours[]
+  hours_exceptions branch_hours_exception[]
+  orders          customer_order[]
+
+  @@index([organization_id, is_active, sort_order])
+}
+
+// Haftaning har kuni uchun bitta oraliq. weekday: ISO, 1 = dushanba ... 7 = yakshanba.
+// closes_at <= opens_at bo'lsa — ertasi kuni yopiladi (tungi smena).
+model branch_working_hours {
+  id         String  @id @default(uuid())
+  branch_id  String
+  branch     branch  @relation(fields: [branch_id], references: [id], onDelete: Cascade)
+
+  weekday    Int
+  opens_at   String  @default("00:00") // HH:mm
+  closes_at  String  @default("00:00") // HH:mm
+  is_24h     Boolean @default(false)
+  is_closed  Boolean @default(false)
+
+  @@unique([branch_id, weekday])
+}
+
+// Muayyan sana uchun istisno (bayram, ta'mir). is_closed yoki boshqa vaqt.
+model branch_hours_exception {
+  id         String   @id @default(uuid())
+  branch_id  String
+  branch     branch   @relation(fields: [branch_id], references: [id], onDelete: Cascade)
+
+  date       DateTime @db.Date
+  opens_at   String?
+  closes_at  String?
+  is_24h     Boolean  @default(false)
+  is_closed  Boolean  @default(false)
+  note       String?
+
+  @@unique([branch_id, date])
+}
 
 model category_translation {
   id         String    @id @default(uuid())
@@ -44,7 +111,14 @@ model category {
   organization_id  String
 
   products product[]
-}model customer_address {
+}// Mijozning saqlangan yetkazib berish manzillari. Tenant alohida ustun emas:
+// customer_id orqali customer.organization_id ga bog'langan, shuning uchun
+// har bir so'rov customer orqali tenantni ham tekshiradi.
+//
+// Migration 20261007100000_customer_address_integrity qo'lda qo'shgan, Prisma
+// ifodalay olmaydigan qoidalar: har bir mijozga BITTA is_default=true
+// (partial unique index) va latitude/longitude juftligi CHECK constraint.
+model customer_address {
   id          String   @id @default(uuid())
 
   customer_id String
@@ -64,6 +138,8 @@ model category {
 
   created_at  DateTime @default(now())
   updated_at  DateTime @updatedAt
+
+  @@index([customer_id])
 }
 // Audit jurnali. Ataylab FK yo'q: mijoz/tenant o'chsa ham yozuvlar qoladi.
 model customer_auth_event {
@@ -114,7 +190,10 @@ enum CustomerStatus {
 // Mijoz bitta tenantga (organization) tegishli.
 // Bir xil telefon ikki tenantda = ikki xil customer.
 // (organization_id, phone) bo'yicha PARTIAL unique index (deleted_at IS NULL)
-// migration.sql ichida qo'lda yaratilgan — Prisma uni schema orqali ifodalay olmaydi.
+// migration 20261006120000_customer_phone_partial_unique ichida qo'lda
+// yaratilgan — Prisma buni schema orqali ifodalay olmaydi (filtered index
+// emas). Shu YAGONA constraint CustomerAuthService.register() dagi P2002
+// race-recovery filialini ishga tushiradi — uni olib tashlamang.
 model customer {
   id              String         @id @default(uuid())
 
@@ -133,6 +212,7 @@ model customer {
 
   addresses       customer_address[]
   sessions        customer_session[]
+  orders          customer_order[]
 
   @@unique([organization_id, telegram_id])
   @@index([organization_id, phone])
@@ -164,6 +244,195 @@ model employee {
   product             product?      @relation(fields: [product_id], references: [id], onDelete: Cascade)
   product_id          String?
 }
+// Mijoz buyurtmasi. Barcha narxlar butun so'mda (UZS). Pozitsiyalar, manzil va
+// filial nomlari buyurtma vaqtidagi SNAPSHOT: menyu yoki manzil keyin
+// o'zgarsa ham buyurtma o'zgarmaydi.
+//
+// Dublikat himoyasi: (customer_id, idempotency_key) unique — bir xil kalit
+// bilan takror so'rov yangi buyurtma yaratmaydi.
+// Optimistik blok: `version` har status o'zgarishida oshadi (OrderTransitionService).
+model customer_order {
+  id              String   @id @default(uuid())
+  // Tenant ichidagi ko'rinadigan raqam (organization.order_seq dan)
+  number          Int
+
+  organization_id String
+  organization    organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  customer_id     String
+  customer        customer     @relation(fields: [customer_id], references: [id], onDelete: Restrict)
+  branch_id       String
+  branch          branch       @relation(fields: [branch_id], references: [id], onDelete: Restrict)
+
+  status          OrderStatus
+  fulfillment     OrderFulfillment
+  version         Int      @default(0)
+
+  idempotency_key String
+  request_hash    String
+
+  phone           String
+  comment         String?
+  // Yetkazib berish manzili snapshot'i (pickup uchun null)
+  address_snapshot Json?
+
+  payment_method     OrderPaymentMethod
+  payment_status     OrderPaymentStatus
+  payment_expires_at DateTime?
+
+  currency        String   @default("UZS")
+  subtotal        Int
+  service_fee     Int      @default(0)
+  discount        Int      @default(0)
+  total           Int
+
+  eta_min         Int
+  eta_max         Int
+
+  cancelled_by    OrderActor?
+  cancel_reason   String?
+  cancelled_at    DateTime?
+
+  // Restoran buyurtmani qabul qilish uchun olgan payt (to'langan yoki naqd)
+  placed_at       DateTime?
+  accepted_at     DateTime?
+  completed_at    DateTime?
+
+  // Restoran guruhiga yuborilgan xabar (keyin tahrirlash uchun)
+  tg_chat_id      String?
+  tg_message_id   Int?
+
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  items           customer_order_item[]
+  payments        order_payment[]
+  events          order_status_event[]
+
+  @@unique([organization_id, number])
+  @@unique([customer_id, idempotency_key])
+  @@index([organization_id, status, created_at])
+  @@index([customer_id, created_at])
+  @@index([branch_id, status])
+}
+
+model customer_order_item {
+  id          String  @id @default(uuid())
+  order_id    String
+  order       customer_order @relation(fields: [order_id], references: [id], onDelete: Cascade)
+
+  // Mahsulot keyin o'chirilsa ham pozitsiya qoladi
+  product_id  String?
+  product     product? @relation(fields: [product_id], references: [id], onDelete: SetNull)
+
+  name        String
+  image       String?
+  weight      String?
+  base_price  Int
+  unit_price  Int
+  quantity    Int
+  position    Int
+
+  options     customer_order_item_option[]
+
+  @@index([order_id])
+}
+
+model customer_order_item_option {
+  id          String  @id @default(uuid())
+  item_id     String
+  item        customer_order_item @relation(fields: [item_id], references: [id], onDelete: Cascade)
+
+  group_id    String?
+  group_title String
+  option_id   String?
+  name        String
+  price       Int
+  position    Int
+
+  @@index([item_id])
+}
+
+// Status o'zgarishlari audit jurnali (faqat qo'shiladi).
+model order_status_event {
+  id          BigInt      @id @default(autoincrement())
+  order_id    String
+  order       customer_order @relation(fields: [order_id], references: [id], onDelete: Cascade)
+
+  from_status OrderStatus?
+  to_status   OrderStatus
+  actor       OrderActor
+  actor_id    String?
+  note        String?
+  created_at  DateTime    @default(now())
+
+  @@index([order_id, created_at])
+}
+// Buyurtma hayot sikli — frontend (features/orders/lib/orderModel.js) bilan bir xil.
+enum OrderStatus {
+  awaiting_payment
+  payment_failed
+  pending_acceptance
+  accepted
+  preparing
+  on_the_way
+  ready
+  completed
+  cancelled
+}
+
+enum OrderFulfillment {
+  delivery
+  pickup
+}
+
+enum OrderPaymentMethod {
+  cash
+  click
+  payme
+}
+
+enum OrderPaymentStatus {
+  not_required
+  pending
+  paid
+  failed
+  cancelled
+  refund_pending
+  refunded
+}
+
+// Kim amalga oshirdi (status tarixi) / kim bekor qildi.
+enum OrderActor {
+  customer
+  restaurant
+  system
+  payment
+}
+// Tenantning buyurtma sozlamalari (bitta qator). Qator bo'lmasa kod standart
+// qiymatlarni ishlatadi (order-settings.service.ts).
+model organization_order_settings {
+  organization_id String   @id
+  organization    organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+
+  delivery_service_fee Int @default(0)
+  min_order_delivery   Int @default(0)
+  min_order_pickup     Int @default(0)
+  eta_min              Int @default(20)
+  eta_max              Int @default(30)
+
+  // Restoran buyurtmani qabul qilmasa — shu vaqtdan keyin avtomatik bekor (soniya)
+  acceptance_timeout_seconds Int @default(300)
+  // Onlayn to'lov oynasi (soniya)
+  payment_timeout_seconds    Int @default(900)
+  // Bir vaqtda faol buyurtmalar soni chegarasi (suiiste'moldan himoya)
+  max_active_orders          Int @default(5)
+
+  // Yetkazib berish zonasi: [[lat, lng], ...] — kamida 3 nuqta. null = tekshirilmaydi.
+  delivery_zone Json?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
 
 model organization_translation {
   id         String    @id @default(uuid())
@@ -194,6 +463,12 @@ model organization {
   categories   category[]
   employees    employee[]
   customers    customer[]
+  branches     branch[]
+  orders       customer_order[]
+  order_settings    organization_order_settings?
+  payment_providers organization_payment_provider[]
+  // Tenant ichidagi buyurtma raqami hisoblagichi (atomik UPDATE ... RETURNING)
+  order_seq    Int               @default(1000)
 
   owner_id     String?           @unique
   owner        user?             @relation(fields: [owner_id], references: [id])
@@ -203,7 +478,73 @@ model organization {
 
   banner_id    String?           @unique
   banner       file?             @relation("OrganizationBanner", fields: [banner_id], references: [id])
+}enum OrderPaymentProvider {
+  click
+  payme
 }
+
+enum PaymentTransactionStatus {
+  created
+  paid
+  cancelled
+  refunded
+  failed
+}
+
+// Provayder tranzaksiyasi (Click prepare/complete, Payme Create/Perform).
+// Bir buyurtmada bir nechta bo'lishi mumkin (qayta to'lash urinishlari).
+model order_payment {
+  id          String  @id @default(uuid())
+  // Click merchant_prepare_id — butun son sifatida beriladi
+  seq         Int     @unique @default(autoincrement())
+
+  order_id    String
+  order       customer_order @relation(fields: [order_id], references: [id], onDelete: Cascade)
+
+  provider    OrderPaymentProvider
+  status      PaymentTransactionStatus @default(created)
+  amount      Int
+
+  // Payme: tranzaksiya id; Click: click_trans_id
+  provider_transaction_id String?
+  // Click: click_paydoc_id — qaytarish (reversal) API'si shu id bilan ishlaydi
+  provider_payment_id     String?
+  // Payme holati: 1 yaratilgan, 2 bajarilgan, -1 bekor (bajarilmasdan), -2 bekor (bajarilgandan keyin)
+  provider_state          Int?
+  // Payme time (ms)
+  provider_create_time    BigInt?
+  // Provayder qaytargan sabab kodi (Payme reason)
+  cancel_reason           Int?
+
+  expires_at   DateTime?
+  performed_at DateTime?
+  cancelled_at DateTime?
+  refunded_at  DateTime?
+
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  @@unique([provider, provider_transaction_id])
+  @@index([order_id])
+}
+
+// Tenantning Click/Payme kalitlari. config_encrypted — AES-256-GCM (base64),
+// kalit PAYMENT_CONFIG_KEY env'da (payment-config.crypto.ts).
+model organization_payment_provider {
+  id              String   @id @default(uuid())
+  organization_id String
+  organization    organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+
+  provider        OrderPaymentProvider
+  is_enabled      Boolean  @default(true)
+  config_encrypted String
+
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  @@unique([organization_id, provider])
+}
+
 
 model additional_product_group_translation {
   id         String    @id @default(uuid())
@@ -220,6 +561,9 @@ model additional_product_group {
   created_at  DateTime  @default(now())
   is_required  Boolean? @default(false) 
   is_multiple Boolean? @default(false)
+  // Tanlov chegaralari (null = is_required/is_multiple bo'yicha standart)
+  min_selected Int?
+  max_selected Int?
 
   translations    additional_product_group_translation[]
 
@@ -285,6 +629,8 @@ model product {
   category_id  String
 
   images       file[]
+
+  order_items  customer_order_item[]
 }
 model translation_prompt {
   id        Int      @id @default(autoincrement())

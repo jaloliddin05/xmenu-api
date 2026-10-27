@@ -26,4 +26,6 @@ model product {
   category_id  String
 
   images       file[]
+
+  order_items  customer_order_item[]
 }

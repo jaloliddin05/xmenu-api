@@ -20,6 +20,12 @@ model organization {
   categories   category[]
   employees    employee[]
   customers    customer[]
+  branches     branch[]
+  orders       customer_order[]
+  order_settings    organization_order_settings?
+  payment_providers organization_payment_provider[]
+  // Tenant ichidagi buyurtma raqami hisoblagichi (atomik UPDATE ... RETURNING)
+  order_seq    Int               @default(1000)
 
   owner_id     String?           @unique
   owner        user?             @relation(fields: [owner_id], references: [id])

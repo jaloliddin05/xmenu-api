@@ -1,0 +1,66 @@
+enum OrderPaymentProvider {
+  click
+  payme
+}
+
+enum PaymentTransactionStatus {
+  created
+  paid
+  cancelled
+  refunded
+  failed
+}
+
+// Provayder tranzaksiyasi (Click prepare/complete, Payme Create/Perform).
+// Bir buyurtmada bir nechta bo'lishi mumkin (qayta to'lash urinishlari).
+model order_payment {
+  id          String  @id @default(uuid())
+  // Click merchant_prepare_id — butun son sifatida beriladi
+  seq         Int     @unique @default(autoincrement())
+
+  order_id    String
+  order       customer_order @relation(fields: [order_id], references: [id], onDelete: Cascade)
+
+  provider    OrderPaymentProvider
+  status      PaymentTransactionStatus @default(created)
+  amount      Int
+
+  // Payme: tranzaksiya id; Click: click_trans_id
+  provider_transaction_id String?
+  // Click: click_paydoc_id — qaytarish (reversal) API'si shu id bilan ishlaydi
+  provider_payment_id     String?
+  // Payme holati: 1 yaratilgan, 2 bajarilgan, -1 bekor (bajarilmasdan), -2 bekor (bajarilgandan keyin)
+  provider_state          Int?
+  // Payme time (ms)
+  provider_create_time    BigInt?
+  // Provayder qaytargan sabab kodi (Payme reason)
+  cancel_reason           Int?
+
+  expires_at   DateTime?
+  performed_at DateTime?
+  cancelled_at DateTime?
+  refunded_at  DateTime?
+
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  @@unique([provider, provider_transaction_id])
+  @@index([order_id])
+}
+
+// Tenantning Click/Payme kalitlari. config_encrypted — AES-256-GCM (base64),
+// kalit PAYMENT_CONFIG_KEY env'da (payment-config.crypto.ts).
+model organization_payment_provider {
+  id              String   @id @default(uuid())
+  organization_id String
+  organization    organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+
+  provider        OrderPaymentProvider
+  is_enabled      Boolean  @default(true)
+  config_encrypted String
+
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  @@unique([organization_id, provider])
+}

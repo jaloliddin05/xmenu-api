@@ -1,0 +1,67 @@
+// Restoran filiallari. Mijoz ilovasida pickup tanlash, buyurtma qabul qilish
+// va buyurtma xabarnomalari (Telegram guruhi) shu yerdan.
+//
+// Ish vaqti jadvali (branch_working_hours) va istisnolar (branch_hours_exception)
+// dan serverda hours / isOpen / opensAt hisoblanadi — kontrakt: docs/BRANCHES_API.md.
+model branch {
+  id              String   @id @default(uuid())
+
+  organization_id String
+  organization    organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+
+  title           String
+  address         String
+  latitude        Float
+  longitude       Float
+  phone           String?
+
+  is_active       Boolean  @default(true)
+  sort_order      Int      @default(0)
+  timezone        String   @default("Asia/Tashkent")
+  accepts_pickup   Boolean @default(true)
+  accepts_delivery Boolean @default(true)
+
+  // Buyurtma xabarnomalari yuboriladigan Telegram guruh/chat (bot a'zo bo'lishi shart)
+  telegram_chat_id String?
+
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  working_hours   branch_working_hours[]
+  hours_exceptions branch_hours_exception[]
+  orders          customer_order[]
+
+  @@index([organization_id, is_active, sort_order])
+}
+
+// Haftaning har kuni uchun bitta oraliq. weekday: ISO, 1 = dushanba ... 7 = yakshanba.
+// closes_at <= opens_at bo'lsa — ertasi kuni yopiladi (tungi smena).
+model branch_working_hours {
+  id         String  @id @default(uuid())
+  branch_id  String
+  branch     branch  @relation(fields: [branch_id], references: [id], onDelete: Cascade)
+
+  weekday    Int
+  opens_at   String  @default("00:00") // HH:mm
+  closes_at  String  @default("00:00") // HH:mm
+  is_24h     Boolean @default(false)
+  is_closed  Boolean @default(false)
+
+  @@unique([branch_id, weekday])
+}
+
+// Muayyan sana uchun istisno (bayram, ta'mir). is_closed yoki boshqa vaqt.
+model branch_hours_exception {
+  id         String   @id @default(uuid())
+  branch_id  String
+  branch     branch   @relation(fields: [branch_id], references: [id], onDelete: Cascade)
+
+  date       DateTime @db.Date
+  opens_at   String?
+  closes_at  String?
+  is_24h     Boolean  @default(false)
+  is_closed  Boolean  @default(false)
+  note       String?
+
+  @@unique([branch_id, date])
+}

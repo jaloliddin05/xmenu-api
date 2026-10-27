@@ -1,0 +1,41 @@
+// Buyurtma hayot sikli — frontend (features/orders/lib/orderModel.js) bilan bir xil.
+enum OrderStatus {
+  awaiting_payment
+  payment_failed
+  pending_acceptance
+  accepted
+  preparing
+  on_the_way
+  ready
+  completed
+  cancelled
+}
+
+enum OrderFulfillment {
+  delivery
+  pickup
+}
+
+enum OrderPaymentMethod {
+  cash
+  click
+  payme
+}
+
+enum OrderPaymentStatus {
+  not_required
+  pending
+  paid
+  failed
+  cancelled
+  refund_pending
+  refunded
+}
+
+// Kim amalga oshirdi (status tarixi) / kim bekor qildi.
+enum OrderActor {
+  customer
+  restaurant
+  system
+  payment
+}

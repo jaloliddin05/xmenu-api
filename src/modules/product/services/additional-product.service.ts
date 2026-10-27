@@ -16,6 +16,8 @@ export class AdditionalProductService {
     const data: any = {
       is_multiple: dto.is_multiple ?? false,
       is_required: dto.is_required ?? false,
+      min_selected: dto.min_selected,
+      max_selected: dto.max_selected,
       translations: {
         create: dto.translations.map((t) => ({
           lang: t.lang,
@@ -102,6 +104,8 @@ export class AdditionalProductService {
       data: {
         is_multiple: dto.is_multiple,
         is_required: dto.is_required,
+        min_selected: dto.min_selected,
+        max_selected: dto.max_selected,
         product: dto.product_id ? { connect: { id: dto.product_id } } : undefined,
       },
       include: {

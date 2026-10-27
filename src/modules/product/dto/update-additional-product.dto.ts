@@ -2,7 +2,9 @@ import { ApiProperty } from "@nestjs/swagger";
 import {
   IsArray,
   IsBoolean,
+  IsInt,
   IsNumber,
+  Min,
   IsOptional,
   IsString,
   ValidateNested,
@@ -82,6 +84,18 @@ export class UpdateAdditionalProductGroupDto {
   @IsOptional()
   @IsBoolean()
   readonly is_required?: boolean;
+
+  @ApiProperty({ example: 2, required: false, description: "Kamida nechta variant tanlanishi kerak (bo'sh — is_required bo'yicha)" })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  readonly min_selected?: number;
+
+  @ApiProperty({ example: 4, required: false, description: "Ko'pi bilan nechta variant (bo'sh — is_multiple bo'yicha)" })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  readonly max_selected?: number;
 
   @ApiProperty({ example: "uuid-of-product", required: false })
   @IsOptional()

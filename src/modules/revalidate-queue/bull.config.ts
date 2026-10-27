@@ -1,11 +1,9 @@
 import { Queue, Worker, QueueEvents } from 'bullmq';
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { RedisOptions } from 'ioredis';
+import { bullConnection } from 'src/infra/redis/bull-connection';
 
-export const redisConfig: RedisOptions = {
-  host: process.env.REDIS_HOST || 'localhost',
-  port: Number(process.env.REDIS_PORT || 6379),
-};
+export const redisConfig: RedisOptions = bullConnection();
 
 @Injectable()
 export class BullConfigService implements OnModuleDestroy {
