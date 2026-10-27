@@ -7,6 +7,7 @@ import { CreateProductDto } from '../dto/create-product.dto';
 import MoveProductDto from '../dto/move-product.dto';
 import { UpdateProductDto } from '../dto/update-product.dto';
 import { RevalidateService } from 'src/modules/revalidate-queue/revalidate.service';
+import { assertOwnTranslations, ownCategory, ownGroup, ownProduct } from './menu-ownership';
 
 @Injectable()
 export class ProductService {
@@ -15,6 +16,35 @@ export class ProductService {
     private readonly fileService: FileService,
     private readonly revalidateService: RevalidateService
   ) { }
+
+  // Every id from the URL or the body must belong to the caller's organization; anything else is 404.
+
+  private async findOwnProduct(id: string, organizationId: string) {
+    const product = await this.prismaService.product.findFirst({
+      where: { id, ...ownProduct(organizationId) },
+      include: { translations: true },
+    });
+    if (!product) throw new NotFoundException('Product not found');
+    return product;
+  }
+
+  private async assertOwnCategory(id: string, organizationId: string) {
+    const category = await this.prismaService.category.findFirst({
+      where: { id, ...ownCategory(organizationId) },
+      select: { id: true },
+    });
+    if (!category) throw new NotFoundException('Category not found');
+  }
+
+  private async assertOwnGroups(ids: string[] | undefined, organizationId: string) {
+    if (!ids?.length) return;
+    const unique = [...new Set(ids)];
+    const found = await this.prismaService.additional_product_group.findMany({
+      where: { id: { in: unique }, ...ownGroup(organizationId) },
+      select: { id: true },
+    });
+    if (found.length !== unique.length) throw new NotFoundException('Additional product group not found');
+  }
 
   async findAll(organization_id: string, category_id: string, lang: string, isActive?, title?: string) {
     const where: any = {}
@@ -31,11 +61,8 @@ export class ProductService {
         }
       }
     }
-    if (organization_id) {
-      where.category = {
-        organization_id: organization_id
-      }
-    }
+    // Always scoped: without an organization this used to list every venue's dishes
+    where.category = ownCategory(organization_id)
 
 
     const products = await this.prismaService.product.findMany({
@@ -75,9 +102,9 @@ export class ProductService {
     }));
   }
 
-  async findById(id: string) {
-    return await this.prismaService.product.findUnique({
-      where: { id },
+  async findById(id: string, organizationId: string) {
+    const product = await this.prismaService.product.findFirst({
+      where: { id, ...ownProduct(organizationId) },
       include: {
         translations: true,
         category: true,
@@ -92,9 +119,14 @@ export class ProductService {
         }
       },
     });
+    if (!product) throw new NotFoundException('Product not found');
+    return product;
   }
 
-  async createProduct(dto: CreateProductDto,slug: string) {
+  async createProduct(dto: CreateProductDto, organizationId: string, slug: string) {
+    await this.assertOwnCategory(dto.category_id, organizationId);
+    await this.assertOwnGroups(dto.additional_product_group_ids, organizationId);
+
     const product = await this.prismaService.$transaction(async (prisma) => {
       const lastProduct = await prisma.product.findFirst({
         where: { category_id: dto.category_id },
@@ -145,20 +177,12 @@ export class ProductService {
     return product
   }
 
-  async updateProduct(id: string, dto: UpdateProductDto, slug: string) {
+  async updateProduct(id: string, dto: UpdateProductDto, organizationId: string, slug: string) {
+    const existingProduct = await this.findOwnProduct(id, organizationId);
+    assertOwnTranslations(existingProduct.translations, dto.translations);
+    if (dto.category_id) await this.assertOwnCategory(dto.category_id, organizationId);
+
     const product = await this.prismaService.$transaction(async (prisma) => {
-      const existingProduct = await prisma.product.findUnique({
-        where: { id },
-        include: {
-          translations: true,
-          additional_product_groups: true,
-        },
-      });
-
-      if (!existingProduct) {
-        throw new Error("Product not found");
-      }
-
       // Translationlar yangilanishi
       if (dto.translations && dto.translations.length > 0) {
         for (const t of dto.translations) {
@@ -205,15 +229,13 @@ export class ProductService {
   }
 
 
-  async moveProduct(dto: MoveProductDto, slug: string) {
+  async moveProduct(dto: MoveProductDto, organizationId: string, slug: string) {
     const { categoryId, productId, newIndex } = dto;
 
     // 1. Avval eski indexni topamiz
-    const product = await this.prismaService.product.findUnique({
-      where: { id: productId },
-    });
-
-    if (!product) throw new Error('Product not found');
+    const product = await this.findOwnProduct(productId, organizationId);
+    // The reindex below runs over categoryId, so it must be the product's own category
+    if (product.category_id !== categoryId) throw new NotFoundException('Category not found');
 
     const oldIndex = product.index || 0;
 
@@ -252,24 +274,23 @@ export class ProductService {
     return updated;
   }
 
-  async updateIsActive(id: string, is_active: boolean, slug: string) {
+  async updateIsActive(id: string, is_active: boolean, organizationId: string, slug: string) {
+    await this.findOwnProduct(id, organizationId);
     const product = await this.prismaService.product.update({ where: { id }, data: { is_active } })
     await this.revalidateService.addRevalidationJob({slug})
     return product;
   }
 
-  async delete(id: string, slug: string) {
+  async delete(id: string, organizationId: string, slug: string) {
+    await this.findOwnProduct(id, organizationId);
     const product = await this.prismaService.product.delete({ where: { id } })
     await this.revalidateService.addRevalidationJob({slug})
     return product
   }
 
-  async addProductImages(productId: string, images: Express.Multer.File[]) {
+  async addProductImages(productId: string, images: Express.Multer.File[], organizationId: string) {
     // 🔸 1. Productni tekshirish
-    const product = await this.prismaService.product.findUnique({
-      where: { id: productId },
-    });
-    if (!product) throw new NotFoundException('Product not found');
+    await this.findOwnProduct(productId, organizationId);
 
     // 🔸 2. Har bir rasmni FileService orqali yuklab olish
     const uploadedFiles: any = [];
@@ -316,7 +337,13 @@ export class ProductService {
   //     return avatar;
   // }
 
-  async deleteImage(id: string) {
+  async deleteImage(id: string, organizationId: string) {
+    // Only images attached to your own dish; logos, avatars and other venues' files are 404 here
+    const image = await this.prismaService.file.findFirst({
+      where: { id, product: ownProduct(organizationId) },
+      select: { id: true },
+    });
+    if (!image) throw new NotFoundException('Image not found');
     await this.fileService.removeFile(id);
   }
 }

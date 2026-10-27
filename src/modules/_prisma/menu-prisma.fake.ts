@@ -172,7 +172,11 @@ export class FakeMenuPrisma {
 
   shape(table: string, row: Row, args: { include?: any; select?: any }): Row {
     const out: Row = { ...row };
-    const include = args.include ?? {};
+    // Relations can be loaded through `include` or named inside `select`
+    const include = { ...(args.include ?? {}) };
+    for (const [key, sub] of Object.entries(args.select ?? {})) {
+      if (RELATIONS[table][key]) include[key] = sub;
+    }
     for (const [key, sub] of Object.entries(include)) {
       if (!sub) continue;
       const rel = RELATIONS[table][key];
