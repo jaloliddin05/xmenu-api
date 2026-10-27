@@ -1,5 +1,4 @@
 export {default as LoginDto} from './login.dto'
-export {default as SmsCodeDto} from './sms-code.dto'
 export {default as CustomerTelegramDto} from './customer-login.dto'
 export {default as CustomerOtpRequestDto} from './customer-otp-request.dto'
 export {default as CustomerOtpVerifyDto} from './customer-otp-verify.dto'

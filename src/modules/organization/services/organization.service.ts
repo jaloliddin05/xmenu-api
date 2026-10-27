@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../_prisma/prisma.service';
 import { CreateOrganizationDto } from '../dto';
@@ -15,17 +16,18 @@ export class OrganizationService {
     private readonly revalidateService: RevalidateService
   ) { }
 
-  async create(data: CreateOrganizationDto, owner_id: string) {
-    const existingOrg = await this.prismaService.organization.findUnique({
+  async create(data: CreateOrganizationDto, owner_id: string, tx?: Prisma.TransactionClient) {
+    const db = tx ?? this.prismaService;
+    const existingOrg = await db.organization.findUnique({
       where: { owner_id },
     });
 
     const type = parseOrganizationType(data.type);
-    const slug = await this.generateUniqueSlug(data.name);
+    const slug = await this.generateUniqueSlug(data.name, existingOrg?.id, tx);
 
     // 🔁 agar organization allaqachon bor bo‘lsa — update qilamiz
     if (existingOrg) {
-      const updatedOrg = await this.prismaService.organization.update({
+      const updatedOrg = await db.organization.update({
         where: { id: existingOrg.id },
         data: {
           ...data,
@@ -37,7 +39,7 @@ export class OrganizationService {
     }
 
     // 🌍 organization yaratilganda 3 tilda translation create qilish
-    const organization = await this.prismaService.organization.create({
+    const organization = await db.organization.create({
       data: {
         ...data,
         slug,
@@ -286,8 +288,9 @@ export class OrganizationService {
   async isSlugExists(
     slug: string,
     excludeId?: string, // update paytida o‘zini hisobga olmaslik uchun
+    tx?: Prisma.TransactionClient,
   ): Promise<boolean> {
-    const existing = await this.prismaService.organization.findFirst({
+    const existing = await (tx ?? this.prismaService).organization.findFirst({
       where: {
         slug,
         ...(excludeId ? { id: { not: excludeId } } : {}),
@@ -299,12 +302,13 @@ export class OrganizationService {
   async generateUniqueSlug(
     name: string,
     excludeId?: string,
+    tx?: Prisma.TransactionClient,
   ): Promise<string> {
     const baseSlug = this.slugify(name);
     let slug = baseSlug;
     let counter = 1;
 
-    while (await this.isSlugExists(slug, excludeId)) {
+    while (await this.isSlugExists(slug, excludeId, tx)) {
       slug = `${baseSlug}-${++counter}`;
     }
 

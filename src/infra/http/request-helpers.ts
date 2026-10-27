@@ -19,6 +19,18 @@ export function resolveLang(req: { query?: Record<string, any>; headers?: Record
   return 'ru';
 }
 
+/** Client IP and user agent for rate limits and audit (IP honours `trust proxy` set in main.ts). */
+export function requestCtx(req: {
+  ip?: string;
+  socket?: { remoteAddress?: string };
+  headers?: Record<string, any>;
+}): { ip: string; userAgent: string } {
+  return {
+    ip: req.ip || req.socket?.remoteAddress || '',
+    userAgent: String(req.headers?.['user-agent'] ?? '').slice(0, 255),
+  };
+}
+
 /** Xodim (staff) so'rovidan organization id; yo'q bo'lsa 403. Global guard `req.user` ni qo'yadi. */
 export function requireStaffOrganizationId(req: { user?: { organization?: { id?: string } | null } }): string {
   const id = req.user?.organization?.id;

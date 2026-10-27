@@ -5,19 +5,8 @@ const CHAT_ID = process.env.XMENU_CHAT_ID || '';
 
 const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: false });
 
-export async function sendOtpWithButton(code: number | string, phone) {
-  const message = `📩 Your code is \`${code}\` \n 📞 Phone: \*${phone}\*`;
-
-  await bot.sendMessage(CHAT_ID, message, {
-    parse_mode: 'Markdown',
-  });
-
-  return code;
-}
-
-// Mijoz (customer) OTP'lari uchun alohida funksiya — sendOtpWithButton'ni
-// QAYTA ISHLATMANG: u xodimlar (staff) oqimida band (auth.service.ts, login
-// va parolni tiklash), signature'si ham boshqa narsa uchun mo'ljallangan.
+// SmsProvider=telegram uchun: mijoz va egasi (staff) OTP'lari shu orqali
+// guruhga boradi (CustomerOtpService scope bo'yicha matnni tayyorlaydi).
 //
 // Loyiha davomida: SMS_PROVIDER=telegram (customer-auth.config.ts) — real
 // Eskiz hisobisiz ham jamoa OTP kodlarini shu guruhda ko'rib test qila
@@ -36,21 +25,6 @@ export async function sendCustomerOtpSms(
   const message = `🧪 Test SMS → ${phone}\n${text}`;
 
   await bot.sendMessage(CHAT_ID, message);
-}
-
-export async function sendUserPassword(
-  password: string,
-  phone,
-  firstName,
-  lastName,
-) {
-  const message = `\*${firstName + ' ' + lastName}\* \n 📩 Your password is \`${password}\` \n 📞 Phone: \*${phone}\*`;
-
-  await bot.sendMessage(CHAT_ID, message, {
-    parse_mode: 'Markdown',
-  });
-
-  return password;
 }
 
 export async function sendApplicationToTelegram(data: {

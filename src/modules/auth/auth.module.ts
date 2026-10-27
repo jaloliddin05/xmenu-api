@@ -26,6 +26,7 @@ import { CustomerSessionService } from './services/customer-session.service';
 import { CustomerTokenService } from './services/customer-token.service';
 import { CustomerAuthEventService } from './services/customer-auth-event.service';
 import { StaffAuthEventService } from './services/staff-auth-event.service';
+import { StaffAuthService } from './services/staff-auth.service';
 import { CustomerCleanupService } from './services/customer-cleanup.service';
 import { RateLimitService } from './services/rate-limit.service';
 import { TelegramInitDataService } from './services/telegram-init-data.service';
@@ -54,6 +55,7 @@ import { NoStoreMiddleware } from './middleware/no-store.middleware';
   ],
   providers: [
     AuthService,
+    StaffAuthService,
     CustomerAuthService,
     { provide: CUSTOMER_AUTH_CONFIG, useFactory: loadCustomerAuthConfig },
     CustomerOtpService,

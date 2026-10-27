@@ -1,4 +1,4 @@
-import { ForbiddenException, HttpException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 
@@ -21,44 +21,5 @@ export class JwtTokenService {
       secret: jwtConfig.refreshTokenSecret,
       expiresIn: jwtConfig.refreshTokenExpiration,
     });
-  }
-
-  generateToken(payload) {
-    const jwtConfig = this.configService.getOrThrow('jwt');
-
-    return this.jwtService.sign(payload, {
-      secret: jwtConfig.accessTokenSecret,
-      expiresIn: 60 * 2,
-    });
-  }
-
-  async decodeToken(token: string) {
-    const jwtConfig = this.configService.getOrThrow('jwt');
-
-    const payload = await this.jwtService
-      .verifyAsync(token, {
-        secret: jwtConfig.accessTokenSecret,
-      })
-      .catch((err) => {
-        throw new HttpException(err.message, 400);
-      });
-    return payload;
-  }
-
-
-  async decodeTokenForRegister(token: string) {
-
-    if(!token) return null
-
-    const jwtConfig = this.configService.getOrThrow('jwt');
-
-    const payload = await this.jwtService
-      .verifyAsync(token, {
-        secret: jwtConfig.accessTokenSecret,
-      })
-      .catch((err) => {
-        return null
-      });
-    return payload || null
   }
 }

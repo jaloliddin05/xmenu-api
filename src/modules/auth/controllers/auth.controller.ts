@@ -7,30 +7,37 @@ import {
   Res,
   HttpCode,
   HttpStatus,
-  Query,
 } from '@nestjs/common';
 import express from 'express';
 import {
   ApiForbiddenResponse,
   ApiNoContentResponse,
-  ApiQuery,
+  ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
 
 import { AuthService } from '../services/auth.service';
-import { LoginDto, SmsCodeDto } from '../dto';
+import { StaffAuthService } from '../services/staff-auth.service';
+import { LoginDto } from '../dto';
+import {
+  StaffCheckCodeDto,
+  StaffRegisterDto,
+  StaffRegistrationRefDto,
+} from '../dto/staff-register.dto';
 import { Public } from '../decorators/public.decorator';
 import { User } from '../../user/models/user.modal';
 import { LocalAuthGuard } from '../passport-strategies/local/local-auth.guard';
 import { RefreshTokenUserGuard } from '../passport-strategies/refresh-token-user/refresh-token-user.guard';
-import { RegisterOrganizationDto } from '../../organization/dto';
-import PhoneDto from '../dto/phone.dto';
+import { requestCtx } from 'src/infra/http/request-helpers';
 
 
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) { }
+  constructor(
+    private readonly authService: AuthService,
+    private readonly staffAuth: StaffAuthService,
+  ) { }
 
   @Public()
   @UseGuards(LocalAuthGuard)
@@ -49,24 +56,28 @@ export class AuthController {
 
   @Public()
   @Post('/register')
-  @ApiQuery({ name: 'token', required: false, description: 'Optional token' })
+  @ApiOperation({
+    summary: 'Start owner signup: nothing is stored in the DB until the SMS code is confirmed',
+  })
   @HttpCode(HttpStatus.CREATED)
-  create(@Body() value: RegisterOrganizationDto,@Query('token') token?: string) {
-    return this.authService.signup(value,token);
+  register(@Body() dto: StaffRegisterDto, @Req() req: express.Request) {
+    return this.staffAuth.register(dto, requestCtx(req));
   }
 
   @Public()
   @Post('/check-code')
+  @ApiOperation({ summary: 'Confirm the signup code; creates the owner and the venue and signs in' })
   @HttpCode(200)
-  async checkCode(@Body() data: SmsCodeDto, @Query('token') token: string) {
-    return await this.authService.checkCode(token, data.code);
+  checkCode(@Body() dto: StaffCheckCodeDto, @Req() req: express.Request) {
+    return this.staffAuth.checkCode(dto, requestCtx(req));
   }
 
   @Public()
   @Post('/resend-code')
+  @ApiOperation({ summary: 'Send a new signup code (respects the resend cooldown)' })
   @HttpCode(200)
-  async resendCode(@Body() data: PhoneDto) {
-    return await this.authService.resendCode(data.phone);
+  resendCode(@Body() dto: StaffRegistrationRefDto, @Req() req: express.Request) {
+    return this.staffAuth.resendCode(dto.registrationId, requestCtx(req));
   }
 
   @Public()

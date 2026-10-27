@@ -24,6 +24,9 @@ export type CustomerErrorCode =
   | 'address_not_found'
   | 'address_limit_reached'
   | 'validation_error'
+  // Owner (staff) auth: docs/API.md
+  | 'invalid_credentials'
+  | 'phone_taken'
   // Buyurtmalar (docs/ORDERS_API.md)
   | 'invalid_order'
   | 'invalid_modifiers'
@@ -66,6 +69,8 @@ const STATUS: Record<CustomerErrorCode, number> = {
   address_not_found: 404,
   address_limit_reached: 409,
   validation_error: 400,
+  invalid_credentials: 401,
+  phone_taken: 409,
   invalid_order: 400,
   invalid_modifiers: 422,
   item_unavailable: 409,

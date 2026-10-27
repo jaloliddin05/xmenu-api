@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { SmsService } from './sms.service';
 import { HttpModule } from '@nestjs/axios';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { SMS_PROVIDER } from './providers/sms-provider.interface';
@@ -35,7 +34,6 @@ export function resolveSmsProviderName(env: NodeJS.ProcessEnv = process.env): Sm
         }),
     ],
     providers: [
-        SmsService,
         ConsoleSmsProvider,
         EskizSmsProvider,
         TelegramSmsProvider,
@@ -50,6 +48,6 @@ export function resolveSmsProviderName(env: NodeJS.ProcessEnv = process.env): Sm
             inject: [ConsoleSmsProvider, EskizSmsProvider, TelegramSmsProvider],
         },
     ],
-    exports: [SmsService, SMS_PROVIDER],
+    exports: [SMS_PROVIDER],
 })
 export class SmsModule { }

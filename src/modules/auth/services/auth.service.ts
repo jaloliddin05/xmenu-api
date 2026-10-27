@@ -1,27 +1,15 @@
 import * as bcrypt from 'bcrypt';
 import { Injectable } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
 import { BadRequestException } from '@nestjs/common/exceptions';
-import { ConfigService } from '@nestjs/config';
 
-import generateRandomCode from 'src/infra/helper/auth/generate-random-code';
-import { sendOtpWithButton, sendUserPassword } from 'src/infra/helper/tg-bot/otp-bot';
-import { generatePasswordWithHash } from 'src/infra/helper/auth/generate-password';
 import { UserService } from 'src/modules/user/user.service';
-import { OrganizationService } from 'src/modules/organization/services/organization.service';
 import { JwtTokenService } from '../jwt.service';
-import { SmsService } from 'src/modules/sms/sms.service';
-import { RegisterOrganizationDto } from 'src/modules/organization/dto';
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly userService: UserService,
-    private readonly organizationService: OrganizationService,
-    private readonly jwtService: JwtService,
-    private readonly configService: ConfigService,
     private readonly jwtTokenService: JwtTokenService,
-    private readonly smsService: SmsService
   ) { }
 
   async validateUserByUsernamePassword(phone: string, password: string) {
@@ -53,53 +41,7 @@ export class AuthService {
     return isSame;
   }
 
-  async signup(value: RegisterOrganizationDto, token) {
-    const tokenValue = await this.jwtTokenService.decodeTokenForRegister(token);
-
-    if(tokenValue?.id) return token 
-
-    const user = await this.userService.create({ first_name: value?.first_name, phone: value.phone, last_name: value?.last_name })
-
-    await this.organizationService.create({ name: value.name, type: value.type }, user.id)
-
-    // const code = generateRandomCode(4);
-    const code = 1111;
-
-    sendOtpWithButton(code, value.phone)
-    // await this.smsService.sendOtp(value.phone, code);
-
-    return this.jwtTokenService.generateToken({ code, id: user.id });
-  }
-
-  async resendCode(phone: string) {
-    const user = await this.userService.findByPhone(phone);
-
-    const code = generateRandomCode(4);
-    sendOtpWithButton(code, phone)
-    await this.smsService.sendOtp(phone, code);
-
-    return this.jwtTokenService.generateToken({ code, id: user?.id });
-  }
-
   getJWT(type: 'access' | 'refresh', sub: string) {
     return this.jwtTokenService.getJWT(type,sub,'user')
-  }
-
-  async checkCode(token: string, code: number) {
-    const { code: tokenCode, id } = await this.jwtTokenService.decodeToken(token);
-
-    if (tokenCode == code) {
-      const organization = await this.organizationService.updateIsActive(id, true)
-      const { hash, password } = await generatePasswordWithHash(organization.name)
-      const user = await this.userService.updateIsActiveAndPassword(id, true, hash)
-      sendUserPassword(password, user.phone, user.first_name, user.last_name)
-      // await this.smsService.sendNewPassword(user.phone, password);
-
-      const accessToken = this.getJWT('access', user.id);
-      const refreshToken = this.getJWT('refresh', user.id);
-      return { success: code == tokenCode, user, accessToken, refreshToken }
-    }
-
-    throw new BadRequestException('Invalid code'); 
   }
 }

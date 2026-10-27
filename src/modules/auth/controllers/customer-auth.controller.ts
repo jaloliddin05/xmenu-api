@@ -19,7 +19,7 @@ import {
   CustomerTelegramDto,
 } from '../dto';
 import { CustomerAuthService } from '../services/customer-auth.service';
-import type { RequestCtx } from '../services/customer-auth-event.service';
+import { requestCtx as ctxOf } from 'src/infra/http/request-helpers';
 import {
   CurrentCustomer,
   CustomerProtectedRoute,
@@ -28,11 +28,6 @@ import {
 import type { CustomerPrincipal } from '../decorators/customer-route.decorator';
 import { CurrentTenant } from '../../tenant/current-tenant.decorator';
 import type { Tenant } from '../../tenant/tenant.service';
-
-const ctxOf = (req: Request): RequestCtx => ({
-  ip: req.ip || req.socket?.remoteAddress || '',
-  userAgent: String(req.headers['user-agent'] ?? '').slice(0, 255),
-});
 
 @ApiTags('Auth-Customer')
 @ApiHeader({
