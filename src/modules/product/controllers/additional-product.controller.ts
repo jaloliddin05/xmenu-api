@@ -13,6 +13,7 @@ import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { CreateAdditionalProductDto, CreateAdditionalProductGroupDto } from '../dto/additional-product.dto';
 import { AdditionalProductService } from '../services/additional-product.service';
 import { UpdateAdditionalProductDto, UpdateAdditionalProductGroupDto } from '../dto/update-additional-product.dto';
+import { requireStaffOrganizationId } from 'src/infra/http/request-helpers';
 
 @ApiTags('Additional-Product')
 @Controller('additional-product')
@@ -26,7 +27,7 @@ export class AdditionalProductController {
         @Body() dto: CreateAdditionalProductGroupDto,
         @Req() req
     ) {
-        return await this.additionalProductService.createGroup(dto,req?.user?.organization?.slug);
+        return await this.additionalProductService.createGroup(dto, requireStaffOrganizationId(req), req?.user?.organization?.slug);
     }
 
     @Post('/')
@@ -36,7 +37,7 @@ export class AdditionalProductController {
         @Body() dto: CreateAdditionalProductDto,
         @Req() req
     ) {
-        return await this.additionalProductService.createAdditionalProduct(dto,req?.user?.organization?.slug);
+        return await this.additionalProductService.createAdditionalProduct(dto, requireStaffOrganizationId(req), req?.user?.organization?.slug);
     }
 
     @Put("group/:id")
@@ -46,7 +47,7 @@ export class AdditionalProductController {
         @Body() dto: UpdateAdditionalProductGroupDto,
         @Req() req
     ) {
-        return this.additionalProductService.updateGroup(id, dto, req?.user?.organization?.slug);
+        return this.additionalProductService.updateGroup(id, dto, requireStaffOrganizationId(req), req?.user?.organization?.slug);
     }
 
     // ✅ UPDATE ADDITIONAL PRODUCT
@@ -57,20 +58,20 @@ export class AdditionalProductController {
         @Body() dto: UpdateAdditionalProductDto,
         @Req() req
     ) {
-        return this.additionalProductService.updateAdditionalProduct(id, dto, req?.user?.organization?.slug);
+        return this.additionalProductService.updateAdditionalProduct(id, dto, requireStaffOrganizationId(req), req?.user?.organization?.slug);
     }
 
     @Delete('/group/:id')
     @ApiOperation({ summary: 'Method: delete' })
     @HttpCode(HttpStatus.NO_CONTENT)
     async deleteGroup(@Param('id') id: string, @Req() req) {
-        return await this.additionalProductService.deleteGroup(id,req?.user?.organization?.slug);
+        return await this.additionalProductService.deleteGroup(id, requireStaffOrganizationId(req), req?.user?.organization?.slug);
     }
 
     @Delete(':id')
     @ApiOperation({ summary: 'Method: delete' })
     @HttpCode(HttpStatus.NO_CONTENT)
     async remove(@Param('id') id: string, @Req() req) {
-        return await this.additionalProductService.delete(id,req?.user?.organization?.slug);
+        return await this.additionalProductService.delete(id, requireStaffOrganizationId(req), req?.user?.organization?.slug);
     }
 }

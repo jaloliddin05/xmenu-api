@@ -82,10 +82,9 @@ export class CreateAdditionalProductGroupDto {
   @Min(1)
   readonly max_selected?: number;
 
-  @ApiProperty({ example: 'uuid', required: false })
-  @IsOptional()
+  @ApiProperty({ example: 'uuid', description: 'Dish the group belongs to (must be your own)' })
   @IsString()
-  readonly product_id?: string;
+  readonly product_id: string;
 
   @ApiProperty({ type: [CreateAdditionalProductGroupTranslationDto] })
   @IsArray()

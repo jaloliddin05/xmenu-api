@@ -4,6 +4,7 @@ import { PrismaService } from '../../_prisma/prisma.service';
 import { CreateAdditionalProductDto, CreateAdditionalProductGroupDto } from '../dto/additional-product.dto';
 import { UpdateAdditionalProductDto, UpdateAdditionalProductGroupDto } from '../dto/update-additional-product.dto';
 import { RevalidateService } from 'src/modules/revalidate-queue/revalidate.service';
+import { assertOwnTranslations, ownGroup, ownOption, ownProduct } from './menu-ownership';
 
 @Injectable()
 export class AdditionalProductService {
@@ -12,7 +13,37 @@ export class AdditionalProductService {
     private readonly revalidateService: RevalidateService
   ) { }
 
-  async createGroup(dto: CreateAdditionalProductGroupDto,slug: string) {
+  // Every id from the URL or the body must belong to the caller's organization; anything else is 404.
+
+  private async findOwnGroup(id: string, organizationId: string) {
+    const group = await this.prismaService.additional_product_group.findFirst({
+      where: { id, ...ownGroup(organizationId) },
+      include: { translations: true, product: true },
+    });
+    if (!group) throw new NotFoundException('Additional product group not found');
+    return group;
+  }
+
+  private async findOwnOption(id: string, organizationId: string) {
+    const option = await this.prismaService.additional_product.findFirst({
+      where: { id, ...ownOption(organizationId) },
+      include: { translations: true, additional_product_group: { include: { product: true } } },
+    });
+    if (!option) throw new NotFoundException('Additional product not found');
+    return option;
+  }
+
+  private async assertOwnProduct(id: string, organizationId: string) {
+    const product = await this.prismaService.product.findFirst({
+      where: { id, ...ownProduct(organizationId) },
+      select: { id: true },
+    });
+    if (!product) throw new NotFoundException('Product not found');
+  }
+
+  async createGroup(dto: CreateAdditionalProductGroupDto, organizationId: string, slug: string) {
+    await this.assertOwnProduct(dto.product_id, organizationId);
+
     const data: any = {
       is_multiple: dto.is_multiple ?? false,
       is_required: dto.is_required ?? false,
@@ -24,14 +55,8 @@ export class AdditionalProductService {
           title: t.title,
         })),
       },
+      product: { connect: { id: dto.product_id } },
     };
-
-    // Agar product_id kelsa — shunda bog‘laymiz
-    if (dto.product_id) {
-      data.product = {
-        connect: { id: dto.product_id },
-      };
-    }
 
     const add_prod_group = await this.prismaService.additional_product_group.create({
       data,
@@ -40,15 +65,15 @@ export class AdditionalProductService {
       },
     });
 
-    if(dto?.product_id){
-      await this.revalidateService.addRevalidationJob({slug})
-    }
+    await this.revalidateService.addRevalidationJob({slug})
 
     return add_prod_group
   }
 
   // 🔹 2. Additional Product yaratish
-  async createAdditionalProduct(dto: CreateAdditionalProductDto,slug: string) {
+  async createAdditionalProduct(dto: CreateAdditionalProductDto, organizationId: string, slug: string) {
+    await this.findOwnGroup(dto.additional_product_group_id, organizationId);
+
     const add_prod = await this.prismaService.additional_product.create({
       data: {
         price: dto.price,
@@ -77,13 +102,10 @@ export class AdditionalProductService {
     return add_prod
   }
 
-  async updateGroup(id: string, dto: UpdateAdditionalProductGroupDto, slug: string) {
-    const group = await this.prismaService.additional_product_group.findUnique({
-      where: { id },
-      include: { translations: true, product: true },
-    });
-
-    if (!group) throw new NotFoundException("Additional product group not found");
+  async updateGroup(id: string, dto: UpdateAdditionalProductGroupDto, organizationId: string, slug: string) {
+    const group = await this.findOwnGroup(id, organizationId);
+    assertOwnTranslations(group.translations, dto.translations);
+    if (dto.product_id) await this.assertOwnProduct(dto.product_id, organizationId);
 
     // 🔹 Translationlarni update qilish
     if (dto.translations && dto.translations.length > 0) {
@@ -121,13 +143,10 @@ export class AdditionalProductService {
   }
 
   // ✅ UPDATE ADDITIONAL PRODUCT
-  async updateAdditionalProduct(id: string, dto: UpdateAdditionalProductDto, slug: string) {
-    const product = await this.prismaService.additional_product.findUnique({
-      where: { id },
-      include: { translations: true, additional_product_group: { include : {product:true}} },
-    });
-
-    if (!product) throw new NotFoundException("Additional product not found");
+  async updateAdditionalProduct(id: string, dto: UpdateAdditionalProductDto, organizationId: string, slug: string) {
+    const product = await this.findOwnOption(id, organizationId);
+    assertOwnTranslations(product.translations, dto.translations);
+    if (dto.additional_product_group_id) await this.findOwnGroup(dto.additional_product_group_id, organizationId);
 
     // 🔹 Translationlarni update qilish
     if (dto.translations && dto.translations.length > 0) {
@@ -166,7 +185,8 @@ export class AdditionalProductService {
     return add_prod
   }
 
-  async deleteGroup(id: string, slug: string) {
+  async deleteGroup(id: string, organizationId: string, slug: string) {
+    await this.findOwnGroup(id, organizationId);
     const add_prod_gr = await this.prismaService.additional_product_group.delete({ where: { id }, include: { product: true } })
     if(add_prod_gr?.product?.id){
       await this.revalidateService.addRevalidationJob({slug})
@@ -175,7 +195,8 @@ export class AdditionalProductService {
 
   }
 
-  async delete(id: string, slug: string) {
+  async delete(id: string, organizationId: string, slug: string) {
+    await this.findOwnOption(id, organizationId);
     const add_prod = await this.prismaService.additional_product.delete({ where: { id }, include: { additional_product_group: { include: { product: true } } } })
     if(add_prod?.additional_product_group?.product?.id){
       await this.revalidateService.addRevalidationJob({slug})
