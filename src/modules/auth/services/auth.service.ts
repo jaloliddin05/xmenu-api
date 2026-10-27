@@ -1,5 +1,4 @@
-import { Injectable } from '@nestjs/common';
-import { BadRequestException } from '@nestjs/common/exceptions';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 
 import { UserService } from 'src/modules/user/user.service';
 import { JwtTokenService } from '../jwt.service';
@@ -11,10 +10,12 @@ export class AuthService {
     private readonly jwtTokenService: JwtTokenService,
   ) { }
 
+  /** Resolves the user behind a staff access/refresh token; deleted and unconfirmed users are rejected. */
   async validateUserById(userId: string) {
-    const user = await this.userService.findOne(userId).catch(() => {
-      throw new BadRequestException('Valid token with non-existent user.');
-    });
+    const user = await this.userService.findOne(userId).catch(() => null);
+    if (!user || !user.isActive) {
+      throw new UnauthorizedException('Valid token with non-existent or inactive user.');
+    }
     return user;
   }
 

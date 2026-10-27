@@ -5,6 +5,7 @@ import { PrismaService } from '../_prisma/prisma.service';
 import { ChangePasswordDto, CreateUserDto, UpdateUserDto } from './dto';
 import { FileService } from '../file/file.service';
 import { hashPassword } from 'src/infra/helper/auth/hash-password';
+import { toStaffUser } from 'src/infra/helper/auth/staff-user';
 
 @Injectable()
 export class UserService {
@@ -37,15 +38,15 @@ export class UserService {
   }
 
   async findOne(id: string) {
-    const user = await this.prismaService.user.findUnique({ 
-      where: { id }, 
-      include: { 
+    const user = await this.prismaService.user.findUnique({
+      where: { id },
+      include: {
         organization: {
           include:{logo:true,banner:true,translations:true}
-        } 
-      } 
+        }
+      }
     })
-    return { ...user, password: null }
+    return user ? toStaffUser(user) : null
   }
 
   async findById(id: string) {
@@ -78,22 +79,12 @@ export class UserService {
       avatar.url = newAvatar.url;
     }
 
-    return await this.prismaService.user.update({
+    const user = await this.prismaService.user.update({
       where: { id },
       data:{ ...data, ...avatar },
       include: { avatar: true }, // agar file ma'lumotini ham qaytarmoqchi bo'lsangiz
     });
-  }
-
-  async updateIsActiveAndPassword(id: string, isActive: boolean, password: string) {
-    return await this.prismaService.user.update({ 
-      where: { id }, data: { isActive, password }, 
-      include:{
-        organization:{
-          include:{
-            logo:true,banner:true,translations:true
-          }}}
-    })
+    return toStaffUser(user);
   }
 
    async changePassword(data: ChangePasswordDto, id: string) {
@@ -120,11 +111,11 @@ export class UserService {
 
     const newPassword = await hashPassword(password);
 
-    return await this.prismaService.user.update({ where:{id} , data:{ password: newPassword }});
+    return toStaffUser(await this.prismaService.user.update({ where:{id} , data:{ password: newPassword }}));
   }
 
   async delete(id: string) {
-    return await this.prismaService.user.delete({ where: { id } })
+    return toStaffUser(await this.prismaService.user.delete({ where: { id } }))
   }
 
   async updateImage(file: Express.Multer.File, id: string) {
