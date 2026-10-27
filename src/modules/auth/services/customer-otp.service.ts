@@ -19,9 +19,23 @@ local a = redis.call('HINCRBY', KEYS[1], 'attempts', 1)
 return {h, a}
 `;
 
-const SMS_TEXT = {
-  uz: (brand: string, code: string) => `${brand} ga kirish uchun kod: ${code}. Hech kimga bermang.`,
-  ru: (brand: string, code: string) => `Код для входа в ${brand}: ${code}. Никому не сообщайте.`,
+/**
+ * Who the code is for. Each audience has its own keys and rate-limit counters, so a restaurant
+ * owner who also orders as a customer does not burn one limit with the other.
+ */
+export type OtpScope = 'customer' | 'staff';
+
+const KEY_PREFIX: Record<OtpScope, string> = { customer: 'otp', staff: 'sotp' };
+
+const SMS_TEXT: Record<OtpScope, Record<'uz' | 'ru', (brand: string, code: string) => string>> = {
+  customer: {
+    uz: (brand, code) => `${brand} ga kirish uchun kod: ${code}. Hech kimga bermang.`,
+    ru: (brand, code) => `Код для входа в ${brand}: ${code}. Никому не сообщайте.`,
+  },
+  staff: {
+    uz: (brand, code) => `${brand} tasdiqlash kodi: ${code}. Hech kimga bermang.`,
+    ru: (brand, code) => `Код подтверждения ${brand}: ${code}. Никому не сообщайте.`,
+  },
 };
 
 @Injectable()
@@ -33,14 +47,15 @@ export class CustomerOtpService {
     private readonly rateLimit: RateLimitService,
   ) {}
 
-  private otpKey(tenantId: string, phone: string) {
-    return `otp:${tenantId}:${phone}`;
+  private otpKey(scope: OtpScope, subjectId: string, phone: string) {
+    return `${KEY_PREFIX[scope]}:${subjectId}:${phone}`;
   }
 
-  private hmac(tenantId: string, phone: string, code: string): Buffer {
-    return createHmac('sha256', this.cfg.otpHmacSecret)
-      .update(`${tenantId}:${phone}:${code}`)
-      .digest();
+  private hmac(scope: OtpScope, subjectId: string, phone: string, code: string): Buffer {
+    // Customer input is unchanged so codes issued before this change stay valid
+    const input =
+      scope === 'customer' ? `${subjectId}:${phone}:${code}` : `${scope}:${subjectId}:${phone}:${code}`;
+    return createHmac('sha256', this.cfg.otpHmacSecret).update(input).digest();
   }
 
   private generateCode(): string {
@@ -53,31 +68,37 @@ export class CustomerOtpService {
   }
 
   /** otp/request: customers jadvaliga umuman tegmaydi. Qaytaradi: resendAfter (sekund). */
-  async request(tenant: { id: string; brandName: string }, phone: string, ip: string): Promise<number> {
+  async request(
+    tenant: { id: string; brandName: string },
+    phone: string,
+    ip: string,
+    scope: OtpScope = 'customer',
+  ): Promise<number> {
     // Telefon bo'yicha kalitlarda tenant YO'Q (tenant klientdan keladi — aylanib o'tib bo'lmasin)
+    const p = KEY_PREFIX[scope];
     const rules: RateRule[] = [
-      { key: `otp:cd:${phone}`, limit: 1, ttlSeconds: this.cfg.otpCooldownSeconds },
-      { key: `otp:rl:phone:h:${phone}`, limit: 5, ttlSeconds: 3600 },
-      { key: `otp:rl:phone:d:${phone}`, limit: 10, ttlSeconds: 86400 },
-      { key: `otp:rl:ip:${ip}`, limit: 30, ttlSeconds: 3600 },
+      { key: `${p}:cd:${phone}`, limit: 1, ttlSeconds: this.cfg.otpCooldownSeconds },
+      { key: `${p}:rl:phone:h:${phone}`, limit: 5, ttlSeconds: 3600 },
+      { key: `${p}:rl:phone:d:${phone}`, limit: 10, ttlSeconds: 86400 },
+      { key: `${p}:rl:ip:${ip}`, limit: 30, ttlSeconds: 3600 },
     ];
     await this.rateLimit.hit(rules);
 
-    const key = this.otpKey(tenant.id, phone);
+    const key = this.otpKey(scope, tenant.id, phone);
     const code = this.generateCode();
 
     // Yangi kod eskisini almashtiradi
     await this.redis
       .multi()
       .del(key)
-      .hset(key, 'h', this.hmac(tenant.id, phone, code).toString('hex'), 'attempts', 0)
+      .hset(key, 'h', this.hmac(scope, tenant.id, phone, code).toString('hex'), 'attempts', 0)
       .expire(key, this.cfg.otpTtlSeconds)
       .exec();
 
     if (!this.cfg.otpDevMode) {
       try {
         await Promise.race([
-          this.sms.send(phone, SMS_TEXT[this.cfg.smsLocale](tenant.brandName, code)),
+          this.sms.send(phone, SMS_TEXT[scope][this.cfg.smsLocale](tenant.brandName, code)),
           new Promise((_, reject) =>
             setTimeout(() => reject(new Error('SMS provider timeout')), SEND_TIMEOUT_MS).unref(),
           ),
@@ -101,14 +122,15 @@ export class CustomerOtpService {
     phone: string,
     code: string,
     hooks: { onFailed: () => Promise<void>; onLocked: () => Promise<void> },
+    scope: OtpScope = 'customer',
   ): Promise<void> {
-    const key = this.otpKey(tenantId, phone);
+    const key = this.otpKey(scope, tenantId, phone);
     const res = (await this.redis.eval(BUMP_LUA, 1, key)) as [string, number] | null;
     if (!res) throw new CustomerAuthException('code_expired');
 
     const [storedHex, attempts] = res;
     const expected = Buffer.from(storedHex, 'hex');
-    const given = this.hmac(tenantId, phone, code);
+    const given = this.hmac(scope, tenantId, phone, code);
     const equal = expected.length === given.length && timingSafeEqual(expected, given);
 
     if (equal) {

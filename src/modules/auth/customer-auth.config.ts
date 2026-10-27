@@ -54,7 +54,7 @@ export function loadCustomerAuthConfig(): CustomerAuthConfig {
   }
   if (otpDevMode) {
     new Logger('CustomerAuthConfig').warn(
-      'OTP_DEV_MODE yoqilgan: SMS yuborilmaydi, kod har doim 1234... bo\'ladi',
+      'OTP_DEV_MODE yoqilgan: SMS yuborilmaydi, kod har doim 123456... bo\'ladi',
     );
   }
 
@@ -79,7 +79,7 @@ export function loadCustomerAuthConfig(): CustomerAuthConfig {
     accessSecret,
     registrationSecret,
     otpHmacSecret,
-    otpLength: int('OTP_LENGTH', 4),
+    otpLength: int('OTP_LENGTH', 6),
     otpTtlSeconds: int('OTP_TTL_SECONDS', 300),
     otpMaxAttempts: int('OTP_MAX_ATTEMPTS', 5),
     otpCooldownSeconds: int('OTP_COOLDOWN_SECONDS', 60),

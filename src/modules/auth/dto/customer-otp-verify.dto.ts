@@ -6,7 +6,7 @@ class CustomerOtpVerifyDto {
   @IsString()
   phone: string;
 
-  @ApiProperty({ example: '1234' })
+  @ApiProperty({ example: '123456' })
   @IsString()
   code: string;
 
