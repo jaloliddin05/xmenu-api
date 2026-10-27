@@ -10,7 +10,7 @@ export interface RateRule {
 }
 
 // Hammasini atomik tekshiradi; birortasi limitga yetgan bo'lsa HECH NARSA oshirilmaydi.
-const HIT_LUA = `
+export const HIT_LUA = `
 for i = 1, #KEYS do
   local c = tonumber(redis.call('GET', KEYS[i]) or '0')
   if c >= tonumber(ARGV[i*2-1]) then
@@ -26,7 +26,7 @@ end
 return {0, 0}
 `;
 
-const ROLLBACK_LUA = `
+export const ROLLBACK_LUA = `
 for i = 1, #KEYS do
   local v = tonumber(redis.call('GET', KEYS[i]) or '0')
   if v > 0 then redis.call('DECR', KEYS[i]) end

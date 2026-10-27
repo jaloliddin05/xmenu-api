@@ -12,7 +12,7 @@ import { RateLimitService, RateRule } from './rate-limit.service';
 const SEND_TIMEOUT_MS = 5000;
 
 // attempts'ni oshiradi va saqlangan hash'ni qaytaradi (kalit yo'q bo'lsa nil)
-const BUMP_LUA = `
+export const BUMP_LUA = `
 local h = redis.call('HGET', KEYS[1], 'h')
 if not h then return nil end
 local a = redis.call('HINCRBY', KEYS[1], 'attempts', 1)
