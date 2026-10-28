@@ -103,6 +103,10 @@ Telegram; на реальном боте (особенно `requestContact()` в
   (недоступны никому); можно удалить вручную.
 - Slug ещё принимается как ключ тенанта: после перехода фронтов и кабинетов Click/Payme на id выключить `TENANT_ALLOW_SLUG`.
 - Скомпилированные `.js/.d.ts/.js.map` в `src/config` (не должны быть в репозитории).
+- `npm run lint` не проходит (около 230 ошибок `recommendedTypeChecked`: нетипизированный `@Req() req`, `any` из
+  конфигов и passport, код заказов и платежей), в CI lint не запускается. Для `*.spec.ts` и `*.fake.ts` правила
+  `no-unsafe-*` и `require-await` выключены. На Windows с `core.autocrlf=true` prettier ругается на CRLF рабочей копии,
+  хотя в git всё в LF: нужен `.gitattributes` с `eol=lf` или `endOfLine: 'auto'`.
 
 ## Правила
 - Никаких захардкоженных кодов и секретов. Не логируй токены ботов, ключи провайдеров, OTP-коды.
