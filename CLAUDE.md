@@ -1,6 +1,7 @@
 # xmenu-backend: единый API (api.xmenu.uz)
 
 Общий контекст, решения и очередь задач: `../CLAUDE.md`. Обслуживает админку, QR-меню и клиентский фронт доставки.
+Стадия: разработка и тестирование MVP; прода, клиентов и реальных данных нет, обратная совместимость не нужна.
 
 ## Стек
 NestJS 11, TypeScript, Prisma 6 + PostgreSQL 16, Redis + BullMQ, Passport (JWT), class-validator,
@@ -12,47 +13,55 @@ Swagger (`/docs`), Jest. Prettier: одинарные кавычки, trailing c
 (`openapi` собирает проект и пишет `docs/openapi.json` из сборки, без БД и Redis; `docs/API.md` правится руками).
 Миграции: `npm run migrate` (собирает схему и запускает `prisma migrate dev`), на сервере `npx prisma migrate deploy`.
 Env: см. `.env.example`. Ключевые: `JWT_*`, `OTP_*`, `SMS_PROVIDER`, `PAYMENT_CONFIG_KEY`, `REDIS_URL`, `PUBLIC_API_URL`,
-`TENANT_ALLOW_SLUG`, `TELEGRAM_*`, `UPLOAD_MAX_BYTES`, `PLATFORM_ADMIN_USER_IDS`, `TRANSLATION_*`.
+`TELEGRAM_BOT_TOKEN`, `TELEGRAM_ORDERS_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `OPS_CHAT_ID`, `ORDER_QUEUES`,
+`MINIAPP_URL`, `UPLOAD_MAX_BYTES`, `PLATFORM_ADMIN_USER_IDS`, `TRANSLATION_*`.
 
 ## Схема Prisma
 Не правь `prisma/schema.prisma` руками: он собирается из `src/modules/*/models/*.prisma` командой
 `npm run generate-schema`. Меняй модельные файлы, потом `npm run migrate`.
 
 ## Модули
-`auth` (два контура: staff и customer), `tenant` (id и slug → тенант), `organization`, `user`, `employee` (пока не
+`auth` (два контура: staff и customer), `tenant` (`TenantGuard`, `TenantService`: тенант по slug), `organization`, `user`, `employee` (пока не
 используется), `branch`, `category`, `product` (+ группы допов), `menu` (публичный), `customer` (+ адреса),
 `order` (state machine, очереди, уведомления), `payment` (Click, Payme, ключи тенанта, возвраты),
-`sms` (провайдеры eskiz, telegram, console), `telegram` (боты ресторанов), `file`, `translation`, `application`,
+`sms` (провайдеры eskiz, telegram, console), `file`, `translation`, `application`,
 `revalidate-queue` (инвалидация кэша QR).
 
 ## Контракт API
 Единое место: `docs/API.md` и `docs/openapi.json`. Подробности: `docs/ORDERS_API.md`, `docs/BRANCHES_API.md`,
-`docs/TELEGRAM_VERIFICATION.md`, `docs/BACKEND_ORDERS.md`. Меняешь контроллер или DTO: добавь `@ApiProperty` и
+`docs/BACKEND_ORDERS.md` (`docs/TELEGRAM_VERIFICATION.md` в репозитории нет). Меняешь контроллер или DTO: добавь `@ApiProperty` и
 `@ApiOperation`, запусти `npm run openapi`, закоммить результат вместе с кодом. Проверки контракта в CI пока нет
 (в `.github/workflows` только `deploy.yml`).
 
-## Тенантность
-- Тенант = `organization`, идентификатор `organization.id` (UUID, не меняется). Клиентские эндпоинты определяют его по
-  `X-Tenant-Id`, вебхуки оплаты по id в URL. Slug принимается только как устаревший вариант
-  (`src/modules/tenant/tenant-key.ts`, флаг `TENANT_ALLOW_SLUG`); каждый пришедший slug логируется один раз.
-  `GET /tenant/by-slug/:slug` отдаёт фронтам id. UUID-подобные slug запрещены.
+## Тенантность (не реализовано: цель)
+Факт: тенант определяется только по slug (`TenantService.resolve(slug)`, `tenant.service.ts:26`); заголовок
+`X-Tenant-Id` в коде несёт slug (`branch.controller.ts:12`), вебхуки на `payments/click/:slug` и
+`payments/payme/:slug`; `GET /tenant/by-slug`, `tenant-key.ts` и валидации slug нет.
+Цель (запланировано, очередь 0b):
+- Тенант только по `organization.id` (UUID, не меняется). Клиентские эндпоинты определяют его по `X-Tenant-Id`,
+  вебхуки оплаты по id в URL. Запасного пути «slug вместо id» нет. `GET /tenant/by-slug/:slug` отдаёт фронтам id и
+  публичный конфиг тенанта (бренд, логотип, цвета, языки, каналы, контакты). Slug валидируется (формат, не
+  UUID-подобный, уникальность).
 - Тенант и клиент берутся из токена и заголовка, не из тела запроса. Каждый запрос и выборка привязаны к тенанту.
 - Платёжные ключи и токены ботов шифруются AES-256-GCM (`PAYMENT_CONFIG_KEY`). Потеря ключа: все вводят заново.
 
 ## Заказы
 `OrderTransitionService` единственный путь смены статуса (автомат, optimistic locking по `version`, журнал).
 Оплату подтверждает только вебхук провайдера. Эскалация: 45 с повтор в Telegram, 120 с SMS, 300 с авто-отмена и
-возврат (робозвонка нет; старые задачи `esc-call` в Redis процессор молча пропускает). Click возвращает автоматически,
+возврат (робозвонка нет; шаг `esc-call` на 180 с шлёт ops-алерт). Click возвращает автоматически,
 Payme вручную через ops-чат.
 
 ## Авторизация клиентов
 Телефон + OTP (HMAC-хеш кода, TTL, лимит попыток, cooldown) через `SmsProvider`; refresh-токены с ротацией и
 сессиями. `CustomerOtpService.issue()` не зависит от канала доставки (SMS или Telegram), лимиты по телефону общие.
 Целевые параметры: `OTP_LENGTH=6`, `OTP_TTL_SECONDS=300`, `OTP_MAX_ATTEMPTS=5`, `OTP_COOLDOWN_SECONDS=60`
-(сейчас по умолчанию длина 4: поменять значение по умолчанию и согласовать с фронтами).
+По умолчанию 6; клиент и дашборд пока ждут 4.
 `TelegramInitDataService` проверяет `initData` токеном бота тенанта (иначе платформенным) и входом не является.
 
-## Подтверждение номера через Telegram
+## Подтверждение номера через Telegram (не реализовано: план)
+В коде нет `TelegramVerificationService`, `TelegramBotWebhookController`, `TelegramBotService`, `PUT /telegram-bot`
+и `docs/TELEGRAM_VERIFICATION.md`. Сейчас есть только платформенный бот заказов (`telegram-orders.controller.ts`)
+и `TelegramInitDataService`. Ниже описана цель.
 `TelegramVerificationService` + `TelegramBotWebhookController` (`POST /telegram/bot/:botKey/webhook`), боты ресторанов в
 `TelegramBotService` (`PUT /telegram-bot` из админки). Два режима: Mini App (`instant`, сессия привязана к
 Telegram-пользователю из `initData`) и сайт (`code`, код приходит в чат бота только при совпадении номера). Сессии в
@@ -89,24 +98,23 @@ Redis (`tgv:*`). Подробно: `docs/TELEGRAM_VERIFICATION.md`. Контак
 
 ## Что не проверено (проверять на стенде перед опорой)
 Запросы Prisma end-to-end (`POST /orders`), боевые вызовы Click/Payme (особенно reversal Click и параметры ссылки
-Payme), Telegram webhook и кнопки, нагрузка. Стендов Click/Payme нет. Telegram-верификация покрыта тестами с подменой
-Telegram; на реальном боте (особенно `requestContact()` в Mini App) не проверена. Миграция
-`20261019120000_organization_telegram_bot` написана вручную и на живой БД не применялась.
+Payme), Telegram webhook и кнопки, нагрузка. Стендов Click/Payme нет.
 
 ## Известные долги
+- Ветки `feat/staff-auth-hardening` (21 коммит) и `fix/pilot-hardening` (7 коммитов поверх неё) не влиты в `main`.
 - Refresh-токены staff без ротации и отзыва (выход не инвалидирует токен; удаление пользователя инвалидирует).
   Восстановления пароля для владельцев нет.
 - Дашборд ещё на старом контракте регистрации (код `1111`, `?token=`): до его обновления регистрация в админке не
   работает. Что поменять: `docs/API.md`, «Авторизация владельцев».
 - Загрузки (`MulterStorage`) принимают только изображения (JPEG, PNG, GIF, WebP по содержимому, до `UPLOAD_MAX_BYTES`) и
   пишут на диск после проверки. Но при 404 владельца в `PUT /organization`, `POST/PATCH /product…` файл, уже записанный
-  валидатором, остаётся на диске без записи в БД. Уже лежащие на проде файлы не проверялись: отдача делает любой
-  не-образ `attachment` + `sandbox`, сами файлы не чистились.
+  валидатором, остаётся на диске без записи в БД. Файлы, загруженные до этой защиты, не проверялись: отдача делает
+  любой не-образ `attachment` + `sandbox`, сами файлы не чистились.
 - Ревалидация: ключ задания `revalidate-{route}-{slug|id}` (`docs/REVALIDATE.md`); бэкенд и QR расходятся по формату
   тела при смене slug (Q-01, чинится в QR). В `GET /application` читать могут только id из `PLATFORM_ADMIN_USER_IDS`.
 - Группы допов, созданные до миграции `additional_product_group_organization` и не привязанные к блюду, без владельца
   (недоступны никому); можно удалить вручную.
-- Slug ещё принимается как ключ тенанта: после перехода фронтов и кабинетов Click/Payme на id выключить `TENANT_ALLOW_SLUG`.
+- Тенант определяется только по slug (по id запланировано); смена slug ломает вебхуки Click/Payme.
 - Скомпилированные `.js/.d.ts/.js.map` в `src/config` (не должны быть в репозитории).
 - `npm run lint` не проходит (около 230 ошибок `recommendedTypeChecked`: нетипизированный `@Req() req`, `any` из
   конфигов и passport, код заказов и платежей), в CI lint не запускается. Для `*.spec.ts` и `*.fake.ts` правила
