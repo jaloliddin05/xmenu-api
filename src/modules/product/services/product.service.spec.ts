@@ -210,3 +210,24 @@ describe('ProductService: organization ownership (IDOR)', () => {
     expect(db.data.product.some((p) => p.id === t.mine.product.id)).toBe(false);
   });
 });
+
+describe('ProductService.findAll: is_active filter (P-33)', () => {
+  const run = async (isActive?: boolean) => {
+    const findMany = jest.fn(async () => []);
+    const service = new ProductService({ product: { findMany } } as any, {} as any, {} as any);
+    await service.findAll('org-1', undefined as any, 'ru', isActive);
+    return (findMany.mock.calls[0] as any)[0].where;
+  };
+
+  it('filters on the real column is_active (isActive is not a Prisma field and gave 500)', async () => {
+    expect(await run(true)).toMatchObject({ is_active: true });
+    expect(await run(false)).toMatchObject({ is_active: false });
+    expect(await run(true)).not.toHaveProperty('isActive');
+  });
+
+  it('adds no status filter when the parameter is absent, and stays scoped to the organization', async () => {
+    const where = await run(undefined);
+    expect(where).not.toHaveProperty('is_active');
+    expect(where.category).toBeDefined();
+  });
+});

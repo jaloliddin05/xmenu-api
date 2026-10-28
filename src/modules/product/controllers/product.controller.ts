@@ -20,6 +20,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiConsumes, ApiQuery, ApiBody } fr
 import { ProductService } from '../services/product.service';
 import { CreateProductDto } from '../dto/create-product.dto';
 import { FileFieldsInterceptor, FilesInterceptor } from '@nestjs/platform-express';
+import { OptionalBoolPipe } from 'src/infra/http/optional-bool.pipe';
 import { MulterStorage } from 'src/infra/helper/upload/multer-upload';
 import MoveProductDto from '../dto/move-product.dto';
 import { UpdateProductDto } from '../dto/update-product.dto';
@@ -34,13 +35,13 @@ export class ProductController {
   @Get()
   @ApiOperation({ summary: 'Method: get all' })
   @ApiQuery({ name: 'categoryId', required: false, description: 'uuid' })
-  @ApiQuery({ name: 'isActive', required: false, description: 'true' })
+  @ApiQuery({ name: 'is_active', required: false, type: Boolean, description: '"true" or "false"; anything else is 400' })
   @ApiQuery({ name: 'title', required: false, description: '' })
   @HttpCode(HttpStatus.OK)
   async findAll(
     @Query('lang') lang: string, 
     @Query('categoryId') categoryId: string,
-    @Query('is_active') is_active: string,
+    @Query('is_active', new OptionalBoolPipe('is_active')) is_active: boolean | undefined,
     @Query('title') title: string,
     @Req() req
   ) {

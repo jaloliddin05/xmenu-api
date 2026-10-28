@@ -46,10 +46,10 @@ export class ProductService {
     if (found.length !== unique.length) throw new NotFoundException('Additional product group not found');
   }
 
-  async findAll(organization_id: string, category_id: string, lang: string, isActive?, title?: string) {
+  async findAll(organization_id: string, category_id: string, lang: string, isActive?: boolean, title?: string) {
     const where: any = {}
     category_id ? where['category_id'] = category_id : null;
-    isActive ? (isActive == 'true' ? where['isActive'] = true : where['isActive'] = false) : null
+    if (isActive !== undefined) where.is_active = isActive;
     if (title) {
       where.translations = {
         some: {
