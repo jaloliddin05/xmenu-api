@@ -107,3 +107,21 @@ IP берётся из `X-Forwarded-For` только от локального 
   `additional_product_group_ids` в `POST /product`); группа принадлежит организации, которая её создала.
 
 Удалены: `GET /user`, `POST /user`, `GET /organization`.
+
+## Загрузка файлов, перевод, заявки, фильтр блюд
+
+- `POST /file/upload` (multipart, поле `file`): только с токеном владельца. Принимаются JPEG, PNG, GIF, WebP;
+  тип определяется по содержимому, а не по имени и MIME. SVG и всё остальное: `400`. Размер ограничен `UPLOAD_MAX_BYTES`
+  (по умолчанию 5 МБ): больше → `413`. Файл пишется на диск под случайным именем с расширением по типу и только после
+  проверок. Те же правила действуют для логотипа и баннера (`PUT /organization/:id`), фото блюд (`POST/PATCH /product…`)
+  и аватара (`PUT /user/:id`).
+- Файлы отдаются с `X-Content-Type-Options: nosniff`; всё, что не изображение, отдаётся как `attachment` с
+  `Content-Security-Policy: sandbox`. Несуществующий файл: обычный `404` без пути на диске.
+- `POST /translation`: только с токеном владельца. Лимит на пользователя: `TRANSLATION_RATE_LIMIT` запросов за
+  `TRANSLATION_RATE_WINDOW_SECONDS` (по умолчанию 30 за 600 с), сверх лимита `429` с `code: rate_limited` и `retryAfter`.
+  `text` до `TRANSLATION_MAX_TEXT` символов (2000), `promptName` до 100: иначе `400`. Сбой модели: `502`.
+- `GET /application`: только платформенные администраторы (`PLATFORM_ADMIN_USER_IDS`, пусто = никто): остальным `403`.
+  `POST /application` остаётся публичным.
+- `GET /product?is_active=true|false`: фильтр по статусу блюда (параметр называется `is_active`). Другое значение: `400`,
+  без параметра фильтра нет.
+- Ревалидация QR: формат тела и ключи заданий в `docs/REVALIDATE.md`.

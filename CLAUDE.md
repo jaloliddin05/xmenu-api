@@ -12,7 +12,7 @@ Swagger (`/docs`), Jest. Prettier: одинарные кавычки, trailing c
 (`openapi` собирает проект и пишет `docs/openapi.json` из сборки, без БД и Redis; `docs/API.md` правится руками).
 Миграции: `npm run migrate` (собирает схему и запускает `prisma migrate dev`), на сервере `npx prisma migrate deploy`.
 Env: см. `.env.example`. Ключевые: `JWT_*`, `OTP_*`, `SMS_PROVIDER`, `PAYMENT_CONFIG_KEY`, `REDIS_URL`, `PUBLIC_API_URL`,
-`TENANT_ALLOW_SLUG`, `TELEGRAM_*`.
+`TENANT_ALLOW_SLUG`, `TELEGRAM_*`, `UPLOAD_MAX_BYTES`, `PLATFORM_ADMIN_USER_IDS`, `TRANSLATION_*`.
 
 ## Схема Prisma
 Не правь `prisma/schema.prisma` руками: он собирается из `src/modules/*/models/*.prisma` командой
@@ -98,7 +98,12 @@ Telegram; на реальном боте (особенно `requestContact()` в
   Восстановления пароля для владельцев нет.
 - Дашборд ещё на старом контракте регистрации (код `1111`, `?token=`): до его обновления регистрация в админке не
   работает. Что поменять: `docs/API.md`, «Авторизация владельцев».
-- multer сохраняет загруженный файл на диск до проверки владельца: при 404 файл остаётся на диске без записи в БД.
+- Загрузки (`MulterStorage`) принимают только изображения (JPEG, PNG, GIF, WebP по содержимому, до `UPLOAD_MAX_BYTES`) и
+  пишут на диск после проверки. Но при 404 владельца в `PUT /organization`, `POST/PATCH /product…` файл, уже записанный
+  валидатором, остаётся на диске без записи в БД. Уже лежащие на проде файлы не проверялись: отдача делает любой
+  не-образ `attachment` + `sandbox`, сами файлы не чистились.
+- Ревалидация: ключ задания `revalidate-{route}-{slug|id}` (`docs/REVALIDATE.md`); бэкенд и QR расходятся по формату
+  тела при смене slug (Q-01, чинится в QR). В `GET /application` читать могут только id из `PLATFORM_ADMIN_USER_IDS`.
 - Группы допов, созданные до миграции `additional_product_group_organization` и не привязанные к блюду, без владельца
   (недоступны никому); можно удалить вручную.
 - Slug ещё принимается как ключ тенанта: после перехода фронтов и кабинетов Click/Payme на id выключить `TENANT_ALLOW_SLUG`.
@@ -111,6 +116,6 @@ Telegram; на реальном боте (особенно `requestContact()` в
 ## Правила
 - Никаких захардкоженных кодов и секретов. Не логируй токены ботов, ключи провайдеров, OTP-коды.
 - Вебхуки оплаты идемпотентны, подписи проверяются ключом именно этого тенанта.
-- Любое изменение меню или slug вызывает ревалидацию QR (`revalidate-queue`).
+- Любое изменение меню или slug вызывает ревалидацию QR (`revalidate-queue`, ключи заданий: `docs/REVALIDATE.md`).
 - Новые эндпоинты с DTO и Swagger; изменение контракта обновляет `docs/*_API.md` в том же коммите.
 - Новая бизнес-логика с тестами рядом (`*.spec.ts`). Тестовые подставки называй `*.fake.ts` (не попадают в сборку).

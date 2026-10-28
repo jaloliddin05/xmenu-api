@@ -33,6 +33,7 @@
             "description": ""
           }
         },
+        "summary": "Platform admins only (PLATFORM_ADMIN_USER_IDS)",
         "tags": [
           "Application"
         ]
@@ -1906,14 +1907,6 @@
             }
           },
           {
-            "name": "is_active",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "title",
             "required": false,
             "in": "query",
@@ -1923,11 +1916,13 @@
             }
           },
           {
-            "name": "isActive",
+            "name": "is_active",
             "required": false,
             "in": "query",
-            "description": "true",
-            "schema": {}
+            "description": "\"true\" or \"false\"; anything else is 400",
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -2350,7 +2345,7 @@
             "description": ""
           }
         },
-        "summary": "Method: create",
+        "summary": "Translate menu text (owner token required; rate limited per owner, 429 rate_limited)",
         "tags": [
           "Translation"
         ]
