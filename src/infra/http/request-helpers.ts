@@ -5,7 +5,7 @@ export type Lang = 'ru' | 'uz' | 'en';
 /** ?lang=uz yoki Accept-Language: uz-UZ,ru;q=0.8 → 'ru' | 'uz' | 'en' (standart: ru). */
 export function resolveLang(req: { query?: Record<string, any>; headers?: Record<string, any> }): Lang {
   const pick = (v: unknown): Lang | null => {
-    const code = String(v ?? '').trim().toLowerCase().slice(0, 2);
+    const code = typeof v === 'string' ? v.trim().toLowerCase().slice(0, 2) : '';
     return code === 'ru' || code === 'uz' || code === 'en' ? code : null;
   };
   const fromQuery = pick(req.query?.lang);

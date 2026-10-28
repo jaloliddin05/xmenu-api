@@ -67,8 +67,11 @@ export class StaffAuthService {
   // ================= POST /auth/register =================
 
   async register(dto: StaffRegisterDto, ctx: RequestCtx) {
-    if (!isValidPhone(dto.phone)) throw new CustomerAuthException('invalid_phone');
-    await this.rateLimit.hit([{ key: `staff:reg:rl:ip:${ctx.ip}`, limit: 10, ttlSeconds: 3600 }]);
+    if (!isValidPhone(dto.phone))
+      throw new CustomerAuthException('invalid_phone');
+    await this.rateLimit.hit([
+      { key: `staff:reg:rl:ip:${ctx.ip}`, limit: 10, ttlSeconds: 3600 },
+    ]);
 
     const existing = await this.prisma.user.findUnique({
       where: { phone: dto.phone },
@@ -86,7 +89,12 @@ export class StaffAuthService {
       passwordHash: await hashPassword(dto.password),
     };
     const key = this.pendingKey(registrationId);
-    await this.redis.set(key, JSON.stringify(pending), 'EX', PENDING_REGISTRATION_TTL_SECONDS);
+    await this.redis.set(
+      key,
+      JSON.stringify(pending),
+      'EX',
+      PENDING_REGISTRATION_TTL_SECONDS,
+    );
 
     let resendAfter: number;
     try {
@@ -108,15 +116,22 @@ export class StaffAuthService {
   async resendCode(registrationId: string, ctx: RequestCtx) {
     const pending = await this.readPending(registrationId);
     const resendAfter = await this.sendCode(registrationId, pending.phone, ctx);
-    await this.redis.expire(this.pendingKey(registrationId), PENDING_REGISTRATION_TTL_SECONDS);
+    await this.redis.expire(
+      this.pendingKey(registrationId),
+      PENDING_REGISTRATION_TTL_SECONDS,
+    );
     return { resendAfter, expiresIn: this.cfg.otpTtlSeconds };
   }
 
   // ================= POST /auth/check-code =================
 
-  async checkCode(dto: { registrationId: string; code: string }, ctx: RequestCtx) {
+  async checkCode(
+    dto: { registrationId: string; code: string },
+    ctx: RequestCtx,
+  ) {
     // A malformed code does not spend an attempt
-    if (!this.otp.isValidCodeFormat(dto.code)) throw new CustomerAuthException('invalid_code');
+    if (!this.otp.isValidCodeFormat(dto.code))
+      throw new CustomerAuthException('invalid_code');
     const pending = await this.readPending(dto.registrationId);
     const { phone } = pending;
 
@@ -164,23 +179,43 @@ export class StaffAuthService {
   async login(dto: { login: string; password: string }, ctx: RequestCtx) {
     const phone = formatPhoneNumber(String(dto.login ?? '')).slice(0, 20);
     await this.rateLimit.hit([
-      { key: `staff:login:rl:ip:${ctx.ip}`, limit: LOGIN_IP_LIMIT, ttlSeconds: LOGIN_IP_WINDOW_SECONDS },
+      {
+        key: `staff:login:rl:ip:${ctx.ip}`,
+        limit: LOGIN_IP_LIMIT,
+        ttlSeconds: LOGIN_IP_WINDOW_SECONDS,
+      },
     ]);
     await this.throttle.assertNotLocked(phone);
 
     const user = isValidPhone(phone)
-      ? await this.prisma.user.findUnique({ where: { phone }, include: USER_WITH_ORGANIZATION })
+      ? await this.prisma.user.findUnique({
+          where: { phone },
+          include: USER_WITH_ORGANIZATION,
+        })
       : null;
     const hash = user?.isActive && user.password ? user.password : null;
-    const matches = await bcrypt.compare(String(dto.password ?? ''), hash ?? DUMMY_HASH);
+    const matches = await bcrypt.compare(
+      String(dto.password ?? ''),
+      hash ?? DUMMY_HASH,
+    );
 
     if (!hash || !matches) {
       const lockedFor = await this.throttle.registerFailure(phone);
-      await this.events.log('staff_login_failed', ctx, { phone, userId: user?.id });
+      await this.events.log('staff_login_failed', ctx, {
+        phone,
+        userId: user?.id,
+      });
       if (lockedFor) {
-        await this.events.log('staff_login_locked', ctx, { phone, userId: user?.id, meta: { seconds: lockedFor } });
+        await this.events.log('staff_login_locked', ctx, {
+          phone,
+          userId: user?.id,
+          meta: { seconds: lockedFor },
+        });
       }
-      throw new CustomerAuthException('invalid_credentials', 'Invalid phone or password');
+      throw new CustomerAuthException(
+        'invalid_credentials',
+        'Invalid phone or password',
+      );
     }
 
     await this.throttle.reset(phone);
@@ -202,13 +237,19 @@ export class StaffAuthService {
     return `staff:reg:${registrationId}`;
   }
 
-  private async readPending(registrationId: string): Promise<PendingRegistration> {
+  private async readPending(
+    registrationId: string,
+  ): Promise<PendingRegistration> {
     const raw = await this.redis.get(this.pendingKey(registrationId));
     if (!raw) throw new CustomerAuthException('registration_expired');
     return JSON.parse(raw) as PendingRegistration;
   }
 
-  private async sendCode(registrationId: string, phone: string, ctx: RequestCtx): Promise<number> {
+  private async sendCode(
+    registrationId: string,
+    phone: string,
+    ctx: RequestCtx,
+  ): Promise<number> {
     try {
       const resendAfter = await this.otp.request(
         { id: registrationId, brandName: OTP_BRAND },
@@ -219,7 +260,10 @@ export class StaffAuthService {
       await this.events.log('staff_otp_requested', ctx, { phone });
       return resendAfter;
     } catch (err) {
-      if (err instanceof CustomerAuthException && err.code === 'sms_unavailable') {
+      if (
+        err instanceof CustomerAuthException &&
+        err.code === 'sms_unavailable'
+      ) {
         await this.events.log('staff_otp_send_failed', ctx, { phone });
       }
       throw err;
@@ -231,8 +275,11 @@ export class StaffAuthService {
     for (let attempt = 1; ; attempt++) {
       try {
         const userId = await this.prisma.$transaction(async (tx) => {
-          const existing = await tx.user.findUnique({ where: { phone: p.phone } });
-          if (existing?.isActive) throw new CustomerAuthException('phone_taken');
+          const existing = await tx.user.findUnique({
+            where: { phone: p.phone },
+          });
+          if (existing?.isActive)
+            throw new CustomerAuthException('phone_taken');
 
           const data = {
             first_name: p.first_name,
@@ -244,8 +291,15 @@ export class StaffAuthService {
             ? await tx.user.update({ where: { id: existing.id }, data })
             : await tx.user.create({ data: { phone: p.phone, ...data } });
 
-          const org = await this.organizations.create({ name: p.name, type: p.type }, user.id, tx);
-          await tx.organization.update({ where: { id: org.id }, data: { is_active: true } });
+          const org = await this.organizations.create(
+            { name: p.name, type: p.type },
+            user.id,
+            tx,
+          );
+          await tx.organization.update({
+            where: { id: org.id },
+            data: { is_active: true },
+          });
           return user.id;
         });
         return await this.prisma.user.findUniqueOrThrow({
@@ -253,9 +307,19 @@ export class StaffAuthService {
           include: USER_WITH_ORGANIZATION,
         });
       } catch (err) {
-        if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== 'P2002') throw err;
-        const target = String(err.meta?.target ?? '');
-        if (target.includes('phone')) throw new CustomerAuthException('phone_taken');
+        if (
+          !(err instanceof Prisma.PrismaClientKnownRequestError) ||
+          err.code !== 'P2002'
+        )
+          throw err;
+        const raw = err.meta?.target;
+        const target = Array.isArray(raw)
+          ? raw.join(',')
+          : typeof raw === 'string'
+            ? raw
+            : '';
+        if (target.includes('phone'))
+          throw new CustomerAuthException('phone_taken');
         // Two venues with the same name signing up at once collide on the slug: try a fresh one
         if (target.includes('slug') && attempt < SLUG_RETRIES) continue;
         throw err;

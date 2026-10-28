@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
 import { maskPhone } from 'src/infra/helper/auth/customer-validators';
 import type { RequestCtx } from './customer-auth-event.service';
@@ -23,11 +24,22 @@ export class StaffAuthEventService {
   async log(
     type: StaffAuthEventType,
     ctx: RequestCtx,
-    data: { userId?: string; organizationId?: string; phone?: string; meta?: Record<string, unknown> } = {},
+    data: {
+      userId?: string;
+      organizationId?: string;
+      phone?: string;
+      meta?: Record<string, unknown>;
+    } = {},
   ): Promise<void> {
     const phone_masked = maskPhone(data.phone);
     this.logger.log(
-      JSON.stringify({ type, user_id: data.userId, organization_id: data.organizationId, phone: phone_masked, ip: ctx.ip }),
+      JSON.stringify({
+        type,
+        user_id: data.userId,
+        organization_id: data.organizationId,
+        phone: phone_masked,
+        ip: ctx.ip,
+      }),
     );
     try {
       await this.prisma.staff_auth_event.create({
@@ -38,12 +50,12 @@ export class StaffAuthEventService {
           phone_masked,
           ip: ctx.ip || null,
           user_agent: ctx.userAgent || null,
-          meta: (data.meta as any) ?? undefined,
+          meta: data.meta as Prisma.InputJsonObject | undefined,
         },
       });
-    } catch (err: any) {
+    } catch (err) {
       // A failed audit write must not break authentication
-      this.logger.warn(`audit not written: ${err?.message}`);
+      this.logger.warn(`audit not written: ${(err as Error)?.message}`);
     }
   }
 }
