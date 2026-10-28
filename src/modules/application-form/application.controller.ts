@@ -1,8 +1,9 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { ApplicationService } from './application.service';
 import { CreateApplicationDto } from './dto/create-application.dto';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Public } from '../auth/decorators/public.decorator';
+import { PlatformAdminGuard } from '../auth/guards/platform-admin.guard';
 
 @ApiTags('Application')
 @Controller('application')
@@ -17,6 +18,8 @@ export class ApplicationController {
   }
 
   @Get()
+  @UseGuards(PlatformAdminGuard)
+  @ApiOperation({ summary: 'Platform admins only (PLATFORM_ADMIN_USER_IDS)' })
   async findAll() {
     return this.applicationService.findAll();
   }
