@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../_prisma/prisma.service';
@@ -8,6 +8,9 @@ import UpdateOrganizationDto from '../dto/update-organization.dto';
 import { parseOrganizationType } from '../models/organization.model';
 import { RevalidateService } from 'src/modules/revalidate-queue/revalidate.service';
 import { assertOwnTranslations } from 'src/modules/product/services/menu-ownership';
+import { randomSlug, SLUG_MAX, slugify } from '../domain/slug';
+
+const slugTaken = () => new ConflictException({ message: 'Slug is already taken', code: 'slug_taken' });
 
 @Injectable()
 export class OrganizationService {
@@ -225,6 +228,10 @@ export class OrganizationService {
     // 3️⃣ type ni moslashtirish
     if (data.type) data.type = parseOrganizationType(data.type);
 
+    if (data.slug !== undefined && data.slug !== existing.slug && (await this.isSlugExists(data.slug, id))) {
+      throw slugTaken();
+    }
+
 
     // 6️⃣ translations ni yangilash
     if (data.translations?.length) {
@@ -242,11 +249,17 @@ export class OrganizationService {
     delete data.translations;
 
         // 5️⃣ asosiy organization yangilash
-    const updatedOrg = await this.prismaService.organization.update({
-      where: { id },
-      data: { ...data, ...files },
-      include: { logo: true, banner: true },
-    });
+    try {
+      await this.prismaService.organization.update({
+        where: { id },
+        data: { ...data, ...files },
+        include: { logo: true, banner: true },
+      });
+    } catch (e) {
+      // Two owners claiming the same slug at once: the unique index decides
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') throw slugTaken();
+      throw e;
+    }
 
     if (data?.slug) {
       await this.revalidateService.addRevalidationJob({id, newSlug:data?.slug, oldSlug: existing?.slug, route: 'organization'})
@@ -284,15 +297,6 @@ export class OrganizationService {
     }
   }
 
-  slugify(text: string): string {
-    return text
-      .toLowerCase()
-      .trim()
-      .replace(/[^\w\s-]/g, '') // maxsus belgilarni olib tashlaydi
-      .replace(/\s+/g, '-') // bo‘sh joylarni '-' bilan almashtiradi
-      .replace(/--+/g, '-'); // ketma-ket – larni bitta qiladi
-  }
-
   async isSlugExists(
     slug: string,
     excludeId?: string, // update paytida o‘zini hisobga olmaslik uchun
@@ -312,12 +316,13 @@ export class OrganizationService {
     excludeId?: string,
     tx?: Prisma.TransactionClient,
   ): Promise<string> {
-    const baseSlug = this.slugify(name);
+    // Room for a "-N" suffix within SLUG_MAX
+    const baseSlug = slugify(name, SLUG_MAX - 4);
     let slug = baseSlug;
     let counter = 1;
 
     while (await this.isSlugExists(slug, excludeId, tx)) {
-      slug = `${baseSlug}-${++counter}`;
+      slug = counter < 999 ? `${baseSlug}-${++counter}` : randomSlug();
     }
 
     return slug;

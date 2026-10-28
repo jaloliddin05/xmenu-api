@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Delete, Put, HttpCode, HttpStatus, UseInterceptors, UploadedFiles, Query, Req } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Post, Body, Param, Delete, Put, HttpCode, HttpStatus, UseInterceptors, UploadedFiles, Query, Req } from '@nestjs/common';
 import { ApiBody, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { OrganizationService } from './services/organization.service';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
@@ -6,6 +6,7 @@ import { MulterStorage } from 'src/infra/helper/upload/multer-upload';
 import UpdateOrganizationDto from './dto/update-organization.dto';
 import { Public } from '../auth/decorators/public.decorator';
 import { requireStaffOrganizationId } from 'src/infra/http/request-helpers';
+import { isValidSlug, SLUG_RULE } from './domain/slug';
 
 @ApiTags('Organization')
 @Controller('organization')
@@ -54,6 +55,7 @@ export class OrganizationController {
     },
   })
   async checkSlug(@Body('slug') slug: string) {
+    if (!isValidSlug(slug)) throw new BadRequestException({ message: `slug: ${SLUG_RULE}`, code: 'invalid_slug' });
     const exists = await this.organizationService.isSlugExists(slug);
     return { exists };
   }

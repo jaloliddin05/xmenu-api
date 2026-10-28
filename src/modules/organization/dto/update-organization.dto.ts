@@ -5,8 +5,10 @@ import {
   IsOptional,
   IsUUID,
   IsArray,
+  ValidateBy,
   ValidateNested,
 } from "class-validator";
+import { isValidSlug, SLUG_RULE } from "../domain/slug";
 
 class UpdateOrganizationTranslationDto {
   @ApiProperty({ example: "translation-uuid" })
@@ -34,9 +36,9 @@ class UpdateOrganizationDto {
   @IsString()
   readonly name?: string;
 
-  @ApiProperty({ description: `slug`, required: false })
+  @ApiProperty({ description: `Public slug: ${SLUG_RULE}. Taken by another venue: 409 slug_taken`, example: "cafe-example", required: false })
   @IsOptional()
-  @IsString()
+  @ValidateBy({ name: "isSlug", validator: { validate: isValidSlug, defaultMessage: () => `slug: ${SLUG_RULE}` } })
   readonly slug?: string;
 
   @ApiProperty({
