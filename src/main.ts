@@ -4,6 +4,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { SwaggerModule } from '@nestjs/swagger';
 import { createOpenApiDocument } from './swagger';
 import { AppModule } from './app.module';
+import { configureStatic } from './infra/http/static-assets';
 import { ErrorFilter } from './infra/validators';
 import { AccessTokenUserGuard } from './modules/auth/passport-strategies/access-token-user/access-token-user.guard';
 
@@ -24,6 +25,8 @@ async function bootstrap() {
   app.enableCors({
     origin: true,
   });
+
+  configureStatic(app);
 
   app.useGlobalFilters(new ErrorFilter());
 
