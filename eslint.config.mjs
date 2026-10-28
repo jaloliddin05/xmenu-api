@@ -31,4 +31,15 @@ export default tseslint.config(
       '@typescript-eslint/no-unsafe-argument': 'warn'
     },
   },
+  {
+    // Tests and in-memory fakes mimic async, loosely typed APIs (Prisma, Redis, Jest mocks)
+    files: ['**/*.spec.ts', '**/*.fake.ts', 'test/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
+      '@typescript-eslint/require-await': 'off',
+    },
+  },
 );
