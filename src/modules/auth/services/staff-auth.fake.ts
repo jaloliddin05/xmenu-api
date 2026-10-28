@@ -67,12 +67,17 @@ export class FakeStaffPrisma {
   }
 
   private withOrg(u: UserRow) {
-    return { ...u, organization: this.orgs.find((o) => o.owner_id === u.id) ?? null };
+    return {
+      ...u,
+      organization: this.orgs.find((o) => o.owner_id === u.id) ?? null,
+    };
   }
 
   user = {
     findUnique: async ({ where, include }: any) => {
-      const u = this.users.find((x) => (where.id ? x.id === where.id : x.phone === where.phone));
+      const u = this.users.find((x) =>
+        where.id ? x.id === where.id : x.phone === where.phone,
+      );
       if (!u) return null;
       return include?.organization ? this.withOrg(u) : { ...u };
     },
@@ -139,7 +144,13 @@ export class FakeOrganizations {
       Object.assign(existing, { name: data.name, type: data.type, slug });
       return { ...existing };
     }
-    const row: OrgRow = { id: this.db.nextId('org'), owner_id, slug, is_active: false, ...data };
+    const row: OrgRow = {
+      id: this.db.nextId('org'),
+      owner_id,
+      slug,
+      is_active: false,
+      ...data,
+    };
     this.db.orgs.push(row);
     return { ...row };
   }

@@ -11,12 +11,17 @@ import { AppModule } from './app.module';
 import { createOpenApiDocument } from './swagger';
 
 async function main() {
-  const app = await NestFactory.create(AppModule, { preview: true, logger: ['error'] });
+  const app = await NestFactory.create(AppModule, {
+    preview: true,
+    logger: ['error'],
+  });
   const document = createOpenApiDocument(app);
   const out = join(__dirname, '..', 'docs', 'openapi.json');
   writeFileSync(out, JSON.stringify(document, null, 2) + '\n');
   await app.close();
-  console.log(`openapi: ${Object.keys(document.paths).length} paths -> docs/openapi.json`);
+  console.log(
+    `openapi: ${Object.keys(document.paths).length} paths -> docs/openapi.json`,
+  );
 }
 
 main().catch((err) => {

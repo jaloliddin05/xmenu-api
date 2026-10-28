@@ -1,5 +1,8 @@
 import { BUMP_LUA } from 'src/modules/auth/services/customer-otp.service';
-import { HIT_LUA, ROLLBACK_LUA } from 'src/modules/auth/services/rate-limit.service';
+import {
+  HIT_LUA,
+  ROLLBACK_LUA,
+} from 'src/modules/auth/services/rate-limit.service';
 
 type Value = string | Map<string, string>;
 
@@ -154,7 +157,8 @@ export class FakeRedis {
             };
           }
           const fn = (this as any)[name];
-          if (typeof fn !== 'function') throw new Error(`FakeRedis.multi: unsupported ${name}`);
+          if (typeof fn !== 'function')
+            throw new Error(`FakeRedis.multi: unsupported ${name}`);
           return (...args: unknown[]) => {
             ops.push(() => fn.apply(this, args));
             return chain;

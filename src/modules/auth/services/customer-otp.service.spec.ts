@@ -69,7 +69,9 @@ describe('CustomerOtpService', () => {
     random.mockRestore();
 
     const code = sms.lastCode();
-    expect(sms.sent[0].text).toBe(`Код подтверждения Xmenu: ${code}. Никому не сообщайте.`);
+    expect(sms.sent[0].text).toBe(
+      `Код подтверждения Xmenu: ${code}. Никому не сообщайте.`,
+    );
     const stored = await redis.hget(`sotp:staff:${PHONE}`, 'h');
     expect(stored).toMatch(/^[0-9a-f]{64}$/);
     for (const k of redis.keys()) {
@@ -80,8 +82,13 @@ describe('CustomerOtpService', () => {
   it('accepts the right code once', async () => {
     await otp.request(STAFF, PHONE, IP, 'staff');
     const code = sms.lastCode();
-    await expect(otp.consume(STAFF.id, PHONE, code, noopHooks(), 'staff')).resolves.toBeUndefined();
-    await expectCode(otp.consume(STAFF.id, PHONE, code, noopHooks(), 'staff'), 'code_expired');
+    await expect(
+      otp.consume(STAFF.id, PHONE, code, noopHooks(), 'staff'),
+    ).resolves.toBeUndefined();
+    await expectCode(
+      otp.consume(STAFF.id, PHONE, code, noopHooks(), 'staff'),
+      'code_expired',
+    );
   });
 
   it('rejects a wrong code and locks after the attempt limit', async () => {
@@ -91,21 +98,33 @@ describe('CustomerOtpService', () => {
     const hooks = noopHooks();
 
     for (let i = 0; i < cfg.otpMaxAttempts - 1; i++) {
-      await expectCode(otp.consume(STAFF.id, PHONE, wrong, hooks, 'staff'), 'invalid_code');
+      await expectCode(
+        otp.consume(STAFF.id, PHONE, wrong, hooks, 'staff'),
+        'invalid_code',
+      );
     }
     expect(hooks.onFailed).toHaveBeenCalledTimes(cfg.otpMaxAttempts - 1);
 
-    await expectCode(otp.consume(STAFF.id, PHONE, wrong, hooks, 'staff'), 'too_many_attempts');
+    await expectCode(
+      otp.consume(STAFF.id, PHONE, wrong, hooks, 'staff'),
+      'too_many_attempts',
+    );
     expect(hooks.onLocked).toHaveBeenCalledTimes(1);
     // The code is gone: even the right one no longer works
-    await expectCode(otp.consume(STAFF.id, PHONE, code, hooks, 'staff'), 'code_expired');
+    await expectCode(
+      otp.consume(STAFF.id, PHONE, code, hooks, 'staff'),
+      'code_expired',
+    );
   });
 
   it('expires the code after the TTL', async () => {
     await otp.request(STAFF, PHONE, IP, 'staff');
     const code = sms.lastCode();
     redis.advance(cfg.otpTtlSeconds);
-    await expectCode(otp.consume(STAFF.id, PHONE, code, noopHooks(), 'staff'), 'code_expired');
+    await expectCode(
+      otp.consume(STAFF.id, PHONE, code, noopHooks(), 'staff'),
+      'code_expired',
+    );
   });
 
   it('enforces the resend cooldown', async () => {
@@ -128,9 +147,17 @@ describe('CustomerOtpService', () => {
 
   it('allows at most 30 sends per hour per IP', async () => {
     for (let i = 0; i < 30; i++) {
-      await otp.request(STAFF, `+9989012345${String(i).padStart(2, '0')}`, IP, 'staff');
+      await otp.request(
+        STAFF,
+        `+9989012345${String(i).padStart(2, '0')}`,
+        IP,
+        'staff',
+      );
     }
-    await expectCode(otp.request(STAFF, '+998909999999', IP, 'staff'), 'rate_limited');
+    await expectCode(
+      otp.request(STAFF, '+998909999999', IP, 'staff'),
+      'rate_limited',
+    );
   });
 
   it('keeps staff and customer codes and limits apart', async () => {
@@ -141,10 +168,17 @@ describe('CustomerOtpService', () => {
     const staffCode = sms.lastCode();
 
     if (customerCode !== staffCode) {
-      await expectCode(otp.consume(STAFF.id, PHONE, customerCode, noopHooks(), 'staff'), 'invalid_code');
+      await expectCode(
+        otp.consume(STAFF.id, PHONE, customerCode, noopHooks(), 'staff'),
+        'invalid_code',
+      );
     }
-    await expect(otp.consume(TENANT.id, PHONE, customerCode, noopHooks())).resolves.toBeUndefined();
-    await expect(otp.consume(STAFF.id, PHONE, staffCode, noopHooks(), 'staff')).resolves.toBeUndefined();
+    await expect(
+      otp.consume(TENANT.id, PHONE, customerCode, noopHooks()),
+    ).resolves.toBeUndefined();
+    await expect(
+      otp.consume(STAFF.id, PHONE, staffCode, noopHooks(), 'staff'),
+    ).resolves.toBeUndefined();
   });
 
   it('rolls back the limits when the SMS provider fails', async () => {

@@ -30,7 +30,11 @@ export class StaffLoginThrottleService {
   async assertNotLocked(phone: string): Promise<void> {
     const ttl = await this.redis.ttl(this.keys(phone).lock);
     if (ttl > 0) {
-      throw new CustomerAuthException('too_many_attempts', 'Too many login attempts', ttl);
+      throw new CustomerAuthException(
+        'too_many_attempts',
+        'Too many login attempts',
+        ttl,
+      );
     }
   }
 
@@ -44,7 +48,10 @@ export class StaffLoginThrottleService {
     await this.redis.del(k.fail);
     const level = await this.redis.incr(k.level);
     await this.redis.expire(k.level, LEVEL_TTL_SECONDS);
-    const seconds = Math.min(BASE_LOCK_SECONDS * 2 ** (level - 1), MAX_LOCK_SECONDS);
+    const seconds = Math.min(
+      BASE_LOCK_SECONDS * 2 ** (level - 1),
+      MAX_LOCK_SECONDS,
+    );
     await this.redis.set(k.lock, '1', 'EX', seconds);
     return seconds;
   }

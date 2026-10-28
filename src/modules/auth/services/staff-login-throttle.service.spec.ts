@@ -1,7 +1,10 @@
 import type Redis from 'ioredis';
 import { FakeRedis } from 'src/infra/redis/redis.fake';
 import { CustomerAuthException } from '../errors/customer-auth.exception';
-import { LOGIN_FAILS_BEFORE_LOCK, StaffLoginThrottleService } from './staff-login-throttle.service';
+import {
+  LOGIN_FAILS_BEFORE_LOCK,
+  StaffLoginThrottleService,
+} from './staff-login-throttle.service';
 
 const PHONE = '+998901234567';
 
@@ -57,7 +60,8 @@ describe('StaffLoginThrottleService', () => {
   });
 
   it('forgets failures outside the 15-minute window', async () => {
-    for (let i = 0; i < LOGIN_FAILS_BEFORE_LOCK - 1; i++) await throttle.registerFailure(PHONE);
+    for (let i = 0; i < LOGIN_FAILS_BEFORE_LOCK - 1; i++)
+      await throttle.registerFailure(PHONE);
     redis.advance(900);
     expect(await throttle.registerFailure(PHONE)).toBeNull();
   });
@@ -80,6 +84,8 @@ describe('StaffLoginThrottleService', () => {
 
   it('keeps phones independent', async () => {
     await failUntilLocked();
-    await expect(throttle.assertNotLocked('+998909999999')).resolves.toBeUndefined();
+    await expect(
+      throttle.assertNotLocked('+998909999999'),
+    ).resolves.toBeUndefined();
   });
 });

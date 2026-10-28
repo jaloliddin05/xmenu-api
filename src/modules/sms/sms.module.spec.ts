@@ -8,15 +8,25 @@ describe('resolveSmsProviderName', () => {
 
   it('refuses the console provider in production', () => {
     expect(() =>
-      resolveSmsProviderName({ NODE_ENV: 'production', SMS_PROVIDER: 'console' }),
+      resolveSmsProviderName({
+        NODE_ENV: 'production',
+        SMS_PROVIDER: 'console',
+      }),
     ).toThrow(/not allowed/);
   });
 
   it('keeps the telegram test provider available', () => {
-    expect(resolveSmsProviderName({ NODE_ENV: 'production', SMS_PROVIDER: 'telegram' })).toBe('telegram');
+    expect(
+      resolveSmsProviderName({
+        NODE_ENV: 'production',
+        SMS_PROVIDER: 'telegram',
+      }),
+    ).toBe('telegram');
   });
 
   it('rejects unknown providers', () => {
-    expect(() => resolveSmsProviderName({ SMS_PROVIDER: 'carrier-pigeon' })).toThrow();
+    expect(() =>
+      resolveSmsProviderName({ SMS_PROVIDER: 'carrier-pigeon' }),
+    ).toThrow();
   });
 });

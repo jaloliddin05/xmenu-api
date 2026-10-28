@@ -28,10 +28,18 @@ function run(exception: any) {
 }
 
 describe('ErrorFilter', () => {
-  beforeAll(() => jest.spyOn(console, 'log').mockImplementation(() => undefined));
+  beforeAll(() =>
+    jest.spyOn(console, 'log').mockImplementation(() => undefined),
+  );
 
   it('adds code, retryAfter and Retry-After when the exception has them', () => {
-    const res = run(new CustomerAuthException('too_many_attempts', 'Too many login attempts', 120));
+    const res = run(
+      new CustomerAuthException(
+        'too_many_attempts',
+        'Too many login attempts',
+        120,
+      ),
+    );
     expect(res.statusCode).toBe(429);
     expect(res.body).toMatchObject({
       status: 429,
@@ -44,7 +52,11 @@ describe('ErrorFilter', () => {
 
   it('keeps the old shape for plain exceptions', () => {
     const res = run(new BadRequestException('Invalid phone number'));
-    expect(res.body).toEqual({ status: 400, timestamp: expect.any(String), message: 'Invalid phone number' });
+    expect(res.body).toEqual({
+      status: 400,
+      timestamp: expect.any(String),
+      message: 'Invalid phone number',
+    });
     expect(res.headers).toEqual({});
   });
 });

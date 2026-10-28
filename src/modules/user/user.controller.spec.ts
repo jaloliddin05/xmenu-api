@@ -17,15 +17,26 @@ describe('UserController: only your own account', () => {
   beforeEach(() => jest.clearAllMocks());
 
   it.each([
-    ['update', () => controller.update({} as any, OTHER_ID, ME, undefined as any)],
-    ['change-password', () => controller.changePassword({} as any, OTHER_ID, ME)],
+    [
+      'update',
+      () => controller.update({} as any, OTHER_ID, ME, undefined as any),
+    ],
+    [
+      'change-password',
+      () => controller.changePassword({} as any, OTHER_ID, ME),
+    ],
     ['delete', () => controller.remove(OTHER_ID, ME)],
-  ])('%s on someone else is 404 and never reaches the service', async (_name, call) => {
-    await expect(Promise.resolve().then(call)).rejects.toBeInstanceOf(NotFoundException);
-    expect(service.update).not.toHaveBeenCalled();
-    expect(service.changePassword).not.toHaveBeenCalled();
-    expect(service.delete).not.toHaveBeenCalled();
-  });
+  ])(
+    '%s on someone else is 404 and never reaches the service',
+    async (_name, call) => {
+      await expect(Promise.resolve().then(call)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(service.update).not.toHaveBeenCalled();
+      expect(service.changePassword).not.toHaveBeenCalled();
+      expect(service.delete).not.toHaveBeenCalled();
+    },
+  );
 
   it('works on your own id', async () => {
     await controller.update({} as any, ME.user.id, ME, undefined as any);
@@ -64,7 +75,10 @@ describe('UserService.changePassword', () => {
 
   it('never returns the new hash', async () => {
     const bcrypt = jest.requireActual('bcrypt');
-    const res = await serviceWith({ id: 'u', password: await bcrypt.hash('old-password', 4) }).changePassword(
+    const res = await serviceWith({
+      id: 'u',
+      password: await bcrypt.hash('old-password', 4),
+    }).changePassword(
       { oldPassword: 'old-password', newPassword: 'new-password' },
       'u',
     );
