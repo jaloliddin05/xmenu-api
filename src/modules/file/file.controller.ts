@@ -1,8 +1,7 @@
 import { ApiConsumes, ApiTags } from "@nestjs/swagger";
 import { FileService } from "./file.service";
-import { Controller, HttpCode, HttpStatus, Post, UploadedFile, UseInterceptors } from "@nestjs/common";
+import { Controller, HttpCode, HttpStatus, Post, BadRequestException, UploadedFile, UseInterceptors } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
-import { Public } from "../auth/decorators/public.decorator";
 import { MulterStorage } from "src/infra/helper/upload/multer-upload";
 
 @ApiTags('File')
@@ -10,7 +9,6 @@ import { MulterStorage } from "src/infra/helper/upload/multer-upload";
 export class FileController {
     constructor(private readonly fileService: FileService) { }
 
-    @Public()
     @Post('upload')
     @ApiConsumes('multipart/form-data')
     @UseInterceptors(
@@ -19,7 +17,8 @@ export class FileController {
         }),
     )
     @HttpCode(HttpStatus.OK)
-    async uploadFile(@UploadedFile() file: Express.Multer.File) {      
+    async uploadFile(@UploadedFile() file: Express.Multer.File) {
+        if (!file) throw new BadRequestException('file is required');
         return await this.fileService.uploadFile(file);
     }
 }
