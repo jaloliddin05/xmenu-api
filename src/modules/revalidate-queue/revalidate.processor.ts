@@ -2,6 +2,7 @@ import { Worker } from 'bullmq';
 import axios from 'axios';
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { redisConfig } from './bull.config';
+import { buildRevalidateBody, describeRevalidate } from './revalidate-job';
 
 @Injectable()
 export class RevalidateProcessor implements OnModuleDestroy {
@@ -12,19 +13,20 @@ export class RevalidateProcessor implements OnModuleDestroy {
       'revalidate-queue',
       async (job) => {
         const { url } = job.data;
+        const what = describeRevalidate(url, job.id);
 
         try {
-          console.log(`🔄 Revalidating: ${url}`);
-          const response = await axios.post(`${process.env.NEXT_PUBLIC_URL}/api/revalidate`,{route:'menu',...url,secret:process.env.REVALIDATE_SECRET});
+          console.log(`🔄 Revalidating: ${what}`);
+          const response = await axios.post(`${process.env.NEXT_PUBLIC_URL}/api/revalidate`,buildRevalidateBody(url, process.env.REVALIDATE_SECRET));
 
           if (response.status === 200) {
-            console.log(`✅ Success: ${url}`);
+            console.log(`✅ Success: ${what}`);
             return { success: true };
           } else {
             throw new Error(`Unexpected status: ${response.status}`);
           }
         } catch (error) {
-          console.error(`❌ Failed revalidate ${url}:`, error.message);
+          console.error(`❌ Failed revalidate ${what}:`, error.message);
         //   await this.telegram.sendMessage(`❌ Ошибка ревалидации\nURL: ${url}\nОшибка: ${error.message}`);
           throw error;
         }
@@ -34,11 +36,11 @@ export class RevalidateProcessor implements OnModuleDestroy {
 
     // Подписка на события очереди
     this.worker.on('failed', (job, err) => {
-      console.error(`💥 Job failed for ${job?.data?.url}:`, err.message);
+      console.error(`💥 Job failed for ${describeRevalidate(job?.data?.url ?? {}, job?.id)}:`, err.message);
     });
 
     this.worker.on('completed', (job) => {
-      console.log(`🎉 Job completed for ${job.data.url}`);
+      console.log(`🎉 Job completed for ${describeRevalidate(job.data.url ?? {}, job.id)}`);
     });
   }
 

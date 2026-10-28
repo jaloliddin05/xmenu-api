@@ -1,6 +1,7 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { Queue } from 'bullmq';
 import { redisConfig } from './bull.config';
+import { buildRevalidateJobId, describeRevalidate, RevalidatePayload } from './revalidate-job';
 
 @Injectable()
 export class RevalidateService implements OnModuleDestroy {
@@ -14,8 +15,8 @@ export class RevalidateService implements OnModuleDestroy {
     },
   });
 
-  async addRevalidationJob(url) {
-    const jobId = `revalidate-${url}`;
+  async addRevalidationJob(url: RevalidatePayload) {
+    const jobId = buildRevalidateJobId(url);
 
     try {
       await this.queue.remove(jobId);
@@ -25,7 +26,7 @@ export class RevalidateService implements OnModuleDestroy {
       jobId,
       delay: 20 * 1000, // 20 seconds
     });
-    console.log(`🧩 Job added for ${url} `);
+    console.log(`🧩 Job added: ${describeRevalidate(url, jobId)}`);
   }
 
   async onModuleDestroy() {
