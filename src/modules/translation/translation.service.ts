@@ -1,10 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { BadGatewayException, Injectable, Logger } from '@nestjs/common';
 import OpenAI from 'openai';
 import { PrismaService } from '../_prisma/prisma.service';
 
 
 @Injectable()
 export class TranslationService {
+    private readonly logger = new Logger(TranslationService.name);
     private openai: OpenAI;
 
     constructor(
@@ -18,7 +19,9 @@ export class TranslationService {
     async translate(text: string, promptName: string) {
         const prompt = await this.prismaService.translation_prompt.findFirst({ where: { title: promptName } })
 
-        const response = await this.openai.chat.completions.create({
+        let response;
+        try {
+            response = await this.openai.chat.completions.create({
             model: 'gpt-4o-mini',
             messages: [
                 { role: 'system', content: 'Ты переводчик меню для ресторана.' },
@@ -28,14 +31,19 @@ export class TranslationService {
                 },
             ],
             temperature: 0.2,
-        });
+            });
+        } catch (e) {
+            this.logger.error(`OpenAI request failed: ${(e as Error).message}`);
+            throw new BadGatewayException('Translation service unavailable');
+        }
 
-        const content = response.choices[0].message?.content;
+        const content = response.choices[0]?.message?.content ?? '';
 
         try {
             return JSON.parse(this.clearJson(content));
         } catch (e) {
-            throw new Error('Invalid GPT response: ' + content);
+            this.logger.error('Invalid GPT response (not JSON)');
+            throw new BadGatewayException('Invalid translation response');
         }
     }
 

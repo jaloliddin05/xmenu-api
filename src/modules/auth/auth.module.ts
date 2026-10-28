@@ -73,7 +73,7 @@ import { NoStoreMiddleware } from './middleware/no-store.middleware';
     JwtTokenService,
   ],
   controllers: [AuthController, AuthCustomerController],
-  exports: [AuthService, CUSTOMER_AUTH_CONFIG],
+  exports: [AuthService, CUSTOMER_AUTH_CONFIG, RateLimitService],
 })
 export class AuthModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

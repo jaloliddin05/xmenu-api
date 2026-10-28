@@ -1,5 +1,6 @@
 import { ApiProperty } from "@nestjs/swagger"
-import { IsNotEmpty, IsNumber, IsString } from "class-validator"
+import { IsNotEmpty, IsString, MaxLength } from "class-validator"
+import { translationMaxText } from "../translation.limits"
 
 class TranslationDto {
     @ApiProperty({
@@ -9,6 +10,7 @@ class TranslationDto {
     })
     @IsNotEmpty()
     @IsString()
+    @MaxLength(translationMaxText())
     readonly text: string
 
     @ApiProperty({
@@ -18,6 +20,7 @@ class TranslationDto {
     })
     @IsNotEmpty()
     @IsString()
+    @MaxLength(100)
     readonly promptName: string
 }
 
