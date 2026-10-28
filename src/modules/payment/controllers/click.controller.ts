@@ -3,22 +3,23 @@ import { ApiExcludeController } from '@nestjs/swagger';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
 import { Public } from 'src/modules/auth/decorators/public.decorator';
 import { OrderTransitionService } from 'src/modules/order/services/order-transition.service';
+import { parseTenantId } from 'src/modules/tenant/tenant-key';
 import { CLICK_ERROR, ClickProtocol } from '../domain/click-protocol';
 import type { ClickRequest } from '../domain/click-protocol';
 import { PaymentConfigService } from '../services/payment-config.service';
 import { PrismaClickStore } from '../stores/prisma-click.store';
 
 /**
- * Click Shop API webhook'lari. URL'da tenant slug'i bor — Click kabinetida har
- * restoran o'z xizmati uchun shu manzilni kiritadi:
- *   Prepare:  POST {API}/payments/click/{slug}/prepare
- *   Complete: POST {API}/payments/click/{slug}/complete
+ * Click Shop API webhook'lari. URL'da tenant id'si (organization UUID) bor — Click kabinetida
+ * har restoran o'z xizmati uchun shu manzilni kiritadi (id o'zgarmaydi, slug esa o'zgarishi mumkin):
+ *   Prepare:  POST {API}/payments/click/{tenantId}/prepare
+ *   Complete: POST {API}/payments/click/{tenantId}/complete
  * Imzo tenantning o'z secret_key'i bilan tekshiriladi. Javob doim HTTP 200
  * (Click xatoni `error` maydonidan o'qiydi).
  */
 @ApiExcludeController()
 @Public()
-@Controller('payments/click/:slug')
+@Controller('payments/click/:tenantId')
 export class ClickController {
   private readonly logger = new Logger('Click');
 
@@ -30,17 +31,17 @@ export class ClickController {
 
   @Post('prepare')
   @HttpCode(200)
-  prepare(@Param('slug') slug: string, @Body() body: ClickRequest) {
-    return this.handle('prepare', slug, body);
+  prepare(@Param('tenantId') tenantId: string, @Body() body: ClickRequest) {
+    return this.handle('prepare', tenantId, body);
   }
 
   @Post('complete')
   @HttpCode(200)
-  complete(@Param('slug') slug: string, @Body() body: ClickRequest) {
-    return this.handle('complete', slug, body);
+  complete(@Param('tenantId') tenantId: string, @Body() body: ClickRequest) {
+    return this.handle('complete', tenantId, body);
   }
 
-  private async handle(action: 'prepare' | 'complete', slug: string, body: ClickRequest) {
+  private async handle(action: 'prepare' | 'complete', tenantId: string, body: ClickRequest) {
     const fail = (error: number, note: string) => ({
       click_trans_id: String(body?.click_trans_id ?? ''),
       merchant_trans_id: String(body?.merchant_trans_id ?? ''),
@@ -49,7 +50,8 @@ export class ClickController {
     });
 
     try {
-      const org = await this.prisma.organization.findUnique({ where: { slug }, select: { id: true, is_active: true } });
+      const id = parseTenantId(tenantId);
+      const org = id ? await this.prisma.organization.findUnique({ where: { id }, select: { id: true, is_active: true } }) : null;
       const cfg = org?.is_active ? await this.configs.getClick(org.id) : null;
       if (!org || !cfg) return fail(CLICK_ERROR.BAD_REQUEST, 'Merchant is not configured');
 

@@ -8,7 +8,7 @@ import type { CustomerPrincipal } from '../auth/decorators/customer-route.decora
 
 @ApiTags('Customers')
 @ApiBearerAuth('access-token')
-@ApiHeader({ name: 'X-Tenant-Id', description: 'Organization slug', required: true })
+@ApiHeader({ name: 'X-Tenant-Id', description: 'Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug', required: true })
 @CustomerProtectedRoute()
 @Controller('customers')
 export class CustomerController {

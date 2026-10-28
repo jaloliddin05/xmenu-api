@@ -9,7 +9,7 @@ import { MenuService } from './menu.service';
 
 /** Mijoz ilovasi menyusi: ommaviy, tenant — X-Tenant-Id, til — ?lang yoki Accept-Language. */
 @ApiTags('Menu (customer)')
-@ApiHeader({ name: 'X-Tenant-Id', description: 'Organization slug', required: true })
+@ApiHeader({ name: 'X-Tenant-Id', description: 'Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug', required: true })
 @CustomerPublicRoute()
 @Controller('menu')
 export class MenuController {

@@ -9,7 +9,7 @@ import { BranchService, BranchView } from './services/branch.service';
 
 /** Mijoz ilovasi uchun filiallar. Ommaviy: token talab qilinmaydi, tenant — X-Tenant-Id. */
 @ApiTags('Branches (customer)')
-@ApiHeader({ name: 'X-Tenant-Id', description: 'Organization slug', required: true })
+@ApiHeader({ name: 'X-Tenant-Id', description: 'Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug', required: true })
 @CustomerPublicRoute()
 @Controller('branches')
 export class BranchController {

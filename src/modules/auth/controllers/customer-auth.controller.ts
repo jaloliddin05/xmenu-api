@@ -32,7 +32,7 @@ import type { Tenant } from '../../tenant/tenant.service';
 @ApiTags('Auth-Customer')
 @ApiHeader({
   name: 'X-Tenant-Id',
-  description: 'Organization slug',
+  description: 'Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug',
   required: true,
 })
 // '/auth/*' endi band: AuthController (xodimlar) shu yerda /auth/login,

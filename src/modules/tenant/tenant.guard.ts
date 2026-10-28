@@ -12,10 +12,10 @@ export class TenantGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest<Request & { tenant?: unknown }>();
     const raw = req.headers[TENANT_HEADER];
-    const slug = (Array.isArray(raw) ? raw[0] : raw)?.trim();
-    if (!slug) throw new CustomerAuthException('tenant_required');
+    const id = (Array.isArray(raw) ? raw[0] : raw)?.trim();
+    if (!id) throw new CustomerAuthException('tenant_required');
 
-    req.tenant = await this.tenants.resolve(slug);
+    req.tenant = await this.tenants.resolve(id);
     return true;
   }
 }

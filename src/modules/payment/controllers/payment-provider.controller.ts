@@ -1,7 +1,6 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseEnumPipe, Post, Put, Req } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { requireStaffOrganizationId } from 'src/infra/http/request-helpers';
-import { PrismaService } from 'src/modules/_prisma/prisma.service';
 import { UpsertPaymentProviderDto } from '../dto/payment-provider.dto';
 import type { OnlineProvider } from '../services/payment-config.service';
 import { PaymentConfigService } from '../services/payment-config.service';
@@ -15,25 +14,20 @@ enum ProviderParam {
 @ApiTags('Payment providers')
 @Controller('payment-provider')
 export class PaymentProviderController {
-  constructor(
-    private readonly configs: PaymentConfigService,
-    private readonly prisma: PrismaService,
-  ) {}
+  constructor(private readonly configs: PaymentConfigService) {}
 
   @Get()
   @ApiOperation({ summary: 'Yoqilgan/sozlangan provayderlar + kabinetga kiritiladigan webhook manzillari' })
   async list(@Req() req) {
     const orgId = requireStaffOrganizationId(req);
-    const org = await this.prisma.organization.findUnique({ where: { id: orgId }, select: { slug: true } });
     const base = (process.env.PUBLIC_API_URL ?? '').replace(/\/$/, '');
     return {
       providers: await this.configs.list(orgId),
-      webhooks: org?.slug
-        ? {
-            click: { prepare: `${base}/payments/click/${org.slug}/prepare`, complete: `${base}/payments/click/${org.slug}/complete` },
-            payme: { endpoint: `${base}/payments/payme/${org.slug}` },
-          }
-        : null,
+      // URL carries the organization id: it never changes, so renaming the slug cannot break the cabinet settings
+      webhooks: {
+        click: { prepare: `${base}/payments/click/${orgId}/prepare`, complete: `${base}/payments/click/${orgId}/complete` },
+        payme: { endpoint: `${base}/payments/payme/${orgId}` },
+      },
     };
   }
 

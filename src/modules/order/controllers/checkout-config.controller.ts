@@ -14,7 +14,7 @@ import { OrderSettingsService } from '../services/order-settings.service';
  * Maxfiy narsa yo'q: ommaviy.
  */
 @ApiTags('Checkout config (customer)')
-@ApiHeader({ name: 'X-Tenant-Id', description: 'Organization slug', required: true })
+@ApiHeader({ name: 'X-Tenant-Id', description: 'Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug', required: true })
 @CustomerPublicRoute()
 @Controller('checkout-config')
 export class CheckoutConfigController {
