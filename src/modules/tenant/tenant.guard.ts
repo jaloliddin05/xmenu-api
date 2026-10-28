@@ -10,7 +10,9 @@ export class TenantGuard implements CanActivate {
   constructor(private readonly tenants: TenantService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const req = context.switchToHttp().getRequest<Request & { tenant?: unknown }>();
+    const req = context
+      .switchToHttp()
+      .getRequest<Request & { tenant?: unknown }>();
     const raw = req.headers[TENANT_HEADER];
     const id = (Array.isArray(raw) ? raw[0] : raw)?.trim();
     if (!id) throw new CustomerAuthException('tenant_required');
