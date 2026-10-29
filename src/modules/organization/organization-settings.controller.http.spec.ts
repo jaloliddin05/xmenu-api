@@ -204,6 +204,22 @@ describe('GET/PUT /organization/:id/settings', () => {
     expect(invalidate).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['theme color', { theme: { brand: 'red' } }, 'validation_error', 'theme.brand', 'matches'],
+    ['language', { languages: ['uz', 'kk'] }, 'validation_error', 'languages', 'isIn'],
+    ['latitude', { mapCenter: { lat: 91, lng: 69 } }, 'validation_error', 'mapCenter.lat', 'max'],
+    ['zoom', { mapZoom: 22 }, 'validation_error', 'mapZoom', 'max'],
+    ['zoom integer', { mapZoom: 1.5 }, 'validation_error', 'mapZoom', 'isInt'],
+    ['unknown field', { extra: 1 }, 'validation_error', 'extra', 'whitelistValidation'],
+    ['default language', { defaultLanguage: 'en' }, 'invalid_settings', 'defaultLanguage', 'notInLanguages'],
+    ['center outside bounds', { mapCenter: { lat: 40, lng: 69.24 } }, 'invalid_settings', 'mapCenter', 'outsideBounds'],
+  ])('400 names the field: %s', async (_name, patch, code, field, reason) => {
+    const res = await put({ ...VALID, ...patch }).expect(400);
+    expect(res.body.code).toBe(code);
+    expect(res.body.errors).toContainEqual(expect.objectContaining({ field, reason }));
+    expect(res.body.message).toContain(`${field}: `);
+  });
+
   it('500 settings_missing when the row does not exist, instead of defaults', async () => {
     delete rows[ORG_A];
     const res = await get().expect(500);

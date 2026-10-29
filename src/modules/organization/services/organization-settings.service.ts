@@ -1,4 +1,5 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+import { fieldErrorsException } from 'src/infra/validators/validation-errors';
 import { PrismaService } from '../../_prisma/prisma.service';
 import { CustomerAuthException } from 'src/modules/auth/errors/customer-auth.exception';
 import { TenantService } from 'src/modules/tenant/tenant.service';
@@ -33,12 +34,7 @@ export class OrganizationSettingsService {
     settings: OrganizationSettings,
   ): Promise<OrganizationSettings> {
     const problems = settingsProblems(settings);
-    if (problems.length) {
-      throw new BadRequestException({
-        message: problems.join('; '),
-        code: 'invalid_settings',
-      });
-    }
+    if (problems.length) throw fieldErrorsException('invalid_settings', problems);
     await this.get(organizationId);
     const row = await this.prisma.organization_settings.update({
       where: { organization_id: organizationId },

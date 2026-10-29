@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import type { organization_settings } from '@prisma/client';
 import { isLang, Lang } from 'src/infra/http/request-helpers';
+import type { FieldError } from 'src/infra/validators/validation-errors';
 
 /** Brand colors a front-end can override; any key may be missing (the front-end keeps its neutral value). */
 export const THEME_KEYS = [
@@ -86,25 +87,40 @@ export function parseTheme(value: unknown): Theme | null {
 export function settingsProblems(
   s: OrganizationSettings,
   now = new Date(),
-): string[] {
-  const problems: string[] = [];
+): FieldError[] {
+  const problems: FieldError[] = [];
   if (!s.languages.includes(s.defaultLanguage)) {
-    problems.push('defaultLanguage must be one of languages');
+    problems.push({
+      field: 'defaultLanguage',
+      reason: 'notInLanguages',
+      message: 'defaultLanguage must be one of languages',
+    });
   }
   if (s.foundedYear !== null && s.foundedYear > now.getFullYear()) {
-    problems.push('foundedYear must not be in the future');
+    problems.push({
+      field: 'foundedYear',
+      reason: 'inFuture',
+      message: 'foundedYear must not be in the future',
+    });
   }
   if (s.mapBounds !== null && parseBounds(s.mapBounds) === null) {
-    problems.push(
-      'mapBounds must be [[southWestLat, southWestLng], [northEastLat, northEastLng]] with valid coordinates, south-west below and left of north-east',
-    );
+    problems.push({
+      field: 'mapBounds',
+      reason: 'invalidBounds',
+      message:
+        'mapBounds must be [[southWestLat, southWestLng], [northEastLat, northEastLng]] with valid coordinates, south-west below and left of north-east',
+    });
   }
   const bounds = s.mapBounds && parseBounds(s.mapBounds);
   if (s.mapCenter && bounds) {
     const { lat, lng } = s.mapCenter;
     const [[s0, w0], [n0, e0]] = bounds;
     if (lat < s0 || lat > n0 || lng < w0 || lng > e0) {
-      problems.push('mapCenter must lie within mapBounds');
+      problems.push({
+        field: 'mapCenter',
+        reason: 'outsideBounds',
+        message: 'mapCenter must lie within mapBounds',
+      });
     }
   }
   return problems;

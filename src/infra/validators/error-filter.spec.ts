@@ -1,6 +1,7 @@
-import { ArgumentsHost, BadRequestException } from '@nestjs/common';
+import { ArgumentsHost, BadRequestException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { CustomerAuthException } from 'src/modules/auth/errors/customer-auth.exception';
 import ErrorFilter from './error-filter';
+import { fieldErrorsException } from './validation-errors';
 
 function run(exception: any) {
   const res = {
@@ -50,13 +51,29 @@ describe('ErrorFilter', () => {
     expect(res.headers['Retry-After']).toBe('120');
   });
 
-  it('keeps the old shape for plain exceptions', () => {
+  it('derives the code from the status for plain exceptions', () => {
     const res = run(new BadRequestException('Invalid phone number'));
     expect(res.body).toEqual({
       status: 400,
       timestamp: expect.any(String),
+      code: 'bad_request',
       message: 'Invalid phone number',
     });
     expect(res.headers).toEqual({});
+    expect(run(new NotFoundException()).body).toMatchObject({ code: 'not_found', message: 'Not Found' });
+    expect(run(new UnauthorizedException()).body).toMatchObject({ code: 'unauthorized' });
+  });
+
+  it('passes field errors and details through', () => {
+    const errors = [{ field: 'theme.brand', reason: 'matches', message: 'brand must be a hex color' }];
+    const res = run(fieldErrorsException('validation_error', errors));
+    expect(res.body).toMatchObject({
+      status: 400,
+      code: 'validation_error',
+      message: 'theme.brand: brand must be a hex color',
+      errors,
+    });
+    const withDetails = run(new CustomerAuthException('branch_closed', 'closed', undefined, { opensAt: '09:00' }));
+    expect(withDetails.body).toMatchObject({ code: 'branch_closed', details: { opensAt: '09:00' } });
   });
 });

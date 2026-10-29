@@ -1,4 +1,4 @@
-import { ValidationPipe } from '@nestjs/common';
+import { createValidationPipe } from './infra/validators/validation-errors';
 import { NestFactory, Reflector } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { SwaggerModule } from '@nestjs/swagger';
@@ -30,14 +30,7 @@ async function bootstrap() {
 
   app.useGlobalFilters(new ErrorFilter());
 
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      forbidUnknownValues: true,
-      transform: true,
-    }),
-  );
+  app.useGlobalPipes(createValidationPipe());
 
   const reflector = app.get(Reflector);
   app.useGlobalGuards(new AccessTokenUserGuard(reflector));

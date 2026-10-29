@@ -35,13 +35,17 @@ describe('settingsProblems', () => {
 
   it('requires the default language among the languages', () => {
     expect(settingsProblems({ ...VALID, defaultLanguage: 'en' }, NOW)).toEqual([
-      'defaultLanguage must be one of languages',
+      {
+        field: 'defaultLanguage',
+        reason: 'notInLanguages',
+        message: 'defaultLanguage must be one of languages',
+      },
     ]);
   });
 
   it('refuses a founding year in the future', () => {
     expect(settingsProblems({ ...VALID, foundedYear: 2027 }, NOW)).toEqual([
-      'foundedYear must not be in the future',
+      expect.objectContaining({ field: 'foundedYear', reason: 'inFuture' }),
     ]);
     expect(settingsProblems({ ...VALID, foundedYear: 2026 }, NOW)).toEqual([]);
   });
@@ -96,13 +100,15 @@ describe('settingsProblems', () => {
       NOW,
     );
     expect(problems).toHaveLength(1);
-    expect(problems[0]).toMatch(/^mapBounds/);
+    expect(problems[0]).toMatchObject({ field: 'mapBounds', reason: 'invalidBounds' });
   });
 
   it('requires the map center inside the bounds when both are set', () => {
     expect(
       settingsProblems({ ...VALID, mapCenter: { lat: 40, lng: 69.24 } }, NOW),
-    ).toEqual(['mapCenter must lie within mapBounds']);
+    ).toEqual([
+      expect.objectContaining({ field: 'mapCenter', reason: 'outsideBounds' }),
+    ]);
     expect(
       settingsProblems(
         { ...VALID, mapCenter: { lat: 40, lng: 69.24 }, mapBounds: null },

@@ -2,13 +2,13 @@ import {
   INestApplication,
   ModuleMetadata,
   UnauthorizedException,
-  ValidationPipe,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import { sign } from 'jsonwebtoken';
 import { ErrorFilter } from 'src/infra/validators';
+import { createValidationPipe } from 'src/infra/validators/validation-errors';
 import { AccessTokenUserGuard } from 'src/modules/auth/passport-strategies/access-token-user/access-token-user.guard';
 import { AccessTokenUserStrategy } from 'src/modules/auth/passport-strategies/access-token-user/access-token-user.strategy';
 import { AuthService } from 'src/modules/auth/services/auth.service';
@@ -60,14 +60,7 @@ export async function createHttpApp(
 
   const app = moduleRef.createNestApplication({ logger: false });
   app.useGlobalFilters(new ErrorFilter());
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      forbidUnknownValues: true,
-      transform: true,
-    }),
-  );
+  app.useGlobalPipes(createValidationPipe());
   app.useGlobalGuards(new AccessTokenUserGuard(app.get(Reflector)));
   await app.init();
   return app;

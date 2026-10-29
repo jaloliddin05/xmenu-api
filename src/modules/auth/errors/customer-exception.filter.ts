@@ -38,6 +38,8 @@ export class CustomerExceptionFilter implements ExceptionFilter {
       code = 'validation_error';
       const r: any = exception.getResponse();
       message = Array.isArray(r?.message) ? r.message.join('; ') : (r?.message ?? 'Validation failed');
+      // Same per-field list as the owner API ({ field, reason, message }), see createValidationPipe
+      if (Array.isArray(r?.errors)) details = { errors: r.errors };
     } else if (exception instanceof HttpException) {
       status = exception.getStatus();
       const r: any = exception.getResponse();
