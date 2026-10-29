@@ -72,7 +72,8 @@ Webhook'и Click/Payme переводят заказ `awaiting_payment → pendi
 * **Филиал.** pickup — `branchId` обязателен, филиал должен быть открыт. delivery —
   `branchId` лишь подсказка: если он закрыт или не доставляет, берётся первый открытый
   филиал с доставкой; если открытых нет — `branch_closed` с ближайшим `opensAt`.
-  Филиал без расписания считается открытым (`isOpen = null`).
+  Филиал без расписания закрыт и заказов не принимает: самовывоз из него → `branch_hours_not_set`;
+  при доставке он пропускается, а если расписания нет ни у одного филиала с доставкой → `branch_hours_not_set`.
 * **Зона.** Доставка работает только при заданной зоне `delivery_zone` (`PUT /order-settings`).
   Зоны нет → `422 delivery_unavailable_no_zone` (самовывоз работает; `GET /tenant/config`
   тогда не включает `delivery` в `fulfillment.modes`). Адрес без координат или вне
@@ -156,6 +157,7 @@ cash ─────────────────────▶ pending_
 | 422 | `delivery_unavailable_no_zone` | — | доставка недоступна, предлагается самовывоз |
 | 404 | `address_not_found` | — | то же |
 | 409 | `branch_closed` | `{ opensAt? }` | сообщение |
+| 422 | `branch_hours_not_set` | — | заведение ещё не задало часы работы: заказ недоступен |
 | 422 | `payment_method_unavailable` | — | сбрасывается способ оплаты |
 | 409 | `idempotency_key_reused` | — | клиент сам берёт новый ключ |
 | 429 | `rate_limited` | `retryAfter` (сек) | сообщение |

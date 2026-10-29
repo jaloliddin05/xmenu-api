@@ -8,7 +8,8 @@
  *  - closes_at <= opens_at (closes_at != 00:00) — tungi smena: ertasi kuni yopiladi.
  *  - closes_at = 00:00 — yarim tunda yopiladi (shu kun ichida).
  *  - Sana bo'yicha istisno (bayram, ta'mir) haftalik jadvaldan ustun.
- *  - Jadval umuman yo'q bo'lsa — isOpen = null ("noma'lum"), hech narsa bloklanmaydi.
+ *  - No schedule at all means closed (isOpen = false, opensAt = null); orders are refused with
+ *    branch_hours_not_set. Round the clock is explicit: is24h on all seven days.
  */
 
 export interface DayHours {
@@ -35,7 +36,7 @@ export interface BranchSchedule {
 }
 
 export interface OpenState {
-  isOpen: boolean | null;
+  isOpen: boolean;
   /** "HH:mm" — yopiq bo'lsa, keyingi ochilish vaqti */
   opensAt: string | null;
 }
@@ -128,13 +129,16 @@ function intervalFor(
   return { start, end };
 }
 
+/** False when the owner never entered working hours: such a branch is closed. */
+export function hasSchedule(schedule: BranchSchedule): boolean {
+  return schedule.days.length > 0 || schedule.exceptions.length > 0;
+}
+
 export function evaluateOpenState(
   schedule: BranchSchedule,
   now: Date,
 ): OpenState {
-  if (schedule.days.length === 0 && schedule.exceptions.length === 0) {
-    return { isOpen: null, opensAt: null };
-  }
+  if (!hasSchedule(schedule)) return { isOpen: false, opensAt: null };
 
   const today = localParts(now, schedule.timezone);
   const todayInterval = intervalFor(schedule, today.date, today.weekday);

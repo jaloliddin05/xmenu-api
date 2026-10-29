@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
 import { Lang } from 'src/infra/http/request-helpers';
-import { evaluateOpenState, formatHours, OpenState } from '../domain/branch-hours';
+import { evaluateOpenState, formatHours, hasSchedule, OpenState } from '../domain/branch-hours';
 import { BranchWithSchedule, toSchedule } from './branch-schedule.mapper';
 import { CreateBranchDto, SetWorkingHoursDto, UpdateBranchDto, CreateHoursExceptionDto } from '../dto/branch.dto';
 
@@ -22,7 +22,7 @@ export interface BranchView {
   longitude: number;
   hours: string;
   phone: string | null;
-  isOpen: boolean | null;
+  isOpen: boolean;
   opensAt: string | null;
 }
 
@@ -76,7 +76,10 @@ export class BranchService {
       orderBy: [{ sort_order: 'asc' }, { created_at: 'asc' }, { id: 'asc' }],
     });
     const now = new Date();
-    return rows.map((branch) => ({ branch, state: evaluateOpenState(toSchedule(branch), now) as OpenState }));
+    return rows.map((branch) => {
+      const schedule = toSchedule(branch);
+      return { branch, scheduled: hasSchedule(schedule), state: evaluateOpenState(schedule, now) as OpenState };
+    });
   }
 
   // ---------------------------------------------------------- xodimlar

@@ -38,6 +38,7 @@ export type CustomerErrorCode =
   | 'out_of_delivery_zone'
   | 'fulfillment_unavailable'
   | 'branch_closed'
+  | 'branch_hours_not_set'
   | 'payment_method_unavailable'
   | 'idempotency_key_required'
   | 'idempotency_key_reused'
@@ -86,6 +87,7 @@ const STATUS: Record<CustomerErrorCode, number> = {
   // The venue has not drawn a delivery zone yet: delivery is off, pickup may still work
   delivery_unavailable_no_zone: 422,
   branch_closed: 409,
+  branch_hours_not_set: 422,
   payment_method_unavailable: 422,
   idempotency_key_required: 400,
   idempotency_key_reused: 409,

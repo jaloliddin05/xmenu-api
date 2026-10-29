@@ -3,6 +3,7 @@ import {
   DayHours,
   evaluateOpenState,
   formatHours,
+  hasSchedule,
 } from './branch-hours';
 
 const day = (weekday: number, opensAt: string, closesAt: string, extra: Partial<DayHours> = {}): DayHours => ({
@@ -28,8 +29,18 @@ describe('evaluateOpenState', () => {
     ...over,
   });
 
-  it('is unknown (null) when the branch has no schedule at all', () => {
-    expect(evaluateOpenState(schedule({ days: [] }), new Date())).toEqual({ isOpen: null, opensAt: null });
+  it('is closed with no next opening when the branch has no schedule at all', () => {
+    expect(evaluateOpenState(schedule({ days: [] }), new Date())).toEqual({ isOpen: false, opensAt: null });
+    expect(hasSchedule(schedule({ days: [] }))).toBe(false);
+    expect(hasSchedule(schedule())).toBe(true);
+  });
+
+  it('round the clock is explicit: is24h on all seven days is open at any minute', () => {
+    const s = schedule({ days: [1, 2, 3, 4, 5, 6, 7].map((w) => day(w, '00:00', '00:00', { is24h: true })) });
+    for (const t of ['2026-10-12T00:00:00', '2026-10-14T13:37:00', '2026-10-18T23:59:00']) {
+      expect(evaluateOpenState(s, tashkent(t))).toEqual({ isOpen: true, opensAt: null });
+    }
+    expect(formatHours(s.days)).toBe('Круглосуточно');
   });
 
   it('is open inside the interval', () => {

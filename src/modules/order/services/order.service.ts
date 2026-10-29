@@ -9,6 +9,7 @@ import { PrismaService } from 'src/modules/_prisma/prisma.service';
 import { PaymentConfigService } from 'src/modules/payment/services/payment-config.service';
 import { PaymentLinkService } from 'src/modules/payment/services/payment-link.service';
 import { CreateOrderDto } from '../dto/create-order.dto';
+import { chooseBranch } from '../domain/branch-choice';
 import { computeTotals, deliveryZoneProblem, hashOrderRequest } from '../domain/order-money';
 import { priceLines, PricingProduct } from '../domain/order-pricing';
 import { ACTIVE_STATUSES, CUSTOMER_CANCELLABLE, OrderStatusName } from '../domain/order-state-machine';
@@ -344,39 +345,8 @@ export class OrderService {
       .then((rows) => new Map(rows.map((p) => [p.id, p as unknown as PricingProduct])));
   }
 
-  /**
-   * Filial tanlash. pickup: mijoz tanlagan filial (ochiq bo'lishi shart). delivery:
-   * so'ralgan filial ochiq bo'lsa u, aks holda yetkazib beradigan birinchi ochiq filial.
-   * Hech biri ochiq bo'lmasa — branch_closed (eng yaqin ochilish vaqti bilan).
-   */
   private async chooseBranch(organizationId: string, mode: 'delivery' | 'pickup', requestedId?: string) {
-    const all = await this.branches.listActiveWithState(organizationId);
-    const supports = (b: (typeof all)[number]) => (mode === 'pickup' ? b.branch.accepts_pickup : b.branch.accepts_delivery);
-    // isOpen === null (jadval kiritilmagan) — bloklamaymiz.
-    const isOpen = (b: (typeof all)[number]) => b.state.isOpen !== false;
-
-    if (mode === 'pickup') {
-      if (!requestedId) throw new CustomerAuthException('validation_error', 'branchId is required for pickup');
-      const chosen = all.find((b) => b.branch.id === requestedId);
-      if (!chosen) throw new CustomerAuthException('validation_error', 'Branch not found');
-      if (!supports(chosen)) throw new CustomerAuthException('fulfillment_unavailable', 'This branch does not offer pickup');
-      if (!isOpen(chosen)) throw new CustomerAuthException('branch_closed', 'Branch is closed', undefined, { opensAt: chosen.state.opensAt });
-      return chosen.branch;
-    }
-
-    if (requestedId && !all.some((b) => b.branch.id === requestedId)) {
-      throw new CustomerAuthException('validation_error', 'Branch not found');
-    }
-    const candidates = all.filter(supports);
-    if (candidates.length === 0) throw new CustomerAuthException('fulfillment_unavailable', 'Delivery is not available');
-
-    const preferred = candidates.find((b) => b.branch.id === requestedId && isOpen(b));
-    const open = preferred ?? candidates.find(isOpen);
-    if (!open) {
-      const next = candidates.map((b) => b.state.opensAt).filter(Boolean).sort()[0] ?? null;
-      throw new CustomerAuthException('branch_closed', 'All branches are closed', undefined, { opensAt: next });
-    }
-    return open.branch;
+    return chooseBranch(await this.branches.listActiveWithState(organizationId), mode, requestedId);
   }
 }
 
