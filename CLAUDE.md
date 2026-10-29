@@ -40,7 +40,7 @@ Env: см. `.env.example` (полный). Ключевые: `JWT_*`, `OTP_*`, `S
   Запасного пути по slug нет. Вебхуки оплаты по id: `payments/click/:tenantId`, `payments/payme/:tenantId`.
 - `GET /tenant/by-slug/:slug` → `{ id, slug }` (только активные). `GET /tenant/config` → публичный конфиг
   (`tenant-config.service.ts`): незаполненное `null`, `delivery` в режимах только при заданной зоне.
-- Slug: `organization/domain/slug.ts` (3–63 символа, `a-z0-9` и дефисы, не UUID), дубликат → 409 `slug_taken`.
+- Slug: `organization/domain/slug.ts` (3–63 символа, `a-z0-9` и дефисы, не UUID, не из `RESERVED_SLUGS`: slug становится поддоменом `{slug}.xmenu.uz`), дубликат → 409 `slug_taken`.
 - `Tenant` несёт `defaultLanguage`, `languages`, `currency` из `organization_settings`: язык ответа
   `resolveLang(req, tenant)`, запасной язык перевода `pickTranslation(list, lang, tenant.defaultLanguage)`, валюта
   меню, `/checkout-config` и заказа из настроек. Константы `'ru'` и `'UZS'` в коде ответов не используются.

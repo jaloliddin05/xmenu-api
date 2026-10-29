@@ -195,7 +195,8 @@ IP берётся из `X-Forwarded-For` только от локального 
 - `/organization/:id` (GET, PUT, DELETE) и `/organization/:id/settings`: только своя. Публичные
   `GET /organization/slug/:slug` и `GET /organization/return-slug/:id` без изменений.
 - `slug` в `PUT /organization/:id` и `POST /organization/check-slug`: 3–63 символа `a-z`, `0-9` и одиночные
-  дефисы между словами, не похож на UUID; иначе `400 invalid_slug`. Занят другим заведением → `409 slug_taken`.
+  дефисы между словами, не похож на UUID и не из зарезервированных имён (`www`, `api`, `app`, `qr`, `order`,
+  `dashboard`, `admin`, `staging` и др.: slug становится поддоменом `{slug}.xmenu.uz`); иначе `400 invalid_slug`. Занят другим заведением → `409 slug_taken`.
 - `/category/for-select/:organizationId`: только свой id. В `POST /category` (`organization_id`) и
   `PATCH /category/index` (`organizationId`) эти поля необязательны и должны совпадать со своей организацией.
 - `POST /additional-product/group`: `product_id` необязателен (группа создаётся до блюда и привязывается через

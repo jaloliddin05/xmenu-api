@@ -21,8 +21,15 @@ describe('slug rules', () => {
     ['space', 'mant cafe'],
     ['cyrillic', 'мант'],
     ['uuid', '3f2b8c1e-4d5a-4b6c-8d7e-9f0a1b2c3d4e'],
+    ['reserved host name', 'api'],
+    ['reserved host name', 'dashboard'],
     ['not a string', 42],
   ])('refuses %s', (_why, s) => expect(isValidSlug(s)).toBe(false));
+
+  it('keeps reserved names off by name only, not as a prefix', () => {
+    expect(isValidSlug('api-cafe')).toBe(true);
+    expect(isValidSlug('www2')).toBe(true);
+  });
 
   it('proposes a valid slug from a name', () => {
     expect(slugify('  Cafe  Example_24! ')).toBe('cafe-example-24');
@@ -30,7 +37,7 @@ describe('slug rules', () => {
   });
 
   it('gives names without latin letters a random valid slug', () => {
-    for (const name of ['Мант', '', '!!!', 'ab']) {
+    for (const name of ['Мант', '', '!!!', 'ab', 'API', 'Dashboard']) {
       const s = slugify(name);
       expect(s).toMatch(/^venue-[a-z0-9]{6}$/);
       expect(isValidSlug(s)).toBe(true);

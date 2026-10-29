@@ -2880,7 +2880,7 @@
           },
           "slug": {
             "type": "string",
-            "description": "Public slug: 3-63 chars: a-z, 0-9 and single dashes between words; must not look like an id. Taken by another venue: 409 slug_taken",
+            "description": "Public slug: 3-63 chars: a-z, 0-9 and single dashes between words; must not look like an id or be a name reserved by the platform. Taken by another venue: 409 slug_taken",
             "example": "cafe-example"
           },
           "logo": {
