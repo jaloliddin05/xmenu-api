@@ -9,7 +9,8 @@ Swagger (`/docs`), Jest. Prettier: одинарные кавычки, trailing c
 Комментарии частично на узбекском, документация на русском; новые комментарии на английском.
 
 ## Команды
-`npm run start:dev` · `npm run build` · `npm run lint` · `npm test` · `npm run test:e2e` · `npm run openapi`
+`npm run start:dev` · `npm run build` · `npm run lint` (только отчёт) · `npm run lint:fix` · `npm test` ·
+`npm run test:e2e` · `npm run openapi`
 (`openapi` собирает проект и пишет `docs/openapi.json` из сборки, без БД и Redis; `docs/API.md` правится руками).
 Миграции: `npm run migrate` (собирает схему и запускает `prisma migrate dev`), на сервере `npx prisma migrate deploy`.
 `generate-schema` вызывает `cat`: под Windows (npm запускает скрипты через cmd) он падает и оставляет
@@ -17,7 +18,10 @@ Swagger (`/docs`), Jest. Prettier: одинарные кавычки, trailing c
 порядок файлов в glob там другой, поэтому лишние перестановки моделей в диффе лучше не коммитить.
 Env: см. `.env.example` (полный). Ключевые: `JWT_*`, `OTP_*`, `SMS_PROVIDER`, `PAYMENT_CONFIG_KEY`, `REDIS_URL`, `PUBLIC_API_URL`, `PUBLIC_FILES_URL`,
 `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ORDERS_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `TELEGRAM_VERIFY_TTL_SECONDS`, `OPS_CHAT_ID`, `ORDER_QUEUES`,
-`MINIAPP_URL`, `UPLOAD_MAX_BYTES`, `PLATFORM_ADMIN_USER_IDS`, `TRANSLATION_*`.
+`MINIAPP_URL`, `UPLOAD_MAX_BYTES`, `PLATFORM_ADMIN_USER_IDS`, `TRANSLATION_*`, `OPENAI_API_KEY` (необязателен: без него
+`/translation` → 503 `translation_unavailable`), `NEXT_PUBLIC_URL` + `REVALIDATE_SECRET` (QR),
+`CLIENT_REVALIDATE_URL` + `CLIENT_REVALIDATE_SECRET` (сайт доставки), `STAFF_REFRESH_TTL_DAYS`,
+`STAFF_SESSION_ABSOLUTE_DAYS`. Окончания строк LF (`.gitattributes`, `.editorconfig`).
 
 ## Схема Prisma
 Не правь `prisma/schema.prisma` руками: он собирается из `src/modules/*/models/*.prisma` командой
@@ -30,7 +34,7 @@ Env: см. `.env.example` (полный). Ключевые: `JWT_*`, `OTP_*`, `S
 `order` (state machine, очереди, уведомления), `payment` (Click, Payme, ключи тенанта, возвраты),
 `sms` (провайдеры eskiz, telegram, console), `telegram` (боты заведений: `TelegramBotService`, `TelegramClient`,
 `/telegram-bot`), `file`, `translation`, `application`,
-`revalidate-queue` (инвалидация кэша QR).
+`revalidate-queue` (`RevalidateModule`: ревалидация QR-меню и сайта доставки, `docs/REVALIDATE.md`).
 
 ## Контракт API
 Единое место: `docs/API.md` и `docs/openapi.json`. Подробности: `docs/ORDERS_API.md`, `docs/BRANCHES_API.md`,
@@ -44,6 +48,11 @@ Env: см. `.env.example` (полный). Ключевые: `JWT_*`, `OTP_*`, `S
   Запасного пути по slug нет. Вебхуки оплаты по id: `payments/click/:tenantId`, `payments/payme/:tenantId`.
 - `GET /tenant/by-slug/:slug` → `{ id, slug }` (только активные). `GET /tenant/config` → публичный конфиг
   (`tenant-config.service.ts`): незаполненное `null`, `delivery` в режимах только при заданной зоне.
+- Кэш тенанта (30 с, в памяти процесса) сбрасывают `PUT /organization/:id/settings`, `PUT` и `DELETE
+  /organization/:id`; кэш настроек заказа сбрасывает `PUT /order-settings`. Другие процессы pm2 видят старое до 30 с.
+- Публичные ответы только через маппер или DTO со списком полей, не строкой БД: `GET /organization/slug/:slug` →
+  `toPublicOrganization` (`organization/domain/public-organization.ts`, только активные), `toStaffUser` для
+  владельца. Новый публичный эндпоинт делай так же.
 - Slug: `organization/domain/slug.ts` (3–63 символа, `a-z0-9` и дефисы, не UUID, не из `RESERVED_SLUGS`: slug становится поддоменом `{slug}.xmenu.uz`), дубликат → 409 `slug_taken`.
 - `Tenant` несёт `defaultLanguage`, `languages`, `currency` из `organization_settings`: язык ответа
   `resolveLang(req, tenant)`, запасной язык перевода `pickTranslation(list, lang, tenant.defaultLanguage)`, валюта
@@ -60,6 +69,15 @@ Env: см. `.env.example` (полный). Ключевые: `JWT_*`, `OTP_*`, `S
   `organization/domain/organization-settings.ts` и DTO), `GET/PUT /order-settings`.
 - Нет зоны доставки (`delivery_zone = null`) → доставка недоступна: `POST /orders` отвечает
   `422 delivery_unavailable_no_zone`.
+- Ошибки валидации: глобальный пайп `createValidationPipe()` (`infra/validators/validation-errors.ts`) отдаёт
+  `400 validation_error` со списком `errors: [{ field, reason, message }]`; доменные проверки настроек тем же списком
+  с кодом `invalid_settings` (`fieldErrorsException`). `ErrorFilter` (staff) всегда ставит `code` (иначе по
+  статусу), пробрасывает `errors` и `details`, логирует только 5xx (без стектрейсов 4xx).
+
+## Филиалы
+- Часы считает `branch/domain/branch-hours.ts` (одна функция для `GET /branches` и `POST /orders`). Филиал без
+  расписания закрыт: `isOpen: false`, `opensAt: null`, заказ → `422 branch_hours_not_set`. Круглосуточно: `is24h`
+  на всех семи днях. Выбор филиала для заказа: `order/domain/branch-choice.ts`.
 
 ## Заказы
 `OrderTransitionService` единственный путь смены статуса (автомат, optimistic locking по `version`, журнал).
@@ -71,7 +89,7 @@ Payme вручную через ops-чат.
 Телефон + OTP (HMAC-хеш кода, TTL, лимит попыток, cooldown) через `SmsProvider`; refresh-токены с ротацией и
 сессиями. `CustomerOtpService.issue()` не зависит от канала доставки (SMS или Telegram), лимиты по телефону общие.
 Целевые параметры: `OTP_LENGTH=6`, `OTP_TTL_SECONDS=300`, `OTP_MAX_ATTEMPTS=5`, `OTP_COOLDOWN_SECONDS=60`
-По умолчанию 6; клиент и дашборд пока ждут 4.
+По умолчанию 6, длина приходит в `codeLength`; дашборд её читает, клиент доставки пока ждёт 4.
 `TelegramInitDataService.verifyForTenant` проверяет `initData` токеном бота заведения (иначе платформенным
 `TELEGRAM_BOT_TOKEN`) и входом не является.
 
@@ -93,7 +111,11 @@ Payme вручную через ops-чат.
 
 ## Авторизация владельцев (staff)
 Контракт, ошибки и лимиты: `docs/API.md`. Код: `StaffAuthService` (регистрация и вход),
-`StaffLoginThrottleService` (блокировка), `StaffAuthEventService` (аудит в `staff_auth_event`).
+`StaffSessionService` (сессии), `StaffLoginThrottleService` (блокировка), `StaffAuthEventService` (аудит в
+`staff_auth_event`).
+- Сессии: access JWT (`JWT_ACCESS_TOKEN_*`) и непрозрачный refresh-токен, хеш в `staff_session` (модель в
+  `user/models/staff-session.prisma`). `POST /auth/refresh { refreshToken }` ротирует (повтор после 30 с отзывает
+  вход), `POST /auth/logout { refreshToken }` → 204 отзывает вход. Access живёт до своего срока (1 ч).
 - `POST /auth/register` ничего не пишет в БД: заявка (с bcrypt-хешем пароля владельца, 8–72 символа) ждёт в Redis
   под случайным `registrationId` 30 минут. `check-code {registrationId, code}` создаёт user и organization в одной
   транзакции; «хвост» старой схемы (`isActive=false`) переиспользуется. Код привязан к заявке, а не к номеру: вторая
@@ -113,8 +135,11 @@ Payme вручную через ops-чат.
 - Интерфейс провайдера доставки (создать, отменить, статус, вебхук) и адаптер собственных курьеров; внешние сервисы
   (Noor, Yandex, Millennium) по мере доступа к API.
 - Уведомления о заказах через бота ресторана (сейчас платформенный бот из env).
-- История старых slug с редиректом. Вторая цель в `revalidate-queue` для клиента доставки (с id тенанта и старым и
-  новым slug); сейчас ревалидация идёт только в QR (`NEXT_PUBLIC_URL`, после переезда `https://qr.xmenu.uz`).
+- История старых slug с редиректом.
+- Возврат после оплаты на сайт заведения: сейчас `MINIAPP_RETURN_URL`/`MINIAPP_URL` один на платформу
+  (`payment/domain/payment-url.ts`), а не `https://{slug}.xmenu.uz`. Бэкенд адресов `{slug}.xmenu.uz` нигде не строит:
+  slug только валидируется как поддомен (`organization/domain/slug.ts`).
+- Отзыв всех сессий владельца при смене пароля, восстановление пароля, выход «везде».
 - Роли сотрудников для отдельного приложения (курьеры, официанты, менеджеры). Таблица `employee` есть, не используется.
 - Позже: POS, Web Push/WebSocket для админки, фискальные чеки, промокоды (поле `discount` всегда 0), заказ ко
   времени, меню по филиалам, язык уведомлений клиенту (только русский), ротация `PAYMENT_CONFIG_KEY`, rate limit на
@@ -128,27 +153,26 @@ Payme), Telegram webhook и кнопки, боты заведений (`PUT /tel
 ## Известные долги
 - Ветки `feat/staff-auth-hardening`, `fix/pilot-hardening`, `feat/tenant-config`, `feat/reserved-slugs` влиты в `main`
   (2026-10-29, fast-forward, без PR); `npm test` и `npm run build` проходили, миграции на реальной БД не применялись.
-- Refresh-токены staff без ротации и отзыва (выход не инвалидирует токен; удаление пользователя инвалидирует).
-  Восстановления пароля для владельцев нет.
-- Дашборд ещё на старом контракте регистрации (код `1111`, `?token=`): до его обновления регистрация в админке не
-  работает. Что поменять: `docs/API.md`, «Авторизация владельцев».
+- Сессии владельцев: ротация и выход есть, но смена пароля сессии не отзывает, access-токен после выхода живёт до
+  часа (denylist нет), восстановления пароля нет. Дашборд должен перейти на `POST /auth/refresh` с телом и
+  сохранять новый refresh-токен, иначе после первого обновления токена его выкинет на вход.
 - Загрузки (`MulterStorage`) принимают только изображения (JPEG, PNG, GIF, WebP по содержимому, до `UPLOAD_MAX_BYTES`) и
   пишут на диск после проверки. Но при 404 владельца в `PUT /organization`, `POST/PATCH /product…` файл, уже записанный
   валидатором, остаётся на диске без записи в БД. Файлы, загруженные до этой защиты, не проверялись: отдача делает
   любой не-образ `attachment` + `sandbox`, сами файлы не чистились.
-- Ревалидация: ключ задания `revalidate-{route}-{slug|id}` (`docs/REVALIDATE.md`); бэкенд и QR расходятся по формату
-  тела при смене slug (Q-01, чинится в QR). В `GET /application` читать могут только id из `PLATFORM_ADMIN_USER_IDS`.
+- Ревалидация: ключ задания `revalidate-{target}-{route}-{tenantId}`, цели QR и сайт доставки (`docs/REVALIDATE.md`);
+  приёмника в `xmenu-client` ещё нет (задача C2), без `CLIENT_REVALIDATE_URL` задания клиенту не ставятся. В
+  `GET /application` читать могут только id из `PLATFORM_ADMIN_USER_IDS`.
 - Группы допов, созданные до миграции `additional_product_group_organization` и не привязанные к блюду, без владельца
   (недоступны никому); можно удалить вручную.
-- Кэш тенанта и настроек заказа в памяти процесса (30 с): после `PUT` настроек другие процессы pm2 видят старые
-  язык, валюту и зону до 30 с.
-- `ErrorFilter` (staff) отдаёт только `message`: тексты ошибок `ValidationPipe` (какое поле не прошло) в ответ
-  админки не попадают.
+- Кэш тенанта и настроек заказа в памяти процесса (30 с): после `PUT` другие процессы pm2 видят старые имя, slug,
+  язык, валюту и зону до 30 с. `is_active` через API не меняется (только в БД), сброса для него нет.
 - Скомпилированные `.js/.d.ts/.js.map` в `src/config` (не должны быть в репозитории).
-- `npm run lint` не проходит (около 230 ошибок `recommendedTypeChecked`: нетипизированный `@Req() req`, `any` из
-  конфигов и passport, код заказов и платежей), в CI lint не запускается. Для `*.spec.ts` и `*.fake.ts` правила
-  `no-unsafe-*` и `require-await` выключены. На Windows с `core.autocrlf=true` prettier ругается на CRLF рабочей копии,
-  хотя в git всё в LF: нужен `.gitattributes` с `eol=lf` или `endOfLine: 'auto'`.
+- `npm run lint` (без `--fix`) не проходит (около 230 ошибок `recommendedTypeChecked` в старом коде:
+  нетипизированный `@Req() req`, `any` из конфигов и passport, код заказов и платежей), в CI lint не запускается.
+  Новые файлы проходят. Для `*.spec.ts` и `*.fake.ts` правила `no-unsafe-*` и `require-await` выключены.
+  `.gitattributes` (`eol=lf`) добавлен; рабочая копия, выгруженная раньше с `core.autocrlf=true`, остаётся в CRLF,
+  пока файлы не перевыгрузить (`git rm --cached -r . && git reset --hard` на чистом дереве).
 
 ## Правила
 - Никаких захардкоженных кодов и секретов. Не логируй токены ботов, ключи провайдеров, OTP-коды.

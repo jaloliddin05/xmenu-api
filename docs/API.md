@@ -6,7 +6,7 @@
 - заказы клиента: `ORDERS_API.md`, устройство заказов на бэкенде: `BACKEND_ORDERS.md`;
 - филиалы: `BRANCHES_API.md`;
 - бот заведения и подтверждение номера через Telegram: `TELEGRAM_VERIFICATION.md`;
-- ревалидация QR: `REVALIDATE.md`.
+- ревалидация QR и сайта доставки: `REVALIDATE.md`.
 
 ## Два контура авторизации
 
@@ -14,9 +14,24 @@
 |---|---|---|
 | Пути | `/auth/*` и все прочие эндпоинты админки | `/auth/customer/*`, `/customers/*`, `/orders/*` |
 | Тенант | организация владельца из access-токена | заголовок `X-Tenant-Id: <organization.id>` (UUID; slug не принимается) |
-| Формат ошибки | `{ status, timestamp, message, code?, retryAfter? }` | `{ error: { code, message, retryAfter?, details? } }` |
+| Формат ошибки | `{ status, timestamp, code, message, retryAfter?, errors?, details? }` | `{ error: { code, message, retryAfter?, details? } }` |
 
 При 429 всегда приходит заголовок `Retry-After` (секунды) и поле `retryAfter`.
+
+**Ошибки валидации.** Тело, не прошедшее DTO, в обоих контурах даёт `400` с `code: validation_error`; `message`
+перечисляет поля (`"theme.brand: …; mapZoom: …"`), а список полей приходит отдельно: у владельца в `errors`, у
+клиента в `details.errors`:
+
+```json
+{ "status": 400, "timestamp": "…", "code": "validation_error",
+  "message": "theme.brand: brand must be a hex color: #RGB, #RRGGBB or #RRGGBBAA",
+  "errors": [{ "field": "theme.brand", "reason": "matches", "message": "brand must be a hex color: …" }] }
+```
+
+`field`: путь в теле (`mapCenter.lat`, `languages[1]`), `reason`: имя правила (`matches`, `isIn`, `min`, `max`,
+`isInt`, `whitelistValidation` для лишнего поля…). У владельца `code` есть всегда: свой код ошибки, иначе по статусу
+(`bad_request`, `unauthorized`, `forbidden`, `not_found`, `conflict`, `payload_too_large`, `rate_limited`,
+`internal_error`, `unavailable`…).
 
 ## Авторизация владельцев
 
@@ -62,21 +77,35 @@
 
 ### 5. `POST /auth/refresh` → 200
 
-Без изменений: `Authorization: Bearer <refreshToken>` → `{ accessToken, refreshToken }`. Токен удалённого или
-неподтверждённого пользователя → 401.
+`{ "refreshToken": "..." }` (в теле, не в заголовке) → `{ accessToken, refreshToken }`. Refresh-токен непрозрачный,
+хранится хешем в `staff_session` и **одноразовый**: каждый refresh выдаёт новый, старый сгорает (фронт обязан
+сохранить новый). Повтор старого токена в течение 30 с (потерянный ответ, параллельные запросы) ещё работает; позже
+это считается кражей: отзывается весь вход. Неизвестный, отозванный, истёкший токен или токен удалённого или
+неактивного пользователя → `401 invalid_refresh_token`. Срок: 7 дней от последнего refresh, не больше 30 дней от
+входа (`STAFF_REFRESH_TTL_DAYS`, `STAFF_SESSION_ABSOLUTE_DAYS`).
 
-В ответах нигде нет хеша пароля.
+### 6. `POST /auth/logout` → 204
+
+`{ "refreshToken": "..." }` отзывает вход (всю цепочку refresh-токенов этого входа); другие устройства не трогает.
+Всегда 204: без токена, с неизвестным или уже отозванным токеном тоже. Access-токен (JWT) живёт до своего срока
+(`JWT_ACCESS_TOKEN_EXPIRATION_TIME`, 1 ч): фронт удаляет его сам.
+
+`user` в ответах `login` и `check-code` (и `GET /user/me`): `id, phone, email, first_name, last_name, url, isActive,
+created_at, avatar_id` и `organization { id, name, slug, type, is_active, logo { id, url }, banner { id, url },
+translations [{ id, lang, description }] }`. Хеша пароля, `owner_id`, `order_seq`, `int_id` и путей файлов на диске
+нет.
 
 ### Коды ошибок
 
 | HTTP | `code` | Когда |
 |---|---|---|
-| 400 | — (`message` от валидации) | тело не прошло DTO (пароль короче 8, неизвестный `type`...) |
+| 400 | `validation_error` | тело не прошло DTO (пароль короче 8, неизвестный `type`...), поля в `errors` |
 | 400 | `invalid_phone` | номер не `+998XXXXXXXXX` |
 | 400 | `invalid_code` | неверный код или код не той длины (попытка не тратится, если формат неверен) |
 | 400 | `code_expired` | код истёк или уже использован |
 | 400 | `registration_expired` | заявки нет: истекла, уже подтверждена или неизвестный `registrationId` |
 | 401 | `invalid_credentials` | вход: неверный телефон или пароль |
+| 401 | `invalid_refresh_token` | refresh: токен неизвестен, отозван, истёк или использован повторно |
 | 409 | `phone_taken` | номер уже принадлежит подтверждённому владельцу |
 | 429 | `too_many_attempts` | 5 неверных кодов (код сгорает) или блокировка входа по телефону |
 | 429 | `rate_limited` | лимиты отправки кода, регистраций, проверок или входов по IP |
@@ -200,9 +229,11 @@ IP берётся из `X-Forwarded-For` только от локального 
 | `mapZoom` | целое 0..21 |
 | `mapBounds` | `[[swLat, swLng], [neLat, neLng]]`, юго-запад строго южнее и западнее; `mapCenter` внутри, если задан |
 
-Ошибки полей: `400` с текстом валидации; несогласованные поля (язык по умолчанию вне списка, год в будущем,
-границы, центр вне границ): `400`, `code: invalid_settings`. Сохранение сразу меняет язык и валюту клиентских
-ответов (кэш заведения в процессе сбрасывается; в других процессах pm2 до 30 с).
+Ошибки полей: `400 validation_error` со списком `errors` (`theme.brand`, `languages`, `mapCenter.lat`, `mapZoom`…);
+несогласованные поля: `400 invalid_settings` с тем же списком (`defaultLanguage` / `notInLanguages`, `foundedYear` /
+`inFuture`, `mapBounds` / `invalidBounds`, `mapCenter` / `outsideBounds`). Сохранение сразу меняет язык и валюту
+клиентских ответов (кэш заведения в процессе сбрасывается; в других процессах pm2 до 30 с) и ставит ревалидацию
+QR-меню и сайта доставки (`REVALIDATE.md`).
 
 Зона доставки, сбор, минимум, ETA и тайм-ауты правятся `PUT /order-settings` (строка тоже создаётся при
 регистрации; `deliveryZone: null` выключает доставку).
@@ -213,8 +244,8 @@ IP берётся из `X-Forwarded-For` только от локального 
 `product_id`, `additional_product_group_id`, id переводов, `organizationId`...) отвечает `404`, как несуществующий.
 
 - `/user/:id`, `/user/change-password/:id`: только свой id. Новый пароль 8–72 символа.
-- `/organization/:id` (GET, PUT, DELETE) и `/organization/:id/settings`: только своя. Публичные
-  `GET /organization/slug/:slug` и `GET /organization/return-slug/:id` без изменений.
+- `/organization/:id` (GET, PUT, DELETE) и `/organization/:id/settings`: только своя. `PUT` и `DELETE` сбрасывают
+  кэш заведения (имя, slug) в своём процессе.
 - `slug` в `PUT /organization/:id` и `POST /organization/check-slug`: 3–63 символа `a-z`, `0-9` и одиночные
   дефисы между словами, не похож на UUID и не из зарезервированных имён (`www`, `api`, `app`, `qr`, `order`,
   `dashboard`, `admin`, `staging` и др.: slug становится поддоменом `{slug}.xmenu.uz`); иначе `400 invalid_slug`. Занят другим заведением → `409 slug_taken`.
@@ -236,9 +267,25 @@ IP берётся из `X-Forwarded-For` только от локального 
   `Content-Security-Policy: sandbox`. Несуществующий файл: обычный `404` без пути на диске.
 - `POST /translation`: только с токеном владельца. Лимит на пользователя: `TRANSLATION_RATE_LIMIT` запросов за
   `TRANSLATION_RATE_WINDOW_SECONDS` (по умолчанию 30 за 600 с), сверх лимита `429` с `code: rate_limited` и `retryAfter`.
-  `text` до `TRANSLATION_MAX_TEXT` символов (2000), `promptName` до 100: иначе `400`. Сбой модели: `502`.
+  `text` до `TRANSLATION_MAX_TEXT` символов (2000), `promptName` до 100: иначе `400`. Сбой модели:
+  `502 translation_failed`. Без `OPENAI_API_KEY` бэкенд стартует, а перевод отвечает `503 translation_unavailable`.
 - `GET /application`: только платформенные администраторы (`PLATFORM_ADMIN_USER_IDS`, пусто = никто): остальным `403`.
-  `POST /application` остаётся публичным.
+  `POST /application` остаётся публичным и отвечает только `{ id }`.
 - `GET /product?is_active=true|false`: фильтр по статусу блюда (параметр называется `is_active`). Другое значение: `400`,
   без параметра фильтра нет.
-- Ревалидация QR: формат тела и ключи заданий в `docs/REVALIDATE.md`.
+- Ревалидация QR и сайта доставки: формат тела и ключи заданий в `docs/REVALIDATE.md`.
+
+## Публичные ответы (без токена)
+
+Публичные эндпоинты отдают только явный список полей (маппер или DTO), а не строки БД.
+
+| Эндпоинт | Раньше отдавал лишнее | Теперь |
+|---|---|---|
+| `GET /organization/slug/:slug` (QR-меню) | строку `organization` целиком: `owner_id`, `order_seq`, `int_id`, `is_active`, `url`, `created_at`, `logo_id`, `banner_id`; файлы с `path` (путь на диске) и `product_id`; у категорий `organization_id`, `index`, `is_active`; у блюд `category_id`, `index`, `is_active`; у групп допов `product_id`, `organization_id`; у допов `additional_product_group_id`; id строк переводов; отвечал и для неактивных заведений | `PublicOrganizationDto`: `id, name, slug, type, logo { id, url }, banner, translations [{ lang, description }], categories [{ id, translations [{ lang, title }], products [{ id, price, weight, protein, kcal, fat, carbohydrate, unit, images [{ id, url }], translations [{ lang, title, description }], additional_product_groups [{ id, is_required, is_multiple, min_selected, max_selected, translations, additional_products [{ id, price, translations }] }] }] }]`; неактивное заведение → 404 |
+| `GET /organization/return-slug/:id` | slug любого заведения, в том числе неактивного, по UUID или числовому `int_id` | slug (текстом) только активного заведения и только по UUID, иначе 404 |
+| `POST /application` | созданную строку заявки целиком | `{ id }` |
+| `POST /auth/login`, `POST /auth/check-code` | `user` без пароля, но со всеми колонками организации (`owner_id`, `order_seq`, `int_id`, пути файлов) | `user` по списку полей (см. «Авторизация владельцев») |
+
+Уже были на мапперах и не менялись: `GET /tenant/by-slug/:slug`, `GET /tenant/config`, `GET /menu`, `GET /branches`,
+`GET /checkout-config`, `/orders*`, `/auth/customer/*`. Вебхуки Click, Payme и Telegram отвечают в формате
+провайдера.
