@@ -113,7 +113,8 @@ Redis (`tgv:*`). Подробно: `docs/TELEGRAM_VERIFICATION.md`. Контак
 Payme), Telegram webhook и кнопки, нагрузка. Стендов Click/Payme нет.
 
 ## Известные долги
-- Ветки `feat/staff-auth-hardening` (21 коммит) и `fix/pilot-hardening` (7 коммитов поверх неё) не влиты в `main`.
+- Ветки `feat/staff-auth-hardening`, `fix/pilot-hardening`, `feat/tenant-config`, `feat/reserved-slugs` влиты в `main`
+  (2026-10-29, fast-forward, без PR); `npm test` и `npm run build` проходили, миграции на реальной БД не применялись.
 - Refresh-токены staff без ротации и отзыва (выход не инвалидирует токен; удаление пользователя инвалидирует).
   Восстановления пароля для владельцев нет.
 - Дашборд ещё на старом контракте регистрации (код `1111`, `?token=`): до его обновления регистрация в админке не
