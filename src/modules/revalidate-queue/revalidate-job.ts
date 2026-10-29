@@ -22,7 +22,10 @@ export interface RevalidateJob {
 }
 
 /** Targets that care about a change: the QR menu shows no branches. */
-export function targetsFor(route: RevalidateRoute, clientEnabled: boolean): RevalidateTarget[] {
+export function targetsFor(
+  route: RevalidateRoute,
+  clientEnabled: boolean,
+): RevalidateTarget[] {
   const targets: RevalidateTarget[] = route === 'branches' ? [] : ['qr'];
   if (clientEnabled) targets.push('client');
   return targets;
@@ -39,9 +42,16 @@ export function buildRevalidateJobId(job: RevalidateJob): string {
 }
 
 /** Short, readable description for logs (never an object). */
-export function describeRevalidate(job: Partial<RevalidateJob>, jobId?: string): string {
+export function describeRevalidate(
+  job: Partial<RevalidateJob>,
+  jobId?: string,
+): string {
   const c: Partial<TenantChange> = job.change ?? {};
-  const parts = [`target=${job.target ?? '?'}`, `route=${c.route ?? '?'}`, `tenant=${c.tenantId ?? '?'}`];
+  const parts = [
+    `target=${job.target ?? '?'}`,
+    `route=${c.route ?? '?'}`,
+    `tenant=${c.tenantId ?? '?'}`,
+  ];
   if (c.oldSlug) parts.push(`slug ${c.oldSlug} -> ${c.slug ?? '?'}`);
   else if (c.slug) parts.push(`slug=${c.slug}`);
   if (jobId) parts.push(`job=${jobId}`);
@@ -53,15 +63,33 @@ export function describeRevalidate(job: Partial<RevalidateJob>, jobId?: string):
  * `organization` route with id, newSlug and oldSlug; anything else re-renders the menu by slug.
  * Returns null when there is nothing the QR app can revalidate (no slug).
  */
-export function buildQrBody(c: RevalidateJob['change'], secret: string | undefined) {
+export function buildQrBody(
+  c: RevalidateJob['change'],
+  secret: string | undefined,
+) {
   if (c.route === 'organization' && c.oldSlug && c.oldSlug !== c.slug) {
-    return { route: 'organization', id: c.tenantId, newSlug: c.slug, oldSlug: c.oldSlug, secret };
+    return {
+      route: 'organization',
+      id: c.tenantId,
+      newSlug: c.slug,
+      oldSlug: c.oldSlug,
+      secret,
+    };
   }
   if (!c.slug) return null;
   return { route: 'menu', slug: c.slug, secret };
 }
 
 /** Body for the delivery site's /api/revalidate (receiver: xmenu-client). */
-export function buildClientBody(c: RevalidateJob['change'], secret: string | undefined) {
-  return { secret, tenantId: c.tenantId, route: c.route, slug: c.slug, oldSlug: c.oldSlug ?? null };
+export function buildClientBody(
+  c: RevalidateJob['change'],
+  secret: string | undefined,
+) {
+  return {
+    secret,
+    tenantId: c.tenantId,
+    route: c.route,
+    slug: c.slug,
+    oldSlug: c.oldSlug ?? null,
+  };
 }

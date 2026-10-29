@@ -11,7 +11,10 @@ import {
 
 const T1 = '11111111-1111-4111-8111-111111111111';
 const T2 = '22222222-2222-4222-8222-222222222222';
-const job = (target: 'qr' | 'client', change: Partial<RevalidateJob['change']> = {}): RevalidateJob => ({
+const job = (
+  target: 'qr' | 'client',
+  change: Partial<RevalidateJob['change']> = {},
+): RevalidateJob => ({
   target,
   change: { tenantId: T1, route: 'menu', slug: 'mant', ...change },
 });
@@ -32,7 +35,9 @@ describe('revalidate job ids', () => {
   });
 
   it('does not depend on the slug, so repeated edits of one tenant collapse per route', () => {
-    expect(buildRevalidateJobId(job('qr', { slug: 'a' }))).toBe(buildRevalidateJobId(job('qr', { slug: 'b' })));
+    expect(buildRevalidateJobId(job('qr', { slug: 'a' }))).toBe(
+      buildRevalidateJobId(job('qr', { slug: 'b' })),
+    );
   });
 
   it('refuses a job without a tenant', () => {
@@ -40,8 +45,13 @@ describe('revalidate job ids', () => {
   });
 
   it('logs readable text', () => {
-    const text = describeRevalidate(job('client', { route: 'organization', slug: 'b', oldSlug: 'a' }), 'j1');
-    expect(text).toBe(`target=client route=organization tenant=${T1} slug a -> b job=j1`);
+    const text = describeRevalidate(
+      job('client', { route: 'organization', slug: 'b', oldSlug: 'a' }),
+      'j1',
+    );
+    expect(text).toBe(
+      `target=client route=organization tenant=${T1} slug a -> b job=j1`,
+    );
   });
 });
 
@@ -56,16 +66,35 @@ describe('targets', () => {
 
 describe('request bodies', () => {
   it('keeps the QR body format: menu by slug, slug change as the organization route', () => {
-    expect(buildQrBody(job('qr').change, 's')).toEqual({ route: 'menu', slug: 'mant', secret: 's' });
-    expect(buildQrBody(job('qr', { route: 'settings' }).change, 's')).toEqual({ route: 'menu', slug: 'mant', secret: 's' });
-    expect(buildQrBody(job('qr', { route: 'organization', slug: 'new', oldSlug: 'old' }).change, 's')).toEqual({
+    expect(buildQrBody(job('qr').change, 's')).toEqual({
+      route: 'menu',
+      slug: 'mant',
+      secret: 's',
+    });
+    expect(buildQrBody(job('qr', { route: 'settings' }).change, 's')).toEqual({
+      route: 'menu',
+      slug: 'mant',
+      secret: 's',
+    });
+    expect(
+      buildQrBody(
+        job('qr', { route: 'organization', slug: 'new', oldSlug: 'old' })
+          .change,
+        's',
+      ),
+    ).toEqual({
       route: 'organization',
       id: T1,
       newSlug: 'new',
       oldSlug: 'old',
       secret: 's',
     });
-    expect(buildQrBody(job('qr', { route: 'organization', oldSlug: null }).change, 's')).toEqual({
+    expect(
+      buildQrBody(
+        job('qr', { route: 'organization', oldSlug: null }).change,
+        's',
+      ),
+    ).toEqual({
       route: 'menu',
       slug: 'mant',
       secret: 's',
@@ -74,14 +103,22 @@ describe('request bodies', () => {
   });
 
   it('sends the client { secret, tenantId, route, slug, oldSlug }', () => {
-    expect(buildClientBody(job('client', { route: 'organization', slug: 'new', oldSlug: 'old' }).change, 'c')).toEqual({
+    expect(
+      buildClientBody(
+        job('client', { route: 'organization', slug: 'new', oldSlug: 'old' })
+          .change,
+        'c',
+      ),
+    ).toEqual({
       secret: 'c',
       tenantId: T1,
       route: 'organization',
       slug: 'new',
       oldSlug: 'old',
     });
-    expect(buildClientBody(job('client', { route: 'branches' }).change, 'c')).toEqual({
+    expect(
+      buildClientBody(job('client', { route: 'branches' }).change, 'c'),
+    ).toEqual({
       secret: 'c',
       tenantId: T1,
       route: 'branches',
@@ -101,9 +138,16 @@ describe('request bodies', () => {
       url: 'https://qr.xmenu.uz/api/revalidate',
       body: { route: 'menu', slug: 'mant', secret: 'q' },
     });
-    expect(revalidateRequest(job('client'), env)?.url).toBe('http://127.0.0.1:3002/api/revalidate');
-    expect(revalidateRequest(job('client'), env)?.body).toMatchObject({ secret: 'c', tenantId: T1 });
-    expect(revalidateRequest(job('client'), { ...env, CLIENT_REVALIDATE_URL: '' })).toBeNull();
+    expect(revalidateRequest(job('client'), env)?.url).toBe(
+      'http://127.0.0.1:3002/api/revalidate',
+    );
+    expect(revalidateRequest(job('client'), env)?.body).toMatchObject({
+      secret: 'c',
+      tenantId: T1,
+    });
+    expect(
+      revalidateRequest(job('client'), { ...env, CLIENT_REVALIDATE_URL: '' }),
+    ).toBeNull();
   });
 });
 
@@ -115,20 +159,40 @@ describe('RevalidateService.addRevalidationJob', () => {
   });
 
   const make = (slug: string | null = 'mant') => {
-    const queue = { remove: jest.fn(async () => 0), add: jest.fn(async () => ({})) };
+    const queue = {
+      remove: jest.fn(async () => 0),
+      add: jest.fn(async () => ({})),
+    };
     const findUnique = jest.fn(async () => ({ slug }));
-    const service = Object.create(RevalidateService.prototype) as RevalidateService;
-    Object.assign(service, { queue, prisma: { organization: { findUnique } }, logger: { log: jest.fn() } });
+    const service = Object.create(
+      RevalidateService.prototype,
+    ) as RevalidateService;
+    Object.assign(service, {
+      queue,
+      prisma: { organization: { findUnique } },
+      logger: { log: jest.fn() },
+    });
     return { service, queue, findUnique };
   };
 
   it('schedules one job per tenant: two tenants in the same window do not replace each other', async () => {
     delete process.env.CLIENT_REVALIDATE_URL;
     const { service, queue } = make();
-    await service.addRevalidationJob({ tenantId: T1, route: 'menu', slug: 'mant' });
-    await service.addRevalidationJob({ tenantId: T2, route: 'menu', slug: 'other' });
+    await service.addRevalidationJob({
+      tenantId: T1,
+      route: 'menu',
+      slug: 'mant',
+    });
+    await service.addRevalidationJob({
+      tenantId: T2,
+      route: 'menu',
+      slug: 'other',
+    });
     const ids = queue.add.mock.calls.map((c: any[]) => c[2].jobId);
-    expect(ids).toEqual([`revalidate-qr-menu-${T1}`, `revalidate-qr-menu-${T2}`]);
+    expect(ids).toEqual([
+      `revalidate-qr-menu-${T1}`,
+      `revalidate-qr-menu-${T2}`,
+    ]);
     expect(queue.remove.mock.calls.map((c: any[]) => c[0])).toEqual(ids);
   });
 
@@ -136,19 +200,38 @@ describe('RevalidateService.addRevalidationJob', () => {
     process.env.CLIENT_REVALIDATE_URL = 'http://127.0.0.1:3002/api/revalidate';
     const { service, queue, findUnique } = make('mant');
     await service.addRevalidationJob({ tenantId: T1, route: 'settings' });
-    expect(findUnique).toHaveBeenCalledWith({ where: { id: T1 }, select: { slug: true } });
+    expect(findUnique).toHaveBeenCalledWith({
+      where: { id: T1 },
+      select: { slug: true },
+    });
     expect(queue.add.mock.calls.map((c: any[]) => c[1])).toEqual([
-      { target: 'qr', change: { tenantId: T1, route: 'settings', slug: 'mant' } },
-      { target: 'client', change: { tenantId: T1, route: 'settings', slug: 'mant' } },
+      {
+        target: 'qr',
+        change: { tenantId: T1, route: 'settings', slug: 'mant' },
+      },
+      {
+        target: 'client',
+        change: { tenantId: T1, route: 'settings', slug: 'mant' },
+      },
     ]);
   });
 
   it('repeated edit of one tenant replaces its pending job', async () => {
     delete process.env.CLIENT_REVALIDATE_URL;
     const { service, queue } = make();
-    await service.addRevalidationJob({ tenantId: T1, route: 'menu', slug: 'mant' });
-    await service.addRevalidationJob({ tenantId: T1, route: 'menu', slug: 'mant' });
+    await service.addRevalidationJob({
+      tenantId: T1,
+      route: 'menu',
+      slug: 'mant',
+    });
+    await service.addRevalidationJob({
+      tenantId: T1,
+      route: 'menu',
+      slug: 'mant',
+    });
     expect(queue.remove).toHaveBeenCalledTimes(2);
-    expect(new Set(queue.add.mock.calls.map((c: any[]) => c[2].jobId)).size).toBe(1);
+    expect(
+      new Set(queue.add.mock.calls.map((c: any[]) => c[2].jobId)).size,
+    ).toBe(1);
   });
 });

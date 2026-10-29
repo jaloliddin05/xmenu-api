@@ -2,7 +2,13 @@ import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { Queue } from 'bullmq';
 import { PrismaService } from '../_prisma/prisma.service';
 import { redisConfig } from './bull.config';
-import { buildRevalidateJobId, describeRevalidate, RevalidateJob, TenantChange, targetsFor } from './revalidate-job';
+import {
+  buildRevalidateJobId,
+  describeRevalidate,
+  RevalidateJob,
+  TenantChange,
+  targetsFor,
+} from './revalidate-job';
 
 @Injectable()
 export class RevalidateService implements OnModuleDestroy {
@@ -25,7 +31,10 @@ export class RevalidateService implements OnModuleDestroy {
       change.slug !== undefined
         ? change.slug
         : ((
-            await this.prisma.organization.findUnique({ where: { id: change.tenantId }, select: { slug: true } })
+            await this.prisma.organization.findUnique({
+              where: { id: change.tenantId },
+              select: { slug: true },
+            })
           )?.slug ?? null);
     const clientEnabled = Boolean(process.env.CLIENT_REVALIDATE_URL?.trim());
 
@@ -34,7 +43,7 @@ export class RevalidateService implements OnModuleDestroy {
       const jobId = buildRevalidateJobId(job);
       try {
         await this.queue.remove(jobId);
-      } catch { }
+      } catch {}
       await this.queue.add('revalidate', job, { jobId, delay: 20 * 1000 });
       this.logger.log(`Job added: ${describeRevalidate(job, jobId)}`);
     }

@@ -15,8 +15,21 @@ import { OrderService } from './services/order.service';
 
 /** Buyurtma API'si: mijoz, restoran paneli, Telegram tugmalari, sozlamalar. Yadro — OrderCoreModule. */
 @Module({
-  imports: [PrismaModule, TenantModule, BranchModule, PaymentModule, OrderCoreModule, RevalidateModule],
-  controllers: [CustomerOrderController, StaffOrderController, OrderSettingsController, CheckoutConfigController, TelegramOrdersController],
+  imports: [
+    PrismaModule,
+    TenantModule,
+    BranchModule,
+    PaymentModule,
+    OrderCoreModule,
+    RevalidateModule,
+  ],
+  controllers: [
+    CustomerOrderController,
+    StaffOrderController,
+    OrderSettingsController,
+    CheckoutConfigController,
+    TelegramOrdersController,
+  ],
   providers: [OrderService, OrderStaffService],
   exports: [OrderService, OrderStaffService],
 })

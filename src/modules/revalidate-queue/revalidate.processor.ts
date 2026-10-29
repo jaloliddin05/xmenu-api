@@ -2,13 +2,23 @@ import { Worker } from 'bullmq';
 import axios from 'axios';
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { redisConfig } from './bull.config';
-import { buildClientBody, buildQrBody, describeRevalidate, RevalidateJob } from './revalidate-job';
+import {
+  buildClientBody,
+  buildQrBody,
+  describeRevalidate,
+  RevalidateJob,
+} from './revalidate-job';
 
 /** Where a job goes and what it sends; null when the target has nothing to do. */
-export function revalidateRequest(job: RevalidateJob, env = process.env): { url: string; body: object } | null {
+export function revalidateRequest(
+  job: RevalidateJob,
+  env = process.env,
+): { url: string; body: object } | null {
   if (job.target === 'client') {
     const url = env.CLIENT_REVALIDATE_URL?.trim();
-    return url ? { url, body: buildClientBody(job.change, env.CLIENT_REVALIDATE_SECRET) } : null;
+    return url
+      ? { url, body: buildClientBody(job.change, env.CLIENT_REVALIDATE_SECRET) }
+      : null;
   }
   const body = buildQrBody(job.change, env.REVALIDATE_SECRET);
   return body ? { url: `${env.NEXT_PUBLIC_URL}/api/revalidate`, body } : null;
@@ -33,14 +43,15 @@ export class RevalidateProcessor implements OnModuleDestroy {
 
         try {
           const response = await axios.post(request.url, request.body);
-          if (response.status !== 200) throw new Error(`Unexpected status: ${response.status}`);
+          if (response.status !== 200)
+            throw new Error(`Unexpected status: ${response.status}`);
           return { success: true };
         } catch (error) {
           this.logger.error(`Failed: ${what}: ${(error as Error).message}`);
           throw error;
         }
       },
-      { connection: redisConfig }
+      { connection: redisConfig },
     );
 
     this.worker.on('completed', (job) => {
