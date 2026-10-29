@@ -8,10 +8,19 @@ import {
 } from '@nestjs/common';
 import express from 'express';
 import {
+  ApiCreatedResponse,
   ApiNoContentResponse,
+  ApiOkResponse,
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
+import {
+  StaffCheckCodeResponseDto,
+  StaffLoginResponseDto,
+  StaffRegisterResponseDto,
+  StaffResendCodeResponseDto,
+  StaffTokenPairDto,
+} from '../dto/auth-response.dto';
 
 import { StaffAuthService } from '../services/staff-auth.service';
 import { StaffSessionService } from '../services/staff-session.service';
@@ -39,6 +48,7 @@ export class AuthController {
   @ApiOperation({
     summary: 'Owner login by phone and password (per-phone escalating lockout, per-IP limit)',
   })
+  @ApiOkResponse({ type: StaffLoginResponseDto })
   @HttpCode(200)
   login(@Body() dto: LoginDto, @Req() req: express.Request) {
     return this.staffAuth.login(dto, requestCtx(req));
@@ -50,6 +60,7 @@ export class AuthController {
   @ApiOperation({
     summary: 'Start owner signup: nothing is stored in the DB until the SMS code is confirmed',
   })
+  @ApiCreatedResponse({ type: StaffRegisterResponseDto })
   @HttpCode(HttpStatus.CREATED)
   register(@Body() dto: StaffRegisterDto, @Req() req: express.Request) {
     return this.staffAuth.register(dto, requestCtx(req));
@@ -58,6 +69,7 @@ export class AuthController {
   @Public()
   @Post('/check-code')
   @ApiOperation({ summary: 'Confirm the signup code; creates the owner and the venue and signs in' })
+  @ApiOkResponse({ type: StaffCheckCodeResponseDto })
   @HttpCode(200)
   checkCode(@Body() dto: StaffCheckCodeDto, @Req() req: express.Request) {
     return this.staffAuth.checkCode(dto, requestCtx(req));
@@ -66,6 +78,7 @@ export class AuthController {
   @Public()
   @Post('/resend-code')
   @ApiOperation({ summary: 'Send a new signup code (respects the resend cooldown)' })
+  @ApiOkResponse({ type: StaffResendCodeResponseDto })
   @HttpCode(200)
   resendCode(@Body() dto: StaffRegistrationRefDto, @Req() req: express.Request) {
     return this.staffAuth.resendCode(dto.registrationId, requestCtx(req));
@@ -76,6 +89,7 @@ export class AuthController {
   @ApiOperation({
     summary: 'New token pair for a refresh token; the old refresh token is spent (rotation). 401 invalid_refresh_token',
   })
+  @ApiOkResponse({ type: StaffTokenPairDto })
   @HttpCode(200)
   refresh(@Body() dto: StaffRefreshDto, @Req() req: express.Request) {
     return this.sessions.refresh(dto.refreshToken, requestCtx(req));

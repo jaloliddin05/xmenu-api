@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Header, HttpCode, HttpStatus, Headers, Param, ParseUUIDPipe, Post, Query, Req } from '@nestjs/common';
-import { ApiBearerAuth, ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiCreatedResponse, ApiHeader, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { OrderViewDto } from '../dto/order-view.dto';
 import type { Request } from 'express';
 import { resolveLang } from 'src/infra/http/request-helpers';
 import { CurrentCustomer, CustomerProtectedRoute } from 'src/modules/auth/decorators/customer-route.decorator';
@@ -25,6 +26,7 @@ export class CustomerOrderController {
   @HttpCode(HttpStatus.CREATED)
   @ApiHeader({ name: 'Idempotency-Key', description: 'Har bir buyurtma urinishi uchun noyob kalit (8-128 belgi). Takrorda o\'sha buyurtma qaytadi.', required: true })
   @ApiOperation({ summary: 'Buyurtma yaratish' })
+  @ApiCreatedResponse({ type: OrderViewDto })
   create(
     @CurrentCustomer() principal: CustomerPrincipal,
     @Body() dto: CreateOrderDto,
@@ -37,6 +39,7 @@ export class CustomerOrderController {
 
   @Get()
   @ApiOperation({ summary: "Mijoz buyurtmalari (yangilari birinchi, 50 tagacha). ?status=active — tugallanmaganlari" })
+  @ApiOkResponse({ type: [OrderViewDto] })
   list(@CurrentCustomer() principal: CustomerPrincipal, @Query('status') status: string | undefined, @CurrentTenant() tenant: Tenant, @Req() req: Request) {
     return this.orders.list(principal, { activeOnly: status === 'active' }, resolveLang(req, tenant));
   }
@@ -44,6 +47,7 @@ export class CustomerOrderController {
   @Get(':id')
   @Header('Cache-Control', 'no-store')
   @ApiOperation({ summary: 'Bitta buyurtma (ekran shuni so\'rab turadi)' })
+  @ApiOkResponse({ type: OrderViewDto })
   get(@CurrentCustomer() principal: CustomerPrincipal, @Param('id', ParseUUIDPipe) id: string, @CurrentTenant() tenant: Tenant, @Req() req: Request) {
     return this.orders.get(principal, id, resolveLang(req, tenant));
   }
@@ -51,6 +55,7 @@ export class CustomerOrderController {
   @Post(':id/cancel')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Bekor qilish (faqat tayyorlash boshlanguncha)' })
+  @ApiOkResponse({ type: OrderViewDto })
   cancel(@CurrentCustomer() principal: CustomerPrincipal, @Param('id', ParseUUIDPipe) id: string, @CurrentTenant() tenant: Tenant, @Req() req: Request) {
     return this.orders.cancel(principal, id, resolveLang(req, tenant));
   }
@@ -58,6 +63,7 @@ export class CustomerOrderController {
   @Post(':id/payment/retry')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "To'lov muvaffaqiyatsiz bo'lgan buyurtma uchun yangi to'lov havolasi" })
+  @ApiOkResponse({ type: OrderViewDto })
   retryPayment(@CurrentCustomer() principal: CustomerPrincipal, @Param('id', ParseUUIDPipe) id: string, @CurrentTenant() tenant: Tenant, @Req() req: Request) {
     return this.orders.retryPayment(principal, id, resolveLang(req, tenant));
   }

@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { CustomerUserDto } from './auth-response.dto';
 import { IsNotEmpty, IsOptional, IsString, Length } from 'class-validator';
 
 /** POST /auth/customer/telegram/start */
@@ -73,4 +74,16 @@ export class CustomerTelegramStatusResponseDto {
 
   @ApiPropertyOptional({ description: 'verified only' })
   isNewUser?: boolean;
+
+  @ApiPropertyOptional({ description: 'verified, isNewUser false' })
+  accessToken?: string;
+
+  @ApiPropertyOptional({ description: 'verified, isNewUser false' })
+  refreshToken?: string;
+
+  @ApiPropertyOptional({ type: CustomerUserDto, description: 'verified, isNewUser false' })
+  user?: CustomerUserDto;
+
+  @ApiPropertyOptional({ description: 'verified, isNewUser true: finish with POST /auth/customer/register' })
+  registrationToken?: string;
 }

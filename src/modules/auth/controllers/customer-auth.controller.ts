@@ -9,10 +9,13 @@ import {
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiExtraModels,
   ApiHeader,
+  ApiNoContentResponse,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
+  getSchemaPath,
 } from '@nestjs/swagger';
 import type { Request } from 'express';
 
@@ -27,6 +30,14 @@ import {
   CustomerTelegramStatusDto,
 } from '../dto';
 import { CustomerOtpRequestResponseDto } from '../dto/customer-otp-response.dto';
+import {
+  CustomerPhoneRequiredDto,
+  CustomerRegistrationRequiredDto,
+  CustomerSessionDto,
+  CustomerSignedInDto,
+  CustomerTokenPairDto,
+  CustomerUserDto,
+} from '../dto/auth-response.dto';
 import {
   CustomerTelegramStartResponseDto,
   CustomerTelegramStatusResponseDto,
@@ -44,6 +55,7 @@ import { CurrentTenant } from '../../tenant/current-tenant.decorator';
 import type { Tenant } from '../../tenant/tenant.service';
 
 @ApiTags('Auth-Customer')
+@ApiExtraModels(CustomerSignedInDto, CustomerRegistrationRequiredDto, CustomerPhoneRequiredDto)
 @ApiHeader({
   name: 'X-Tenant-Id',
   description: 'Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug',
@@ -77,6 +89,8 @@ export class AuthCustomerController {
   @CustomerPublicRoute()
   @Post('otp/verify')
   @HttpCode(200)
+  @ApiOperation({ summary: 'Check the code: known phone signs in (isNewUser false), new phone gets a registrationToken' })
+  @ApiOkResponse({ schema: { oneOf: [{ $ref: getSchemaPath(CustomerSignedInDto) }, { $ref: getSchemaPath(CustomerRegistrationRequiredDto) }] } })
   verifyOtp(
     @CurrentTenant() tenant: Tenant,
     @Body() dto: CustomerOtpVerifyDto,
@@ -124,6 +138,7 @@ export class AuthCustomerController {
   @CustomerPublicRoute()
   @Post('register')
   @HttpCode(200)
+  @ApiOkResponse({ type: CustomerSessionDto })
   register(
     @CurrentTenant() tenant: Tenant,
     @Body() dto: CustomerRegisterDto,
@@ -135,6 +150,7 @@ export class AuthCustomerController {
   @CustomerPublicRoute()
   @Post('refresh')
   @HttpCode(200)
+  @ApiOkResponse({ type: CustomerTokenPairDto })
   refresh(
     @CurrentTenant() tenant: Tenant,
     @Body() dto: CustomerRefreshDto,
@@ -146,6 +162,7 @@ export class AuthCustomerController {
   @CustomerPublicRoute()
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiNoContentResponse({ description: 'Always 204 (idempotent); the login and its access tokens are revoked' })
   async logout(
     @CurrentTenant() tenant: Tenant,
     @Body() dto: CustomerLogoutDto,
@@ -157,6 +174,7 @@ export class AuthCustomerController {
   @CustomerProtectedRoute()
   @ApiBearerAuth('access-token')
   @Get('me')
+  @ApiOkResponse({ type: CustomerUserDto })
   me(@CurrentCustomer() me: CustomerPrincipal) {
     return this.auth.me(me.tenantId, me.customerId);
   }
@@ -165,6 +183,7 @@ export class AuthCustomerController {
   @CustomerPublicRoute()
   @Post('login')
   @HttpCode(200)
+  @ApiOkResponse({ schema: { oneOf: [{ $ref: getSchemaPath(CustomerSignedInDto) }, { $ref: getSchemaPath(CustomerRegistrationRequiredDto) }, { $ref: getSchemaPath(CustomerPhoneRequiredDto) }] } })
   telegramLogin(
     @CurrentTenant() tenant: Tenant,
     @Body() dto: CustomerTelegramDto,

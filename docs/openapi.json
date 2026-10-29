@@ -17,10 +17,25 @@
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ]
+                }
+              }
+            }
           }
         },
-        "summary": "Method: create",
+        "summary": "Landing contact form (public); answers { id }",
         "tags": [
           "Application"
         ]
@@ -55,7 +70,14 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffLoginResponseDto"
+                }
+              }
+            }
           }
         },
         "summary": "Owner login by phone and password (per-phone escalating lockout, per-IP limit)",
@@ -80,7 +102,14 @@
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffRegisterResponseDto"
+                }
+              }
+            }
           }
         },
         "summary": "Start owner signup: nothing is stored in the DB until the SMS code is confirmed",
@@ -105,7 +134,14 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffCheckCodeResponseDto"
+                }
+              }
+            }
           }
         },
         "summary": "Confirm the signup code; creates the owner and the venue and signs in",
@@ -130,7 +166,14 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffResendCodeResponseDto"
+                }
+              }
+            }
           }
         },
         "summary": "Send a new signup code (respects the resend cooldown)",
@@ -143,14 +186,54 @@
       "post": {
         "operationId": "AuthController_refresh",
         "parameters": [],
-        "responses": {
-          "204": {
-            "description": "New access, refresh tokens have been saved."
-          },
-          "403": {
-            "description": "Unauthorized Request"
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StaffRefreshDto"
+              }
+            }
           }
         },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffTokenPairDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "New token pair for a refresh token; the old refresh token is spent (rotation). 401 invalid_refresh_token",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "operationId": "AuthController_logout",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StaffLogoutDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Revoke the login behind a refresh token (idempotent, always 204)",
         "tags": [
           "Auth"
         ]
@@ -223,9 +306,24 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CustomerSignedInDto"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CustomerRegistrationRequiredDto"
+                    }
+                  ]
+                }
+              }
+            }
           }
         },
+        "summary": "Check the code: known phone signs in (isNewUser false), new phone gets a registrationToken",
         "tags": [
           "Auth-Customer"
         ]
@@ -341,7 +439,14 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerSessionDto"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -375,7 +480,14 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerTokenPairDto"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -409,7 +521,7 @@
         },
         "responses": {
           "204": {
-            "description": ""
+            "description": "Always 204 (idempotent); the login and its access tokens are revoked"
           }
         },
         "tags": [
@@ -433,7 +545,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerUserDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -472,7 +591,24 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CustomerSignedInDto"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CustomerRegistrationRequiredDto"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CustomerPhoneRequiredDto"
+                    }
+                  ]
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -678,10 +814,18 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "example": "mant"
+                }
+              }
+            }
           }
         },
-        "summary": "Method: get slug",
+        "summary": "Slug of an active venue by organization id (UUID), as plain text; 404 otherwise",
         "tags": [
           "Organization"
         ]
@@ -710,10 +854,17 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicOrganizationDto"
+                }
+              }
+            }
           }
         },
-        "summary": "Method: get one",
+        "summary": "Public QR menu of an active venue (only public fields; 404 for unknown or inactive)",
         "tags": [
           "Organization"
         ]
@@ -1744,7 +1895,14 @@
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderViewDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1772,7 +1930,17 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OrderViewDto"
+                  }
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1810,7 +1978,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderViewDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1848,7 +2023,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderViewDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1886,7 +2068,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderViewDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1940,7 +2129,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffOrderListDto"
+                }
+              }
+            }
           }
         },
         "summary": "Buyurtmalar ro'yxati (yangilari birinchi, cursor pagination)",
@@ -1964,7 +2160,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffOrderViewDto"
+                }
+              }
+            }
           }
         },
         "summary": "Buyurtma tafsiloti (mijoz, status tarixi bilan)",
@@ -1998,7 +2201,14 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffOrderViewDto"
+                }
+              }
+            }
           }
         },
         "summary": "Qabul qilish (ixtiyoriy: ETA)",
@@ -2032,7 +2242,14 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffOrderViewDto"
+                }
+              }
+            }
           }
         },
         "summary": "Rad etish (to'langan bo'lsa pul qaytariladi)",
@@ -2056,7 +2273,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffOrderViewDto"
+                }
+              }
+            }
           }
         },
         "summary": "Keyingi bosqichga o'tkazish (tayyorlanmoqda → yo'lda/tayyor → yakunlandi)",
@@ -2090,7 +2314,14 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffOrderViewDto"
+                }
+              }
+            }
           }
         },
         "summary": "Aniq holatga o'tkazish (holatlar mashinasi ruxsat bergan taqdirda)",
@@ -2825,6 +3056,173 @@
           "password"
         ]
       },
+      "StaffFileDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "url"
+        ]
+      },
+      "StaffOrganizationTranslationDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "lang": {
+            "type": "string",
+            "example": "ru"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "lang",
+          "description"
+        ]
+      },
+      "StaffOrganizationDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string",
+            "nullable": true
+          },
+          "type": {
+            "type": "string",
+            "example": "restaurant"
+          },
+          "is_active": {
+            "type": "boolean"
+          },
+          "logo": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StaffFileDto"
+              }
+            ]
+          },
+          "banner": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StaffFileDto"
+              }
+            ]
+          },
+          "translations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StaffOrganizationTranslationDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "type",
+          "is_active"
+        ]
+      },
+      "StaffUserDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "example": "+998901234567"
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "first_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "last_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "url": {
+            "type": "string",
+            "nullable": true,
+            "description": "Avatar URL"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "avatar_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "organization": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StaffOrganizationDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "phone",
+          "email",
+          "first_name",
+          "last_name",
+          "url",
+          "isActive",
+          "created_at",
+          "avatar_id"
+        ]
+      },
+      "StaffLoginResponseDto": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "description": "JWT, send as Authorization: Bearer (lifetime JWT_ACCESS_TOKEN_EXPIRATION_TIME)"
+          },
+          "refreshToken": {
+            "type": "string",
+            "description": "Opaque, single use: POST /auth/refresh rotates it, POST /auth/logout revokes it"
+          },
+          "user": {
+            "$ref": "#/components/schemas/StaffUserDto"
+          }
+        },
+        "required": [
+          "accessToken",
+          "refreshToken",
+          "user"
+        ]
+      },
       "StaffRegisterDto": {
         "type": "object",
         "properties": {
@@ -2872,6 +3270,35 @@
           "first_name"
         ]
       },
+      "StaffRegisterResponseDto": {
+        "type": "object",
+        "properties": {
+          "registrationId": {
+            "type": "string",
+            "description": "Pass to check-code and resend-code"
+          },
+          "resendAfter": {
+            "type": "number",
+            "example": 60,
+            "description": "Seconds until a new code may be requested"
+          },
+          "codeLength": {
+            "type": "number",
+            "example": 6
+          },
+          "expiresIn": {
+            "type": "number",
+            "example": 300,
+            "description": "Code lifetime in seconds"
+          }
+        },
+        "required": [
+          "registrationId",
+          "resendAfter",
+          "codeLength",
+          "expiresIn"
+        ]
+      },
       "StaffCheckCodeDto": {
         "type": "object",
         "properties": {
@@ -2891,6 +3318,34 @@
           "code"
         ]
       },
+      "StaffCheckCodeResponseDto": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "description": "JWT, send as Authorization: Bearer (lifetime JWT_ACCESS_TOKEN_EXPIRATION_TIME)"
+          },
+          "refreshToken": {
+            "type": "string",
+            "description": "Opaque, single use: POST /auth/refresh rotates it, POST /auth/logout revokes it"
+          },
+          "user": {
+            "$ref": "#/components/schemas/StaffUserDto"
+          },
+          "success": {
+            "type": "number",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "accessToken",
+          "refreshToken",
+          "user",
+          "success"
+        ]
+      },
       "StaffRegistrationRefDto": {
         "type": "object",
         "properties": {
@@ -2902,6 +3357,149 @@
         },
         "required": [
           "registrationId"
+        ]
+      },
+      "StaffResendCodeResponseDto": {
+        "type": "object",
+        "properties": {
+          "resendAfter": {
+            "type": "number",
+            "example": 60
+          },
+          "expiresIn": {
+            "type": "number",
+            "example": 300
+          }
+        },
+        "required": [
+          "resendAfter",
+          "expiresIn"
+        ]
+      },
+      "StaffRefreshDto": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "description": "Refresh token from login, check-code or the previous refresh (single use)"
+          }
+        },
+        "required": [
+          "refreshToken"
+        ]
+      },
+      "StaffTokenPairDto": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "description": "JWT, send as Authorization: Bearer (lifetime JWT_ACCESS_TOKEN_EXPIRATION_TIME)"
+          },
+          "refreshToken": {
+            "type": "string",
+            "description": "Opaque, single use: POST /auth/refresh rotates it, POST /auth/logout revokes it"
+          }
+        },
+        "required": [
+          "accessToken",
+          "refreshToken"
+        ]
+      },
+      "StaffLogoutDto": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string"
+          }
+        }
+      },
+      "CustomerUserDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "example": "+998901234567"
+          },
+          "name": {
+            "type": "string",
+            "example": "Ali"
+          }
+        },
+        "required": [
+          "id",
+          "phone",
+          "name"
+        ]
+      },
+      "CustomerSignedInDto": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "description": "JWT, send as Authorization: Bearer"
+          },
+          "refreshToken": {
+            "type": "string",
+            "description": "Opaque, single use: POST /auth/customer/refresh rotates it"
+          },
+          "user": {
+            "$ref": "#/components/schemas/CustomerUserDto"
+          },
+          "isNewUser": {
+            "type": "number",
+            "enum": [
+              false
+            ]
+          }
+        },
+        "required": [
+          "accessToken",
+          "refreshToken",
+          "user",
+          "isNewUser"
+        ]
+      },
+      "CustomerRegistrationRequiredDto": {
+        "type": "object",
+        "properties": {
+          "isNewUser": {
+            "type": "number",
+            "enum": [
+              true
+            ]
+          },
+          "registrationToken": {
+            "type": "string",
+            "description": "One-time token for POST /auth/customer/register"
+          }
+        },
+        "required": [
+          "isNewUser",
+          "registrationToken"
+        ]
+      },
+      "CustomerPhoneRequiredDto": {
+        "type": "object",
+        "properties": {
+          "isNewUser": {
+            "type": "number",
+            "enum": [
+              true
+            ]
+          },
+          "requiresPhone": {
+            "type": "number",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "isNewUser",
+          "requiresPhone"
         ]
       },
       "CustomerOtpRequestDto": {
@@ -3040,6 +3638,26 @@
           "isNewUser": {
             "type": "boolean",
             "description": "verified only"
+          },
+          "accessToken": {
+            "type": "string",
+            "description": "verified, isNewUser false"
+          },
+          "refreshToken": {
+            "type": "string",
+            "description": "verified, isNewUser false"
+          },
+          "user": {
+            "description": "verified, isNewUser false",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CustomerUserDto"
+              }
+            ]
+          },
+          "registrationToken": {
+            "type": "string",
+            "description": "verified, isNewUser true: finish with POST /auth/customer/register"
           }
         },
         "required": [
@@ -3066,6 +3684,27 @@
           "name"
         ]
       },
+      "CustomerSessionDto": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "description": "JWT, send as Authorization: Bearer"
+          },
+          "refreshToken": {
+            "type": "string",
+            "description": "Opaque, single use: POST /auth/customer/refresh rotates it"
+          },
+          "user": {
+            "$ref": "#/components/schemas/CustomerUserDto"
+          }
+        },
+        "required": [
+          "accessToken",
+          "refreshToken",
+          "user"
+        ]
+      },
       "CustomerRefreshDto": {
         "type": "object",
         "properties": {
@@ -3074,6 +3713,23 @@
           }
         },
         "required": [
+          "refreshToken"
+        ]
+      },
+      "CustomerTokenPairDto": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "description": "JWT, send as Authorization: Bearer"
+          },
+          "refreshToken": {
+            "type": "string",
+            "description": "Opaque, single use: POST /auth/customer/refresh rotates it"
+          }
+        },
+        "required": [
+          "accessToken",
           "refreshToken"
         ]
       },
@@ -3143,6 +3799,291 @@
         "required": [
           "oldPassword",
           "newPassword"
+        ]
+      },
+      "PublicFileDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "url"
+        ]
+      },
+      "DescriptionTranslationDto": {
+        "type": "object",
+        "properties": {
+          "lang": {
+            "type": "string",
+            "example": "ru"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "lang",
+          "description"
+        ]
+      },
+      "TitleTranslationDto": {
+        "type": "object",
+        "properties": {
+          "lang": {
+            "type": "string",
+            "example": "ru"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "lang",
+          "title"
+        ]
+      },
+      "ProductTranslationDto": {
+        "type": "object",
+        "properties": {
+          "lang": {
+            "type": "string",
+            "example": "ru"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "lang",
+          "title",
+          "description"
+        ]
+      },
+      "PublicModifierDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "price": {
+            "type": "number"
+          },
+          "translations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TitleTranslationDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "price",
+          "translations"
+        ]
+      },
+      "PublicModifierGroupDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "is_required": {
+            "type": "boolean"
+          },
+          "is_multiple": {
+            "type": "boolean"
+          },
+          "min_selected": {
+            "type": "number",
+            "nullable": true
+          },
+          "max_selected": {
+            "type": "number",
+            "nullable": true
+          },
+          "translations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TitleTranslationDto"
+            }
+          },
+          "additional_products": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicModifierDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "is_required",
+          "is_multiple",
+          "min_selected",
+          "max_selected",
+          "translations",
+          "additional_products"
+        ]
+      },
+      "PublicProductDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "price": {
+            "type": "number"
+          },
+          "weight": {
+            "type": "number",
+            "nullable": true
+          },
+          "protein": {
+            "type": "number",
+            "nullable": true
+          },
+          "kcal": {
+            "type": "number",
+            "nullable": true
+          },
+          "fat": {
+            "type": "number",
+            "nullable": true
+          },
+          "carbohydrate": {
+            "type": "number",
+            "nullable": true
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "gr",
+              "ml"
+            ]
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicFileDto"
+            }
+          },
+          "translations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductTranslationDto"
+            }
+          },
+          "additional_product_groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicModifierGroupDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "price",
+          "weight",
+          "protein",
+          "kcal",
+          "fat",
+          "carbohydrate",
+          "unit",
+          "images",
+          "translations",
+          "additional_product_groups"
+        ]
+      },
+      "PublicCategoryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "translations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TitleTranslationDto"
+            }
+          },
+          "products": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicProductDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "translations",
+          "products"
+        ]
+      },
+      "PublicOrganizationDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string",
+            "nullable": true
+          },
+          "type": {
+            "type": "string",
+            "example": "restaurant"
+          },
+          "logo": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PublicFileDto"
+              }
+            ]
+          },
+          "banner": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PublicFileDto"
+              }
+            ]
+          },
+          "translations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DescriptionTranslationDto"
+            }
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicCategoryDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "type",
+          "logo",
+          "banner",
+          "translations",
+          "categories"
         ]
       },
       "UpdateOrganizationDto": {
@@ -3572,8 +4513,7 @@
           },
           "isOpen": {
             "type": "boolean",
-            "nullable": true,
-            "description": "null: no working hours set"
+            "description": "false also when no working hours are set (hours is then an empty string)"
           },
           "opensAt": {
             "type": "string",
@@ -4113,6 +5053,479 @@
           "phone",
           "paymentMethod",
           "items"
+        ]
+      },
+      "OrderBranchDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "address"
+        ]
+      },
+      "OrderPaymentDto": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "nullable": true,
+            "description": "Payment link, only in awaiting_payment"
+          },
+          "expiresAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "failReason": {
+            "type": "string",
+            "enum": [
+              "declined",
+              "expired",
+              "cancelled"
+            ],
+            "nullable": true,
+            "description": "Only in payment_failed"
+          }
+        },
+        "required": [
+          "url",
+          "expiresAt",
+          "failReason"
+        ]
+      },
+      "OrderViewDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "number": {
+            "type": "number",
+            "example": 1001
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "awaiting_payment",
+              "payment_failed",
+              "pending_acceptance",
+              "accepted",
+              "preparing",
+              "on_the_way",
+              "ready",
+              "completed",
+              "cancelled"
+            ]
+          },
+          "fulfillmentMode": {
+            "type": "string",
+            "enum": [
+              "delivery",
+              "pickup"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "branchId": {
+            "type": "string"
+          },
+          "branch": {
+            "$ref": "#/components/schemas/OrderBranchDto"
+          },
+          "address": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true,
+            "description": "Delivery address snapshot (null for pickup)"
+          },
+          "phone": {
+            "type": "string",
+            "example": "+998901234567"
+          },
+          "comment": {
+            "type": "string"
+          },
+          "paymentMethod": {
+            "type": "string",
+            "enum": [
+              "cash",
+              "click",
+              "payme"
+            ]
+          },
+          "paymentStatus": {
+            "type": "string",
+            "enum": [
+              "not_required",
+              "pending",
+              "paid",
+              "failed",
+              "cancelled",
+              "refund_pending",
+              "refunded"
+            ]
+          },
+          "payment": {
+            "nullable": true,
+            "description": "null for cash",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OrderPaymentDto"
+              }
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderItemDto"
+            }
+          },
+          "currency": {
+            "type": "string",
+            "example": "UZS"
+          },
+          "subtotal": {
+            "type": "number"
+          },
+          "serviceFee": {
+            "type": "number"
+          },
+          "discount": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          },
+          "etaMinutes": {
+            "example": [
+              30,
+              45
+            ],
+            "description": "[min, max] minutes",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "cancelledBy": {
+            "type": "string",
+            "enum": [
+              "customer",
+              "restaurant",
+              "system"
+            ],
+            "nullable": true
+          },
+          "cancelReason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "status",
+          "fulfillmentMode",
+          "createdAt",
+          "branchId",
+          "branch",
+          "address",
+          "phone",
+          "comment",
+          "paymentMethod",
+          "paymentStatus",
+          "payment",
+          "items",
+          "currency",
+          "subtotal",
+          "serviceFee",
+          "discount",
+          "total",
+          "etaMinutes",
+          "cancelledBy",
+          "cancelReason"
+        ]
+      },
+      "OrderCustomerDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "example": "+998901234567"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "phone"
+        ]
+      },
+      "OrderEventDto": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "enum": [
+              "awaiting_payment",
+              "payment_failed",
+              "pending_acceptance",
+              "accepted",
+              "preparing",
+              "on_the_way",
+              "ready",
+              "completed",
+              "cancelled"
+            ],
+            "nullable": true
+          },
+          "to": {
+            "type": "string",
+            "enum": [
+              "awaiting_payment",
+              "payment_failed",
+              "pending_acceptance",
+              "accepted",
+              "preparing",
+              "on_the_way",
+              "ready",
+              "completed",
+              "cancelled"
+            ]
+          },
+          "actor": {
+            "type": "string",
+            "enum": [
+              "customer",
+              "restaurant",
+              "system",
+              "payment"
+            ]
+          },
+          "actorId": {
+            "type": "string",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "actor",
+          "actorId",
+          "note",
+          "at"
+        ]
+      },
+      "StaffOrderViewDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "number": {
+            "type": "number",
+            "example": 1001
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "awaiting_payment",
+              "payment_failed",
+              "pending_acceptance",
+              "accepted",
+              "preparing",
+              "on_the_way",
+              "ready",
+              "completed",
+              "cancelled"
+            ]
+          },
+          "fulfillmentMode": {
+            "type": "string",
+            "enum": [
+              "delivery",
+              "pickup"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "branchId": {
+            "type": "string"
+          },
+          "branch": {
+            "$ref": "#/components/schemas/OrderBranchDto"
+          },
+          "address": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true,
+            "description": "Delivery address snapshot (null for pickup)"
+          },
+          "phone": {
+            "type": "string",
+            "example": "+998901234567"
+          },
+          "comment": {
+            "type": "string"
+          },
+          "paymentMethod": {
+            "type": "string",
+            "enum": [
+              "cash",
+              "click",
+              "payme"
+            ]
+          },
+          "paymentStatus": {
+            "type": "string",
+            "enum": [
+              "not_required",
+              "pending",
+              "paid",
+              "failed",
+              "cancelled",
+              "refund_pending",
+              "refunded"
+            ]
+          },
+          "payment": {
+            "nullable": true,
+            "description": "null for cash",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OrderPaymentDto"
+              }
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderItemDto"
+            }
+          },
+          "currency": {
+            "type": "string",
+            "example": "UZS"
+          },
+          "subtotal": {
+            "type": "number"
+          },
+          "serviceFee": {
+            "type": "number"
+          },
+          "discount": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          },
+          "etaMinutes": {
+            "example": [
+              30,
+              45
+            ],
+            "description": "[min, max] minutes",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "cancelledBy": {
+            "type": "string",
+            "enum": [
+              "customer",
+              "restaurant",
+              "system"
+            ],
+            "nullable": true
+          },
+          "cancelReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "customer": {
+            "$ref": "#/components/schemas/OrderCustomerDto"
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderEventDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "status",
+          "fulfillmentMode",
+          "createdAt",
+          "branchId",
+          "branch",
+          "address",
+          "phone",
+          "comment",
+          "paymentMethod",
+          "paymentStatus",
+          "payment",
+          "items",
+          "currency",
+          "subtotal",
+          "serviceFee",
+          "discount",
+          "total",
+          "etaMinutes",
+          "cancelledBy",
+          "cancelReason",
+          "customer",
+          "events"
+        ]
+      },
+      "StaffOrderListDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StaffOrderViewDto"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true,
+            "description": "Pass as ?cursor= for the next page"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
         ]
       },
       "AcceptOrderDto": {
