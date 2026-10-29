@@ -82,6 +82,11 @@ describe('TenantService.resolve', () => {
     expect(await code(service.resolve(BARE))).toBe('settings_missing');
   });
 
+  it('reports an inactive venue as inactive even without settings', async () => {
+    orgs[1].settings = null;
+    expect(await code(service.resolve(OFF))).toBe('tenant_inactive');
+  });
+
   it('drops unknown language codes stored in the settings', async () => {
     orgs[0].settings = { ...SETTINGS, languages: ['uz', 'kk', 'ru'] };
     await expect(service.resolve(ID)).resolves.toMatchObject({

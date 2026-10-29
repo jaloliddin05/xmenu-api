@@ -18,6 +18,7 @@ import { BranchModule } from './modules/branch/branch.module';
 import { MenuModule } from './modules/menu/menu.module';
 import { OrderModule } from './modules/order/order.module';
 import { PaymentModule } from './modules/payment/payment.module';
+import { TenantConfigModule } from './modules/tenant/tenant-config.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -39,6 +40,7 @@ import { PaymentModule } from './modules/payment/payment.module';
     ProductModule,
     RedisModule,
     SmsModule,
+    TenantConfigModule,
     TranslationModule,
     UserModule
   ],

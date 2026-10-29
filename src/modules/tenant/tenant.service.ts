@@ -23,7 +23,7 @@ export class TenantService {
   private readonly logger = new Logger(TenantService.name);
   private cache = new Map<
     string,
-    { at: number; tenant: Tenant | null; active: boolean }
+    { at: number; found: boolean; active: boolean; tenant: Tenant | null }
   >();
 
   constructor(private readonly prisma: PrismaService) {}
@@ -48,37 +48,37 @@ export class TenantService {
           },
         },
       });
-      // The settings row is created at signup; a missing one is a data bug, not a default
-      if (org && !org.settings) {
-        this.logger.error(
-          `organization_settings row missing for organization ${id}`,
-        );
-        throw new CustomerAuthException(
-          'settings_missing',
-          'Venue settings are missing',
-        );
-      }
       entry = {
         at: Date.now(),
-        tenant:
-          org && org.settings
-            ? {
-                id: org.id,
-                slug: org.slug ?? '',
-                brandName: org.name,
-                defaultLanguage: org.settings.default_language as Lang,
-                languages: org.settings.languages.filter(isLang),
-                currency: org.settings.currency,
-              }
-            : null,
+        found: !!org,
         active: !!org?.is_active,
+        tenant: org?.settings
+          ? {
+              id: org.id,
+              slug: org.slug ?? '',
+              brandName: org.name,
+              defaultLanguage: org.settings.default_language as Lang,
+              languages: org.settings.languages.filter(isLang),
+              currency: org.settings.currency,
+            }
+          : null,
       };
       if (this.cache.size > 1000) this.cache.clear();
       this.cache.set(id, entry);
     }
 
-    if (!entry.tenant) throw new CustomerAuthException('tenant_not_found');
+    if (!entry.found) throw new CustomerAuthException('tenant_not_found');
     if (!entry.active) throw new CustomerAuthException('tenant_inactive');
+    // The settings row is created at signup; a missing one is a data bug, not a default
+    if (!entry.tenant) {
+      this.logger.error(
+        `organization_settings row missing for organization ${id}`,
+      );
+      throw new CustomerAuthException(
+        'settings_missing',
+        'Venue settings are missing',
+      );
+    }
     return entry.tenant;
   }
 
