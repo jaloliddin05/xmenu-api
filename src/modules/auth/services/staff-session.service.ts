@@ -106,7 +106,11 @@ export class StaffSessionService {
     refreshToken: string,
     ctx: RequestCtx,
   ): Promise<StaffTokenPair> {
-    const invalid = () => new CustomerAuthException('invalid_refresh_token');
+    const invalid = () =>
+      new CustomerAuthException(
+        'invalid_refresh_token',
+        'Refresh token is invalid, expired or already used',
+      );
     const now = new Date();
 
     const session = await this.prisma.staff_session.findUnique({
@@ -178,7 +182,10 @@ export class StaffSessionService {
       userId: session.user_id,
       meta: { family_id: session.family_id },
     });
-    throw new CustomerAuthException('invalid_refresh_token');
+    throw new CustomerAuthException(
+      'invalid_refresh_token',
+      'Refresh token is invalid, expired or already used',
+    );
   }
 
   /** POST /auth/logout: always succeeds; an unknown token is ignored. */
