@@ -23,13 +23,11 @@ Slug организации уникален в БД, поэтому ключ о
 `route` по умолчанию `menu`; поля payload добавляются на верхний уровень, затем `secret`.
 
 ## Что читает QR (`xmenu-qr/src/app/api/revalidate/route.js`)
-`{ route, slug, secret, data }`. Для `route: 'menu'` сбрасывает `/{locale}/{slug}` по трём языкам. Для
-`route: 'organization'` читает `data.id`, `data.oldSlug`, `data.newSlug`.
-
-## Известное расхождение (Q-01, чинится в QR)
-Бэкенд кладёт `id`, `oldSlug`, `newSlug` на верхний уровень, а QR ждёт их в `data`. При смене slug `data` пуст, QR
-падает с 500, задание повторяется (5 попыток, экспоненциальная пауза). Формат тела здесь не меняется: правка должна
-быть в QR (принимать оба варианта).
+`{ route, slug, secret, data }`; `id`, `slug`, `oldSlug`, `newSlug` принимаются и на верхнем уровне, и в `data`.
+Для `route: 'menu'` сбрасывает `/{locale}/{slug}` по трём языкам (нужен `slug`). Для `route: 'organization'`
+сбрасывает `/{locale}/organization/{id}`, `/{locale}/{oldSlug}` и `/{locale}/{newSlug}`; нужно хотя бы одно из
+`id`, `oldSlug`, `newSlug`. Ответы: 503 при пустом секрете, 401 при неверном, 400 при плохом теле.
 
 ## Окружение
-`NEXT_PUBLIC_URL` (адрес QR), `REVALIDATE_SECRET` (должен совпадать с QR; пустой секрет в QR пропускает любые запросы, Q-05).
+`NEXT_PUBLIC_URL` (адрес QR), `REVALIDATE_SECRET` (должен совпадать с QR; при пустом секрете QR отключает эндпоинт и
+отвечает 503, задания будут повторяться и падать).
