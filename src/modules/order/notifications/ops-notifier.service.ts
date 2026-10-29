@@ -3,7 +3,7 @@ import { TelegramApiService } from '../services/telegram-api.service';
 
 /**
  * Platforma jamoasiga (restoranga emas) signal: qo'lda aralashuv kerak bo'lgan
- * holatlar — avtomatik qaytarib bo'lmagan to'lov, ulanmagan robozvonok.
+ * holatlar — avtomatik qaytarib bo'lmagan to'lov, filialda SMS uchun telefon yo'qligi.
  * Chat: OPS_CHAT_ID, bo'lmasa XMENU_CHAT_ID (otp-bot.ts dagi jamoa guruhi).
  */
 @Injectable()

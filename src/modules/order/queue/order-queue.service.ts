@@ -11,8 +11,9 @@ export const REFUND_QUEUE = 'order-refunds';
  *
  *    45s   Telegramda takroriy ogohlantirish
  *   120s   filial telefoniga SMS
- *   180s   robozvonok (provayder ulanmagan — ops'ga xabar)
  *   300s   avtomatik bekor + qaytarish (acceptance_timeout_seconds)
+ *
+ * There is no robocall step: it was dropped from the chain on purpose.
  *
  * Har bir job bajarilganda buyurtma holatini QAYTA o'qiydi: qabul qilingan /
  * bekor qilingan bo'lsa hech narsa qilmaydi — shuning uchun jobni o'chirish
@@ -21,7 +22,6 @@ export const REFUND_QUEUE = 'order-refunds';
 export const ESCALATION_STEPS = [
   { name: 'ping', afterSeconds: 45 },
   { name: 'sms', afterSeconds: 120 },
-  { name: 'call', afterSeconds: 180 },
 ] as const;
 
 /**

@@ -72,9 +72,7 @@ export class EscalationProcessor implements OnModuleInit, OnModuleDestroy {
       }
 
       case 'esc-call':
-        if (order.status !== 'pending_acceptance') return;
-        // Robozvonok provayderi ulanmagan: jamoaga signal beramiz, 5 daqiqada avto-bekor baribir ishlaydi.
-        await this.ops.alert(`Заказ №${order.number} не принят уже 3 мин (робозвонок не подключён) — свяжитесь с филиалом`);
+        // Removed step (robocall). Jobs scheduled before it was dropped may still sit in Redis: ignore them.
         return;
 
       case 'esc-cancel':
