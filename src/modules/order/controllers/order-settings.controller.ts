@@ -6,6 +6,7 @@ import { PrismaService } from 'src/modules/_prisma/prisma.service';
 import { parseZone } from '../domain/order-money';
 import { UpdateOrderSettingsDto } from '../dto/order-settings.dto';
 import { OrderSettingsService } from '../services/order-settings.service';
+import { RevalidateService } from 'src/modules/revalidate-queue/revalidate.service';
 
 /** Restoran paneli: yetkazib berish narxi, minimal summa, zona, taymautlar. */
 @ApiTags('Order settings')
@@ -14,6 +15,7 @@ export class OrderSettingsController {
   constructor(
     private readonly settings: OrderSettingsService,
     private readonly prisma: PrismaService,
+    private readonly revalidate: RevalidateService,
   ) {}
 
   @Get()
@@ -53,6 +55,8 @@ export class OrderSettingsController {
       data,
     });
     this.settings.invalidate(organizationId);
+    // Fees, minimums, ETA and the zone are part of the delivery site's config
+    await this.revalidate.addRevalidationJob({ tenantId: organizationId, route: 'settings' });
     return this.settings.get(organizationId);
   }
 }

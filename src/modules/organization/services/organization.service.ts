@@ -223,7 +223,6 @@ export class OrganizationService {
     data: UpdateOrganizationDto,
     logo?: Express.Multer.File,
     banner?: Express.Multer.File,
-    slug?: string
   ) {
     // Ownership first: nothing (not even the logo/banner files) is touched for someone else's venue
     this.assertOwn(id, organizationId);
@@ -290,11 +289,13 @@ export class OrganizationService {
     // Name and slug feed the cached tenant (brand name in SMS, slug in /tenant/by-slug)
     this.tenants.invalidate(id);
 
-    if (data?.slug) {
-      await this.revalidateService.addRevalidationJob({id, newSlug:data?.slug, oldSlug: existing?.slug, route: 'organization'})
-    } else {
-      await this.revalidateService.addRevalidationJob({slug})
-    }
+    const slugChanged = data.slug !== undefined && data.slug !== existing.slug;
+    await this.revalidateService.addRevalidationJob({
+      tenantId: id,
+      route: 'organization',
+      slug: slugChanged ? data.slug : existing.slug,
+      oldSlug: slugChanged ? existing.slug : null,
+    });
 
     // 7️⃣ yangilangan ma’lumotni qaytarish
     return await this.prismaService.organization.findUnique({

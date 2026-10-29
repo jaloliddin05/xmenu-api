@@ -88,7 +88,7 @@ export class OrganizationController {
     {
     const banner = files?.banner?.[0];
     const logo = files?.logo?.[0];
-    return await this.organizationService.update(id, requireStaffOrganizationId(req), data, logo,banner, req?.user?.organization?.slug );
+    return await this.organizationService.update(id, requireStaffOrganizationId(req), data, logo, banner);
   }
 
   @Delete(':id')

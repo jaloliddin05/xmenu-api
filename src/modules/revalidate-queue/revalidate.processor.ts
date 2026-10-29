@@ -1,46 +1,50 @@
 import { Worker } from 'bullmq';
 import axios from 'axios';
-import { Injectable, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { redisConfig } from './bull.config';
-import { buildRevalidateBody, describeRevalidate } from './revalidate-job';
+import { buildClientBody, buildQrBody, describeRevalidate, RevalidateJob } from './revalidate-job';
+
+/** Where a job goes and what it sends; null when the target has nothing to do. */
+export function revalidateRequest(job: RevalidateJob, env = process.env): { url: string; body: object } | null {
+  if (job.target === 'client') {
+    const url = env.CLIENT_REVALIDATE_URL?.trim();
+    return url ? { url, body: buildClientBody(job.change, env.CLIENT_REVALIDATE_SECRET) } : null;
+  }
+  const body = buildQrBody(job.change, env.REVALIDATE_SECRET);
+  return body ? { url: `${env.NEXT_PUBLIC_URL}/api/revalidate`, body } : null;
+}
 
 @Injectable()
 export class RevalidateProcessor implements OnModuleDestroy {
+  private readonly logger = new Logger('Revalidate');
   private worker: Worker;
 
   constructor() {
     this.worker = new Worker(
       'revalidate-queue',
       async (job) => {
-        const { url } = job.data;
-        const what = describeRevalidate(url, job.id);
+        const data = job.data as RevalidateJob;
+        const what = describeRevalidate(data, job.id);
+        const request = data?.change ? revalidateRequest(data) : null;
+        if (!request) {
+          this.logger.log(`Skipped: ${what}`);
+          return { success: true, skipped: true };
+        }
 
         try {
-          console.log(`🔄 Revalidating: ${what}`);
-          const response = await axios.post(`${process.env.NEXT_PUBLIC_URL}/api/revalidate`,buildRevalidateBody(url, process.env.REVALIDATE_SECRET));
-
-          if (response.status === 200) {
-            console.log(`✅ Success: ${what}`);
-            return { success: true };
-          } else {
-            throw new Error(`Unexpected status: ${response.status}`);
-          }
+          const response = await axios.post(request.url, request.body);
+          if (response.status !== 200) throw new Error(`Unexpected status: ${response.status}`);
+          return { success: true };
         } catch (error) {
-          console.error(`❌ Failed revalidate ${what}:`, error.message);
-        //   await this.telegram.sendMessage(`❌ Ошибка ревалидации\nURL: ${url}\nОшибка: ${error.message}`);
+          this.logger.error(`Failed: ${what}: ${(error as Error).message}`);
           throw error;
         }
       },
       { connection: redisConfig }
     );
 
-    // Подписка на события очереди
-    this.worker.on('failed', (job, err) => {
-      console.error(`💥 Job failed for ${describeRevalidate(job?.data?.url ?? {}, job?.id)}:`, err.message);
-    });
-
     this.worker.on('completed', (job) => {
-      console.log(`🎉 Job completed for ${describeRevalidate(job.data.url ?? {}, job.id)}`);
+      this.logger.log(`Done: ${describeRevalidate(job.data ?? {}, job.id)}`);
     });
   }
 

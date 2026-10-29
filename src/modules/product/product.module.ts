@@ -4,10 +4,10 @@ import { ProductController } from './controllers/product.controller';
 import { PrismaModule } from '../_prisma/prisma.module';
 import { AdditionalProductService } from './services/additional-product.service';
 import { AdditionalProductController } from './controllers/additional-product.controller';
-import { BullModule } from '../revalidate-queue/revalidate.module';
+import { RevalidateModule } from '../revalidate-queue/revalidate.module';
 
 @Module({
-  imports:[PrismaModule,BullModule],
+  imports:[PrismaModule,RevalidateModule],
   controllers: [ProductController,AdditionalProductController],
   providers: [ProductService,AdditionalProductService],
   exports:[ProductService,AdditionalProductService]

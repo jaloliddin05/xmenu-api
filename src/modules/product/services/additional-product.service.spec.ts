@@ -39,6 +39,8 @@ describe('AdditionalProductService: organization ownership (IDOR)', () => {
         db.data.additional_product_group.find((r) => r.id === g.id)?.product_id,
       ).toBe(t.mine.product.id);
       expect(revalidate.addRevalidationJob).toHaveBeenCalledWith({
+        tenantId: t.mine.org.id,
+        route: 'menu',
         slug: 'mine',
       });
     });

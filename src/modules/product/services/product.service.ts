@@ -173,7 +173,7 @@ export class ProductService {
       });
     });
 
-    await this.revalidateService.addRevalidationJob({slug})
+    await this.revalidateService.addRevalidationJob({ tenantId: organizationId, route: 'menu', slug })
     return product
   }
 
@@ -224,7 +224,7 @@ export class ProductService {
       
     });
     
-    await this.revalidateService.addRevalidationJob({slug})
+    await this.revalidateService.addRevalidationJob({ tenantId: organizationId, route: 'menu', slug })
     return product
   }
 
@@ -269,7 +269,7 @@ export class ProductService {
       data: { index: newIndex },
     });
 
-    await this.revalidateService.addRevalidationJob({slug})
+    await this.revalidateService.addRevalidationJob({ tenantId: organizationId, route: 'menu', slug })
 
     return updated;
   }
@@ -277,14 +277,14 @@ export class ProductService {
   async updateIsActive(id: string, is_active: boolean, organizationId: string, slug: string) {
     await this.findOwnProduct(id, organizationId);
     const product = await this.prismaService.product.update({ where: { id }, data: { is_active } })
-    await this.revalidateService.addRevalidationJob({slug})
+    await this.revalidateService.addRevalidationJob({ tenantId: organizationId, route: 'menu', slug })
     return product;
   }
 
   async delete(id: string, organizationId: string, slug: string) {
     await this.findOwnProduct(id, organizationId);
     const product = await this.prismaService.product.delete({ where: { id } })
-    await this.revalidateService.addRevalidationJob({slug})
+    await this.revalidateService.addRevalidationJob({ tenantId: organizationId, route: 'menu', slug })
     return product
   }
 

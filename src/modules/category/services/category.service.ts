@@ -62,7 +62,7 @@ export class CategoryService {
       return newCategory;
     });
 
-    await this.revalidateService.addRevalidationJob({slug})
+    await this.revalidateService.addRevalidationJob({ tenantId: organizationId, route: 'menu', slug })
 
     return category;
   }
@@ -155,7 +155,7 @@ export class CategoryService {
       })
     );
 
-    await this.revalidateService.addRevalidationJob({slug})
+    await this.revalidateService.addRevalidationJob({ tenantId: organizationId, route: 'menu', slug })
 
     return this.prismaService.category.findUnique({
       where: { id },
@@ -203,7 +203,7 @@ export class CategoryService {
       data: { index: newIndex },
     });
 
-    await this.revalidateService.addRevalidationJob({slug})
+    await this.revalidateService.addRevalidationJob({ tenantId: organizationId, route: 'menu', slug })
 
     return updated;
   }
@@ -211,14 +211,14 @@ export class CategoryService {
   async updateIsActive(id: string, is_active: boolean, organizationId: string, slug:string) {
     await this.findOwnCategory(id, organizationId);
     const category = await this.prismaService.category.update({ where: { id }, data: { is_active } })
-    await this.revalidateService.addRevalidationJob({slug})
+    await this.revalidateService.addRevalidationJob({ tenantId: organizationId, route: 'menu', slug })
     return category
   }
 
   async delete(id: string, organizationId: string, slug:string) {
     await this.findOwnCategory(id, organizationId);
     const category =  await this.prismaService.category.delete({ where: { id } })
-    await this.revalidateService.addRevalidationJob({slug})
+    await this.revalidateService.addRevalidationJob({ tenantId: organizationId, route: 'menu', slug })
     return category
   }
 }

@@ -3,6 +3,7 @@ import { fieldErrorsException } from 'src/infra/validators/validation-errors';
 import { PrismaService } from '../../_prisma/prisma.service';
 import { CustomerAuthException } from 'src/modules/auth/errors/customer-auth.exception';
 import { TenantService } from 'src/modules/tenant/tenant.service';
+import { RevalidateService } from 'src/modules/revalidate-queue/revalidate.service';
 import {
   OrganizationSettings,
   settingsProblems,
@@ -18,6 +19,7 @@ export class OrganizationSettingsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tenants: TenantService,
+    private readonly revalidate: RevalidateService,
   ) {}
 
   async get(organizationId: string): Promise<OrganizationSettings> {
@@ -42,6 +44,7 @@ export class OrganizationSettingsService {
     });
     // Customer endpoints read language and currency from the cached tenant
     this.tenants.invalidate(organizationId);
+    await this.revalidate.addRevalidationJob({ tenantId: organizationId, route: 'settings' });
     return toSettingsView(row);
   }
 

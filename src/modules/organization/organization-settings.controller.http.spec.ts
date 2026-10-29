@@ -6,6 +6,7 @@ import { PrismaService } from '../_prisma/prisma.service';
 import { FileService } from '../file/file.service';
 import { RevalidateService } from '../revalidate-queue/revalidate.service';
 import { TenantService } from '../tenant/tenant.service';
+import { RevalidateService } from '../revalidate-queue/revalidate.service';
 import { OrganizationSettingsController } from './organization-settings.controller';
 import { OrganizationService } from './services/organization.service';
 import { OrganizationSettingsService } from './services/organization-settings.service';
@@ -56,6 +57,7 @@ describe('GET/PUT /organization/:id/settings', () => {
   let app: INestApplication;
   let rows: Record<string, any>;
   const invalidate = jest.fn();
+  const addRevalidationJob = jest.fn();
   const A = `Bearer ${staffToken('owner-a')}`;
   const NO_ORG = `Bearer ${staffToken('no-org')}`;
 
@@ -85,6 +87,7 @@ describe('GET/PUT /organization/:id/settings', () => {
           { provide: FileService, useValue: {} },
           { provide: RevalidateService, useValue: {} },
           { provide: TenantService, useValue: { invalidate } },
+          { provide: RevalidateService, useValue: { addRevalidationJob } },
         ],
       },
       [
@@ -98,6 +101,7 @@ describe('GET/PUT /organization/:id/settings', () => {
   beforeEach(() => {
     rows = { [ORG_A]: emptyRow(ORG_A), [ORG_B]: emptyRow(ORG_B) };
     invalidate.mockClear();
+    addRevalidationJob.mockClear();
   });
 
   const get = (auth = A, id = ORG_A) => {
@@ -136,6 +140,7 @@ describe('GET/PUT /organization/:id/settings', () => {
     const res = await put(VALID).expect(200);
     expect(res.body).toEqual({ ...VALID, supportTelegram: 'demo_cafe' });
     expect(invalidate).toHaveBeenCalledWith(ORG_A);
+    expect(addRevalidationJob).toHaveBeenCalledWith({ tenantId: ORG_A, route: 'settings' });
 
     const again = await get().expect(200);
     expect(again.body).toEqual(res.body);
@@ -202,6 +207,7 @@ describe('GET/PUT /organization/:id/settings', () => {
     await put({ ...VALID, ...patch }).expect(400);
     expect(rows[ORG_A].city).toBeNull();
     expect(invalidate).not.toHaveBeenCalled();
+    expect(addRevalidationJob).not.toHaveBeenCalled();
   });
 
   it.each([

@@ -73,7 +73,7 @@ export class AdditionalProductService {
     });
 
     if(dto?.product_id){
-      await this.revalidateService.addRevalidationJob({slug})
+      await this.revalidateService.addRevalidationJob({ tenantId: organizationId, route: 'menu', slug })
     }
 
     return add_prod_group
@@ -105,7 +105,7 @@ export class AdditionalProductService {
     });
 
     if(add_prod?.additional_product_group?.product?.id){
-      await this.revalidateService.addRevalidationJob({slug})
+      await this.revalidateService.addRevalidationJob({ tenantId: organizationId, route: 'menu', slug })
     }
 
     return add_prod
@@ -145,7 +145,7 @@ export class AdditionalProductService {
     });
 
     if(group?.product?.id){
-      await this.revalidateService.addRevalidationJob({slug})
+      await this.revalidateService.addRevalidationJob({ tenantId: organizationId, route: 'menu', slug })
     }
 
     return add_prod_group
@@ -188,7 +188,7 @@ export class AdditionalProductService {
     });
 
     if(product?.additional_product_group?.product?.id){
-      await this.revalidateService.addRevalidationJob({slug})
+      await this.revalidateService.addRevalidationJob({ tenantId: organizationId, route: 'menu', slug })
     }
 
     return add_prod
@@ -198,7 +198,7 @@ export class AdditionalProductService {
     await this.findOwnGroup(id, organizationId);
     const add_prod_gr = await this.prismaService.additional_product_group.delete({ where: { id }, include: { product: true } })
     if(add_prod_gr?.product?.id){
-      await this.revalidateService.addRevalidationJob({slug})
+      await this.revalidateService.addRevalidationJob({ tenantId: organizationId, route: 'menu', slug })
     }
     return add_prod_gr
 
@@ -208,7 +208,7 @@ export class AdditionalProductService {
     await this.findOwnOption(id, organizationId);
     const add_prod = await this.prismaService.additional_product.delete({ where: { id }, include: { additional_product_group: { include: { product: true } } } })
     if(add_prod?.additional_product_group?.product?.id){
-      await this.revalidateService.addRevalidationJob({slug})
+      await this.revalidateService.addRevalidationJob({ tenantId: organizationId, route: 'menu', slug })
     }
     return add_prod
   }

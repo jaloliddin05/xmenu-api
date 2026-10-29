@@ -3,6 +3,7 @@ import { PrismaService } from 'src/modules/_prisma/prisma.service';
 import { Lang } from 'src/infra/http/request-helpers';
 import { evaluateOpenState, formatHours, hasSchedule, OpenState } from '../domain/branch-hours';
 import { BranchWithSchedule, toSchedule } from './branch-schedule.mapper';
+import { RevalidateService } from 'src/modules/revalidate-queue/revalidate.service';
 import { CreateBranchDto, SetWorkingHoursDto, UpdateBranchDto, CreateHoursExceptionDto } from '../dto/branch.dto';
 
 const withSchedule = {
@@ -44,7 +45,16 @@ export function toBranchView(b: BranchWithSchedule, lang: Lang, now = new Date()
 
 @Injectable()
 export class BranchService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly revalidate: RevalidateService,
+  ) {}
+
+  /** Branch list, hours and open state are shown by the delivery site. */
+  private async changed<T>(organizationId: string, result: T): Promise<T> {
+    await this.revalidate.addRevalidationJob({ tenantId: organizationId, route: 'branches' });
+    return result;
+  }
 
   /** Mijoz uchun: faqat faol filiallar, admin belgilagan tartibda. */
   async listPublic(organizationId: string, lang: Lang): Promise<BranchView[]> {
@@ -93,8 +103,8 @@ export class BranchService {
     return rows;
   }
 
-  create(organizationId: string, dto: CreateBranchDto) {
-    return this.prisma.branch.create({
+  async create(organizationId: string, dto: CreateBranchDto) {
+    const branch = await this.prisma.branch.create({
       data: {
         organization_id: organizationId,
         title: dto.title,
@@ -109,11 +119,12 @@ export class BranchService {
         telegram_chat_id: dto.telegramChatId,
       },
     });
+    return this.changed(organizationId, branch);
   }
 
   async update(organizationId: string, id: string, dto: UpdateBranchDto) {
     await this.requireOwn(organizationId, id);
-    return this.prisma.branch.update({
+    const branch = await this.prisma.branch.update({
       where: { id },
       data: {
         title: dto.title,
@@ -129,6 +140,7 @@ export class BranchService {
         telegram_chat_id: dto.telegramChatId,
       },
     });
+    return this.changed(organizationId, branch);
   }
 
   /** Haftalik jadvalni to'liq almashtiradi (PUT semantikasi). */
@@ -147,22 +159,27 @@ export class BranchService {
         })),
       }),
     ]);
-    return this.prisma.branch_working_hours.findMany({ where: { branch_id: id }, orderBy: { weekday: 'asc' } });
+    return this.changed(
+      organizationId,
+      await this.prisma.branch_working_hours.findMany({ where: { branch_id: id }, orderBy: { weekday: 'asc' } }),
+    );
   }
 
   async addException(organizationId: string, id: string, dto: CreateHoursExceptionDto) {
     await this.requireOwn(organizationId, id);
     const date = new Date(`${dto.date}T00:00:00Z`);
-    return this.prisma.branch_hours_exception.upsert({
+    const exception = await this.prisma.branch_hours_exception.upsert({
       where: { branch_id_date: { branch_id: id, date } },
       create: { branch_id: id, date, opens_at: dto.opensAt, closes_at: dto.closesAt, is_24h: dto.is24h ?? false, is_closed: dto.isClosed ?? false, note: dto.note },
       update: { opens_at: dto.opensAt, closes_at: dto.closesAt, is_24h: dto.is24h ?? false, is_closed: dto.isClosed ?? false, note: dto.note },
     });
+    return this.changed(organizationId, exception);
   }
 
   async removeException(organizationId: string, id: string, exceptionId: string) {
     await this.requireOwn(organizationId, id);
     await this.prisma.branch_hours_exception.deleteMany({ where: { id: exceptionId, branch_id: id } });
+    await this.changed(organizationId, undefined);
   }
 
   /**
@@ -174,10 +191,10 @@ export class BranchService {
     const orders = await this.prisma.customer_order.count({ where: { branch_id: id } });
     if (orders > 0) {
       await this.prisma.branch.update({ where: { id }, data: { is_active: false } });
-      return { deleted: false };
+      return this.changed(organizationId, { deleted: false });
     }
     await this.prisma.branch.delete({ where: { id } });
-    return { deleted: true };
+    return this.changed(organizationId, { deleted: true });
   }
 
   private async requireOwn(organizationId: string, id: string) {
