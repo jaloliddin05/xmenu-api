@@ -13,13 +13,13 @@ import { OrganizationService } from 'src/modules/organization/services/organizat
 import { CUSTOMER_AUTH_CONFIG } from '../customer-auth.config';
 import type { CustomerAuthConfig } from '../customer-auth.config';
 import { CustomerAuthException } from '../errors/customer-auth.exception';
-import { JwtTokenService } from '../jwt.service';
 import type { StaffRegisterDto } from '../dto/staff-register.dto';
 import { CustomerOtpService } from './customer-otp.service';
 import type { RequestCtx } from './customer-auth-event.service';
 import { RateLimitService } from './rate-limit.service';
 import { StaffAuthEventService } from './staff-auth-event.service';
 import { StaffLoginThrottleService } from './staff-login-throttle.service';
+import { StaffSessionService } from './staff-session.service';
 
 /** How long a signup waits for its phone code; every resend extends it. */
 export const PENDING_REGISTRATION_TTL_SECONDS = 1800;
@@ -59,7 +59,7 @@ export class StaffAuthService {
     private readonly rateLimit: RateLimitService,
     private readonly events: StaffAuthEventService,
     private readonly throttle: StaffLoginThrottleService,
-    private readonly tokens: JwtTokenService,
+    private readonly sessions: StaffSessionService,
     @Inject(REDIS) private readonly redis: Redis,
     @Inject(CUSTOMER_AUTH_CONFIG) private readonly cfg: CustomerAuthConfig,
   ) {}
@@ -165,8 +165,7 @@ export class StaffAuthService {
     return {
       success: true,
       user: toStaffUser(user),
-      accessToken: this.tokens.getJWT('access', user.id, 'user'),
-      refreshToken: this.tokens.getJWT('refresh', user.id, 'user'),
+      ...(await this.sessions.create(user.id, ctx)),
     };
   }
 
@@ -225,8 +224,7 @@ export class StaffAuthService {
       phone,
     });
     return {
-      accessToken: this.tokens.getJWT('access', user!.id, 'user'),
-      refreshToken: this.tokens.getJWT('refresh', user!.id, 'user'),
+      ...(await this.sessions.create(user!.id, ctx)),
       user: toStaffUser(user!),
     };
   }

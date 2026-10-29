@@ -5,7 +5,6 @@ import { IConfig } from './config.interface';
 dotenv.config();
 
 const DEFAULT_ACCESS_TOKEN_SECRET = 'defaultAccessTokenSecret';
-const DEFAULT_REFRESH_TOKEN_SECRET = 'defaultRefreshTokenSecret';
 
 // customer-auth.config.ts requires JWT_CUSTOMER_* in production and refuses
 // to boot without them. This (staff/org) config never got the same guard —
@@ -31,12 +30,6 @@ export default (): IConfig => ({
     accessTokenSecret: staffTokenSecret(
       'JWT_ACCESS_TOKEN_SECRET',
       DEFAULT_ACCESS_TOKEN_SECRET,
-    ),
-    refreshTokenExpiration:
-      process.env.JWT_REFRESH_TOKEN_EXPIRATION_TIME || '7d',
-    refreshTokenSecret: staffTokenSecret(
-      'JWT_REFRESH_TOKEN_SECRET',
-      DEFAULT_REFRESH_TOKEN_SECRET,
     ),
   },
 

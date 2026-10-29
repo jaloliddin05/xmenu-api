@@ -697,6 +697,31 @@ model translation_prompt {
   context   String   
   created_at DateTime @default(now())
 }// Audit log for owner (staff) auth. No FKs on purpose: records outlive deleted users and organizations.
+// Owner refresh-token sessions. Only the SHA-256 hash of the token is stored.
+// family_id: one login = one family; every refresh adds a row (rotation), reuse revokes the family.
+model staff_session {
+  id                String    @id @default(uuid())
+  family_id         String
+  family_started_at DateTime
+
+  user_id           String
+  user              user      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  token_hash        Bytes     @unique
+  parent_id         String?
+
+  created_at        DateTime  @default(now())
+  expires_at        DateTime
+  used_at           DateTime?
+  revoked_at        DateTime?
+
+  user_agent        String?
+  ip                String?
+
+  @@index([family_id])
+  @@index([user_id])
+}
+
 model staff_auth_event {
   id              BigInt   @id @default(autoincrement())
   user_id         String?
@@ -722,6 +747,7 @@ model user {
   isActive  Boolean @default(false) 
   created_at  DateTime    @default(now())
   organization organization?
+  sessions     staff_session[]
   avatar_id    String?      @unique
   avatar       file?        @relation(fields: [avatar_id], references: [id])
 }

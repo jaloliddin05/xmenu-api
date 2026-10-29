@@ -67,10 +67,7 @@ export function loadCustomerAuthConfig(): CustomerAuthConfig {
   if (accessSecret === registrationSecret) {
     throw new Error('JWT_CUSTOMER_ACCESS_SECRET va JWT_CUSTOMER_REGISTRATION_SECRET har xil bo\'lishi kerak');
   }
-  const staffSecrets = [
-    process.env.JWT_ACCESS_TOKEN_SECRET,
-    process.env.JWT_REFRESH_TOKEN_SECRET,
-  ].filter(Boolean);
+  const staffSecrets = [process.env.JWT_ACCESS_TOKEN_SECRET].filter(Boolean);
   if (staffSecrets.includes(accessSecret) || staffSecrets.includes(registrationSecret)) {
     throw new Error('Mijoz JWT secretlari xodimlar (user) secretlaridan farq qilishi kerak');
   }

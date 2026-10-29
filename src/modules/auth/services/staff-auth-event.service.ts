@@ -12,7 +12,9 @@ export type StaffAuthEventType =
   | 'staff_registered'
   | 'staff_login'
   | 'staff_login_failed'
-  | 'staff_login_locked';
+  | 'staff_login_locked'
+  | 'staff_logout'
+  | 'staff_refresh_reuse_detected';
 
 /** Owner auth audit: DB row + structured log. Codes, passwords, tokens and full phones are never written. */
 @Injectable()

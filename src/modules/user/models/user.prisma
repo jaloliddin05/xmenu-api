@@ -9,6 +9,7 @@ model user {
   isActive  Boolean @default(false) 
   created_at  DateTime    @default(now())
   organization organization?
+  sessions     staff_session[]
   avatar_id    String?      @unique
   avatar       file?        @relation(fields: [avatar_id], references: [id])
 }

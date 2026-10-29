@@ -6,7 +6,6 @@ import { UserModule } from '../user/user.module';
 import { AuthController } from './controllers/auth.controller';
 import { ConfigService } from '@nestjs/config';
 import { AccessTokenUserStrategy } from './passport-strategies/access-token-user/access-token-user.strategy';
-import { RefreshTokenUserStrategy } from './passport-strategies/refresh-token-user/refresh-token-user.strategy';
 import { OrganizationModule } from '../organization/organization.module';
 import { JwtTokenService } from './jwt.service';
 import { SmsModule } from '../sms/sms.module';
@@ -27,6 +26,7 @@ import { CustomerTokenService } from './services/customer-token.service';
 import { CustomerAuthEventService } from './services/customer-auth-event.service';
 import { StaffAuthEventService } from './services/staff-auth-event.service';
 import { StaffAuthService } from './services/staff-auth.service';
+import { StaffSessionService } from './services/staff-session.service';
 import { StaffLoginThrottleService } from './services/staff-login-throttle.service';
 import { CustomerCleanupService } from './services/customer-cleanup.service';
 import { RateLimitService } from './services/rate-limit.service';
@@ -60,6 +60,7 @@ import { NoStoreMiddleware } from './middleware/no-store.middleware';
   providers: [
     AuthService,
     StaffAuthService,
+    StaffSessionService,
     StaffLoginThrottleService,
     CustomerAuthService,
     { provide: CUSTOMER_AUTH_CONFIG, useFactory: loadCustomerAuthConfig },
@@ -74,7 +75,6 @@ import { NoStoreMiddleware } from './middleware/no-store.middleware';
     TelegramVerificationService,
     CustomerAccessTokenStrategy,
     AccessTokenUserStrategy,
-    RefreshTokenUserStrategy,
     JwtTokenService,
   ],
   controllers: [

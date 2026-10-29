@@ -1,8 +1,6 @@
 interface IJWT {
   accessTokenSecret: string;
   accessTokenExpiration: string;
-  refreshTokenSecret: string;
-  refreshTokenExpiration;
 }
 
 

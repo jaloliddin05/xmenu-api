@@ -156,9 +156,10 @@ export class FakeOrganizations {
   }
 }
 
-export class FakeJwt {
-  getJWT(type: string, sub: string) {
-    return `${type}:${sub}`;
+/** Stands in for StaffSessionService: deterministic tokens, no session table. */
+export class FakeStaffSessions {
+  async create(userId: string) {
+    return { accessToken: `access:${userId}`, refreshToken: `refresh:${userId}` };
   }
 }
 
@@ -181,6 +182,6 @@ export function makeStaffAuthDeps() {
     events,
     throttle,
     organizations: new FakeOrganizations(db),
-    jwt: new FakeJwt(),
+    sessions: new FakeStaffSessions(),
   };
 }

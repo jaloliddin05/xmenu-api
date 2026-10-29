@@ -2,22 +2,19 @@ import {
   Req,
   Controller,
   Post,
-  UseGuards,
   Body,
-  Res,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
 import express from 'express';
 import {
-  ApiForbiddenResponse,
   ApiNoContentResponse,
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
 
-import { AuthService } from '../services/auth.service';
 import { StaffAuthService } from '../services/staff-auth.service';
+import { StaffSessionService } from '../services/staff-session.service';
 import { LoginDto } from '../dto';
 import {
   StaffCheckCodeDto,
@@ -25,8 +22,7 @@ import {
   StaffRegistrationRefDto,
 } from '../dto/staff-register.dto';
 import { Public } from '../decorators/public.decorator';
-import { User } from '../../user/models/user.modal';
-import { RefreshTokenUserGuard } from '../passport-strategies/refresh-token-user/refresh-token-user.guard';
+import { StaffLogoutDto, StaffRefreshDto } from '../dto/staff-session.dto';
 import { requestCtx } from 'src/infra/http/request-helpers';
 
 
@@ -34,8 +30,8 @@ import { requestCtx } from 'src/infra/http/request-helpers';
 @Controller('auth')
 export class AuthController {
   constructor(
-    private readonly authService: AuthService,
     private readonly staffAuth: StaffAuthService,
+    private readonly sessions: StaffSessionService,
   ) { }
 
   @Public()
@@ -76,19 +72,21 @@ export class AuthController {
   }
 
   @Public()
-  @UseGuards(RefreshTokenUserGuard)
   @Post('/refresh')
-  @HttpCode(200)
-  @ApiNoContentResponse({
-    description: 'New access, refresh tokens have been saved.',
+  @ApiOperation({
+    summary: 'New token pair for a refresh token; the old refresh token is spent (rotation). 401 invalid_refresh_token',
   })
-  @ApiForbiddenResponse({ description: 'Unauthorized Request' })
-  async refresh(
-    @Req() { user }: { user: User },
-    @Res({ passthrough: true }) response: express.Response,
-  ) {
-    const accessToken = this.authService.getJWT('access', user.id);
-    const refreshToken = this.authService.getJWT('refresh', user.id);
-    return { accessToken, refreshToken };
+  @HttpCode(200)
+  refresh(@Body() dto: StaffRefreshDto, @Req() req: express.Request) {
+    return this.sessions.refresh(dto.refreshToken, requestCtx(req));
+  }
+
+  @Public()
+  @Post('/logout')
+  @ApiOperation({ summary: 'Revoke the login behind a refresh token (idempotent, always 204)' })
+  @ApiNoContentResponse()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async logout(@Body() dto: StaffLogoutDto, @Req() req: express.Request): Promise<void> {
+    await this.sessions.logout(dto.refreshToken, requestCtx(req));
   }
 }

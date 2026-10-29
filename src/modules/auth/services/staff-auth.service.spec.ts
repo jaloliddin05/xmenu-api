@@ -59,7 +59,7 @@ describe('StaffAuthService (signup)', () => {
       deps.rateLimit,
       deps.events,
       deps.throttle,
-      deps.jwt as any,
+      deps.sessions as any,
       deps.r,
       staffTestConfig,
     );
