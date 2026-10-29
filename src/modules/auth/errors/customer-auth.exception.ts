@@ -44,6 +44,7 @@ export type CustomerErrorCode =
   | 'payment_not_retryable'
   | 'order_not_found'
   | 'settings_missing'
+  | 'delivery_unavailable_no_zone'
   | 'internal_error';
 
 const STATUS: Record<CustomerErrorCode, number> = {
@@ -79,6 +80,8 @@ const STATUS: Record<CustomerErrorCode, number> = {
   min_order_not_reached: 422,
   out_of_delivery_zone: 422,
   fulfillment_unavailable: 422,
+  // The venue has not drawn a delivery zone yet: delivery is off, pickup may still work
+  delivery_unavailable_no_zone: 422,
   branch_closed: 409,
   payment_method_unavailable: 422,
   idempotency_key_required: 400,

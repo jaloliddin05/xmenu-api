@@ -93,6 +93,15 @@ describe('priceLines', () => {
     it('is a 422', () => expect(run([]).getStatus()).toBe(422));
   });
 
+  it('caps one dish across lines: modifiers cannot be used to split past the limit', () => {
+    const lines = (n: number) => Array.from({ length: n }, () => ({ itemId: 'p2', quantity: 25 }));
+    expect(() => priceLines(lines(2), catalog(plain()), 'ru', 'ru')).not.toThrow(); // 50 in total
+    const e = thrown(() => priceLines([...lines(2), { itemId: 'p2', quantity: 1 }], catalog(plain()), 'ru', 'ru'));
+    expect(e.code).toBe('invalid_order');
+    expect(e.getStatus()).toBe(400);
+    expect(e.details).toEqual({ items: [{ itemId: 'p2', quantity: 51, max: 50 }] });
+  });
+
   it.each([0, -1, 51, 1.5, NaN])('quantity %p is invalid_order', (quantity) => {
     expect(thrown(() => priceLines([{ itemId: 'p2', quantity }], catalog(plain()), 'ru', 'ru')).code).toBe('invalid_order');
   });

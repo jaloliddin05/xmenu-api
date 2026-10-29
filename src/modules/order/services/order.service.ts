@@ -9,7 +9,7 @@ import { PrismaService } from 'src/modules/_prisma/prisma.service';
 import { PaymentConfigService } from 'src/modules/payment/services/payment-config.service';
 import { PaymentLinkService } from 'src/modules/payment/services/payment-link.service';
 import { CreateOrderDto } from '../dto/create-order.dto';
-import { computeTotals, hashOrderRequest, parseZone, pointInPolygon } from '../domain/order-money';
+import { computeTotals, deliveryZoneProblem, hashOrderRequest } from '../domain/order-money';
 import { priceLines, PricingProduct } from '../domain/order-pricing';
 import { ACTIVE_STATUSES, CUSTOMER_CANCELLABLE, OrderStatusName } from '../domain/order-state-machine';
 import type { Tenant } from 'src/modules/tenant/tenant.service';
@@ -80,10 +80,11 @@ export class OrderService {
       const address = await this.prisma.customer_address.findFirst({ where: { id: dto.addressId, customer_id: customerId } });
       if (!address) throw new CustomerAuthException('address_not_found');
 
-      const zone = settings.deliveryZone ?? parseZone(null);
-      if (zone && (address.latitude == null || address.longitude == null || !pointInPolygon(address.latitude, address.longitude, zone))) {
-        throw new CustomerAuthException('out_of_delivery_zone', 'Address is outside the delivery zone');
+      const zoneProblem = deliveryZoneProblem(settings.deliveryZone, address);
+      if (zoneProblem === 'delivery_unavailable_no_zone') {
+        throw new CustomerAuthException(zoneProblem, 'Delivery is unavailable: the venue has no delivery zone');
       }
+      if (zoneProblem) throw new CustomerAuthException(zoneProblem, 'Address is outside the delivery zone');
       addressSnapshot = toAddressView(address) as unknown as Prisma.InputJsonValue;
     }
 

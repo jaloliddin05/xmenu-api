@@ -1,4 +1,4 @@
-import { computeTotals, hashOrderRequest, parseZone, pointInPolygon, toSum } from './order-money';
+import { computeTotals, deliveryZoneProblem, hashOrderRequest, parseZone, pointInPolygon, toSum } from './order-money';
 
 // Toshkent markazi atrofida kvadrat zona
 const zone: [number, number][] = [
@@ -19,6 +19,21 @@ describe('pointInPolygon', () => {
     const c: [number, number][] = [[0, 0], [0, 10], [10, 10], [10, 6], [4, 6], [4, 4], [10, 4], [10, 0]];
     expect(pointInPolygon(5, 5, c)).toBe(false); // in the notch
     expect(pointInPolygon(2, 2, c)).toBe(true);
+  });
+});
+
+describe('deliveryZoneProblem', () => {
+  const zone: [number, number][] = [[41.2, 69.1], [41.4, 69.1], [41.4, 69.4], [41.2, 69.4]];
+  it('without a zone delivery is unavailable, whatever the address', () => {
+    expect(deliveryZoneProblem(null, { latitude: 41.3, longitude: 69.25 })).toBe('delivery_unavailable_no_zone');
+    expect(deliveryZoneProblem(null, { latitude: null, longitude: null })).toBe('delivery_unavailable_no_zone');
+  });
+  it('serves an address inside the zone only', () => {
+    expect(deliveryZoneProblem(zone, { latitude: 41.3, longitude: 69.25 })).toBeNull();
+    expect(deliveryZoneProblem(zone, { latitude: 41.5, longitude: 69.25 })).toBe('out_of_delivery_zone');
+  });
+  it('treats an address without coordinates as outside', () => {
+    expect(deliveryZoneProblem(zone, { latitude: null, longitude: 69.25 })).toBe('out_of_delivery_zone');
   });
 });
 

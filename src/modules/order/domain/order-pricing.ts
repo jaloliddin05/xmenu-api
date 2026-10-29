@@ -4,6 +4,8 @@ import { formatWeight, groupLimits, MenuProductRow, publicFileUrl } from 'src/mo
 import { toSum } from './order-money';
 
 export const MAX_LINE_QUANTITY = 50;
+/** Cap on one dish across all lines of an order (lines differ by modifiers, so a dish can repeat). */
+export const MAX_ITEM_QUANTITY = 50;
 
 export type PricingProduct = MenuProductRow & { category: { is_active: boolean | null } };
 
@@ -46,7 +48,7 @@ type Problem = { index: number; itemId: string; reason: string; groupId?: string
  *  - item_unavailable: taom yo'q / o'chirilgan / kategoriyasi o'chirilgan
  *  - invalid_modifiers: noma'lum guruh/variant, takror, majburiy tanlanmagan,
  *    min/max buzilgan — frontend validateSelections() bilan bir xil qoida
- *  - invalid_order: miqdor 1..50 emas
+ *  - invalid_order: miqdor 1..50 emas, or one dish more than 50 times across lines
  */
 export function priceLines(
   items: RequestItem[],
@@ -75,6 +77,15 @@ export function priceLines(
   });
   if (invalid.length) {
     throw new CustomerAuthException('invalid_modifiers', 'Invalid modifiers', undefined, { items: invalid });
+  }
+
+  const perItem = new Map<string, number>();
+  for (const item of items) perItem.set(item.itemId, (perItem.get(item.itemId) ?? 0) + item.quantity);
+  const tooMany = [...perItem].filter(([, quantity]) => quantity > MAX_ITEM_QUANTITY);
+  if (tooMany.length) {
+    throw new CustomerAuthException('invalid_order', `at most ${MAX_ITEM_QUANTITY} of one item per order`, undefined, {
+      items: tooMany.map(([itemId, quantity]) => ({ itemId, quantity, max: MAX_ITEM_QUANTITY })),
+    });
   }
 
   const lines: PricedLine[] = items.map((item, position) => {

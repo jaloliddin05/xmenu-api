@@ -12,7 +12,7 @@ export function pointInPolygon(lat: number, lng: number, polygon: [number, numbe
   return inside;
 }
 
-/** DB'dan kelgan JSON ni xavfsiz [lat, lng][] ga aylantiradi; yaroqsiz bo'lsa null (zona tekshirilmaydi). */
+/** DB'dan kelgan JSON ni xavfsiz [lat, lng][] ga aylantiradi; yaroqsiz bo'lsa null (no zone: delivery is unavailable). */
 export function parseZone(value: unknown): [number, number][] | null {
   if (!Array.isArray(value) || value.length < 3) return null;
   const points: [number, number][] = [];
@@ -23,6 +23,19 @@ export function parseZone(value: unknown): [number, number][] | null {
     points.push([p[0], p[1]]);
   }
   return points;
+}
+
+/**
+ * Why a delivery address cannot be served, or null when it can. Without a zone drawn by the owner
+ * delivery is unavailable rather than open to any point; an address without coordinates is outside.
+ */
+export function deliveryZoneProblem(
+  zone: [number, number][] | null,
+  address: { latitude: number | null; longitude: number | null },
+): 'delivery_unavailable_no_zone' | 'out_of_delivery_zone' | null {
+  if (!zone) return 'delivery_unavailable_no_zone';
+  if (address.latitude == null || address.longitude == null) return 'out_of_delivery_zone';
+  return pointInPolygon(address.latitude, address.longitude, zone) ? null : 'out_of_delivery_zone';
 }
 
 export interface Totals {
