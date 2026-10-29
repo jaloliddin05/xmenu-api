@@ -42,5 +42,4 @@ export default (): IConfig => ({
 
   newPasswordBytes: 4,
   codeBytes: 2,
-  smsAccessKeyId: process.env.SMS_ACCESS_KEY_ID || '',
 });
