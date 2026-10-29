@@ -3,7 +3,6 @@ interface IJWT {
   accessTokenExpiration: string;
 }
 
-
 export interface IConfig {
   port: number;
   jwt: IJWT;

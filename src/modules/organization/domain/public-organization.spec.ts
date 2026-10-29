@@ -38,9 +38,17 @@ const row = {
   owner_id: 'user-1',
   logo_id: 'f-1',
   banner_id: null,
-  logo: { id: 'f-1', url: 'https://files/x.png', path: '/srv/uploads/x.png', product_id: null, created_at: new Date() },
+  logo: {
+    id: 'f-1',
+    url: 'https://files/x.png',
+    path: '/srv/uploads/x.png',
+    product_id: null,
+    created_at: new Date(),
+  },
   banner: null,
-  translations: [{ id: 'tr-1', lang: 'ru', description: 'Манты', organization_id: 'org-1' }],
+  translations: [
+    { id: 'tr-1', lang: 'ru', description: 'Манты', organization_id: 'org-1' },
+  ],
   categories: [
     {
       id: 'c-1',
@@ -63,8 +71,17 @@ const row = {
           fat: null,
           carbohydrate: null,
           unit: 'gr',
-          images: [{ id: 'f-2', url: 'https://files/p.png', path: '/srv/uploads/p.png', product_id: 'p-1' }],
-          translations: [{ id: 'pt-1', lang: 'ru', title: 'Манты', description: null }],
+          images: [
+            {
+              id: 'f-2',
+              url: 'https://files/p.png',
+              path: '/srv/uploads/p.png',
+              product_id: 'p-1',
+            },
+          ],
+          translations: [
+            { id: 'pt-1', lang: 'ru', title: 'Манты', description: null },
+          ],
           additional_product_groups: [
             {
               id: 'g-1',
@@ -134,7 +151,13 @@ describe('toPublicOrganization', () => {
                   min_selected: null,
                   max_selected: 2,
                   translations: [{ lang: 'ru', title: 'Соус' }],
-                  additional_products: [{ id: 'm-1', price: 3000, translations: [{ lang: 'ru', title: 'Сметана' }] }],
+                  additional_products: [
+                    {
+                      id: 'm-1',
+                      price: 3000,
+                      translations: [{ lang: 'ru', title: 'Сметана' }],
+                    },
+                  ],
                 },
               ],
             },

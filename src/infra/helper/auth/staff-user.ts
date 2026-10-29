@@ -51,7 +51,8 @@ export interface StaffUser {
   } | null;
 }
 
-const file = (f: FileLike | null | undefined) => (f ? { id: f.id, url: f.url } : f);
+const file = (f: FileLike | null | undefined) =>
+  f ? { id: f.id, url: f.url } : f;
 
 /**
  * The staff user as it leaves the API (and as req.user): an explicit list of fields, so the password
@@ -82,7 +83,11 @@ export function toStaffUser(user: UserLike): StaffUser {
       ...(o.logo !== undefined && { logo: file(o.logo) }),
       ...(o.banner !== undefined && { banner: file(o.banner) }),
       ...(o.translations && {
-        translations: o.translations.map((t) => ({ id: t.id, lang: t.lang, description: t.description })),
+        translations: o.translations.map((t) => ({
+          id: t.id,
+          lang: t.lang,
+          description: t.description,
+        })),
       }),
     };
   }

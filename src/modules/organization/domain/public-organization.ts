@@ -84,7 +84,11 @@ export interface OrganizationTreeRow {
       carbohydrate: number | null;
       unit: string;
       images: FileRow[];
-      translations: { lang: string; title: string; description: string | null }[];
+      translations: {
+        lang: string;
+        title: string;
+        description: string | null;
+      }[];
       additional_product_groups: {
         id: string;
         is_required: boolean | null;
@@ -92,16 +96,24 @@ export interface OrganizationTreeRow {
         min_selected: number | null;
         max_selected: number | null;
         translations: { lang: string; title: string }[];
-        additional_products: { id: string; price: number; translations: { lang: string; title: string }[] }[];
+        additional_products: {
+          id: string;
+          price: number;
+          translations: { lang: string; title: string }[];
+        }[];
       }[];
     }[];
   }[];
 }
 
-const file = (f: FileRow | null): PublicFile | null => (f ? { id: f.id, url: f.url } : null);
-const titles = (list: { lang: string; title: string }[]) => list.map((t) => ({ lang: t.lang, title: t.title }));
+const file = (f: FileRow | null): PublicFile | null =>
+  f ? { id: f.id, url: f.url } : null;
+const titles = (list: { lang: string; title: string }[]) =>
+  list.map((t) => ({ lang: t.lang, title: t.title }));
 
-export function toPublicOrganization(o: OrganizationTreeRow): PublicOrganization {
+export function toPublicOrganization(
+  o: OrganizationTreeRow,
+): PublicOrganization {
   return {
     id: o.id,
     name: o.name,
@@ -109,7 +121,10 @@ export function toPublicOrganization(o: OrganizationTreeRow): PublicOrganization
     type: o.type,
     logo: file(o.logo),
     banner: file(o.banner),
-    translations: o.translations.map((t) => ({ lang: t.lang, description: t.description })),
+    translations: o.translations.map((t) => ({
+      lang: t.lang,
+      description: t.description,
+    })),
     categories: o.categories.map((c) => ({
       id: c.id,
       translations: titles(c.translations),
@@ -123,7 +138,11 @@ export function toPublicOrganization(o: OrganizationTreeRow): PublicOrganization
         carbohydrate: p.carbohydrate,
         unit: p.unit,
         images: p.images.map((i) => file(i)!),
-        translations: p.translations.map((t) => ({ lang: t.lang, title: t.title, description: t.description })),
+        translations: p.translations.map((t) => ({
+          lang: t.lang,
+          title: t.title,
+          description: t.description,
+        })),
         additional_product_groups: p.additional_product_groups.map((g) => ({
           id: g.id,
           is_required: g.is_required ?? false,

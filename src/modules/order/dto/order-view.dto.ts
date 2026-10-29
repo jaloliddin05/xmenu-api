@@ -10,9 +10,19 @@ class OrderBranchDto {
 }
 
 class OrderPaymentDto {
-  @ApiProperty({ type: String, nullable: true, description: 'Payment link, only in awaiting_payment' }) url: string | null;
-  @ApiProperty({ type: String, nullable: true, format: 'date-time' }) expiresAt: string | null;
-  @ApiProperty({ enum: ['declined', 'expired', 'cancelled'], nullable: true, description: 'Only in payment_failed' })
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Payment link, only in awaiting_payment',
+  })
+  url: string | null;
+  @ApiProperty({ type: String, nullable: true, format: 'date-time' })
+  expiresAt: string | null;
+  @ApiProperty({
+    enum: ['declined', 'expired', 'cancelled'],
+    nullable: true,
+    description: 'Only in payment_failed',
+  })
   failReason: 'declined' | 'expired' | 'cancelled' | null;
 }
 
@@ -25,7 +35,8 @@ class OrderModifierOptionDto {
 class OrderModifierGroupDto {
   @ApiProperty() groupId: string;
   @ApiProperty() groupTitle: string;
-  @ApiProperty({ type: [OrderModifierOptionDto] }) options: OrderModifierOptionDto[];
+  @ApiProperty({ type: [OrderModifierOptionDto] })
+  options: OrderModifierOptionDto[];
 }
 
 class OrderItemDto {
@@ -36,7 +47,8 @@ class OrderItemDto {
   @ApiProperty({ example: 'UZS' }) currency: string;
   @ApiProperty() quantity: number;
   @ApiProperty() unitPrice: number;
-  @ApiProperty({ type: [OrderModifierGroupDto] }) modifiers: OrderModifierGroupDto[];
+  @ApiProperty({ type: [OrderModifierGroupDto] })
+  modifiers: OrderModifierGroupDto[];
 }
 
 export class OrderViewDto {
@@ -57,17 +69,38 @@ export class OrderViewDto {
   @ApiProperty({ example: '+998901234567' }) phone: string;
   @ApiProperty() comment: string;
   @ApiProperty({ enum: ['cash', 'click', 'payme'] }) paymentMethod: string;
-  @ApiProperty({ enum: ['not_required', 'pending', 'paid', 'failed', 'cancelled', 'refund_pending', 'refunded'] })
+  @ApiProperty({
+    enum: [
+      'not_required',
+      'pending',
+      'paid',
+      'failed',
+      'cancelled',
+      'refund_pending',
+      'refunded',
+    ],
+  })
   paymentStatus: string;
-  @ApiProperty({ type: OrderPaymentDto, nullable: true, description: 'null for cash' }) payment: OrderPaymentDto | null;
+  @ApiProperty({
+    type: OrderPaymentDto,
+    nullable: true,
+    description: 'null for cash',
+  })
+  payment: OrderPaymentDto | null;
   @ApiProperty({ type: [OrderItemDto] }) items: OrderItemDto[];
   @ApiProperty({ example: 'UZS' }) currency: string;
   @ApiProperty() subtotal: number;
   @ApiProperty() serviceFee: number;
   @ApiProperty() discount: number;
   @ApiProperty() total: number;
-  @ApiProperty({ type: [Number], example: [30, 45], description: '[min, max] minutes' }) etaMinutes: number[];
-  @ApiProperty({ enum: ['customer', 'restaurant', 'system'], nullable: true }) cancelledBy: string | null;
+  @ApiProperty({
+    type: [Number],
+    example: [30, 45],
+    description: '[min, max] minutes',
+  })
+  etaMinutes: number[];
+  @ApiProperty({ enum: ['customer', 'restaurant', 'system'], nullable: true })
+  cancelledBy: string | null;
   @ApiProperty({ type: String, nullable: true }) cancelReason: string | null;
 }
 
@@ -80,7 +113,8 @@ class OrderCustomerDto {
 class OrderEventDto {
   @ApiProperty({ enum: ORDER_STATUSES, nullable: true }) from: string | null;
   @ApiProperty({ enum: ORDER_STATUSES }) to: string;
-  @ApiProperty({ enum: ['customer', 'restaurant', 'system', 'payment'] }) actor: string;
+  @ApiProperty({ enum: ['customer', 'restaurant', 'system', 'payment'] })
+  actor: string;
   @ApiProperty({ type: String, nullable: true }) actorId: string | null;
   @ApiProperty({ type: String, nullable: true }) note: string | null;
   @ApiProperty({ format: 'date-time' }) at: string;
@@ -94,6 +128,10 @@ export class StaffOrderViewDto extends OrderViewDto {
 
 export class StaffOrderListDto {
   @ApiProperty({ type: [StaffOrderViewDto] }) items: StaffOrderViewDto[];
-  @ApiProperty({ type: String, nullable: true, description: 'Pass as ?cursor= for the next page' })
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Pass as ?cursor= for the next page',
+  })
   nextCursor: string | null;
 }

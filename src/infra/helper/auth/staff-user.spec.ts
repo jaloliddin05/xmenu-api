@@ -24,9 +24,22 @@ const user = {
     owner_id: 'u-1',
     logo_id: 'f-1',
     banner_id: null,
-    logo: { id: 'f-1', url: 'https://files/x.png', path: '/srv/uploads/x.png', product_id: null },
+    logo: {
+      id: 'f-1',
+      url: 'https://files/x.png',
+      path: '/srv/uploads/x.png',
+      product_id: null,
+    },
     banner: null,
-    translations: [{ id: 'tr-1', lang: 'ru', description: 'Манты', organization_id: 'org-1', created_at: new Date() }],
+    translations: [
+      {
+        id: 'tr-1',
+        lang: 'ru',
+        description: 'Манты',
+        organization_id: 'org-1',
+        created_at: new Date(),
+      },
+    ],
   },
 };
 
@@ -56,8 +69,10 @@ describe('toStaffUser', () => {
   });
 
   it('adds relations only when they were loaded', () => {
-    const { organization: _o, ...plain } = user;
+    const plain = { ...user, organization: undefined };
     expect(Object.keys(toStaffUser(plain))).not.toContain('organization');
-    expect(toStaffUser({ ...plain, organization: null }).organization).toBeNull();
+    expect(
+      toStaffUser({ ...plain, organization: null }).organization,
+    ).toBeNull();
   });
 });

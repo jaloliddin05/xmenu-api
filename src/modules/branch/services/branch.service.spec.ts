@@ -14,21 +14,31 @@ describe('BranchService: delivery site revalidation', () => {
       customer_order: { count: jest.fn(async () => 0) },
     };
     const revalidate = { addRevalidationJob: jest.fn() };
-    return { service: new BranchService(prisma as any, revalidate as any), revalidate };
+    return {
+      service: new BranchService(prisma as any, revalidate as any),
+      revalidate,
+    };
   };
 
   it('schedules the branches route after create, update and remove', async () => {
     const { service, revalidate } = make();
     await service.create(ORG, { title: 'A' } as any);
     await service.update(ORG, 'b-1', { title: 'B' } as any);
-    await expect(service.remove(ORG, 'b-1')).resolves.toEqual({ deleted: true });
+    await expect(service.remove(ORG, 'b-1')).resolves.toEqual({
+      deleted: true,
+    });
     expect(revalidate.addRevalidationJob).toHaveBeenCalledTimes(3);
-    expect(revalidate.addRevalidationJob).toHaveBeenCalledWith({ tenantId: ORG, route: 'branches' });
+    expect(revalidate.addRevalidationJob).toHaveBeenCalledWith({
+      tenantId: ORG,
+      route: 'branches',
+    });
   });
 
   it('schedules nothing for a branch of another venue', async () => {
     const { service, revalidate } = make(false);
-    await expect(service.update(ORG, 'b-2', {} as any)).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.update(ORG, 'b-2', {} as any)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
     expect(revalidate.addRevalidationJob).not.toHaveBeenCalled();
   });
 });

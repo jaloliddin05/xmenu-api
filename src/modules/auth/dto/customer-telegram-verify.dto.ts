@@ -81,9 +81,15 @@ export class CustomerTelegramStatusResponseDto {
   @ApiPropertyOptional({ description: 'verified, isNewUser false' })
   refreshToken?: string;
 
-  @ApiPropertyOptional({ type: CustomerUserDto, description: 'verified, isNewUser false' })
+  @ApiPropertyOptional({
+    type: CustomerUserDto,
+    description: 'verified, isNewUser false',
+  })
   user?: CustomerUserDto;
 
-  @ApiPropertyOptional({ description: 'verified, isNewUser true: finish with POST /auth/customer/register' })
+  @ApiPropertyOptional({
+    description:
+      'verified, isNewUser true: finish with POST /auth/customer/register',
+  })
   registrationToken?: string;
 }

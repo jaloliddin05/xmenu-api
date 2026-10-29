@@ -1,17 +1,30 @@
-import { ArrayMinSize, IsIn, IsInt, Matches, Max, ValidateNested } from 'class-validator';
+import {
+  ArrayMinSize,
+  IsIn,
+  IsInt,
+  Matches,
+  Max,
+  ValidateNested,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { BadRequestException } from '@nestjs/common';
-import { createValidationPipe, flattenValidationErrors } from './validation-errors';
+import {
+  createValidationPipe,
+  flattenValidationErrors,
+} from './validation-errors';
 
 class Theme {
-  @Matches(/^#[0-9a-f]{6}$/i, { message: 'brand must be a hex color' }) brand: string;
+  @Matches(/^#[0-9a-f]{6}$/i, { message: 'brand must be a hex color' })
+  brand: string;
 }
 class Point {
   @Max(90) lat: number;
 }
 class Body {
   @ValidateNested() @Type(() => Theme) theme: Theme;
-  @ArrayMinSize(1) @IsIn(['ru', 'uz', 'en'], { each: true }) languages: string[];
+  @ArrayMinSize(1)
+  @IsIn(['ru', 'uz', 'en'], { each: true })
+  languages: string[];
   @ValidateNested({ each: true }) @Type(() => Point) points: Point[];
   @IsInt() @Max(21) zoom: number;
 }
@@ -29,15 +42,25 @@ describe('validation errors', () => {
       extra: true,
     }).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(BadRequestException);
-    const body = (err as BadRequestException).getResponse() as Record<string, any>;
+    const body = (err as BadRequestException).getResponse() as Record<
+      string,
+      any
+    >;
     expect(body.code).toBe('validation_error');
     expect(body.errors).toEqual(
       expect.arrayContaining([
-        { field: 'theme.brand', reason: 'matches', message: 'brand must be a hex color' },
+        {
+          field: 'theme.brand',
+          reason: 'matches',
+          message: 'brand must be a hex color',
+        },
         expect.objectContaining({ field: 'languages', reason: 'isIn' }),
         expect.objectContaining({ field: 'points[1].lat', reason: 'max' }),
         expect.objectContaining({ field: 'zoom', reason: 'isInt' }),
-        expect.objectContaining({ field: 'extra', reason: 'whitelistValidation' }),
+        expect.objectContaining({
+          field: 'extra',
+          reason: 'whitelistValidation',
+        }),
       ]),
     );
     expect(body.message).toContain('theme.brand: brand must be a hex color');

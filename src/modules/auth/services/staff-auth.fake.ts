@@ -159,7 +159,10 @@ export class FakeOrganizations {
 /** Stands in for StaffSessionService: deterministic tokens, no session table. */
 export class FakeStaffSessions {
   async create(userId: string) {
-    return { accessToken: `access:${userId}`, refreshToken: `refresh:${userId}` };
+    return {
+      accessToken: `access:${userId}`,
+      refreshToken: `refresh:${userId}`,
+    };
   }
 }
 

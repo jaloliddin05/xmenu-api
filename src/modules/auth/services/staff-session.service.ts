@@ -31,7 +31,9 @@ const positive = (raw: string | undefined, fallback: number) => {
   return Number.isFinite(n) && n > 0 ? n : fallback;
 };
 
-export const loadStaffSessionConfig = (env = process.env): StaffSessionConfig => ({
+export const loadStaffSessionConfig = (
+  env = process.env,
+): StaffSessionConfig => ({
   refreshTtlDays: positive(env.STAFF_REFRESH_TTL_DAYS, 7),
   absoluteDays: positive(env.STAFF_SESSION_ABSOLUTE_DAYS, 30),
   reuseLeewaySeconds: positive(env.STAFF_REFRESH_REUSE_LEEWAY_SECONDS, 30),
@@ -64,11 +66,18 @@ export class StaffSessionService {
   }
 
   private pair(userId: string, refreshToken: string): StaffTokenPair {
-    return { accessToken: this.jwt.getJWT('access', userId, 'user'), refreshToken };
+    return {
+      accessToken: this.jwt.getJWT('access', userId, 'user'),
+      refreshToken,
+    };
   }
 
   /** New login = new family. */
-  async create(userId: string, ctx: RequestCtx, db: Db = this.prisma): Promise<StaffTokenPair> {
+  async create(
+    userId: string,
+    ctx: RequestCtx,
+    db: Db = this.prisma,
+  ): Promise<StaffTokenPair> {
     const now = new Date();
     const { token, hash } = this.newRefreshToken();
     await db.staff_session.create({
@@ -93,7 +102,10 @@ export class StaffSessionService {
   }
 
   /** POST /auth/refresh: the old token is spent, a new pair is issued. */
-  async refresh(refreshToken: string, ctx: RequestCtx): Promise<StaffTokenPair> {
+  async refresh(
+    refreshToken: string,
+    ctx: RequestCtx,
+  ): Promise<StaffTokenPair> {
     const invalid = () => new CustomerAuthException('invalid_refresh_token');
     const now = new Date();
 
@@ -101,8 +113,13 @@ export class StaffSessionService {
       where: { token_hash: sha256(refreshToken) },
       include: { user: { select: { id: true, isActive: true } } },
     });
-    if (!session || session.revoked_at || session.expires_at <= now) throw invalid();
-    if (session.family_started_at.getTime() + this.cfg.absoluteDays * DAY_MS <= now.getTime()) throw invalid();
+    if (!session || session.revoked_at || session.expires_at <= now)
+      throw invalid();
+    if (
+      session.family_started_at.getTime() + this.cfg.absoluteDays * DAY_MS <=
+      now.getTime()
+    )
+      throw invalid();
     if (!session.user?.isActive) {
       await this.revokeFamily(session.family_id);
       throw invalid();
@@ -117,7 +134,9 @@ export class StaffSessionService {
         data: { used_at: now },
       });
       if (claimed.count === 0) {
-        const fresh = await this.prisma.staff_session.findUnique({ where: { id: session.id } });
+        const fresh = await this.prisma.staff_session.findUnique({
+          where: { id: session.id },
+        });
         if (!fresh || fresh.revoked_at) throw invalid();
         await this.assertWithinLeeway(fresh, ctx);
       }
@@ -140,11 +159,20 @@ export class StaffSessionService {
   }
 
   private async assertWithinLeeway(
-    session: { family_id: string; user_id: string; used_at: Date | null; revoked_at: Date | null },
+    session: {
+      family_id: string;
+      user_id: string;
+      used_at: Date | null;
+      revoked_at: Date | null;
+    },
     ctx: RequestCtx,
   ) {
     const usedAt = session.used_at?.getTime() ?? 0;
-    if (!session.revoked_at && Date.now() - usedAt <= this.cfg.reuseLeewaySeconds * 1000) return;
+    if (
+      !session.revoked_at &&
+      Date.now() - usedAt <= this.cfg.reuseLeewaySeconds * 1000
+    )
+      return;
     await this.revokeFamily(session.family_id);
     await this.events.log('staff_refresh_reuse_detected', ctx, {
       userId: session.user_id,
@@ -154,7 +182,10 @@ export class StaffSessionService {
   }
 
   /** POST /auth/logout: always succeeds; an unknown token is ignored. */
-  async logout(refreshToken: string | undefined, ctx: RequestCtx): Promise<void> {
+  async logout(
+    refreshToken: string | undefined,
+    ctx: RequestCtx,
+  ): Promise<void> {
     if (!refreshToken) return;
     const session = await this.prisma.staff_session.findUnique({
       where: { token_hash: sha256(refreshToken) },

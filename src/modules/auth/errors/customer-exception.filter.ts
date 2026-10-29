@@ -39,7 +39,8 @@ export class CustomerExceptionFilter implements ExceptionFilter {
       const r: any = exception.getResponse();
       message = Array.isArray(r?.message) ? r.message.join('; ') : (r?.message ?? 'Validation failed');
       // Same per-field list as the owner API ({ field, reason, message }), see createValidationPipe
-      if (Array.isArray(r?.errors)) details = { errors: r.errors };
+      const errors: unknown = (r as { errors?: unknown } | undefined)?.errors;
+      if (Array.isArray(errors)) details = { errors };
     } else if (exception instanceof HttpException) {
       status = exception.getStatus();
       const r: any = exception.getResponse();
