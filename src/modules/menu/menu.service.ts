@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { Lang } from 'src/infra/http/request-helpers';
 import { PrismaService } from '../_prisma/prisma.service';
-import { MenuCategoryRow, MenuView, toMenuView } from './menu.mapper';
+import { MenuCategoryRow, MenuLocale, MenuView, toMenuView } from './menu.mapper';
 
 /** is_active: Boolean? @default(true) — NULL ham "faol" hisoblanadi (eski yozuvlar). */
 export const ACTIVE = { OR: [{ is_active: true }, { is_active: null }] };
@@ -10,7 +9,7 @@ export const ACTIVE = { OR: [{ is_active: true }, { is_active: null }] };
 export class MenuService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getMenu(organizationId: string, lang: Lang): Promise<MenuView> {
+  async getMenu(organizationId: string, locale: MenuLocale): Promise<MenuView> {
     const rows = await this.prisma.category.findMany({
       where: { organization_id: organizationId, ...ACTIVE },
       orderBy: [{ index: 'asc' }, { created_at: 'asc' }],
@@ -33,6 +32,6 @@ export class MenuService {
         },
       },
     });
-    return toMenuView(rows as MenuCategoryRow[], lang);
+    return toMenuView(rows as MenuCategoryRow[], locale);
   }
 }

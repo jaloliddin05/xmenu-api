@@ -56,7 +56,7 @@ export class CustomerAuthService {
     tenant: Tenant,
     phone: string,
     ctx: RequestCtx,
-  ): Promise<{ resendAfter: number }> {
+  ): Promise<{ resendAfter: number; codeLength: number }> {
     if (!isValidPhone(phone)) throw new CustomerAuthException('invalid_phone');
 
     try {
@@ -65,7 +65,7 @@ export class CustomerAuthService {
         tenantId: tenant.id,
         phone,
       });
-      return { resendAfter };
+      return { resendAfter, codeLength: this.cfg.otpLength };
     } catch (err) {
       if (
         err instanceof CustomerAuthException &&

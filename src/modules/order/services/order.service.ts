@@ -12,6 +12,7 @@ import { CreateOrderDto } from '../dto/create-order.dto';
 import { computeTotals, hashOrderRequest, parseZone, pointInPolygon } from '../domain/order-money';
 import { priceLines, PricingProduct } from '../domain/order-pricing';
 import { ACTIVE_STATUSES, CUSTOMER_CANCELLABLE, OrderStatusName } from '../domain/order-state-machine';
+import type { Tenant } from 'src/modules/tenant/tenant.service';
 import { OrderSettingsService } from './order-settings.service';
 import { InvalidTransitionError, OrderNotFoundError, OrderTransitionService } from './order-transition.service';
 import { OrderWithItems, toOrderView } from './order-view';
@@ -46,7 +47,7 @@ export class OrderService {
     dto: CreateOrderDto,
     idempotencyKey: string | undefined,
     lang: Lang,
-    currency: string,
+    tenant: Pick<Tenant, 'currency' | 'defaultLanguage'>,
   ) {
     if (!idempotencyKey || !IDEMPOTENCY_KEY.test(idempotencyKey)) {
       throw new CustomerAuthException('idempotency_key_required', 'Idempotency-Key header (8-128 chars: A-Z a-z 0-9 _ -) is required');
@@ -94,7 +95,7 @@ export class OrderService {
 
     // 6. Narxlash (faqat bazadagi narxlar)
     const products = await this.loadProducts(organizationId, dto.items.map((i) => i.itemId));
-    const { lines, subtotal } = priceLines(dto.items, products, lang);
+    const { lines, subtotal } = priceLines(dto.items, products, lang, tenant.defaultLanguage);
 
     const serviceFee = mode === 'delivery' ? settings.deliveryServiceFee : 0;
     const totals = computeTotals(subtotal, serviceFee);
@@ -149,7 +150,7 @@ export class OrderService {
             payment_method: dto.paymentMethod,
             payment_status: online ? 'pending' : 'not_required',
             payment_expires_at: paymentExpiresAt,
-            currency,
+            currency: tenant.currency,
             subtotal: totals.subtotal,
             service_fee: totals.serviceFee,
             discount: totals.discount,

@@ -32,33 +32,33 @@ export class CustomerOrderController {
     @CurrentTenant() tenant: Tenant,
     @Req() req: Request,
   ) {
-    return this.orders.create(principal, dto, key, resolveLang(req), tenant.currency);
+    return this.orders.create(principal, dto, key, resolveLang(req, tenant), tenant);
   }
 
   @Get()
   @ApiOperation({ summary: "Mijoz buyurtmalari (yangilari birinchi, 50 tagacha). ?status=active — tugallanmaganlari" })
-  list(@CurrentCustomer() principal: CustomerPrincipal, @Query('status') status: string | undefined, @Req() req: Request) {
-    return this.orders.list(principal, { activeOnly: status === 'active' }, resolveLang(req));
+  list(@CurrentCustomer() principal: CustomerPrincipal, @Query('status') status: string | undefined, @CurrentTenant() tenant: Tenant, @Req() req: Request) {
+    return this.orders.list(principal, { activeOnly: status === 'active' }, resolveLang(req, tenant));
   }
 
   @Get(':id')
   @Header('Cache-Control', 'no-store')
   @ApiOperation({ summary: 'Bitta buyurtma (ekran shuni so\'rab turadi)' })
-  get(@CurrentCustomer() principal: CustomerPrincipal, @Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
-    return this.orders.get(principal, id, resolveLang(req));
+  get(@CurrentCustomer() principal: CustomerPrincipal, @Param('id', ParseUUIDPipe) id: string, @CurrentTenant() tenant: Tenant, @Req() req: Request) {
+    return this.orders.get(principal, id, resolveLang(req, tenant));
   }
 
   @Post(':id/cancel')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Bekor qilish (faqat tayyorlash boshlanguncha)' })
-  cancel(@CurrentCustomer() principal: CustomerPrincipal, @Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
-    return this.orders.cancel(principal, id, resolveLang(req));
+  cancel(@CurrentCustomer() principal: CustomerPrincipal, @Param('id', ParseUUIDPipe) id: string, @CurrentTenant() tenant: Tenant, @Req() req: Request) {
+    return this.orders.cancel(principal, id, resolveLang(req, tenant));
   }
 
   @Post(':id/payment/retry')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "To'lov muvaffaqiyatsiz bo'lgan buyurtma uchun yangi to'lov havolasi" })
-  retryPayment(@CurrentCustomer() principal: CustomerPrincipal, @Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
-    return this.orders.retryPayment(principal, id, resolveLang(req));
+  retryPayment(@CurrentCustomer() principal: CustomerPrincipal, @Param('id', ParseUUIDPipe) id: string, @CurrentTenant() tenant: Tenant, @Req() req: Request) {
+    return this.orders.retryPayment(principal, id, resolveLang(req, tenant));
   }
 }

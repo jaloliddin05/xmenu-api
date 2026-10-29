@@ -47,6 +47,7 @@ describe('priceLines', () => {
       ],
       catalog(manti(), plain()),
       'ru',
+      'ru',
     );
     expect(lines[0]).toMatchObject({ productId: 'p1', name: 'Мант', weight: '800 г', basePrice: 45000, unitPrice: 45000 + 3500 + 0 + 2000, quantity: 2, position: 0 });
     expect(lines[1]).toMatchObject({ productId: 'p2', unitPrice: 15000, quantity: 3, image: null }); // fractional price rounded
@@ -54,7 +55,7 @@ describe('priceLines', () => {
   });
 
   it('options are recorded in database order, not request order', () => {
-    const { lines } = priceLines([{ itemId: 'p1', quantity: 1, modifiers: [{ groupId: 'g1', optionIds: ['o2', 'o1'] }] }], catalog(manti()), 'ru');
+    const { lines } = priceLines([{ itemId: 'p1', quantity: 1, modifiers: [{ groupId: 'g1', optionIds: ['o2', 'o1'] }] }], catalog(manti()), 'ru', 'ru');
     expect(lines[0].options.map((o) => o.optionId)).toEqual(['o1', 'o2']);
     expect(lines[0].options.map((o) => o.position)).toEqual([0, 1]);
   });
@@ -65,6 +66,7 @@ describe('priceLines', () => {
         [{ itemId: 'zzz', quantity: 1 }, { itemId: 'p2', quantity: 1 }, { itemId: 'p3', quantity: 1 }, { itemId: 'p4', quantity: 1 }],
         catalog(plain(), { ...plain(), id: 'p3', is_active: false } as any, { ...plain(), id: 'p4', category: { is_active: false } } as any),
         'ru',
+        'ru',
       ),
     );
     expect(e.code).toBe('item_unavailable');
@@ -72,11 +74,11 @@ describe('priceLines', () => {
   });
 
   it('a product with NULL is_active (legacy rows) is available', () => {
-    expect(() => priceLines([{ itemId: 'p2', quantity: 1 }], catalog({ ...plain(), is_active: null } as any), 'ru')).not.toThrow();
+    expect(() => priceLines([{ itemId: 'p2', quantity: 1 }], catalog({ ...plain(), is_active: null } as any), 'ru', 'ru')).not.toThrow();
   });
 
   describe('invalid modifiers', () => {
-    const run = (modifiers: any) => thrown(() => priceLines([{ itemId: 'p1', quantity: 1, modifiers }], catalog(manti()), 'ru'));
+    const run = (modifiers: any) => thrown(() => priceLines([{ itemId: 'p1', quantity: 1, modifiers }], catalog(manti()), 'ru', 'ru'));
     const reason = (modifiers: any) => (run(modifiers).details!.items as any[])[0].reason;
     const ok = [{ groupId: 'g1', optionIds: ['o1', 'o2'] }];
 
@@ -92,6 +94,6 @@ describe('priceLines', () => {
   });
 
   it.each([0, -1, 51, 1.5, NaN])('quantity %p is invalid_order', (quantity) => {
-    expect(thrown(() => priceLines([{ itemId: 'p2', quantity }], catalog(plain()), 'ru')).code).toBe('invalid_order');
+    expect(thrown(() => priceLines([{ itemId: 'p2', quantity }], catalog(plain()), 'ru', 'ru')).code).toBe('invalid_order');
   });
 });

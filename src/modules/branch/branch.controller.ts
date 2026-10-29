@@ -21,6 +21,6 @@ export class BranchController {
   @Header('Cache-Control', 'public, max-age=30')
   @Header('Vary', 'X-Tenant-Id, Accept-Language')
   list(@CurrentTenant() tenant: Tenant, @Req() req: Request): Promise<BranchView[]> {
-    return this.branches.listPublic(tenant.id, resolveLang(req));
+    return this.branches.listPublic(tenant.id, resolveLang(req, tenant));
   }
 }

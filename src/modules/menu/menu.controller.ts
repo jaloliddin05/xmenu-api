@@ -20,6 +20,10 @@ export class MenuController {
   @Header('Cache-Control', 'public, max-age=30')
   @Header('Vary', 'X-Tenant-Id, Accept-Language')
   get(@CurrentTenant() tenant: Tenant, @Req() req: Request) {
-    return this.menu.getMenu(tenant.id, resolveLang(req));
+    return this.menu.getMenu(tenant.id, {
+      lang: resolveLang(req, tenant),
+      fallback: tenant.defaultLanguage,
+      currency: tenant.currency,
+    });
   }
 }

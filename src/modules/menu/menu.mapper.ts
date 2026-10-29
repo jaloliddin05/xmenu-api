@@ -26,7 +26,12 @@ export type MenuCategoryRow = category & {
   products: MenuProductRow[];
 };
 
-export const CURRENCY = 'UZS';
+/** Language of the response, the tenant's default language for missing translations, the tenant's currency. */
+export interface MenuLocale {
+  lang: Lang;
+  fallback: Lang;
+  currency: string;
+}
 
 /**
  * file.url bazada faqat uploads ichidagi nisbiy yo'l ("/abc.png") sifatida
@@ -64,18 +69,19 @@ export function groupLimits(g: Pick<additional_product_group, 'is_required' | 'i
   return { required, multiple, min, max: Math.max(1, Math.min(max, optionCount)) };
 }
 
-export function toMenuView(categories: MenuCategoryRow[], lang: Lang) {
+export function toMenuView(categories: MenuCategoryRow[], locale: MenuLocale) {
+  const { lang, fallback } = locale;
   return categories
     .map((c) => ({
       id: c.id,
-      title: pickTranslation(c.translations, lang)?.title ?? '',
-      items: c.products.map((p) => toItemView(p, lang)),
+      title: pickTranslation(c.translations, lang, fallback)?.title ?? '',
+      items: c.products.map((p) => toItemView(p, locale)),
     }))
     .filter((c) => c.items.length > 0);
 }
 
-function toItemView(p: MenuProductRow, lang: Lang) {
-  const t = pickTranslation(p.translations, lang);
+function toItemView(p: MenuProductRow, { lang, fallback, currency }: MenuLocale) {
+  const t = pickTranslation(p.translations, lang, fallback);
   const g = UNIT.gr[lang];
   const nutrition: Record<string, number | string> = {};
   if (p.kcal != null) nutrition.kcal = Math.round(p.kcal);
@@ -90,7 +96,7 @@ function toItemView(p: MenuProductRow, lang: Lang) {
     image: publicFileUrl(p.images[0]?.url),
     images: p.images.map((i) => publicFileUrl(i.url) as string),
     price: toSum(p.price),
-    currency: CURRENCY,
+    currency,
     weight: formatWeight(p.weight, p.unit, lang),
     nutrition: Object.keys(nutrition).length ? nutrition : null,
     optionGroups: p.additional_product_groups
@@ -100,15 +106,15 @@ function toItemView(p: MenuProductRow, lang: Lang) {
         const limits = groupLimits(grp, grp.additional_products.length);
         return {
           id: grp.id,
-          title: pickTranslation(grp.translations, lang)?.title ?? '',
+          title: pickTranslation(grp.translations, lang, fallback)?.title ?? '',
           selectionType: limits.multiple ? 'multi' : 'single',
           required: limits.required,
           min: limits.min > 0 ? limits.min : null,
           max: limits.max,
-          currency: CURRENCY,
+          currency,
           options: grp.additional_products.map((o) => ({
             id: o.id,
-            name: pickTranslation(o.translations, lang)?.title ?? '',
+            name: pickTranslation(o.translations, lang, fallback)?.title ?? '',
             price: toSum(o.price),
           })),
         };

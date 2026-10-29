@@ -33,21 +33,30 @@ const category = (over: Partial<MenuCategoryRow> = {}): MenuCategoryRow =>
     ...over,
   }) as unknown as MenuCategoryRow;
 
+const locale = (lang: 'ru' | 'uz' | 'en', fallback: 'ru' | 'uz' | 'en' = 'ru', currency = 'UZS') => ({ lang, fallback, currency });
+
 describe('toMenuView', () => {
   it('maps categories, items and the language fallback', () => {
-    const ru = toMenuView([category()], 'ru');
+    const ru = toMenuView([category()], locale('ru'));
     expect(ru[0]).toMatchObject({ id: 'c1', title: 'Акции' });
     expect(ru[0].items[0]).toMatchObject({ id: 'p1', name: 'Мант с бараниной', description: 'Описание', price: 45000, currency: 'UZS', weight: '800 г', image: '/uploads/a.png' });
-    expect(toMenuView([category()], 'uz')[0].items[0].name).toBe("Qo'y go'shtli manti");
-    expect(toMenuView([category()], 'en')[0].title).toBe('Акции'); // no en → ru
+    expect(toMenuView([category()], locale('uz'))[0].items[0].name).toBe("Qo'y go'shtli manti");
+    expect(toMenuView([category()], locale('en', 'ru'))[0].title).toBe('Акции'); // no en → tenant default ru
+    expect(toMenuView([category()], locale('en', 'uz'))[0].title).toBe('Aksiyalar'); // no en → tenant default uz
+  });
+
+  it("prices in the tenant's currency", () => {
+    const item = toMenuView([category()], locale('ru', 'ru', 'USD'))[0].items[0];
+    expect(item.currency).toBe('USD');
+    expect(item.optionGroups.every((g) => g.currency === 'USD')).toBe(true);
   });
 
   it('nutrition: only the known values, with units', () => {
-    expect(toMenuView([category()], 'ru')[0].items[0].nutrition).toEqual({ kcal: 325, protein: '70 г', carbs: '24 г' });
+    expect(toMenuView([category()], locale('ru'))[0].items[0].nutrition).toEqual({ kcal: 325, protein: '70 г', carbs: '24 г' });
   });
 
   it('option groups: limits, selection type, sums rounded, empty groups hidden', () => {
-    const groups = toMenuView([category()], 'ru')[0].items[0].optionGroups;
+    const groups = toMenuView([category()], locale('ru'))[0].items[0].optionGroups;
     expect(groups).toHaveLength(2); // g3 has nothing to choose
     expect(groups[0]).toMatchObject({ id: 'g1', selectionType: 'multi', required: true, min: 2, max: 3 }); // max clamped to option count
     expect(groups[1]).toMatchObject({ id: 'g2', selectionType: 'single', required: false, min: null, max: 1 });
@@ -55,7 +64,7 @@ describe('toMenuView', () => {
   });
 
   it('drops categories without any active product', () => {
-    expect(toMenuView([category({ products: [] })], 'ru')).toEqual([]);
+    expect(toMenuView([category({ products: [] })], locale('ru'))).toEqual([]);
   });
 });
 

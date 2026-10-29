@@ -52,6 +52,7 @@ export function priceLines(
   items: RequestItem[],
   products: Map<string, PricingProduct>,
   lang: Lang,
+  fallback: Lang,
 ): { lines: PricedLine[]; subtotal: number } {
   const unavailable: Problem[] = [];
   const invalid: Problem[] = [];
@@ -90,9 +91,9 @@ export function priceLines(
         addons += price;
         options.push({
           groupId: group.id,
-          groupTitle: pickTranslation(group.translations, lang)?.title ?? '',
+          groupTitle: pickTranslation(group.translations, lang, fallback)?.title ?? '',
           optionId: option.id,
-          name: pickTranslation(option.translations, lang)?.title ?? '',
+          name: pickTranslation(option.translations, lang, fallback)?.title ?? '',
           price,
           position: options.length,
         });
@@ -102,7 +103,7 @@ export function priceLines(
     const basePrice = toSum(p.price);
     return {
       productId: p.id,
-      name: pickTranslation(p.translations, lang)?.title ?? '',
+      name: pickTranslation(p.translations, lang, fallback)?.title ?? '',
       image: publicFileUrl(p.images[0]?.url),
       weight: formatWeight(p.weight, p.unit, lang),
       basePrice,

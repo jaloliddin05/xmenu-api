@@ -30,7 +30,7 @@ export class CheckoutConfigController {
   async get(@CurrentTenant() tenant: Tenant) {
     const [s, online] = await Promise.all([this.settings.get(tenant.id), this.payments.enabledProviders(tenant.id)]);
     return {
-      currency: 'UZS',
+      currency: tenant.currency,
       deliveryServiceFee: s.deliveryServiceFee,
       minOrder: { delivery: s.minOrderDelivery, pickup: s.minOrderPickup },
       etaMinutes: [s.etaMin, s.etaMax],
