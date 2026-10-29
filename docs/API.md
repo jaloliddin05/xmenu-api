@@ -4,14 +4,15 @@
 Здесь то, чего в OpenAPI не видно: сценарии, коды ошибок, лимиты. Подробно по доменам:
 
 - заказы клиента: `ORDERS_API.md`, устройство заказов на бэкенде: `BACKEND_ORDERS.md`;
-- филиалы: `BRANCHES_API.md`.
+- филиалы: `BRANCHES_API.md`;
+- ревалидация QR: `REVALIDATE.md`.
 
 ## Два контура авторизации
 
 | | Владельцы (staff, админка) | Клиенты (доставка) |
 |---|---|---|
 | Пути | `/auth/*` и все прочие эндпоинты админки | `/auth/customer/*`, `/customers/*`, `/orders/*` |
-| Тенант | организация владельца из access-токена | заголовок `X-Tenant-Id` |
+| Тенант | организация владельца из access-токена | заголовок `X-Tenant-Id: <organization.id>` (UUID; slug не принимается) |
 | Формат ошибки | `{ status, timestamp, message, code?, retryAfter? }` | `{ error: { code, message, retryAfter?, details? } }` |
 
 При 429 всегда приходит заголовок `Retry-After` (секунды) и поле `retryAfter`.
@@ -29,7 +30,7 @@
 {
   "phone": "+998901234567",
   "password": "8-72 символа",
-  "name": "Mant",
+  "name": "Demo Cafe",
   "type": "restaurant | cafe | fast_food | coffee_shop | other",
   "first_name": "Aziz",
   "last_name": "Karimov"
@@ -47,7 +48,8 @@
 ### 3. `POST /auth/check-code` → 200
 
 `{ "registrationId": "uuid", "code": "123456" }` (код строкой: ведущие нули значимы).
-Создаёт владельца и заведение (slug из названия), сразу входит:
+Создаёт владельца, заведение (slug из названия) и строки настроек `organization_settings` и
+`organization_order_settings` со значениями платформы по умолчанию (см. «Настройки заведения»), сразу входит:
 `{ "success": true, "user": { ..., "organization": { ... } }, "accessToken": "...", "refreshToken": "..." }`.
 Заявка одноразовая.
 
@@ -93,14 +95,107 @@
 Счётчики входа ведутся и для несуществующих номеров: блокировка не выдаёт, есть ли аккаунт.
 IP берётся из `X-Forwarded-For` только от локального прокси (`trust proxy = loopback`).
 
+## Тенант: адрес → id → конфиг
+
+Клиентские фронты (QR-меню, доставка) определяют заведение так:
+
+1. `GET /tenant/by-slug/:slug` (публичный, без заголовков) → `{ "id": "uuid", "slug": "cafe-example" }`.
+   Только активные заведения. Неизвестный, неактивный, невалидный или UUID-подобный slug → `404 tenant_not_found`.
+   `Cache-Control: public, max-age=60` (slug владелец может переименовать), ошибки `no-store`.
+2. Дальше во все клиентские запросы заголовок `X-Tenant-Id: <id>`. Принимается только UUID организации: slug в
+   заголовке → `404 tenant_not_found` без запроса в БД. Нет заголовка → `400 tenant_required`, неактивное
+   заведение → `403 tenant_inactive`. Id не меняется при смене slug.
+3. `GET /tenant/config` (`X-Tenant-Id`, язык по `?lang=` или `Accept-Language`) → конфиг заведения.
+   `Cache-Control: public, max-age=60`, `Vary: X-Tenant-Id, Accept-Language`.
+
+```json
+{
+  "id": "uuid", "slug": "cafe-example", "name": "Demo Cafe", "type": "cafe",
+  "logoUrl": "https://files.example/image/organization/logo.png", "bannerUrl": null,
+  "description": "текст на языке ответа", "foundedYear": null,
+  "theme": { "brand": "#EE2E17", "brandForeground": "#FFFFFF" },
+  "locale": { "defaultLanguage": "ru", "languages": ["ru", "uz", "en"], "currency": "UZS" },
+  "contacts": { "phone": null, "telegramUsername": null, "workingHours": null, "address": null },
+  "fulfillment": { "modes": ["pickup"], "defaultMode": "pickup" },
+  "map": { "center": [41.311081, 69.240562], "zoom": 15, "city": "Ташкент",
+           "bounds": [[41.15, 69.0], [41.45, 69.45]], "deliveryZone": null }
+}
+```
+
+- Чего владелец не заполнил, приходит `null`; сервер ничего не подставляет. `theme` содержит только заданные цвета
+  (ключи `background, foreground, surface, mutedSurface, muted, brand, brandForeground, danger, serviceArea`),
+  остальное фронт берёт из своих нейтральных значений.
+- `logoUrl`, `bannerUrl`: абсолютные URL от `PUBLIC_FILES_URL` (иначе `PUBLIC_API_URL`).
+- `description`: на языке ответа; пустое или отсутствующее берётся на языке заведения по умолчанию, иначе `null`.
+- `fulfillment.modes`: `pickup`, если есть активный филиал с самовывозом; `delivery`, если есть активный филиал с
+  доставкой **и** задана зона доставки. Нет филиалов: `[]`, `defaultMode: null`. Деньги (сбор, минимум, ETA,
+  способы оплаты) остаются в `GET /checkout-config`.
+- `map.center` `[lat, lng]`, `map.bounds` `[[юго-запад], [северо-восток]]`, `map.deliveryZone` полигон
+  `[[lat, lng], ...]` или `null` (доставки нет).
+- Полей `contacts.country` и каналов (`channels`) пока нет.
+
+**Язык и валюта клиентских ответов** (`/menu`, `/branches`, `/orders`, `/tenant/config`): берётся первый язык из
+`?lang=` или `Accept-Language`, который есть в `languages` заведения; иначе язык заведения по умолчанию. Если
+перевода нет на языке ответа, берётся язык заведения по умолчанию, затем любой. Валюта (`currency` в меню, в
+`/checkout-config` и в заказе) из настроек заведения.
+
+Заведение без строки настроек (ошибка данных: строки создаются при регистрации) → `500 settings_missing`.
+
+### Вход клиента
+
+`POST /auth/customer/otp/request` → `{ "resendAfter": 60, "codeLength": 6 }`: поле ввода кода строится по
+`codeLength`, а не по константе во фронте.
+
+## Настройки заведения (владелец)
+
+`GET /organization/:id/settings` и `PUT /organization/:id/settings` (JSON, токен владельца, только своя организация).
+Без токена `401`, у пользователя нет организации `403`, чужой id `404`. Ответ обоих в одной форме:
+
+```json
+{
+  "theme": { "brand": "#EE2E17", "muted": "#4B494380" },
+  "currency": "UZS", "defaultLanguage": "ru", "languages": ["ru", "uz", "en"],
+  "supportPhone": "+998711234567", "supportTelegram": "demo_cafe", "supportHours": "10:00-23:00",
+  "address": "Main street 1", "foundedYear": 2015, "city": "Tashkent",
+  "mapCenter": { "lat": 41.31, "lng": 69.24 }, "mapZoom": 15,
+  "mapBounds": [[41.15, 69.0], [41.45, 69.45]]
+}
+```
+
+`PUT` заменяет документ целиком: каждое поле обязательно, `null` очищает необязательное. После регистрации:
+`UZS`, `ru`, `["ru","uz","en"]`, остальное `null`.
+
+| Поле | Правило |
+|---|---|
+| `theme` | объект или `null`; только ключи из списка выше, цвета `#RGB`, `#RRGGBB`, `#RRGGBBAA`; лишний ключ → 400 |
+| `currency` | `UZS` (цены в целых суммах) |
+| `languages` | непустой список без повторов из `ru`, `uz`, `en` |
+| `defaultLanguage` | один из `languages` |
+| `supportPhone` | `+998XXXXXXXXX` |
+| `supportTelegram` | username 5–32 символа, `@` в начале допускается и отбрасывается |
+| `supportHours`, `address`, `city` | непустая строка до 100 / 255 / 100 символов |
+| `foundedYear` | целое от 1800, не больше текущего года |
+| `mapCenter` | `{ lat: -90..90, lng: -180..180 }` |
+| `mapZoom` | целое 0..21 |
+| `mapBounds` | `[[swLat, swLng], [neLat, neLng]]`, юго-запад строго южнее и западнее; `mapCenter` внутри, если задан |
+
+Ошибки полей: `400` с текстом валидации; несогласованные поля (язык по умолчанию вне списка, год в будущем,
+границы, центр вне границ): `400`, `code: invalid_settings`. Сохранение сразу меняет язык и валюту клиентских
+ответов (кэш заведения в процессе сбрасывается; в других процессах pm2 до 30 с).
+
+Зона доставки, сбор, минимум, ETA и тайм-ауты правятся `PUT /order-settings` (строка тоже создаётся при
+регистрации; `deliveryZone: null` выключает доставку).
+
 ## Доступ к данным админки
 
 Владелец видит и меняет только свою организацию. Любой id чужой организации (в пути или в теле: `category_id`,
 `product_id`, `additional_product_group_id`, id переводов, `organizationId`...) отвечает `404`, как несуществующий.
 
 - `/user/:id`, `/user/change-password/:id`: только свой id. Новый пароль 8–72 символа.
-- `/organization/:id` (GET, PUT, DELETE): только своя. Публичные `GET /organization/slug/:slug` и
-  `GET /organization/return-slug/:id` без изменений.
+- `/organization/:id` (GET, PUT, DELETE) и `/organization/:id/settings`: только своя. Публичные
+  `GET /organization/slug/:slug` и `GET /organization/return-slug/:id` без изменений.
+- `slug` в `PUT /organization/:id` и `POST /organization/check-slug`: 3–63 символа `a-z`, `0-9` и одиночные
+  дефисы между словами, не похож на UUID; иначе `400 invalid_slug`. Занят другим заведением → `409 slug_taken`.
 - `/category/for-select/:organizationId`: только свой id. В `POST /category` (`organization_id`) и
   `PATCH /category/index` (`organizationId`) эти поля необязательны и должны совпадать со своей организацией.
 - `POST /additional-product/group`: `product_id` необязателен (группа создаётся до блюда и привязывается через

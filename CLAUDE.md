@@ -12,7 +12,7 @@ Swagger (`/docs`), Jest. Prettier: одинарные кавычки, trailing c
 `npm run start:dev` · `npm run build` · `npm run lint` · `npm test` · `npm run test:e2e` · `npm run openapi`
 (`openapi` собирает проект и пишет `docs/openapi.json` из сборки, без БД и Redis; `docs/API.md` правится руками).
 Миграции: `npm run migrate` (собирает схему и запускает `prisma migrate dev`), на сервере `npx prisma migrate deploy`.
-Env: см. `.env.example`. Ключевые: `JWT_*`, `OTP_*`, `SMS_PROVIDER`, `PAYMENT_CONFIG_KEY`, `REDIS_URL`, `PUBLIC_API_URL`,
+Env: см. `.env.example` (полный). Ключевые: `JWT_*`, `OTP_*`, `SMS_PROVIDER`, `PAYMENT_CONFIG_KEY`, `REDIS_URL`, `PUBLIC_API_URL`, `PUBLIC_FILES_URL`,
 `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ORDERS_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `OPS_CHAT_ID`, `ORDER_QUEUES`,
 `MINIAPP_URL`, `UPLOAD_MAX_BYTES`, `PLATFORM_ADMIN_USER_IDS`, `TRANSLATION_*`.
 
@@ -21,7 +21,8 @@ Env: см. `.env.example`. Ключевые: `JWT_*`, `OTP_*`, `SMS_PROVIDER`, `
 `npm run generate-schema`. Меняй модельные файлы, потом `npm run migrate`.
 
 ## Модули
-`auth` (два контура: staff и customer), `tenant` (`TenantGuard`, `TenantService`: тенант по slug), `organization`, `user`, `employee` (пока не
+`auth` (два контура: staff и customer), `tenant` (`TenantGuard`, `TenantService`: тенант по id; `GET /tenant/by-slug`,
+`GET /tenant/config` в `TenantConfigModule`), `organization` (+ настройки заведения), `user`, `employee` (пока не
 используется), `branch`, `category`, `product` (+ группы допов), `menu` (публичный), `customer` (+ адреса),
 `order` (state machine, очереди, уведомления), `payment` (Click, Payme, ключи тенанта, возвраты),
 `sms` (провайдеры eskiz, telegram, console), `file`, `translation`, `application`,
@@ -33,17 +34,28 @@ Env: см. `.env.example`. Ключевые: `JWT_*`, `OTP_*`, `SMS_PROVIDER`, `
 `@ApiOperation`, запусти `npm run openapi`, закоммить результат вместе с кодом. Проверки контракта в CI пока нет
 (в `.github/workflows` только `deploy.yml`).
 
-## Тенантность (не реализовано: цель)
-Факт: тенант определяется только по slug (`TenantService.resolve(slug)`, `tenant.service.ts:26`); заголовок
-`X-Tenant-Id` в коде несёт slug (`branch.controller.ts:12`), вебхуки на `payments/click/:slug` и
-`payments/payme/:slug`; `GET /tenant/by-slug`, `tenant-key.ts` и валидации slug нет.
-Цель (запланировано, очередь 0b):
-- Тенант только по `organization.id` (UUID, не меняется). Клиентские эндпоинты определяют его по `X-Tenant-Id`,
-  вебхуки оплаты по id в URL. Запасного пути «slug вместо id» нет. `GET /tenant/by-slug/:slug` отдаёт фронтам id и
-  публичный конфиг тенанта (бренд, логотип, цвета, языки, каналы, контакты). Slug валидируется (формат, не
-  UUID-подобный, уникальность).
+## Тенантность
+- Тенант только по `organization.id` (UUID, не меняется): `parseTenantId` (`tenant/tenant-key.ts`), `TenantService.resolve`
+  (кэш 30 с, `invalidate(id)`), `TenantGuard` по `X-Tenant-Id`. Slug в заголовке → `tenant_not_found` без запроса в БД.
+  Запасного пути по slug нет. Вебхуки оплаты по id: `payments/click/:tenantId`, `payments/payme/:tenantId`.
+- `GET /tenant/by-slug/:slug` → `{ id, slug }` (только активные). `GET /tenant/config` → публичный конфиг
+  (`tenant-config.service.ts`): незаполненное `null`, `delivery` в режимах только при заданной зоне.
+- Slug: `organization/domain/slug.ts` (3–63 символа, `a-z0-9` и дефисы, не UUID), дубликат → 409 `slug_taken`.
+- `Tenant` несёт `defaultLanguage`, `languages`, `currency` из `organization_settings`: язык ответа
+  `resolveLang(req, tenant)`, запасной язык перевода `pickTranslation(list, lang, tenant.defaultLanguage)`, валюта
+  меню, `/checkout-config` и заказа из настроек. Константы `'ru'` и `'UZS'` в коде ответов не используются.
 - Тенант и клиент берутся из токена и заголовка, не из тела запроса. Каждый запрос и выборка привязаны к тенанту.
 - Платёжные ключи и токены ботов шифруются AES-256-GCM (`PAYMENT_CONFIG_KEY`). Потеря ключа: все вводят заново.
+
+## Настройки заведения
+- `organization_settings` (бренд, валюта, языки, контакты, карта) и `organization_order_settings` (сбор, минимумы,
+  ETA, тайм-ауты, зона): по одной строке на заведение, обе создаются в `OrganizationService.create` при регистрации
+  значениями из `organization/domain/platform-defaults.ts`. У колонок нет `DEFAULT` в БД.
+- Чтение никогда не подставляет значения: нет строки → `settings_missing` (500) с логом.
+- Владелец: `GET/PUT /organization/:id/settings` (PUT заменяет документ целиком, проверки в
+  `organization/domain/organization-settings.ts` и DTO), `GET/PUT /order-settings`.
+- Нет зоны доставки (`delivery_zone = null`) → доставка недоступна: `POST /orders` отвечает
+  `422 delivery_unavailable_no_zone`.
 
 ## Заказы
 `OrderTransitionService` единственный путь смены статуса (автомат, optimistic locking по `version`, журнал).
@@ -114,7 +126,10 @@ Payme), Telegram webhook и кнопки, нагрузка. Стендов Click
   тела при смене slug (Q-01, чинится в QR). В `GET /application` читать могут только id из `PLATFORM_ADMIN_USER_IDS`.
 - Группы допов, созданные до миграции `additional_product_group_organization` и не привязанные к блюду, без владельца
   (недоступны никому); можно удалить вручную.
-- Тенант определяется только по slug (по id запланировано); смена slug ломает вебхуки Click/Payme.
+- Кэш тенанта и настроек заказа в памяти процесса (30 с): после `PUT` настроек другие процессы pm2 видят старые
+  язык, валюту и зону до 30 с.
+- `ErrorFilter` (staff) отдаёт только `message`: тексты ошибок `ValidationPipe` (какое поле не прошло) в ответ
+  админки не попадают.
 - Скомпилированные `.js/.d.ts/.js.map` в `src/config` (не должны быть в репозитории).
 - `npm run lint` не проходит (около 230 ошибок `recommendedTypeChecked`: нетипизированный `@Req() req`, `any` из
   конфигов и passport, код заказов и платежей), в CI lint не запускается. Для `*.spec.ts` и `*.fake.ts` правила

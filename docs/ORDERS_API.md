@@ -17,7 +17,7 @@ customer-эндпоинтов). Ошибки — единый формат кл�
 | POST | `/orders` | создать заказ (заголовок `Idempotency-Key` обязателен) |
 | GET | `/orders/:id` | один заказ (его опрашивает экран отслеживания) |
 | GET | `/orders` | история, новые первыми |
-| GET | `/menu` | меню (публичный, `?lang=` или `Accept-Language`) |
+| GET | `/menu` | меню (публичный; язык из `?lang=`/`Accept-Language` среди языков заведения, иначе язык заведения; валюта из настроек заведения) |
 | GET | `/checkout-config` | доставка/минимум/ETA/включённые способы оплаты (публичный) |
 | GET | `/orders?status=active` | только незавершённые (не `completed`/`cancelled`) — для плашки «активный заказ» на главной; если параметр не поддержан, клиент отфильтрует сам |
 | POST | `/orders/:id/cancel` | отмена клиентом |
@@ -50,7 +50,8 @@ Webhook'и Click/Payme переводят заказ `awaiting_payment → pendi
 * Одно блюдо может идти несколькими элементами `items` с разными
   `modifiers` — это разные позиции заказа.
 * Сервер обязан проверить: блюдо/опции существуют и доступны; для каждой
-  группы выполнены `required/min/max`; `quantity` 1..50; филиал открыт;
+  группы выполнены `required/min/max`; `quantity` 1..50 в строке и не больше 50 одного блюда
+  на весь заказ (строки с разными модификаторами суммируются); филиал открыт;
   адрес принадлежит клиенту и входит в зону; минимальная сумма;
   способ оплаты включён у тенанта.
 * `expectedTotal` — сумма, которую видел клиент. Не совпала → `409 price_changed`.
@@ -72,8 +73,10 @@ Webhook'и Click/Payme переводят заказ `awaiting_payment → pendi
   `branchId` лишь подсказка: если он закрыт или не доставляет, берётся первый открытый
   филиал с доставкой; если открытых нет — `branch_closed` с ближайшим `opensAt`.
   Филиал без расписания считается открытым (`isOpen = null`).
-* **Зона.** Если у тенанта задан `delivery_zone` (см. `PUT /order-settings`), адрес без
-  координат или вне полигона → `out_of_delivery_zone`.
+* **Зона.** Доставка работает только при заданной зоне `delivery_zone` (`PUT /order-settings`).
+  Зоны нет → `422 delivery_unavailable_no_zone` (самовывоз работает; `GET /tenant/config`
+  тогда не включает `delivery` в `fulfillment.modes`). Адрес без координат или вне
+  полигона → `out_of_delivery_zone`.
 * **Конкурентные повторы.** Два одинаковых запроса одновременно не создают два заказа:
   второй упирается в уникальный индекс `(customer_id, idempotency_key)` и получает
   тот же заказ.
@@ -142,7 +145,7 @@ cash ─────────────────────▶ pending_
 | 403 | `customer_blocked` | — | сообщение |
 | 404 | `order_not_found` | — | «Заказ не найден» (в т.ч. чужой заказ) |
 | 400 | `idempotency_key_required` | — | (ошибка клиента: нет/некорректный `Idempotency-Key`) |
-| 400/422 | `validation_error`, `invalid_order` | — | сообщение |
+| 400/422 | `validation_error`, `invalid_order` | для `invalid_order` сверх 50 одного блюда: `{ items: [{ itemId, quantity, max }] }` | сообщение |
 | 422 | `fulfillment_unavailable` | — | сообщение (филиал не делает самовывоз/доставку) |
 | 429 | `too_many_active_orders` | `retryAfter` | сообщение |
 | 422 | `invalid_modifiers` | `{ items: [{ index, itemId, reason, groupId? }] }` (`reason`: `missing_required`, `below_min`, `above_max`, `unknown_group`, `unknown_option`, `duplicate_group`, `duplicate_option`) | строки помечаются, «Убрать» |
@@ -150,6 +153,7 @@ cash ─────────────────────▶ pending_
 | 409 | `price_changed` | `{ items: [{ index, unitPrice }], subtotal, serviceFee, total }` | цены в корзине обновляются, просим подтвердить |
 | 422 | `min_order_not_reached` | `{ minAmount }` | сообщение |
 | 422 | `out_of_delivery_zone` | — | открывается список адресов |
+| 422 | `delivery_unavailable_no_zone` | — | доставка недоступна, предлагается самовывоз |
 | 404 | `address_not_found` | — | то же |
 | 409 | `branch_closed` | `{ opensAt? }` | сообщение |
 | 422 | `payment_method_unavailable` | — | сбрасывается способ оплаты |
@@ -167,7 +171,7 @@ cash ─────────────────────▶ pending_
   "minOrder": { "delivery": 30000, "pickup": 0 },
   "etaMinutes": [20, 30], "paymentMethods": ["cash", "click"] }
 ```
-Нужен корзине, чтобы оценка суммы совпадала с серверной (иначе `expectedTotal`
+`currency` из настроек заведения (`organization_settings`). Нужен корзине, чтобы оценка суммы совпадала с серверной (иначе `expectedTotal`
 расходится и каждый заказ уходит в `price_changed`). Значения задаёт ресторан:
 `PUT /order-settings` и `PUT /payment-provider/:provider`.
 

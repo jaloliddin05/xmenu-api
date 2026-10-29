@@ -11,7 +11,7 @@
 | `menu` | `GET /menu` (публичный): категории → блюда → группы модификаторов, язык по `?lang`/`Accept-Language` |
 | `order` | клиентский API `/orders*`, `GET /checkout-config`; панель ресторана `/order*`, `/order-settings`; Telegram-кнопки `/telegram/orders/webhook` |
 | `order` (ядро) | `OrderTransitionService` — **единственный** путь смены статуса: автомат состояний + оптимистичная блокировка (`version`) + журнал `order_status_event`; очереди; уведомления |
-| `payment` | Click Shop API (`/payments/click/:slug/prepare|complete`), Payme Merchant API (`/payments/payme/:slug`), ключи тенанта (`/payment-provider`), возвраты |
+| `payment` | Click Shop API (`/payments/click/:tenantId/prepare|complete`), Payme Merchant API (`/payments/payme/:tenantId`), ключи тенанта (`/payment-provider`), возвраты |
 
 Зависимости модулей без циклов: `payment → order-core ← order`, `order → payment`.
 
@@ -81,9 +81,9 @@ Click — автоматически через Merchant API (reversal). Payme �
 
 ## Безопасность
 
-* Tenant и клиент берутся из токена/slug, не из тела запроса; чужой заказ = `order_not_found`.
+* Tenant и клиент берутся из токена и `X-Tenant-Id` (id организации), не из тела запроса; чужой заказ = `order_not_found`.
 * Цены, названия, доступность и правила модификаторов — только из БД; от клиента приходят id и количества.
-* Вебхуки Click/Payme: URL содержит slug тенанта, подпись проверяется ключом **этого** тенанта
+* Вебхуки Click/Payme: URL содержит id тенанта (не меняется при смене slug), подпись проверяется ключом **этого** тенанта
   (`timingSafeEqual`); заказ ищется только внутри тенанта. Payme: неверный тенант и неверный пароль
   дают один и тот же ответ.
 * Telegram-кнопки: secret-token + проверка, что нажали в группе **этого** филиала.
