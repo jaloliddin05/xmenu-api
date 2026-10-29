@@ -11,6 +11,8 @@ import { TenantService } from 'src/modules/tenant/tenant.service';
 import { assertOwnTranslations } from 'src/modules/product/services/menu-ownership';
 import { randomSlug, SLUG_MAX, slugify } from '../domain/slug';
 import { PLATFORM_ORDER_SETTINGS, PLATFORM_SETTINGS } from '../domain/platform-defaults';
+import { PublicOrganization, toPublicOrganization } from '../domain/public-organization';
+import { parseTenantId } from 'src/modules/tenant/tenant-key';
 
 const slugTaken = () => new ConflictException({ message: 'Slug is already taken', code: 'slug_taken' });
 
@@ -113,9 +115,21 @@ export class OrganizationService {
     return organization;
   }
 
-  async findBySlug(slug: string, lang) {
-    const organization = await this.prismaService.organization.findUnique({
-      where: { slug },
+  /** Slug of an active venue by its id (QR redirect /organization/{id}); null for anything else. */
+  async findActiveSlug(id: string): Promise<string | null> {
+    const tenantId = parseTenantId(id);
+    if (!tenantId) return null;
+    const organization = await this.prismaService.organization.findFirst({
+      where: { id: tenantId, is_active: true },
+      select: { slug: true },
+    });
+    return organization?.slug ?? null;
+  }
+
+  /** Public QR menu of an active venue: only the fields in PublicOrganization. */
+  async findBySlug(slug: string, lang): Promise<PublicOrganization> {
+    const organization = await this.prismaService.organization.findFirst({
+      where: { slug, is_active: true },
       include: {
         logo: true,
         banner: true,
@@ -189,7 +203,7 @@ export class OrganizationService {
       throw new NotFoundException(`Organization with slug "${slug}" not found`);
     }
 
-    return organization;
+    return toPublicOrganization(organization);
   }
 
 

@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { ApplicationService } from './application.service';
 import { CreateApplicationDto } from './dto/create-application.dto';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiCreatedResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Public } from '../auth/decorators/public.decorator';
 import { PlatformAdminGuard } from '../auth/guards/platform-admin.guard';
 
@@ -12,7 +12,8 @@ export class ApplicationController {
 
   @Public()
   @Post()
-  @ApiOperation({ summary: 'Method: create' })
+  @ApiOperation({ summary: 'Landing contact form (public); answers { id }' })
+  @ApiCreatedResponse({ schema: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] } })
   async create(@Body() dto: CreateApplicationDto) {
     return this.applicationService.create(dto);
   }

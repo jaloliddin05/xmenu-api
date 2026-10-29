@@ -7,7 +7,8 @@ import { sendApplicationToTelegram } from 'src/infra/helper/tg-bot/otp-bot';
 export class ApplicationService {
   constructor(private prisma: PrismaService) {}
 
-  async create(dto: CreateApplicationDto) {
+  /** Public landing form: answers only the new id, never the stored row. */
+  async create(dto: CreateApplicationDto): Promise<{ id: string }> {
     // 1️⃣ DB ga yozish
     const application = await this.prisma.application.create({
       data: dto,
@@ -16,7 +17,7 @@ export class ApplicationService {
     // 2️⃣ Telegram ga yuborish
     await sendApplicationToTelegram(dto);
 
-    return application;
+    return { id: application.id };
   }
 
   async findAll() {
