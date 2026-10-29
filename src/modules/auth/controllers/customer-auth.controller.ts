@@ -7,7 +7,13 @@ import {
   Post,
   Req,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiHeader, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiHeader,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import type { Request } from 'express';
 
 import {
@@ -17,9 +23,16 @@ import {
   CustomerRefreshDto,
   CustomerRegisterDto,
   CustomerTelegramDto,
+  CustomerTelegramStartDto,
+  CustomerTelegramStatusDto,
 } from '../dto';
 import { CustomerOtpRequestResponseDto } from '../dto/customer-otp-response.dto';
+import {
+  CustomerTelegramStartResponseDto,
+  CustomerTelegramStatusResponseDto,
+} from '../dto/customer-telegram-verify.dto';
 import { CustomerAuthService } from '../services/customer-auth.service';
+import { TelegramVerificationService } from '../services/telegram-verification.service';
 import { requestCtx as ctxOf } from 'src/infra/http/request-helpers';
 import {
   CurrentCustomer,
@@ -44,7 +57,10 @@ import type { Tenant } from '../../tenant/tenant.service';
 // bitta segment qo'shiladi, "/auth/otp/request" -> "/auth/customer/otp/request").
 @Controller('auth/customer')
 export class AuthCustomerController {
-  constructor(private readonly auth: CustomerAuthService) {}
+  constructor(
+    private readonly auth: CustomerAuthService,
+    private readonly telegramVerification: TelegramVerificationService,
+  ) {}
 
   @CustomerPublicRoute()
   @Post('otp/request')
@@ -67,6 +83,42 @@ export class AuthCustomerController {
     @Req() req: Request,
   ) {
     return this.auth.verifyOtp(tenant, dto, ctxOf(req));
+  }
+
+  /**
+   * Telegram phone verification (alternative to SMS). Mini App: pass initData, share contact, poll
+   * status. Website: pass phone, open deepLink, share contact, type the code sent into the chat,
+   * then call otp/verify. See docs/TELEGRAM_VERIFICATION.md.
+   */
+  @CustomerPublicRoute()
+  @Post('telegram/start')
+  @HttpCode(200)
+  @ApiOperation({
+    summary:
+      'Start phone verification through the venue Telegram bot (503 telegram_unavailable: no bot, offer SMS only)',
+  })
+  @ApiOkResponse({ type: CustomerTelegramStartResponseDto })
+  telegramStart(
+    @CurrentTenant() tenant: Tenant,
+    @Body() dto: CustomerTelegramStartDto,
+    @Req() req: Request,
+  ) {
+    return this.telegramVerification.start(tenant, dto, ctxOf(req));
+  }
+
+  @CustomerPublicRoute()
+  @Post('telegram/status')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Poll the Telegram verification session every 2 s (the login result is returned once)',
+  })
+  @ApiOkResponse({ type: CustomerTelegramStatusResponseDto })
+  telegramStatus(
+    @CurrentTenant() tenant: Tenant,
+    @Body() dto: CustomerTelegramStatusDto,
+    @Req() req: Request,
+  ) {
+    return this.telegramVerification.status(tenant, dto.sessionId, ctxOf(req));
   }
 
   @CustomerPublicRoute()

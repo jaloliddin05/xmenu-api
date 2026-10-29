@@ -1,0 +1,19 @@
+
+// The venue's own Telegram bot: created in @BotFather, token entered in the dashboard.
+// token_encrypted: AES-256-GCM, same format and key (PAYMENT_CONFIG_KEY) as payment provider keys.
+// One bot belongs to one venue only (telegram_bot_id is unique).
+model organization_telegram_bot {
+  id              String       @id @default(uuid())
+  organization_id String       @unique
+  organization    organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+
+  telegram_bot_id String       @unique
+  username        String
+  token_encrypted String
+  // secret_token given to setWebhook: webhook calls must carry it in a header
+  webhook_secret  String
+  is_enabled      Boolean      @default(true)
+
+  created_at      DateTime     @default(now())
+  updated_at      DateTime     @updatedAt
+}

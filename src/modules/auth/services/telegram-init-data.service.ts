@@ -3,6 +3,7 @@ import { createHmac, timingSafeEqual } from 'crypto';
 import { CUSTOMER_AUTH_CONFIG } from '../customer-auth.config';
 import type { CustomerAuthConfig } from '../customer-auth.config';
 import { CustomerAuthException } from '../errors/customer-auth.exception';
+import { TelegramBotService } from '../../telegram/telegram-bot.service';
 
 export interface TelegramUser {
   id: number | string;
@@ -13,13 +14,23 @@ export interface TelegramUser {
 
 @Injectable()
 export class TelegramInitDataService {
-  constructor(@Inject(CUSTOMER_AUTH_CONFIG) private readonly cfg: CustomerAuthConfig) {}
+  constructor(
+    @Inject(CUSTOMER_AUTH_CONFIG) private readonly cfg: CustomerAuthConfig,
+    private readonly bots: TelegramBotService,
+  ) {}
 
-  /** Telegram WebApp initData imzosini tekshiradi va user'ni qaytaradi. */
-  verify(initData: string): TelegramUser {
-    const botToken = process.env.TELEGRAM_BOT_TOKEN;
-    if (!botToken) throw new Error('TELEGRAM_BOT_TOKEN is not configured');
+  /**
+   * initData is signed with the token of the bot that opened the Mini App: the venue's own bot,
+   * or the platform bot (TELEGRAM_BOT_TOKEN) while the venue has not connected one.
+   */
+  async verifyForTenant(tenantId: string, initData: string): Promise<TelegramUser> {
+    const token = await this.bots.initDataToken(tenantId);
+    if (!token) throw new Error('TELEGRAM_BOT_TOKEN is not configured');
+    return this.verifyWithToken(initData, token);
+  }
 
+  /** Verifies the WebApp initData signature against `botToken` and returns the user. */
+  verifyWithToken(initData: string, botToken: string): TelegramUser {
     const bad = () => new CustomerAuthException('invalid_telegram_data', 'Invalid Telegram initData');
 
     const params = new URLSearchParams(initData);

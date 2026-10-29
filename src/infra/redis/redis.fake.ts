@@ -122,18 +122,31 @@ export class FakeRedis {
     return Math.ceil((e.expiresAt - this.clock) / 1000);
   }
 
-  async hset(key: string, ...fieldValues: (string | number)[]) {
+  /** Both ioredis forms: hset(key, field, value, ...) and hset(key, { field: value }). */
+  async hset(
+    key: string,
+    ...fieldValues: (string | number | Record<string, string | number>)[]
+  ) {
+    const [first] = fieldValues;
+    const pairs: string[] =
+      fieldValues.length === 1 && typeof first === 'object'
+        ? Object.entries(first).flatMap(([f, v]) => [f, String(v)])
+        : fieldValues.map((v) => (typeof v === 'object' ? '' : String(v)));
     const h = this.hash(key, true)!;
     let added = 0;
-    for (let i = 0; i < fieldValues.length; i += 2) {
-      if (!h.has(String(fieldValues[i]))) added++;
-      h.set(String(fieldValues[i]), String(fieldValues[i + 1]));
+    for (let i = 0; i < pairs.length; i += 2) {
+      if (!h.has(pairs[i])) added++;
+      h.set(pairs[i], pairs[i + 1]);
     }
     return added;
   }
 
   async hget(key: string, field: string) {
     return this.hash(key, false)?.get(field) ?? null;
+  }
+
+  async hgetall(key: string): Promise<Record<string, string>> {
+    return Object.fromEntries(this.hash(key, false) ?? []);
   }
 
   async hincrby(key: string, field: string, by: number) {

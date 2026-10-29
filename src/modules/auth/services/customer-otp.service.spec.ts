@@ -194,4 +194,67 @@ describe('CustomerOtpService', () => {
     expect(otp.isValidCodeFormat('1234')).toBe(false);
     expect(otp.isValidCodeFormat(123456)).toBe(false);
   });
+
+  describe('issue() (delivery channel of the caller)', () => {
+    it('hands the code to the channel; it verifies like an SMS code', async () => {
+      const deliver = jest.fn<Promise<void>, [string]>(async () => undefined);
+      await expect(otp.issue(TENANT, PHONE, { deliver })).resolves.toBe(60);
+      expect(sms.sent).toHaveLength(0);
+      const code = deliver.mock.calls[0][0];
+      expect(code).toMatch(/^\d{6}$/);
+      await expect(
+        otp.consume(TENANT.id, PHONE, code, noopHooks()),
+      ).resolves.toBeUndefined();
+    });
+
+    it('shares the per-phone limits with SMS', async () => {
+      await otp.request(TENANT, PHONE, IP);
+      await expectCode(
+        otp.issue(TENANT, PHONE, { deliver: async () => undefined }),
+        'rate_limited',
+      );
+    });
+
+    it('without an ip (Telegram webhook) skips only the per-IP limit', async () => {
+      for (let i = 0; i < 30; i++) {
+        await otp.request(TENANT, `+9989012345${String(i).padStart(2, '0')}`, IP);
+      }
+      await expectCode(otp.request(TENANT, '+998909999999', IP), 'rate_limited');
+      await expect(
+        otp.issue(TENANT, '+998909999999', { deliver: async () => undefined }),
+      ).resolves.toBe(60);
+    });
+
+    it('dev mode sends nothing unless the channel asks for it', async () => {
+      const r = redis as unknown as Redis;
+      const dev = new CustomerOtpService(
+        r,
+        { ...cfg, otpDevMode: true },
+        sms,
+        new RateLimitService(r),
+      );
+      const quiet = jest.fn(async () => undefined);
+      await dev.issue(TENANT, PHONE, { deliver: quiet });
+      expect(quiet).not.toHaveBeenCalled();
+
+      redis.advance(60);
+      const loud = jest.fn(async () => undefined);
+      await dev.issue(TENANT, PHONE, { deliver: loud, alwaysDeliver: true });
+      expect(loud).toHaveBeenCalledWith('123456');
+    });
+
+    it('a failed delivery drops the code, gives the budget back and reports the channel', async () => {
+      await expectCode(
+        otp.issue(TENANT, PHONE, {
+          deliver: async () => {
+            throw new Error('boom');
+          },
+          unavailableCode: 'telegram_unavailable',
+        }),
+        'telegram_unavailable',
+      );
+      expect(await redis.exists(`otp:${TENANT.id}:${PHONE}`)).toBe(0);
+      await expect(otp.request(TENANT, PHONE, IP)).resolves.toBe(60);
+    });
+  });
 });

@@ -106,6 +106,21 @@ export class CustomerAuthService {
     });
     await this.events.log('otp_verified', ctx, { tenantId: tenant.id, phone });
 
+    return this.completeVerifiedPhone(tenant, phone, ctx, {
+      initData: dto.initData,
+    });
+  }
+
+  /**
+   * The phone is proven (SMS code, Telegram code or Telegram contact): log the customer in,
+   * or hand out a one-time registration token for a new phone. Shared by every verification channel.
+   */
+  async completeVerifiedPhone(
+    tenant: Tenant,
+    phone: string,
+    ctx: RequestCtx,
+    link?: { initData?: string; telegramId?: string },
+  ): Promise<VerifyResult> {
     const customer = await this.customers.findByPhone(tenant.id, phone);
 
     if (!customer) {
@@ -117,8 +132,11 @@ export class CustomerAuthService {
     }
 
     this.assertActive(customer, tenant, ctx, 'otp_verify');
-    if (dto.initData)
-      await this.tryLinkTelegram(tenant.id, customer.id, dto.initData);
+    if (link?.telegramId) {
+      await this.linkTelegramId(tenant.id, customer.id, link.telegramId);
+    } else if (link?.initData) {
+      await this.tryLinkTelegram(tenant.id, customer.id, link.initData);
+    }
 
     const pair = await this.login(customer, tenant, ctx);
     return {
@@ -158,7 +176,9 @@ export class CustomerAuthService {
     if (burned !== 'OK')
       throw new CustomerAuthException('registration_expired');
 
-    const telegramId = dto.initData ? this.safeTelegramId(dto.initData) : null;
+    const telegramId = dto.initData
+      ? await this.safeTelegramId(tenant.id, dto.initData)
+      : null;
 
     try {
       const result = await this.prisma.$transaction(async (tx) => {
@@ -248,7 +268,7 @@ export class CustomerAuthService {
     initData: string,
     ctx: RequestCtx,
   ): Promise<VerifyResult | { isNewUser: true; requiresPhone: true }> {
-    const tgUser = this.telegram.verify(initData);
+    const tgUser = await this.telegram.verifyForTenant(tenant.id, initData);
     const customer = await this.customers.findByTelegramId(
       tenant.id,
       String(tgUser.id),
@@ -306,9 +326,14 @@ export class CustomerAuthService {
     return pair;
   }
 
-  private safeTelegramId(initData: string): string | null {
+  private async safeTelegramId(
+    tenantId: string,
+    initData: string,
+  ): Promise<string | null> {
     try {
-      return String(this.telegram.verify(initData).id);
+      return String(
+        (await this.telegram.verifyForTenant(tenantId, initData)).id,
+      );
     } catch {
       return null; // noto'g'ri initData telefon orqali kirishni to'sib qo'ymasin
     }
@@ -319,8 +344,16 @@ export class CustomerAuthService {
     customerId: string,
     initData: string,
   ) {
-    const telegramId = this.safeTelegramId(initData);
+    const telegramId = await this.safeTelegramId(tenantId, initData);
     if (!telegramId) return;
+    await this.linkTelegramId(tenantId, customerId, telegramId);
+  }
+
+  private async linkTelegramId(
+    tenantId: string,
+    customerId: string,
+    telegramId: string,
+  ) {
     const owner = await this.customers.findByTelegramId(tenantId, telegramId);
     if (owner) return; // allaqachon band (shu yoki boshqa mijozga)
     await this.customers

@@ -19,6 +19,7 @@ import { MenuModule } from './modules/menu/menu.module';
 import { OrderModule } from './modules/order/order.module';
 import { PaymentModule } from './modules/payment/payment.module';
 import { TenantConfigModule } from './modules/tenant/tenant-config.module';
+import { TelegramModule } from './modules/telegram/telegram.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -40,6 +41,7 @@ import { TenantConfigModule } from './modules/tenant/tenant-config.module';
     ProductModule,
     RedisModule,
     SmsModule,
+    TelegramModule,
     TenantConfigModule,
     TranslationModule,
     UserModule

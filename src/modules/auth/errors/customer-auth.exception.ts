@@ -19,6 +19,8 @@ export type CustomerErrorCode =
   | 'customer_blocked'
   | 'tenant_mismatch'
   | 'sms_unavailable'
+  // The venue has no Telegram bot connected, or the bot could not deliver the code
+  | 'telegram_unavailable'
   | 'invalid_telegram_data'
   | 'invalid_address'
   | 'address_not_found'
@@ -66,6 +68,7 @@ const STATUS: Record<CustomerErrorCode, number> = {
   customer_blocked: 403,
   tenant_mismatch: 403,
   sms_unavailable: 503,
+  telegram_unavailable: 503,
   invalid_telegram_data: 401,
   invalid_address: 400,
   address_not_found: 404,

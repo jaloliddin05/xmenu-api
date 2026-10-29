@@ -22,6 +22,8 @@ export interface CustomerAuthConfig {
 
   smsLocale: 'uz' | 'ru';
   telegramInitDataMaxAgeSeconds: number;
+  /** Lifetime of a Telegram phone-verification session. */
+  telegramVerifyTtlSeconds: number;
 }
 
 function int(name: string, def: number): number {
@@ -92,5 +94,6 @@ export function loadCustomerAuthConfig(): CustomerAuthConfig {
     maxActiveFamilies: 10,
     smsLocale: locale,
     telegramInitDataMaxAgeSeconds: int('TELEGRAM_INITDATA_MAX_AGE_SECONDS', 86400),
+    telegramVerifyTtlSeconds: int('TELEGRAM_VERIFY_TTL_SECONDS', 300),
   };
 }

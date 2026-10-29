@@ -8,6 +8,8 @@ export type AuthEventType =
   | 'otp_verified'
   | 'otp_failed'
   | 'otp_locked'
+  | 'telegram_verify_started'
+  | 'telegram_verified'
   | 'registered'
   | 'login'
   | 'refresh'

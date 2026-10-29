@@ -74,14 +74,39 @@ export class CustomerOtpService {
     ip: string,
     scope: OtpScope = 'customer',
   ): Promise<number> {
+    return this.issue(tenant, phone, {
+      ip,
+      scope,
+      deliver: (code) => this.sms.send(phone, SMS_TEXT[scope][this.cfg.smsLocale](tenant.brandName, code)),
+    });
+  }
+
+  /**
+   * Creates a code (stored hashed, one-time, attempt-limited) and hands it to `deliver`.
+   * SMS and Telegram share the same store and the same per-phone limits, so a phone cannot be
+   * flooded by alternating channels. `ip` is optional: the Telegram webhook does not know it.
+   */
+  async issue(
+    tenant: { id: string; brandName: string },
+    phone: string,
+    opts: {
+      ip?: string;
+      scope?: OtpScope;
+      deliver: (code: string) => Promise<void>;
+      /** Deliver even in OTP_DEV_MODE (the fixed dev code is otherwise never sent). */
+      alwaysDeliver?: boolean;
+      unavailableCode?: 'sms_unavailable' | 'telegram_unavailable';
+    },
+  ): Promise<number> {
+    const scope = opts.scope ?? 'customer';
     // Telefon bo'yicha kalitlarda tenant YO'Q (tenant klientdan keladi — aylanib o'tib bo'lmasin)
     const p = KEY_PREFIX[scope];
     const rules: RateRule[] = [
       { key: `${p}:cd:${phone}`, limit: 1, ttlSeconds: this.cfg.otpCooldownSeconds },
       { key: `${p}:rl:phone:h:${phone}`, limit: 5, ttlSeconds: 3600 },
       { key: `${p}:rl:phone:d:${phone}`, limit: 10, ttlSeconds: 86400 },
-      { key: `${p}:rl:ip:${ip}`, limit: 30, ttlSeconds: 3600 },
     ];
+    if (opts.ip !== undefined) rules.push({ key: `${p}:rl:ip:${opts.ip}`, limit: 30, ttlSeconds: 3600 });
     await this.rateLimit.hit(rules);
 
     const key = this.otpKey(scope, tenant.id, phone);
@@ -95,18 +120,18 @@ export class CustomerOtpService {
       .expire(key, this.cfg.otpTtlSeconds)
       .exec();
 
-    if (!this.cfg.otpDevMode) {
+    if (!this.cfg.otpDevMode || opts.alwaysDeliver) {
       try {
         await Promise.race([
-          this.sms.send(phone, SMS_TEXT[scope][this.cfg.smsLocale](tenant.brandName, code)),
+          opts.deliver(code),
           new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('SMS provider timeout')), SEND_TIMEOUT_MS).unref(),
+            setTimeout(() => reject(new Error('Code delivery timeout')), SEND_TIMEOUT_MS).unref(),
           ),
         ]);
       } catch (err) {
         await this.redis.del(key);
         await this.rateLimit.rollback(rules);
-        throw new CustomerAuthException('sms_unavailable', 'SMS provider unavailable');
+        throw new CustomerAuthException(opts.unavailableCode ?? 'sms_unavailable', 'Code delivery unavailable');
       }
     }
 

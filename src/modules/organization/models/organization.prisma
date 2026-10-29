@@ -25,6 +25,7 @@ model organization {
   settings          organization_settings?
   order_settings    organization_order_settings?
   payment_providers organization_payment_provider[]
+  telegram_bot      organization_telegram_bot?
   additional_product_groups additional_product_group[]
   // Tenant ichidagi buyurtma raqami hisoblagichi (atomik UPDATE ... RETURNING)
   order_seq    Int               @default(1000)

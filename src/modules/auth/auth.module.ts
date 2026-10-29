@@ -15,6 +15,7 @@ import { AuthCustomerController } from './controllers/customer-auth.controller';
 import { CustomerAuthService } from './services/customer-auth.service';
 import { CustomerModule } from '../customer/customer.module';
 import { TenantModule } from '../tenant/tenant.module';
+import { TelegramModule } from '../telegram/telegram.module';
 import { PrismaModule } from '../_prisma/prisma.module';
 import {
   CUSTOMER_AUTH_CONFIG,
@@ -30,6 +31,8 @@ import { StaffLoginThrottleService } from './services/staff-login-throttle.servi
 import { CustomerCleanupService } from './services/customer-cleanup.service';
 import { RateLimitService } from './services/rate-limit.service';
 import { TelegramInitDataService } from './services/telegram-init-data.service';
+import { TelegramVerificationService } from './services/telegram-verification.service';
+import { TelegramBotWebhookController } from './controllers/telegram-bot-webhook.controller';
 import { CustomerAccessTokenStrategy } from './passport-strategies/customer-access-token/customer-access-token.strategy';
 import { NoStoreMiddleware } from './middleware/no-store.middleware';
 
@@ -40,6 +43,7 @@ import { NoStoreMiddleware } from './middleware/no-store.middleware';
     PassportModule,
     CustomerModule,
     TenantModule,
+    TelegramModule,
     PrismaModule,
     JwtModule.registerAsync({
       useFactory: (configService: ConfigService) => {
@@ -67,12 +71,17 @@ import { NoStoreMiddleware } from './middleware/no-store.middleware';
     CustomerCleanupService,
     RateLimitService,
     TelegramInitDataService,
+    TelegramVerificationService,
     CustomerAccessTokenStrategy,
     AccessTokenUserStrategy,
     RefreshTokenUserStrategy,
     JwtTokenService,
   ],
-  controllers: [AuthController, AuthCustomerController],
+  controllers: [
+    AuthController,
+    AuthCustomerController,
+    TelegramBotWebhookController,
+  ],
   exports: [AuthService, CUSTOMER_AUTH_CONFIG, RateLimitService],
 })
 export class AuthModule implements NestModule {
