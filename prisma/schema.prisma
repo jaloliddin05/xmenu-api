@@ -279,7 +279,7 @@ model customer_order {
   payment_status     OrderPaymentStatus
   payment_expires_at DateTime?
 
-  currency        String   @default("UZS")
+  currency        String
   subtotal        Int
   service_fee     Int      @default(0)
   discount        Int      @default(0)
@@ -408,27 +408,58 @@ enum OrderActor {
   system
   payment
 }
-// Tenantning buyurtma sozlamalari (bitta qator). Qator bo'lmasa kod standart
-// qiymatlarni ishlatadi (order-settings.service.ts).
+// Ordering settings of a tenant (one row per organization). The row is created at signup with the
+// platform defaults (organization/domain/platform-defaults.ts) and must exist: the code never
+// substitutes values for a missing row (order-settings.service.ts).
 model organization_order_settings {
   organization_id String   @id
   organization    organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
 
-  delivery_service_fee Int @default(0)
-  min_order_delivery   Int @default(0)
-  min_order_pickup     Int @default(0)
-  eta_min              Int @default(20)
-  eta_max              Int @default(30)
+  delivery_service_fee Int
+  min_order_delivery   Int
+  min_order_pickup     Int
+  eta_min              Int
+  eta_max              Int
 
   // Restoran buyurtmani qabul qilmasa — shu vaqtdan keyin avtomatik bekor (soniya)
-  acceptance_timeout_seconds Int @default(300)
+  acceptance_timeout_seconds Int
   // Onlayn to'lov oynasi (soniya)
-  payment_timeout_seconds    Int @default(900)
+  payment_timeout_seconds    Int
   // Bir vaqtda faol buyurtmalar soni chegarasi (suiiste'moldan himoya)
-  max_active_orders          Int @default(5)
+  max_active_orders          Int
 
-  // Yetkazib berish zonasi: [[lat, lng], ...] — kamida 3 nuqta. null = tekshirilmaydi.
+  // Delivery zone: [[lat, lng], ...], at least 3 points. null = delivery is unavailable.
   delivery_zone Json?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+// Public settings of a tenant (one row per organization, created at signup with the platform
+// defaults from organization/domain/platform-defaults.ts). Read by GET /tenant/config, edited
+// through PUT /organization/:id/settings. NULL = the owner has not filled it in.
+model organization_settings {
+  organization_id String       @id
+  organization    organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+
+  // Brand colors: { brand: "#EE2E17", ... }, keys from THEME_KEYS (domain/organization-settings.ts)
+  theme            Json?
+  currency         String
+  default_language String
+  languages        String[]
+
+  support_phone    String?
+  support_telegram String?
+  support_hours    String?
+  address          String?
+  founded_year     Int?
+
+  city           String?
+  map_center_lat Float?
+  map_center_lng Float?
+  map_zoom       Int?
+  // [[swLat, swLng], [neLat, neLng]]
+  map_bounds     Json?
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -465,6 +496,7 @@ model organization {
   customers    customer[]
   branches     branch[]
   orders       customer_order[]
+  settings          organization_settings?
   order_settings    organization_order_settings?
   payment_providers organization_payment_provider[]
   additional_product_groups additional_product_group[]

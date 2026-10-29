@@ -4,6 +4,8 @@ import type { Request } from 'express';
 import { resolveLang } from 'src/infra/http/request-helpers';
 import { CurrentCustomer, CustomerProtectedRoute } from 'src/modules/auth/decorators/customer-route.decorator';
 import type { CustomerPrincipal } from 'src/modules/auth/decorators/customer-route.decorator';
+import { CurrentTenant } from 'src/modules/tenant/current-tenant.decorator';
+import type { Tenant } from 'src/modules/tenant/tenant.service';
 import { CreateOrderDto } from '../dto/create-order.dto';
 import { OrderService } from '../services/order.service';
 
@@ -27,9 +29,10 @@ export class CustomerOrderController {
     @CurrentCustomer() principal: CustomerPrincipal,
     @Body() dto: CreateOrderDto,
     @Headers('idempotency-key') key: string | undefined,
+    @CurrentTenant() tenant: Tenant,
     @Req() req: Request,
   ) {
-    return this.orders.create(principal, dto, key, resolveLang(req));
+    return this.orders.create(principal, dto, key, resolveLang(req), tenant.currency);
   }
 
   @Get()

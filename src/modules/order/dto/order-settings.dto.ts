@@ -13,7 +13,7 @@ export class UpdateOrderSettingsDto {
   @ApiPropertyOptional({ description: "Onlayn to'lov oynasi (soniya), 120..7200" }) @IsOptional() @IsInt() @Min(120) @Max(7200)
   readonly paymentTimeoutSeconds?: number;
   @ApiPropertyOptional() @IsOptional() @IsInt() @Min(1) @Max(50) readonly maxActiveOrders?: number;
-  @ApiPropertyOptional({ description: '[[lat,lng], ...] kamida 3 nuqta; null — zona tekshirilmaydi', nullable: true })
+  @ApiPropertyOptional({ description: '[[lat, lng], ...] with at least 3 points; null removes the zone and makes delivery unavailable', nullable: true })
   @IsOptional() @IsArray()
   readonly deliveryZone?: number[][] | null;
 }

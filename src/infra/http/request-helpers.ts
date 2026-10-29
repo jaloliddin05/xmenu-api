@@ -1,6 +1,11 @@
 import { ForbiddenException } from '@nestjs/common';
 
-export type Lang = 'ru' | 'uz' | 'en';
+export const LANGS = ['ru', 'uz', 'en'] as const;
+export type Lang = (typeof LANGS)[number];
+
+export function isLang(value: unknown): value is Lang {
+  return typeof value === 'string' && (LANGS as readonly string[]).includes(value);
+}
 
 /** ?lang=uz yoki Accept-Language: uz-UZ,ru;q=0.8 → 'ru' | 'uz' | 'en' (standart: ru). */
 export function resolveLang(req: { query?: Record<string, any>; headers?: Record<string, any> }): Lang {

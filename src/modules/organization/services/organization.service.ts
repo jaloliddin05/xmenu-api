@@ -9,6 +9,7 @@ import { parseOrganizationType } from '../models/organization.model';
 import { RevalidateService } from 'src/modules/revalidate-queue/revalidate.service';
 import { assertOwnTranslations } from 'src/modules/product/services/menu-ownership';
 import { randomSlug, SLUG_MAX, slugify } from '../domain/slug';
+import { PLATFORM_ORDER_SETTINGS, PLATFORM_SETTINGS } from '../domain/platform-defaults';
 
 const slugTaken = () => new ConflictException({ message: 'Slug is already taken', code: 'slug_taken' });
 
@@ -37,6 +38,13 @@ export class OrganizationService {
           ...data,
           slug,
           type,
+          // A row left by the old signup flow may predate the settings tables
+          settings: {
+            upsert: { create: { ...PLATFORM_SETTINGS }, update: {} },
+          },
+          order_settings: {
+            upsert: { create: { ...PLATFORM_ORDER_SETTINGS }, update: {} },
+          },
         },
       });
       return updatedOrg;
@@ -49,6 +57,9 @@ export class OrganizationService {
         slug,
         type,
         owner_id,
+        // Settings rows always exist; readers never substitute missing values (platform-defaults.ts)
+        settings: { create: { ...PLATFORM_SETTINGS } },
+        order_settings: { create: { ...PLATFORM_ORDER_SETTINGS } },
         translations: {
           create: [
             {

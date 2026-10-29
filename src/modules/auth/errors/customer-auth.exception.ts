@@ -43,6 +43,7 @@ export type CustomerErrorCode =
   | 'cancel_not_allowed'
   | 'payment_not_retryable'
   | 'order_not_found'
+  | 'settings_missing'
   | 'internal_error';
 
 const STATUS: Record<CustomerErrorCode, number> = {
@@ -86,6 +87,8 @@ const STATUS: Record<CustomerErrorCode, number> = {
   cancel_not_allowed: 409,
   payment_not_retryable: 409,
   order_not_found: 404,
+  // A venue without its settings rows (they are created at signup): a data bug, not a client error
+  settings_missing: 500,
   internal_error: 500,
 };
 

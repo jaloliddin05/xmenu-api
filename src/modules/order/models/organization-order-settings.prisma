@@ -1,23 +1,24 @@
-// Tenantning buyurtma sozlamalari (bitta qator). Qator bo'lmasa kod standart
-// qiymatlarni ishlatadi (order-settings.service.ts).
+// Ordering settings of a tenant (one row per organization). The row is created at signup with the
+// platform defaults (organization/domain/platform-defaults.ts) and must exist: the code never
+// substitutes values for a missing row (order-settings.service.ts).
 model organization_order_settings {
   organization_id String   @id
   organization    organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
 
-  delivery_service_fee Int @default(0)
-  min_order_delivery   Int @default(0)
-  min_order_pickup     Int @default(0)
-  eta_min              Int @default(20)
-  eta_max              Int @default(30)
+  delivery_service_fee Int
+  min_order_delivery   Int
+  min_order_pickup     Int
+  eta_min              Int
+  eta_max              Int
 
   // Restoran buyurtmani qabul qilmasa — shu vaqtdan keyin avtomatik bekor (soniya)
-  acceptance_timeout_seconds Int @default(300)
+  acceptance_timeout_seconds Int
   // Onlayn to'lov oynasi (soniya)
-  payment_timeout_seconds    Int @default(900)
+  payment_timeout_seconds    Int
   // Bir vaqtda faol buyurtmalar soni chegarasi (suiiste'moldan himoya)
-  max_active_orders          Int @default(5)
+  max_active_orders          Int
 
-  // Yetkazib berish zonasi: [[lat, lng], ...] — kamida 3 nuqta. null = tekshirilmaydi.
+  // Delivery zone: [[lat, lng], ...], at least 3 points. null = delivery is unavailable.
   delivery_zone Json?
 
   created_at DateTime @default(now())

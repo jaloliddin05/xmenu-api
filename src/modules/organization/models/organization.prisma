@@ -22,6 +22,7 @@ model organization {
   customers    customer[]
   branches     branch[]
   orders       customer_order[]
+  settings          organization_settings?
   order_settings    organization_order_settings?
   payment_providers organization_payment_provider[]
   additional_product_groups additional_product_group[]

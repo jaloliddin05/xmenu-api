@@ -1,0 +1,30 @@
+
+// Public settings of a tenant (one row per organization, created at signup with the platform
+// defaults from organization/domain/platform-defaults.ts). Read by GET /tenant/config, edited
+// through PUT /organization/:id/settings. NULL = the owner has not filled it in.
+model organization_settings {
+  organization_id String       @id
+  organization    organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+
+  // Brand colors: { brand: "#EE2E17", ... }, keys from THEME_KEYS (domain/organization-settings.ts)
+  theme            Json?
+  currency         String
+  default_language String
+  languages        String[]
+
+  support_phone    String?
+  support_telegram String?
+  support_hours    String?
+  address          String?
+  founded_year     Int?
+
+  city           String?
+  map_center_lat Float?
+  map_center_lng Float?
+  map_zoom       Int?
+  // [[swLat, swLng], [neLat, neLng]]
+  map_bounds     Json?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}

@@ -41,7 +41,13 @@ export class OrderService {
    * to'lov usuli → narxlash (bazadan) → summa/minimum → faol buyurtmalar chegarasi →
    * yozish (bitta tranzaksiya). Birinchi topilgan muammo darhol xato qaytaradi.
    */
-  async create(principal: CustomerPrincipal, dto: CreateOrderDto, idempotencyKey: string | undefined, lang: Lang) {
+  async create(
+    principal: CustomerPrincipal,
+    dto: CreateOrderDto,
+    idempotencyKey: string | undefined,
+    lang: Lang,
+    currency: string,
+  ) {
     if (!idempotencyKey || !IDEMPOTENCY_KEY.test(idempotencyKey)) {
       throw new CustomerAuthException('idempotency_key_required', 'Idempotency-Key header (8-128 chars: A-Z a-z 0-9 _ -) is required');
     }
@@ -143,6 +149,7 @@ export class OrderService {
             payment_method: dto.paymentMethod,
             payment_status: online ? 'pending' : 'not_required',
             payment_expires_at: paymentExpiresAt,
+            currency,
             subtotal: totals.subtotal,
             service_fee: totals.serviceFee,
             discount: totals.discount,

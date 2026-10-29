@@ -33,7 +33,7 @@ model customer_order {
   payment_status     OrderPaymentStatus
   payment_expires_at DateTime?
 
-  currency        String   @default("UZS")
+  currency        String
   subtotal        Int
   service_fee     Int      @default(0)
   discount        Int      @default(0)

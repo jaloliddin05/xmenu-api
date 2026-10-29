@@ -17,7 +17,7 @@ export class OrderSettingsController {
   ) {}
 
   @Get()
-  @ApiOperation({ summary: 'Joriy sozlamalar (qator bo\'lmasa standartlar)' })
+  @ApiOperation({ summary: 'Current ordering settings (the row is created at signup)' })
   get(@Req() req) {
     return this.settings.get(requireStaffOrganizationId(req));
   }
@@ -47,10 +47,10 @@ export class OrderSettingsController {
       max_active_orders: dto.maxActiveOrders,
       delivery_zone: zone,
     };
-    await this.prisma.organization_order_settings.upsert({
+    await this.settings.get(organizationId); // settings_missing instead of a Prisma "not found"
+    await this.prisma.organization_order_settings.update({
       where: { organization_id: organizationId },
-      create: { organization_id: organizationId, ...data },
-      update: data,
+      data,
     });
     this.settings.invalidate(organizationId);
     return this.settings.get(organizationId);
