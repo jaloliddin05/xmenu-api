@@ -3,6 +3,7 @@ import {
   Catch,
   ArgumentsHost,
   HttpException,
+  Logger,
 } from '@nestjs/common';
 import { Response } from 'express';
 
@@ -31,12 +32,14 @@ export const defaultErrorCode = (status: number) =>
  */
 @Catch(HttpException)
 class ErrorFilter implements ExceptionFilter {
+  private static readonly logger = new Logger('HttpError');
+
   catch(exception: HttpException, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const status = exception.getStatus();
-    console.log(exception);
-    console.log(host.getArgs()[0].route);
+    // Client errors (401, 404, validation) are expected traffic: no log, no stack trace
+    if (status >= 500) ErrorFilter.logger.error(exception.message, exception.stack);
 
     const extra: Record<string, unknown> = {};
     let code = defaultErrorCode(status);

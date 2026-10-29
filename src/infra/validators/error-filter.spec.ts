@@ -1,4 +1,11 @@
-import { ArgumentsHost, BadRequestException, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import {
+  ArgumentsHost,
+  BadRequestException,
+  Logger,
+  NotFoundException,
+  ServiceUnavailableException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { CustomerAuthException } from 'src/modules/auth/errors/customer-auth.exception';
 import ErrorFilter from './error-filter';
 import { fieldErrorsException } from './validation-errors';
@@ -29,9 +36,24 @@ function run(exception: any) {
 }
 
 describe('ErrorFilter', () => {
-  beforeAll(() =>
-    jest.spyOn(console, 'log').mockImplementation(() => undefined),
-  );
+  const log = jest.spyOn(console, 'log');
+  const loggerError = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+  beforeEach(() => {
+    log.mockClear();
+    loggerError.mockClear();
+  });
+
+  it('does not log client errors such as 401 (no stack trace in the log)', () => {
+    run(new UnauthorizedException());
+    run(new NotFoundException());
+    expect(log).not.toHaveBeenCalled();
+    expect(loggerError).not.toHaveBeenCalled();
+  });
+
+  it('logs server errors with their stack', () => {
+    run(new ServiceUnavailableException('down'));
+    expect(loggerError).toHaveBeenCalledWith('down', expect.stringContaining('ServiceUnavailableException'));
+  });
 
   it('adds code, retryAfter and Retry-After when the exception has them', () => {
     const res = run(
