@@ -1,10 +1,11 @@
 import { Controller, Get, Header, Req } from '@nestjs/common';
-import { ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiHeader, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { resolveLang } from 'src/infra/http/request-helpers';
 import { CustomerPublicRoute } from '../auth/decorators/customer-route.decorator';
 import { CurrentTenant } from '../tenant/current-tenant.decorator';
 import type { Tenant } from '../tenant/tenant.service';
+import { BranchViewDto } from './dto/branch-view.dto';
 import { BranchService, BranchView } from './services/branch.service';
 
 /** Mijoz ilovasi uchun filiallar. Ommaviy: token talab qilinmaydi, tenant — X-Tenant-Id. */
@@ -17,6 +18,7 @@ export class BranchController {
 
   @Get()
   @ApiOperation({ summary: 'Faol filiallar (hours/isOpen/opensAt serverda hisoblanadi)' })
+  @ApiOkResponse({ type: [BranchViewDto] })
   // isOpen vaqtga bog'liq — qisqa kesh. Vary: javob tenant va tilga qarab farq qiladi.
   @Header('Cache-Control', 'public, max-age=30')
   @Header('Vary', 'X-Tenant-Id, Accept-Language')

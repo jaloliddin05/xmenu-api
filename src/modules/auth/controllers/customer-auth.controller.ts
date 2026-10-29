@@ -7,7 +7,7 @@ import {
   Post,
   Req,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiHeader, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiHeader, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 
 import {
@@ -18,6 +18,7 @@ import {
   CustomerRegisterDto,
   CustomerTelegramDto,
 } from '../dto';
+import { CustomerOtpRequestResponseDto } from '../dto/customer-otp-response.dto';
 import { CustomerAuthService } from '../services/customer-auth.service';
 import { requestCtx as ctxOf } from 'src/infra/http/request-helpers';
 import {
@@ -48,6 +49,7 @@ export class AuthCustomerController {
   @CustomerPublicRoute()
   @Post('otp/request')
   @HttpCode(200)
+  @ApiOkResponse({ type: CustomerOtpRequestResponseDto })
   requestOtp(
     @CurrentTenant() tenant: Tenant,
     @Body() dto: CustomerOtpRequestDto,

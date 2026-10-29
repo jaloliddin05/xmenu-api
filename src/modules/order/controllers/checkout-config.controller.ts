@@ -1,9 +1,10 @@
 import { Controller, Get, Header } from '@nestjs/common';
-import { ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiHeader, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CustomerPublicRoute } from 'src/modules/auth/decorators/customer-route.decorator';
 import { PaymentConfigService } from 'src/modules/payment/services/payment-config.service';
 import { CurrentTenant } from 'src/modules/tenant/current-tenant.decorator';
 import type { Tenant } from 'src/modules/tenant/tenant.service';
+import { CheckoutConfigDto } from '../dto/checkout-config.dto';
 import { OrderSettingsService } from '../services/order-settings.service';
 
 /**
@@ -27,7 +28,8 @@ export class CheckoutConfigController {
   @Header('Cache-Control', 'public, max-age=30')
   @Header('Vary', 'X-Tenant-Id')
   @ApiOperation({ summary: "Savat sozlamalari: yetkazib berish narxi, minimal summa, ETA, to'lov usullari" })
-  async get(@CurrentTenant() tenant: Tenant) {
+  @ApiOkResponse({ type: CheckoutConfigDto })
+  async get(@CurrentTenant() tenant: Tenant): Promise<CheckoutConfigDto> {
     const [s, online] = await Promise.all([this.settings.get(tenant.id), this.payments.enabledProviders(tenant.id)]);
     return {
       currency: tenant.currency,

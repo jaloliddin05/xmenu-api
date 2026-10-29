@@ -37,7 +37,7 @@ export class StaffRegisterDto {
   readonly password: string;
 
   @ApiProperty({
-    example: 'Mant',
+    example: 'Demo Cafe',
     description: 'Venue name; the slug is derived from it',
   })
   @IsString()

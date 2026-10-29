@@ -22,7 +22,7 @@ const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 const PHONE = /^\+998\d{9}$/;
 
 export class CreateBranchDto {
-  @ApiProperty({ example: 'Mant 24/7 — Chilonzor' })
+  @ApiProperty({ example: 'Main branch' })
   @IsString() @MinLength(1) @MaxLength(120)
   readonly title: string;
 

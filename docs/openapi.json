@@ -163,7 +163,7 @@
           {
             "name": "X-Tenant-Id",
             "in": "header",
-            "description": "Organization slug",
+            "description": "Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug",
             "required": true,
             "schema": {
               "type": "string"
@@ -182,7 +182,14 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerOtpRequestResponseDto"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -197,7 +204,7 @@
           {
             "name": "X-Tenant-Id",
             "in": "header",
-            "description": "Organization slug",
+            "description": "Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug",
             "required": true,
             "schema": {
               "type": "string"
@@ -231,7 +238,7 @@
           {
             "name": "X-Tenant-Id",
             "in": "header",
-            "description": "Organization slug",
+            "description": "Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug",
             "required": true,
             "schema": {
               "type": "string"
@@ -265,7 +272,7 @@
           {
             "name": "X-Tenant-Id",
             "in": "header",
-            "description": "Organization slug",
+            "description": "Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug",
             "required": true,
             "schema": {
               "type": "string"
@@ -299,7 +306,7 @@
           {
             "name": "X-Tenant-Id",
             "in": "header",
-            "description": "Organization slug",
+            "description": "Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug",
             "required": true,
             "schema": {
               "type": "string"
@@ -333,7 +340,7 @@
           {
             "name": "X-Tenant-Id",
             "in": "header",
-            "description": "Organization slug",
+            "description": "Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug",
             "required": true,
             "schema": {
               "type": "string"
@@ -362,7 +369,7 @@
           {
             "name": "X-Tenant-Id",
             "in": "header",
-            "description": "Organization slug",
+            "description": "Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug",
             "required": true,
             "schema": {
               "type": "string"
@@ -663,6 +670,141 @@
         ]
       }
     },
+    "/organization/{id}/settings": {
+      "get": {
+        "operationId": "OrganizationSettingsController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationSettingsDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No or invalid owner token"
+          },
+          "403": {
+            "description": "The user has no organization"
+          },
+          "404": {
+            "description": "Not your organization (any other id looks missing)"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Venue settings (your own organization only)",
+        "tags": [
+          "Organization"
+        ]
+      },
+      "put": {
+        "operationId": "OrganizationSettingsController_replace",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganizationSettingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationSettingsDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid field (colors, languages, coordinates, zoom, bounds) or invalid_settings: defaultLanguage outside languages, foundedYear in the future, mapCenter outside mapBounds"
+          },
+          "401": {
+            "description": "No or invalid owner token"
+          },
+          "403": {
+            "description": "The user has no organization"
+          },
+          "404": {
+            "description": "Not your organization (any other id looks missing)"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Replace venue settings: send every field, null clears it",
+        "tags": [
+          "Organization"
+        ]
+      }
+    },
+    "/tenant/by-slug/{slug}": {
+      "get": {
+        "operationId": "TenantController_bySlug",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantRefDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "tenant_not_found: no such slug, invalid slug or inactive venue"
+          }
+        },
+        "summary": "Resolve a public slug to the tenant id (send it in X-Tenant-Id)",
+        "tags": [
+          "Tenant"
+        ]
+      }
+    },
     "/customers/me": {
       "get": {
         "operationId": "CustomerController_getMe",
@@ -670,7 +812,7 @@
           {
             "name": "X-Tenant-Id",
             "in": "header",
-            "description": "Organization slug",
+            "description": "Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug",
             "required": true,
             "schema": {
               "type": "string"
@@ -698,7 +840,7 @@
           {
             "name": "X-Tenant-Id",
             "in": "header",
-            "description": "Organization slug",
+            "description": "Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug",
             "required": true,
             "schema": {
               "type": "string"
@@ -738,7 +880,7 @@
           {
             "name": "X-Tenant-Id",
             "in": "header",
-            "description": "Organization slug",
+            "description": "Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug",
             "required": true,
             "schema": {
               "type": "string"
@@ -766,7 +908,7 @@
           {
             "name": "X-Tenant-Id",
             "in": "header",
-            "description": "Organization slug",
+            "description": "Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug",
             "required": true,
             "schema": {
               "type": "string"
@@ -806,7 +948,7 @@
           {
             "name": "X-Tenant-Id",
             "in": "header",
-            "description": "Organization slug",
+            "description": "Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug",
             "required": true,
             "schema": {
               "type": "string"
@@ -844,7 +986,7 @@
           {
             "name": "X-Tenant-Id",
             "in": "header",
-            "description": "Organization slug",
+            "description": "Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug",
             "required": true,
             "schema": {
               "type": "string"
@@ -882,7 +1024,7 @@
           {
             "name": "X-Tenant-Id",
             "in": "header",
-            "description": "Organization slug",
+            "description": "Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug",
             "required": true,
             "schema": {
               "type": "string"
@@ -891,7 +1033,17 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BranchViewDto"
+                  }
+                }
+              }
+            }
           }
         },
         "summary": "Faol filiallar (hours/isOpen/opensAt serverda hisoblanadi)",
@@ -1341,7 +1493,7 @@
           {
             "name": "X-Tenant-Id",
             "in": "header",
-            "description": "Organization slug",
+            "description": "Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug",
             "required": true,
             "schema": {
               "type": "string"
@@ -1350,7 +1502,17 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MenuCategoryDto"
+                  }
+                }
+              }
+            }
           }
         },
         "summary": "Menyu: kategoriyalar → taomlar → modifikator guruhlari",
@@ -1366,7 +1528,7 @@
           {
             "name": "X-Tenant-Id",
             "in": "header",
-            "description": "Organization slug",
+            "description": "Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug",
             "required": true,
             "schema": {
               "type": "string"
@@ -1413,7 +1575,7 @@
           {
             "name": "X-Tenant-Id",
             "in": "header",
-            "description": "Organization slug",
+            "description": "Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug",
             "required": true,
             "schema": {
               "type": "string"
@@ -1443,7 +1605,7 @@
           {
             "name": "X-Tenant-Id",
             "in": "header",
-            "description": "Organization slug",
+            "description": "Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug",
             "required": true,
             "schema": {
               "type": "string"
@@ -1481,7 +1643,7 @@
           {
             "name": "X-Tenant-Id",
             "in": "header",
-            "description": "Organization slug",
+            "description": "Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug",
             "required": true,
             "schema": {
               "type": "string"
@@ -1519,7 +1681,7 @@
           {
             "name": "X-Tenant-Id",
             "in": "header",
-            "description": "Organization slug",
+            "description": "Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug",
             "required": true,
             "schema": {
               "type": "string"
@@ -1758,7 +1920,7 @@
             "description": ""
           }
         },
-        "summary": "Joriy sozlamalar (qator bo'lmasa standartlar)",
+        "summary": "Current ordering settings (the row is created at signup)",
         "tags": [
           "Order settings"
         ]
@@ -1794,7 +1956,7 @@
           {
             "name": "X-Tenant-Id",
             "in": "header",
-            "description": "Organization slug",
+            "description": "Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug",
             "required": true,
             "schema": {
               "type": "string"
@@ -1803,7 +1965,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutConfigDto"
+                }
+              }
+            }
           }
         },
         "summary": "Savat sozlamalari: yetkazib berish narxi, minimal summa, ETA, to'lov usullari",
@@ -2326,6 +2495,56 @@
         ]
       }
     },
+    "/tenant/config": {
+      "get": {
+        "operationId": "TenantConfigController_get",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "ru, uz or en (or ?lang=); a language the venue does not offer gives the venue's default",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantConfigDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "tenant_required: no X-Tenant-Id"
+          },
+          "403": {
+            "description": "tenant_inactive"
+          },
+          "404": {
+            "description": "tenant_not_found: X-Tenant-Id is not a venue id"
+          }
+        },
+        "summary": "Venue configuration: brand, colors, languages, currency, contacts, fulfillment modes, map",
+        "tags": [
+          "Tenant"
+        ]
+      }
+    },
     "/translation": {
       "post": {
         "operationId": "TranslationController_create",
@@ -2434,7 +2653,7 @@
           },
           "name": {
             "type": "string",
-            "example": "Mant",
+            "example": "Demo Cafe",
             "description": "Venue name; the slug is derived from it"
           },
           "type": {
@@ -2507,6 +2726,25 @@
         },
         "required": [
           "phone"
+        ]
+      },
+      "CustomerOtpRequestResponseDto": {
+        "type": "object",
+        "properties": {
+          "resendAfter": {
+            "type": "number",
+            "example": 60,
+            "description": "Seconds until a new code may be requested"
+          },
+          "codeLength": {
+            "type": "number",
+            "example": 6,
+            "description": "Digits in the code (OTP_LENGTH)"
+          }
+        },
+        "required": [
+          "resendAfter",
+          "codeLength"
         ]
       },
       "CustomerOtpVerifyDto": {
@@ -2642,7 +2880,8 @@
           },
           "slug": {
             "type": "string",
-            "description": "slug"
+            "description": "Public slug: 3-63 chars: a-z, 0-9 and single dashes between words; must not look like an id. Taken by another venue: 409 slug_taken",
+            "example": "cafe-example"
           },
           "logo": {
             "type": "string",
@@ -2678,6 +2917,233 @@
             }
           }
         }
+      },
+      "ThemeDto": {
+        "type": "object",
+        "properties": {
+          "background": {
+            "type": "string",
+            "example": "#F4F4F4",
+            "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+          },
+          "foreground": {
+            "type": "string",
+            "example": "#21201F",
+            "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+          },
+          "surface": {
+            "type": "string",
+            "example": "#FFFFFF",
+            "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+          },
+          "mutedSurface": {
+            "type": "string",
+            "example": "#EFEFEF",
+            "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+          },
+          "muted": {
+            "type": "string",
+            "example": "#4B494380",
+            "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+          },
+          "brand": {
+            "type": "string",
+            "example": "#EE2E17",
+            "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+          },
+          "brandForeground": {
+            "type": "string",
+            "example": "#FFFFFF",
+            "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+          },
+          "danger": {
+            "type": "string",
+            "example": "#E53935",
+            "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+          },
+          "serviceArea": {
+            "type": "string",
+            "example": "#5B6FE8",
+            "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+          }
+        }
+      },
+      "LatLngDto": {
+        "type": "object",
+        "properties": {
+          "lat": {
+            "type": "number",
+            "example": 41.311081,
+            "minimum": -90,
+            "maximum": 90
+          },
+          "lng": {
+            "type": "number",
+            "example": 69.240562,
+            "minimum": -180,
+            "maximum": 180
+          }
+        },
+        "required": [
+          "lat",
+          "lng"
+        ]
+      },
+      "OrganizationSettingsDto": {
+        "type": "object",
+        "properties": {
+          "theme": {
+            "nullable": true,
+            "description": "Brand colors; a missing key keeps the front-end neutral value",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ThemeDto"
+              }
+            ]
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "UZS"
+            ],
+            "example": "UZS"
+          },
+          "defaultLanguage": {
+            "type": "string",
+            "enum": [
+              "ru",
+              "uz",
+              "en"
+            ],
+            "example": "ru",
+            "description": "Must be one of languages"
+          },
+          "languages": {
+            "type": "array",
+            "example": [
+              "ru",
+              "uz",
+              "en"
+            ],
+            "items": {
+              "type": "string",
+              "enum": [
+                "ru",
+                "uz",
+                "en"
+              ]
+            }
+          },
+          "supportPhone": {
+            "type": "object",
+            "nullable": true,
+            "example": "+998711234567"
+          },
+          "supportTelegram": {
+            "type": "object",
+            "nullable": true,
+            "example": "demo_cafe",
+            "description": "Telegram username, stored without @"
+          },
+          "supportHours": {
+            "type": "object",
+            "nullable": true,
+            "example": "10:00-23:00",
+            "maxLength": 100
+          },
+          "address": {
+            "type": "object",
+            "nullable": true,
+            "example": "Main street 1",
+            "maxLength": 255
+          },
+          "foundedYear": {
+            "type": "object",
+            "nullable": true,
+            "example": 2015,
+            "minimum": 1800,
+            "description": "Not in the future"
+          },
+          "city": {
+            "type": "object",
+            "nullable": true,
+            "example": "Tashkent",
+            "maxLength": 100
+          },
+          "mapCenter": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LatLngDto"
+              }
+            ]
+          },
+          "mapZoom": {
+            "type": "object",
+            "nullable": true,
+            "example": 15,
+            "minimum": 0,
+            "maximum": 21
+          },
+          "mapBounds": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "minItems": 2,
+            "maxItems": 2,
+            "example": [
+              [
+                41.15,
+                69
+              ],
+              [
+                41.45,
+                69.45
+              ]
+            ],
+            "description": "[[southWestLat, southWestLng], [northEastLat, northEastLng]]; mapCenter must lie inside"
+          }
+        },
+        "required": [
+          "theme",
+          "currency",
+          "defaultLanguage",
+          "languages",
+          "supportPhone",
+          "supportTelegram",
+          "supportHours",
+          "address",
+          "foundedYear",
+          "city",
+          "mapCenter",
+          "mapZoom",
+          "mapBounds"
+        ]
+      },
+      "TenantRefDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Tenant id: send it as X-Tenant-Id"
+          },
+          "slug": {
+            "type": "string",
+            "example": "cafe-example"
+          }
+        },
+        "required": [
+          "id",
+          "slug"
+        ]
       },
       "UpdateCustomerDto": {
         "type": "object",
@@ -2745,12 +3211,68 @@
           "address"
         ]
       },
+      "BranchViewDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "example": "Main branch"
+          },
+          "address": {
+            "type": "string",
+            "example": "Main street 1"
+          },
+          "latitude": {
+            "type": "number",
+            "example": 41.311081
+          },
+          "longitude": {
+            "type": "number",
+            "example": 69.240562
+          },
+          "hours": {
+            "type": "string",
+            "example": "Mon-Sun 10:00-23:00",
+            "description": "Working hours in the response language"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true,
+            "example": "+998711234567"
+          },
+          "isOpen": {
+            "type": "boolean",
+            "nullable": true,
+            "description": "null: no working hours set"
+          },
+          "opensAt": {
+            "type": "string",
+            "nullable": true,
+            "example": "09:00",
+            "description": "HH:mm when a closed branch opens next"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "address",
+          "latitude",
+          "longitude",
+          "hours",
+          "phone",
+          "isOpen",
+          "opensAt"
+        ]
+      },
       "CreateBranchDto": {
         "type": "object",
         "properties": {
           "title": {
             "type": "string",
-            "example": "Mant 24/7 — Chilonzor"
+            "example": "Main branch"
           },
           "address": {
             "type": "string",
@@ -2985,6 +3507,195 @@
           }
         }
       },
+      "MenuNutritionDto": {
+        "type": "object",
+        "properties": {
+          "kcal": {
+            "type": "number",
+            "example": 325
+          },
+          "protein": {
+            "type": "string",
+            "example": "70 g"
+          },
+          "fat": {
+            "type": "string",
+            "example": "12 g"
+          },
+          "carbs": {
+            "type": "string",
+            "example": "24 g"
+          }
+        }
+      },
+      "MenuOptionDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "example": "Extra cheese"
+          },
+          "price": {
+            "type": "number",
+            "example": 3500,
+            "description": "Whole sums, rounded"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "price"
+        ]
+      },
+      "MenuOptionGroupDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "example": "Toppings"
+          },
+          "selectionType": {
+            "type": "string",
+            "enum": [
+              "single",
+              "multi"
+            ]
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "min": {
+            "type": "number",
+            "nullable": true,
+            "description": "Minimum choices; null = none"
+          },
+          "max": {
+            "type": "number",
+            "description": "Maximum choices, never above the option count"
+          },
+          "currency": {
+            "type": "string",
+            "example": "UZS",
+            "description": "The venue's currency"
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MenuOptionDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "selectionType",
+          "required",
+          "min",
+          "max",
+          "currency",
+          "options"
+        ]
+      },
+      "MenuItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "example": "Lamb manti"
+          },
+          "description": {
+            "type": "string",
+            "description": "Empty string when missing"
+          },
+          "image": {
+            "type": "string",
+            "nullable": true,
+            "description": "Absolute URL of the first image"
+          },
+          "images": {
+            "description": "Absolute URLs",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "price": {
+            "type": "number",
+            "example": 45000,
+            "description": "Whole sums, rounded"
+          },
+          "currency": {
+            "type": "string",
+            "example": "UZS",
+            "description": "The venue's currency"
+          },
+          "weight": {
+            "type": "string",
+            "example": "800 g",
+            "description": "Empty string when unknown"
+          },
+          "nutrition": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MenuNutritionDto"
+              }
+            ]
+          },
+          "optionGroups": {
+            "description": "Groups without options are left out",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MenuOptionGroupDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "image",
+          "images",
+          "price",
+          "currency",
+          "weight",
+          "nutrition",
+          "optionGroups"
+        ]
+      },
+      "MenuCategoryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "example": "Main dishes"
+          },
+          "items": {
+            "description": "Never empty: categories without active items are left out",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MenuItemDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "items"
+        ]
+      },
       "OrderModifierDto": {
         "type": "object",
         "properties": {
@@ -3148,10 +3859,77 @@
           },
           "deliveryZone": {
             "type": "object",
-            "description": "[[lat,lng], ...] kamida 3 nuqta; null — zona tekshirilmaydi",
+            "description": "[[lat, lng], ...] with at least 3 points; null removes the zone and makes delivery unavailable",
             "nullable": true
           }
         }
+      },
+      "MinOrderDto": {
+        "type": "object",
+        "properties": {
+          "delivery": {
+            "type": "number",
+            "example": 40000
+          },
+          "pickup": {
+            "type": "number",
+            "example": 0
+          }
+        },
+        "required": [
+          "delivery",
+          "pickup"
+        ]
+      },
+      "CheckoutConfigDto": {
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string",
+            "example": "UZS",
+            "description": "The venue's currency"
+          },
+          "deliveryServiceFee": {
+            "type": "number",
+            "example": 5000,
+            "description": "Added to delivery orders"
+          },
+          "minOrder": {
+            "$ref": "#/components/schemas/MinOrderDto"
+          },
+          "etaMinutes": {
+            "minItems": 2,
+            "maxItems": 2,
+            "example": [
+              20,
+              30
+            ],
+            "description": "[min, max] minutes",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "paymentMethods": {
+            "type": "array",
+            "description": "cash always; click/payme when the venue set its keys",
+            "items": {
+              "type": "string",
+              "enum": [
+                "cash",
+                "click",
+                "payme"
+              ]
+            }
+          }
+        },
+        "required": [
+          "currency",
+          "deliveryServiceFee",
+          "minOrder",
+          "etaMinutes",
+          "paymentMethods"
+        ]
       },
       "UpsertPaymentProviderDto": {
         "type": "object",
@@ -3541,6 +4319,278 @@
             }
           }
         }
+      },
+      "TenantLocaleDto": {
+        "type": "object",
+        "properties": {
+          "defaultLanguage": {
+            "type": "string",
+            "enum": [
+              "ru",
+              "uz",
+              "en"
+            ],
+            "example": "ru"
+          },
+          "languages": {
+            "type": "array",
+            "example": [
+              "ru",
+              "uz",
+              "en"
+            ],
+            "items": {
+              "type": "string",
+              "enum": [
+                "ru",
+                "uz",
+                "en"
+              ]
+            }
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "UZS"
+            ],
+            "example": "UZS"
+          }
+        },
+        "required": [
+          "defaultLanguage",
+          "languages",
+          "currency"
+        ]
+      },
+      "TenantContactsDto": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "nullable": true,
+            "example": "+998711234567"
+          },
+          "telegramUsername": {
+            "type": "string",
+            "nullable": true,
+            "example": "demo_cafe",
+            "description": "Without @"
+          },
+          "workingHours": {
+            "type": "string",
+            "nullable": true,
+            "example": "10:00-23:00"
+          },
+          "address": {
+            "type": "string",
+            "nullable": true,
+            "example": "Main street 1"
+          }
+        },
+        "required": [
+          "phone",
+          "telegramUsername",
+          "workingHours",
+          "address"
+        ]
+      },
+      "TenantFulfillmentDto": {
+        "type": "object",
+        "properties": {
+          "modes": {
+            "type": "array",
+            "description": "pickup: an active branch accepts pickup. delivery: an active branch accepts delivery and a delivery zone is set. Empty without branches",
+            "items": {
+              "type": "string",
+              "enum": [
+                "delivery",
+                "pickup"
+              ]
+            }
+          },
+          "defaultMode": {
+            "type": "string",
+            "enum": [
+              "delivery",
+              "pickup"
+            ],
+            "nullable": true,
+            "description": "First of modes; null when modes is empty"
+          }
+        },
+        "required": [
+          "modes",
+          "defaultMode"
+        ]
+      },
+      "TenantMapDto": {
+        "type": "object",
+        "properties": {
+          "center": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2,
+            "nullable": true,
+            "example": [
+              41.311081,
+              69.240562
+            ],
+            "description": "[lat, lng]"
+          },
+          "zoom": {
+            "type": "number",
+            "nullable": true,
+            "example": 15
+          },
+          "city": {
+            "type": "string",
+            "nullable": true,
+            "example": "Tashkent"
+          },
+          "bounds": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "nullable": true,
+            "example": [
+              [
+                41.15,
+                69
+              ],
+              [
+                41.45,
+                69.45
+              ]
+            ],
+            "description": "[[southWestLat, southWestLng], [northEastLat, northEastLng]]"
+          },
+          "deliveryZone": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "nullable": true,
+            "example": [
+              [
+                41.361,
+                69.201
+              ],
+              [
+                41.37,
+                69.28
+              ],
+              [
+                41.345,
+                69.33
+              ]
+            ],
+            "description": "Delivery polygon [[lat, lng], ...]; null = delivery unavailable"
+          }
+        },
+        "required": [
+          "center",
+          "zoom",
+          "city",
+          "bounds",
+          "deliveryZone"
+        ]
+      },
+      "TenantConfigDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "slug": {
+            "type": "string",
+            "example": "cafe-example"
+          },
+          "name": {
+            "type": "string",
+            "example": "Demo Cafe"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "restaurant",
+              "cafe",
+              "fast_food",
+              "coffee_shop",
+              "other"
+            ]
+          },
+          "logoUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "Absolute URL (PUBLIC_FILES_URL)"
+          },
+          "bannerUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "Absolute URL (PUBLIC_FILES_URL)"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true,
+            "description": "In the response language, else the venue's default language, else null"
+          },
+          "foundedYear": {
+            "type": "number",
+            "nullable": true,
+            "example": 2015
+          },
+          "theme": {
+            "nullable": true,
+            "description": "Brand colors; a missing key (or null theme) means the front-end neutral value",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ThemeDto"
+              }
+            ]
+          },
+          "locale": {
+            "$ref": "#/components/schemas/TenantLocaleDto"
+          },
+          "contacts": {
+            "$ref": "#/components/schemas/TenantContactsDto"
+          },
+          "fulfillment": {
+            "$ref": "#/components/schemas/TenantFulfillmentDto"
+          },
+          "map": {
+            "$ref": "#/components/schemas/TenantMapDto"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "type",
+          "logoUrl",
+          "bannerUrl",
+          "description",
+          "foundedYear",
+          "theme",
+          "locale",
+          "contacts",
+          "fulfillment",
+          "map"
+        ]
       },
       "TranslationDto": {
         "type": "object",
