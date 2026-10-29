@@ -5,6 +5,7 @@
 
 - заказы клиента: `ORDERS_API.md`, устройство заказов на бэкенде: `BACKEND_ORDERS.md`;
 - филиалы: `BRANCHES_API.md`;
+- бот заведения и подтверждение номера через Telegram: `TELEGRAM_VERIFICATION.md`;
 - ревалидация QR: `REVALIDATE.md`.
 
 ## Два контура авторизации
@@ -145,6 +146,26 @@ IP берётся из `X-Forwarded-For` только от локального 
 
 `POST /auth/customer/otp/request` → `{ "resendAfter": 60, "codeLength": 6 }`: поле ввода кода строится по
 `codeLength`, а не по константе во фронте.
+
+Альтернатива SMS: подтверждение номера через бота заведения, `POST /auth/customer/telegram/start` и
+`POST /auth/customer/telegram/status` (сценарии, статусы и защита: `TELEGRAM_VERIFICATION.md`). Нет бота у
+заведения → `503 telegram_unavailable`: показывать только SMS. В режиме сайта вход завершается обычным
+`otp/verify` с кодом из чата бота; в Mini App ответ `status: "verified"` уже содержит результат входа.
+
+## Бот заведения (владелец)
+
+`GET /telegram-bot` → `{ connected, username, link, webhookUrl, isEnabled }` (токен не возвращается никогда).
+`PUT /telegram-bot { "token": "123456:AA..." }` проверяет токен через `getMe`, ставит webhook с секретом, хранит токен
+зашифрованным (`PAYMENT_CONFIG_KEY`) и отвечает тем же статусом. `DELETE /telegram-bot` → 204, webhook снимается.
+
+| HTTP | `code` | Когда |
+|---|---|---|
+| 400 | `invalid_bot_token` | токен не по формату или Telegram его не принял |
+| 400 | `webhook_url_not_https` | на сервере `PUBLIC_API_URL` не `https://` (ошибка настройки платформы, не владельца) |
+| 400 | `webhook_setup_failed` | Telegram отказал в `setWebhook`; ничего не сохранено |
+| 409 | `bot_already_connected` | этот бот подключён к другому заведению |
+
+Пока бот не подключён, `initData` Mini App проверяется платформенным ботом (`TELEGRAM_BOT_TOKEN`).
 
 ## Настройки заведения (владелец)
 

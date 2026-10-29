@@ -231,6 +231,90 @@
         ]
       }
     },
+    "/auth/customer/telegram/start": {
+      "post": {
+        "operationId": "AuthCustomerController_telegramStart",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerTelegramStartDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerTelegramStartResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Start phone verification through the venue Telegram bot (503 telegram_unavailable: no bot, offer SMS only)",
+        "tags": [
+          "Auth-Customer"
+        ]
+      }
+    },
+    "/auth/customer/telegram/status": {
+      "post": {
+        "operationId": "AuthCustomerController_telegramStatus",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerTelegramStatusDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerTelegramStatusResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Poll the Telegram verification session every 2 s (the login result is returned once)",
+        "tags": [
+          "Auth-Customer"
+        ]
+      }
+    },
     "/auth/customer/register": {
       "post": {
         "operationId": "AuthCustomerController_register",
@@ -1014,6 +1098,110 @@
         "summary": "Manzilni o'chirish. Asosiy o'chirilsa, eng yangisi asosiy bo'ladi",
         "tags": [
           "Customer addresses"
+        ]
+      }
+    },
+    "/telegram-bot": {
+      "get": {
+        "operationId": "TelegramBotController_status",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramBotStatusDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No or invalid owner token"
+          },
+          "403": {
+            "description": "The user has no organization"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Connection status of the venue bot",
+        "tags": [
+          "Telegram bot"
+        ]
+      },
+      "put": {
+        "operationId": "TelegramBotController_connect",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectTelegramBotDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramBotStatusDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid_bot_token (malformed or rejected by Telegram), webhook_setup_failed, webhook_url_not_https (server PUBLIC_API_URL is not https)"
+          },
+          "401": {
+            "description": "No or invalid owner token"
+          },
+          "403": {
+            "description": "The user has no organization"
+          },
+          "409": {
+            "description": "bot_already_connected: the bot belongs to another venue"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Connect or replace the bot: checks the token with Telegram, registers the webhook, stores the token encrypted",
+        "tags": [
+          "Telegram bot"
+        ]
+      },
+      "delete": {
+        "operationId": "TelegramBotController_disconnect",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "401": {
+            "description": "No or invalid owner token"
+          },
+          "403": {
+            "description": "The user has no organization"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Disconnect the bot and remove its webhook",
+        "tags": [
+          "Telegram bot"
         ]
       }
     },
@@ -2768,6 +2956,96 @@
           "code"
         ]
       },
+      "CustomerTelegramStartDto": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "example": "+998901234567",
+            "description": "Required without initData (website): the code is sent only to the Telegram account whose contact matches this phone. With initData (Mini App) it is optional; if given, the shared contact must match it."
+          },
+          "initData": {
+            "type": "string",
+            "description": "Telegram WebApp initData of the venue bot. Present = Mini App mode: the session is bound to this Telegram user and the contact share confirms the phone directly, no code to type."
+          }
+        }
+      },
+      "CustomerTelegramStartResponseDto": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "description": "Pass to telegram/status; also the deep-link payload"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "instant",
+              "code"
+            ],
+            "description": "instant: Mini App, the contact share signs in; code: website, the bot sends a code to type into otp/verify"
+          },
+          "botUsername": {
+            "type": "string",
+            "example": "venue_bot"
+          },
+          "deepLink": {
+            "type": "string",
+            "example": "https://t.me/venue_bot?start=SESSION_ID"
+          },
+          "expiresIn": {
+            "type": "number",
+            "example": 300,
+            "description": "Session lifetime in seconds"
+          }
+        },
+        "required": [
+          "sessionId",
+          "mode",
+          "botUsername",
+          "deepLink",
+          "expiresIn"
+        ]
+      },
+      "CustomerTelegramStatusDto": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "description": "sessionId from telegram/start"
+          }
+        },
+        "required": [
+          "sessionId"
+        ]
+      },
+      "CustomerTelegramStatusResponseDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "code_sent",
+              "verified",
+              "expired"
+            ],
+            "description": "pending: keep polling. code_sent: show the code field, finish with otp/verify. verified: same fields as the otp/verify response (isNewUser, tokens and user, or registrationToken), returned once. expired: start again"
+          },
+          "phone": {
+            "type": "string",
+            "example": "+998901234567",
+            "description": "code_sent: the phone the code was issued for"
+          },
+          "isNewUser": {
+            "type": "boolean",
+            "description": "verified only"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
       "CustomerRegisterDto": {
         "type": "object",
         "properties": {
@@ -3209,6 +3487,55 @@
         },
         "required": [
           "address"
+        ]
+      },
+      "TelegramBotStatusDto": {
+        "type": "object",
+        "properties": {
+          "connected": {
+            "type": "boolean",
+            "example": true
+          },
+          "username": {
+            "type": "string",
+            "nullable": true,
+            "example": "venue_bot"
+          },
+          "link": {
+            "type": "string",
+            "nullable": true,
+            "example": "https://t.me/venue_bot"
+          },
+          "webhookUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "Registered automatically on connect; shown for diagnostics only",
+            "example": "https://api.example.uz/telegram/bot/0b6a6c3e-7c1f-4b8e-9d4e-3f2a1b0c9d8e/webhook"
+          },
+          "isEnabled": {
+            "type": "boolean",
+            "example": true
+          }
+        },
+        "required": [
+          "connected",
+          "username",
+          "link",
+          "webhookUrl",
+          "isEnabled"
+        ]
+      },
+      "ConnectTelegramBotDto": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "Bot token from @BotFather",
+            "example": "123456789:AA..."
+          }
+        },
+        "required": [
+          "token"
         ]
       },
       "BranchViewDto": {

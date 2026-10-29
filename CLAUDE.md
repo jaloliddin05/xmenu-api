@@ -12,8 +12,11 @@ Swagger (`/docs`), Jest. Prettier: одинарные кавычки, trailing c
 `npm run start:dev` · `npm run build` · `npm run lint` · `npm test` · `npm run test:e2e` · `npm run openapi`
 (`openapi` собирает проект и пишет `docs/openapi.json` из сборки, без БД и Redis; `docs/API.md` правится руками).
 Миграции: `npm run migrate` (собирает схему и запускает `prisma migrate dev`), на сервере `npx prisma migrate deploy`.
+`generate-schema` вызывает `cat`: под Windows (npm запускает скрипты через cmd) он падает и оставляет
+`prisma/schema.prisma` пустым. Собирай схему из Git Bash (`cat ./src/modules/*/*/*.prisma > prisma/schema.prisma`);
+порядок файлов в glob там другой, поэтому лишние перестановки моделей в диффе лучше не коммитить.
 Env: см. `.env.example` (полный). Ключевые: `JWT_*`, `OTP_*`, `SMS_PROVIDER`, `PAYMENT_CONFIG_KEY`, `REDIS_URL`, `PUBLIC_API_URL`, `PUBLIC_FILES_URL`,
-`TELEGRAM_BOT_TOKEN`, `TELEGRAM_ORDERS_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `OPS_CHAT_ID`, `ORDER_QUEUES`,
+`TELEGRAM_BOT_TOKEN`, `TELEGRAM_ORDERS_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `TELEGRAM_VERIFY_TTL_SECONDS`, `OPS_CHAT_ID`, `ORDER_QUEUES`,
 `MINIAPP_URL`, `UPLOAD_MAX_BYTES`, `PLATFORM_ADMIN_USER_IDS`, `TRANSLATION_*`.
 
 ## Схема Prisma
@@ -25,12 +28,13 @@ Env: см. `.env.example` (полный). Ключевые: `JWT_*`, `OTP_*`, `S
 `GET /tenant/config` в `TenantConfigModule`), `organization` (+ настройки заведения), `user`, `employee` (пока не
 используется), `branch`, `category`, `product` (+ группы допов), `menu` (публичный), `customer` (+ адреса),
 `order` (state machine, очереди, уведомления), `payment` (Click, Payme, ключи тенанта, возвраты),
-`sms` (провайдеры eskiz, telegram, console), `file`, `translation`, `application`,
+`sms` (провайдеры eskiz, telegram, console), `telegram` (боты заведений: `TelegramBotService`, `TelegramClient`,
+`/telegram-bot`), `file`, `translation`, `application`,
 `revalidate-queue` (инвалидация кэша QR).
 
 ## Контракт API
 Единое место: `docs/API.md` и `docs/openapi.json`. Подробности: `docs/ORDERS_API.md`, `docs/BRANCHES_API.md`,
-`docs/BACKEND_ORDERS.md` (`docs/TELEGRAM_VERIFICATION.md` в репозитории нет). Меняешь контроллер или DTO: добавь `@ApiProperty` и
+`docs/BACKEND_ORDERS.md`, `docs/TELEGRAM_VERIFICATION.md`. Меняешь контроллер или DTO: добавь `@ApiProperty` и
 `@ApiOperation`, запусти `npm run openapi`, закоммить результат вместе с кодом. Проверки контракта в CI пока нет
 (в `.github/workflows` только `deploy.yml`).
 
@@ -60,7 +64,7 @@ Env: см. `.env.example` (полный). Ключевые: `JWT_*`, `OTP_*`, `S
 ## Заказы
 `OrderTransitionService` единственный путь смены статуса (автомат, optimistic locking по `version`, журнал).
 Оплату подтверждает только вебхук провайдера. Эскалация: 45 с повтор в Telegram, 120 с SMS, 300 с авто-отмена и
-возврат (робозвонка нет; шаг `esc-call` на 180 с шлёт ops-алерт). Click возвращает автоматически,
+возврат. Робозвонка в цепочке нет: задачи `esc-call`, оставшиеся в Redis, молча пропускаются. Click возвращает автоматически,
 Payme вручную через ops-чат.
 
 ## Авторизация клиентов
@@ -68,16 +72,24 @@ Payme вручную через ops-чат.
 сессиями. `CustomerOtpService.issue()` не зависит от канала доставки (SMS или Telegram), лимиты по телефону общие.
 Целевые параметры: `OTP_LENGTH=6`, `OTP_TTL_SECONDS=300`, `OTP_MAX_ATTEMPTS=5`, `OTP_COOLDOWN_SECONDS=60`
 По умолчанию 6; клиент и дашборд пока ждут 4.
-`TelegramInitDataService` проверяет `initData` токеном бота тенанта (иначе платформенным) и входом не является.
+`TelegramInitDataService.verifyForTenant` проверяет `initData` токеном бота заведения (иначе платформенным
+`TELEGRAM_BOT_TOKEN`) и входом не является.
 
-## Подтверждение номера через Telegram (не реализовано: план)
-В коде нет `TelegramVerificationService`, `TelegramBotWebhookController`, `TelegramBotService`, `PUT /telegram-bot`
-и `docs/TELEGRAM_VERIFICATION.md`. Сейчас есть только платформенный бот заказов (`telegram-orders.controller.ts`)
-и `TelegramInitDataService`. Ниже описана цель.
-`TelegramVerificationService` + `TelegramBotWebhookController` (`POST /telegram/bot/:botKey/webhook`), боты ресторанов в
-`TelegramBotService` (`PUT /telegram-bot` из админки). Два режима: Mini App (`instant`, сессия привязана к
-Telegram-пользователю из `initData`) и сайт (`code`, код приходит в чат бота только при совпадении номера). Сессии в
-Redis (`tgv:*`). Подробно: `docs/TELEGRAM_VERIFICATION.md`. Контакт принимается только если `contact.user_id == from.id`.
+## Боты заведений и подтверждение номера через Telegram
+Контракт и сценарии: `docs/TELEGRAM_VERIFICATION.md`. На реальном Telegram не проверено (чек-лист там же).
+- `TelegramBotService` (`modules/telegram`): `GET/PUT/DELETE /telegram-bot` из админки. Таблица
+  `organization_telegram_bot` (одна строка на заведение, `telegram_bot_id` уникален), токен зашифрован
+  `PAYMENT_CONFIG_KEY`, `PUT` требует https `PUBLIC_API_URL`. Webhook `POST /telegram/bot/:botKey/webhook`
+  (`botKey` = id строки, не slug), секрет в заголовке сравнивается за константное время. `TelegramClient` не
+  кладёт токен в ошибки: логируй через `telegramErrorText(e)`.
+- `TelegramVerificationService` + `TelegramBotWebhookController` (в `auth`), клиентские `POST
+  /auth/customer/telegram/start` и `/status`. Режимы: Mini App (`instant`, сессия привязана к Telegram-пользователю
+  из `initData`, вход выдаётся в `status` один раз) и сайт (`code`, код приходит в чат только при совпадении номера,
+  дальше обычный `otp/verify`). Сессии в Redis (`tgv:*`, `TELEGRAM_VERIFY_TTL_SECONDS`). Контакт принимается только
+  если `contact.user_id == from.id`.
+- Код из бота выдаёт `CustomerOtpService.issue()` (тот же хеш, попытки и лимиты по телефону, что у SMS).
+- Вход завершает `CustomerAuthService.completeVerifiedPhone` (общий для SMS и Telegram).
+- Уведомления о заказах по-прежнему идут через платформенного бота (`telegram-orders.controller.ts`).
 
 ## Авторизация владельцев (staff)
 Контракт, ошибки и лимиты: `docs/API.md`. Код: `StaffAuthService` (регистрация и вход),
@@ -110,7 +122,8 @@ Redis (`tgv:*`). Подробно: `docs/TELEGRAM_VERIFICATION.md`. Контак
 
 ## Что не проверено (проверять на стенде перед опорой)
 Запросы Prisma end-to-end (`POST /orders`), боевые вызовы Click/Payme (особенно reversal Click и параметры ссылки
-Payme), Telegram webhook и кнопки, нагрузка. Стендов Click/Payme нет.
+Payme), Telegram webhook и кнопки, боты заведений (`PUT /telegram-bot`, вебхук, `requestContact()` в Mini App,
+цепочка `deepLink` → контакт → код → `otp/verify`), нагрузка. Стендов Click/Payme нет.
 
 ## Известные долги
 - Ветки `feat/staff-auth-hardening`, `fix/pilot-hardening`, `feat/tenant-config`, `feat/reserved-slugs` влиты в `main`
