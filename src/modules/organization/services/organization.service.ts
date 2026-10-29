@@ -7,6 +7,7 @@ import { FileService } from 'src/modules/file/file.service';
 import UpdateOrganizationDto from '../dto/update-organization.dto';
 import { parseOrganizationType } from '../models/organization.model';
 import { RevalidateService } from 'src/modules/revalidate-queue/revalidate.service';
+import { TenantService } from 'src/modules/tenant/tenant.service';
 import { assertOwnTranslations } from 'src/modules/product/services/menu-ownership';
 import { randomSlug, SLUG_MAX, slugify } from '../domain/slug';
 import { PLATFORM_ORDER_SETTINGS, PLATFORM_SETTINGS } from '../domain/platform-defaults';
@@ -18,7 +19,8 @@ export class OrganizationService {
   constructor(
     private readonly prismaService: PrismaService,
     private readonly fileService: FileService,
-    private readonly revalidateService: RevalidateService
+    private readonly revalidateService: RevalidateService,
+    private readonly tenants: TenantService,
   ) { }
 
   async create(data: CreateOrganizationDto, owner_id: string, tx?: Prisma.TransactionClient) {
@@ -234,7 +236,7 @@ export class OrganizationService {
 
     // 2️⃣ mavjud organization ni topamiz
     const existing = await this.prismaService.organization.findUnique({ where: { id } });
-    if (!existing) throw new Error('Organization not found');
+    if (!existing) throw new NotFoundException('Organization not found');
 
     // 3️⃣ type ni moslashtirish
     if (data.type) data.type = parseOrganizationType(data.type);
@@ -271,6 +273,8 @@ export class OrganizationService {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') throw slugTaken();
       throw e;
     }
+    // Name and slug feed the cached tenant (brand name in SMS, slug in /tenant/by-slug)
+    this.tenants.invalidate(id);
 
     if (data?.slug) {
       await this.revalidateService.addRevalidationJob({id, newSlug:data?.slug, oldSlug: existing?.slug, route: 'organization'})
@@ -292,7 +296,9 @@ export class OrganizationService {
 
   async delete(id: string, organizationId: string) {
     this.assertOwn(id, organizationId);
-    return await this.prismaService.organization.delete({ where: { id } })
+    const deleted = await this.prismaService.organization.delete({ where: { id } });
+    this.tenants.invalidate(id);
+    return deleted;
   }
 
   async updateImage(file: Express.Multer.File, id: string, type: 'logo' | 'banner') {

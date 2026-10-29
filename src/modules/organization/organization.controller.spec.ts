@@ -11,6 +11,7 @@ describe('Organization endpoints: own organization only (IDOR)', () => {
   let t: ReturnType<typeof seedTwoTenants>;
   let files: { updateFile: jest.Mock; removeFile: jest.Mock };
   let revalidate: { addRevalidationJob: jest.Mock };
+  let tenants: { invalidate: jest.Mock };
   let controller: OrganizationController;
   let req: { user: { organization: { id: string; slug: string } } };
   let theirTr: { id: string };
@@ -33,8 +34,9 @@ describe('Organization endpoints: own organization only (IDOR)', () => {
       removeFile: jest.fn(),
     };
     revalidate = { addRevalidationJob: jest.fn() };
+    tenants = { invalidate: jest.fn() };
     controller = new OrganizationController(
-      new OrganizationService(db as any, files as any, revalidate as any),
+      new OrganizationService(db as any, files as any, revalidate as any, tenants as any),
     );
     req = { user: { organization: { id: t.mine.org.id, slug: 'mine' } } };
   });
@@ -44,6 +46,7 @@ describe('Organization endpoints: own organization only (IDOR)', () => {
     expect(db.log).toEqual([]);
     expect(files.updateFile).not.toHaveBeenCalled();
     expect(revalidate.addRevalidationJob).not.toHaveBeenCalled();
+    expect(tenants.invalidate).not.toHaveBeenCalled();
   }
 
   it('no longer lists every organization', () => {
@@ -97,6 +100,11 @@ describe('Organization endpoints: own organization only (IDOR)', () => {
       'Mine 2',
     );
   });
+
+  it('drops the cached tenant after an update, so the new name and slug apply at once', async () => {
+    await controller.update(t.mine.org.id, { name: 'Mine 2', slug: 'mine-2' } as any, {}, req);
+    expect(tenants.invalidate).toHaveBeenCalledWith(t.mine.org.id);
+  });
 });
 
 describe('Organization slug', () => {
@@ -113,6 +121,7 @@ describe('Organization slug', () => {
         db as any,
         { updateFile: jest.fn(), removeFile: jest.fn() } as any,
         { addRevalidationJob: jest.fn() } as any,
+        { invalidate: jest.fn() } as any,
       ),
     );
     req = { user: { organization: { id: t.mine.org.id, slug: 'mine' } } };
