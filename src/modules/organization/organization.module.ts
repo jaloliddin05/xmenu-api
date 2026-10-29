@@ -8,9 +8,9 @@ import { OrganizationSettingsController } from './organization-settings.controll
 import { OrganizationSettingsService } from './services/organization-settings.service';
 
 @Module({
-  imports:[PrismaModule,RevalidateModule,TenantModule],
+  imports: [PrismaModule, RevalidateModule, TenantModule],
   controllers: [OrganizationController, OrganizationSettingsController],
   providers: [OrganizationService, OrganizationSettingsService],
-  exports:[OrganizationService]
+  exports: [OrganizationService],
 })
 export class OrganizationModule {}

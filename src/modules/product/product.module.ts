@@ -7,9 +7,9 @@ import { AdditionalProductController } from './controllers/additional-product.co
 import { RevalidateModule } from '../revalidate-queue/revalidate.module';
 
 @Module({
-  imports:[PrismaModule,RevalidateModule],
-  controllers: [ProductController,AdditionalProductController],
-  providers: [ProductService,AdditionalProductService],
-  exports:[ProductService,AdditionalProductService]
+  imports: [PrismaModule, RevalidateModule],
+  controllers: [ProductController, AdditionalProductController],
+  providers: [ProductService, AdditionalProductService],
+  exports: [ProductService, AdditionalProductService],
 })
 export class ProductModule {}
