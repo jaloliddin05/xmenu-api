@@ -5,6 +5,7 @@ import { REDIS } from 'src/infra/redis/redis.module';
 import { isValidPhone } from 'src/infra/helper/auth/customer-validators';
 import type { Tenant } from 'src/modules/tenant/tenant.service';
 import { TelegramBotService } from 'src/modules/telegram/telegram-bot.service';
+import { TelegramBotProfileService } from 'src/modules/telegram/telegram-bot-profile.service';
 import type { TenantBot } from 'src/modules/telegram/telegram-bot.service';
 import {
   TelegramClient,
@@ -103,6 +104,7 @@ export class TelegramVerificationService {
     private readonly client: TelegramClient,
     private readonly events: CustomerAuthEventService,
     private readonly auth: CustomerAuthService,
+    private readonly botProfile: TelegramBotProfileService,
   ) {}
 
   // ================= POST auth/customer/telegram/start =================
@@ -263,7 +265,14 @@ export class TelegramVerificationService {
     const fromId = String(msg.from!.id);
     const t = BOT_MESSAGES[pickBotLang(msg.from!.language_code)];
 
-    if (!payload) return this.say(bot, chatId, t.greeting, REMOVE_KEYBOARD);
+    if (!payload) {
+      // The greeting opens the venue's Mini App when its address is known
+      const url = await this.botProfile.startUrl(bot.organizationId);
+      const markup = url
+        ? { inline_keyboard: [[{ text: t.openApp, web_app: { url } }]] }
+        : REMOVE_KEYBOARD;
+      return this.say(bot, chatId, t.greeting, markup);
+    }
 
     const session = await this.load(payload);
     const ttl = session ? await this.redis.ttl(sKey(payload)) : 0;

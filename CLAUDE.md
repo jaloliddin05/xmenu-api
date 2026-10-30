@@ -20,7 +20,7 @@ Env: см. `.env.example` (полный). Ключевые: `JWT_*`, `OTP_*`, `S
 `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ORDERS_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `TELEGRAM_VERIFY_TTL_SECONDS`, `OPS_CHAT_ID`, `ORDER_QUEUES`,
 `MINIAPP_URL`, `UPLOAD_MAX_BYTES`, `PLATFORM_ADMIN_USER_IDS`, `TRANSLATION_*`, `OPENAI_API_KEY` (необязателен: без него
 `/translation` → 503 `translation_unavailable`), `NEXT_PUBLIC_URL` + `REVALIDATE_SECRET` (QR),
-`CLIENT_REVALIDATE_URL` + `CLIENT_REVALIDATE_SECRET` (сайт доставки), `STAFF_REFRESH_TTL_DAYS`,
+`CLIENT_REVALIDATE_URL` + `CLIENT_REVALIDATE_SECRET` (сайт доставки), `DELIVERY_URL_TEMPLATE` (адрес Mini App для кнопки бота), `STAFF_REFRESH_TTL_DAYS`,
 `STAFF_SESSION_ABSOLUTE_DAYS`. Окончания строк LF (`.gitattributes`, `.editorconfig`).
 
 ## Схема Prisma
@@ -100,6 +100,10 @@ Payme вручную через ops-чат.
   `PAYMENT_CONFIG_KEY`, `PUT` требует https `PUBLIC_API_URL`. Webhook `POST /telegram/bot/:botKey/webhook`
   (`botKey` = id строки, не slug), секрет в заголовке сравнивается за константное время. `TelegramClient` не
   кладёт токен в ошибки: логируй через `telegramErrorText(e)`.
+- `TelegramBotProfileService` (`modules/telegram`): автонастройка бота заведения (имя, описания, `/start`, кнопка меню Mini App) по
+  профилю из `organization_telegram_bot.profile` или дефолтам из данных заведения (`domain/bot-profile.ts`); `PUT
+  /telegram-bot` применяет её после подключения, `PUT /telegram-bot/profile` и `POST /telegram-bot/sync` вручную, смена slug
+  перенастраивает кнопку. Пункты независимы, итог в `sync_result`. Аватар не меняется (нет метода). На реальном Telegram не проверено.
 - `TelegramVerificationService` + `TelegramBotWebhookController` (в `auth`), клиентские `POST
   /auth/customer/telegram/start` и `/status`. Режимы: Mini App (`instant`, сессия привязана к Telegram-пользователю
   из `initData`, вход выдаётся в `status` один раз) и сайт (`code`, код приходит в чат только при совпадении номера,

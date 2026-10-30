@@ -12,6 +12,7 @@ describe('Public organization endpoints', () => {
       {} as any,
       {} as any,
       {} as any,
+      {} as any,
     ),
   );
   beforeEach(() => findFirst.mockReset());

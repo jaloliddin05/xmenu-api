@@ -4,11 +4,12 @@ import { OrganizationController } from './organization.controller';
 import { PrismaModule } from '../_prisma/prisma.module';
 import { RevalidateModule } from '../revalidate-queue/revalidate.module';
 import { TenantModule } from '../tenant/tenant.module';
+import { TelegramModule } from '../telegram/telegram.module';
 import { OrganizationSettingsController } from './organization-settings.controller';
 import { OrganizationSettingsService } from './services/organization-settings.service';
 
 @Module({
-  imports: [PrismaModule, RevalidateModule, TenantModule],
+  imports: [PrismaModule, RevalidateModule, TenantModule, TelegramModule],
   controllers: [OrganizationController, OrganizationSettingsController],
   providers: [OrganizationService, OrganizationSettingsService],
   exports: [OrganizationService],

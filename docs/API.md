@@ -183,9 +183,34 @@ IP берётся из `X-Forwarded-For` только от локального 
 
 ## Бот заведения (владелец)
 
-`GET /telegram-bot` → `{ connected, username, link, webhookUrl, isEnabled }` (токен не возвращается никогда).
+`GET /telegram-bot` → `{ connected, username, link, webhookUrl, isEnabled, profile, isDefault, deliveryUrl, lastSync }`
+(токен не возвращается никогда; без бота `profile`, `deliveryUrl`, `lastSync` = `null`).
 `PUT /telegram-bot { "token": "123456:AA..." }` проверяет токен через `getMe`, ставит webhook с секретом, хранит токен
-зашифрованным (`PAYMENT_CONFIG_KEY`) и отвечает тем же статусом. `DELETE /telegram-bot` → 204, webhook снимается.
+зашифрованным (`PAYMENT_CONFIG_KEY`), затем сам настраивает бота (см. ниже) и отвечает полным статусом. Сбой настройки
+профиля подключение не отменяет: он виден в `lastSync`. `DELETE /telegram-bot` → 204, меню бота возвращается к
+стандартному, webhook снимается.
+
+### Профиль бота (автонастройка)
+
+Профиль: `profile = { ru|uz|en: { name, description, shortDescription, menuButtonText } }`, по одному элементу на язык
+заведения (`languages` настроек). Пока владелец не сохранял профиль (`isDefault: true`), значения собираются из данных
+заведения: имя = название (≤64), описание = описание заведения на этом языке (иначе на языке по умолчанию, иначе
+общая строка; ≤512), короткое = его начало (≤120), текст кнопки = «Меню» / «Menyu» / «Menu» (≤32).
+
+- `PUT /telegram-bot/profile { "profile": { "ru": { ... } } }`: проверяет, сохраняет и сразу применяет. Языки, не
+  присланные в теле, остаются со своими значениями. Ошибки: `400 validation_error` с `errors[]` (`ru.name` / `maxLength`,
+  `isNotEmpty`, `isString`, `notInLanguages`, `whitelistValidation`), `404 bot_not_connected`.
+- `POST /telegram-bot/sync`: применить сохранённое ещё раз (после ошибки). `404 bot_not_connected`.
+- Применение вызывает Bot API по пунктам, каждый независим: `setMyName`, `setMyDescription`,
+  `setMyShortDescription`, `setMyCommands` (одна команда `/start`) для каждого языка и один раз без `language_code`
+  (язык по умолчанию), и `setChatMenuButton` (кнопка `web_app`, адрес `deliveryUrl`). Итог хранится и приходит в
+  `lastSync: { syncedAt, result: { name, description, shortDescription, commands, menuButton } }`, где каждый пункт
+  `{ status: "ok" | "failed" | "skipped_no_url", reason? }`; `reason` текст Telegram (у имени есть лимит частоты смены).
+- `deliveryUrl` строится из `DELIVERY_URL_TEMPLATE` (`https://{slug}.xmenu.uz`, только https); без переменной или без
+  `{slug}` в шаблоне кнопка не ставится (`skipped_no_url`), остальное применяется.
+- Смена slug (`PUT /organization/:id`) перенастраивает только кнопку меню, в фоне и без влияния на ответ. Правка
+  названия, описания или языков заведения профиль бота сама не меняет: применить вручную (`PUT .../profile` или `sync`).
+- Аватар бота API не меняет: только в @BotFather. Приветствие `/start` в боте получает кнопку Mini App, если адрес известен.
 
 | HTTP | `code` | Когда |
 |---|---|---|

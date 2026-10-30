@@ -9,6 +9,7 @@ import { parseOrganizationType } from '../models/organization.model';
 import { RevalidateService } from 'src/modules/revalidate-queue/revalidate.service';
 import { TenantService } from 'src/modules/tenant/tenant.service';
 import { assertOwnTranslations } from 'src/modules/product/services/menu-ownership';
+import { TelegramBotProfileService } from 'src/modules/telegram/telegram-bot-profile.service';
 import { randomSlug, SLUG_MAX, slugify } from '../domain/slug';
 import { PLATFORM_ORDER_SETTINGS, PLATFORM_SETTINGS } from '../domain/platform-defaults';
 import { PublicOrganization, toPublicOrganization } from '../domain/public-organization';
@@ -23,6 +24,7 @@ export class OrganizationService {
     private readonly fileService: FileService,
     private readonly revalidateService: RevalidateService,
     private readonly tenants: TenantService,
+    private readonly botProfile: TelegramBotProfileService,
   ) { }
 
   async create(data: CreateOrganizationDto, owner_id: string, tx?: Prisma.TransactionClient) {
@@ -296,6 +298,9 @@ export class OrganizationService {
       slug: slugChanged ? data.slug : existing.slug,
       oldSlug: slugChanged ? existing.slug : null,
     });
+
+    // The Mini App menu button of the venue's bot points at the slug address; best effort, never throws
+    if (slugChanged) void this.botProfile.refreshMenuButton(id);
 
     // 7️⃣ yangilangan ma’lumotni qaytarish
     return await this.prismaService.organization.findUnique({

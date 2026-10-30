@@ -183,6 +183,18 @@ describe('TelegramBotService', () => {
     expect(await svc.status(ORG)).toMatchObject({ connected: false });
   });
 
+  it('disconnect gives the menu button back to Telegram before dropping the webhook', async () => {
+    const { svc, client } = setup();
+    await svc.connect(ORG, TOKEN);
+    client.call.mockClear();
+    await svc.disconnect(ORG);
+    const methods = client.call.mock.calls.map((c: any[]) => c[1]);
+    expect(methods).toEqual(['setChatMenuButton', 'deleteWebhook']);
+    expect(client.call.mock.calls[0][2]).toEqual({
+      menu_button: { type: 'default' },
+    });
+  });
+
   it('initDataToken falls back to the platform bot until the venue connects its own', async () => {
     process.env.TELEGRAM_BOT_TOKEN = 'platform:token';
     const { svc } = setup();

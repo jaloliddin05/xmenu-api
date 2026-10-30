@@ -43,6 +43,9 @@ function setup(opts: { bot?: typeof BOT | null; devMode?: boolean } = {}) {
       registrationToken: 'reg-token',
     })),
   };
+  const botProfile = {
+    startUrl: jest.fn(async (): Promise<string | null> => null),
+  };
   const svc = new TelegramVerificationService(
     redis as any,
     { telegramVerifyTtlSeconds: 300 } as any,
@@ -53,6 +56,7 @@ function setup(opts: { bot?: typeof BOT | null; devMode?: boolean } = {}) {
     client as any,
     events as any,
     auth as any,
+    botProfile as any,
   );
   let updateId = 1;
   const update = (message: any): TelegramUpdate => ({
@@ -75,6 +79,7 @@ function setup(opts: { bot?: typeof BOT | null; devMode?: boolean } = {}) {
     rateLimit,
     events,
     auth,
+    botProfile,
     update,
     priv,
   };
@@ -145,6 +150,23 @@ describe('website ("code") mode through the bot', () => {
     expect(sent).toHaveLength(1);
     expect(sent[0].text).toContain('Mant');
     expect(sent[0].reply_markup.keyboard[0][0].request_contact).toBe(true);
+  });
+
+  it('/start without a session greets with a Mini App button when the venue address is known', async () => {
+    const { svc, update, priv, sent, botProfile } = setup();
+    botProfile.startUrl.mockResolvedValue('https://mant.xmenu.uz');
+    await svc.handleUpdate(BOT, update(priv({ text: '/start' })));
+    expect(botProfile.startUrl).toHaveBeenCalledWith('tenant-1');
+    expect(sent[0].reply_markup.inline_keyboard[0][0]).toEqual({
+      text: 'Открыть меню',
+      web_app: { url: 'https://mant.xmenu.uz' },
+    });
+  });
+
+  it('/start without a session and without an address only greets', async () => {
+    const { svc, update, priv, sent } = setup();
+    await svc.handleUpdate(BOT, update(priv({ text: '/start' })));
+    expect(sent[0].reply_markup).toEqual({ remove_keyboard: true });
   });
 
   it('answers "expired" for an unknown or foreign-bot session', async () => {

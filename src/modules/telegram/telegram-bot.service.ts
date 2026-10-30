@@ -227,10 +227,25 @@ export class TelegramBotService {
       where: { organization_id: organizationId },
     });
     if (!row) return;
+    await this.resetMenuButton(row);
     await this.dropWebhook(row);
     await this.prisma.organization_telegram_bot.delete({
       where: { organization_id: organizationId },
     });
+  }
+
+  /** The bot is no longer ours: give its menu button back to Telegram's default. Best effort. */
+  private async resetMenuButton(row: BotRow) {
+    try {
+      const bot = this.toTenantBot(row);
+      await this.client.call(bot.token, 'setChatMenuButton', {
+        menu_button: { type: 'default' },
+      });
+    } catch (e) {
+      this.logger.warn(
+        `setChatMenuButton reset failed: ${telegramErrorText(e)}`,
+      );
+    }
   }
 
   private async dropWebhook(row: BotRow) {

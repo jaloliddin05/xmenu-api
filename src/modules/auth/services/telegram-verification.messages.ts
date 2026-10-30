@@ -4,6 +4,7 @@ interface Messages {
   greeting: string;
   askContact: (brand: string) => string;
   shareButton: string;
+  openApp: string;
   verified: string;
   code: (brand: string, code: string) => string;
   notYourContact: string;
@@ -25,6 +26,7 @@ export const BOT_MESSAGES: Record<BotLang, Messages> = {
     askContact: (brand) =>
       `Подтверждение номера для «${b(brand)}».\nНажмите кнопку ниже, чтобы поделиться номером телефона.`,
     shareButton: 'Поделиться номером',
+    openApp: 'Открыть меню',
     verified: '✅ Номер подтверждён. Вернитесь в приложение.',
     code: (brand, code) =>
       `Код для входа в «${b(brand)}»: <b>${code}</b>\nНикому не сообщайте этот код.`,
@@ -44,6 +46,7 @@ export const BOT_MESSAGES: Record<BotLang, Messages> = {
     askContact: (brand) =>
       `«${b(brand)}» uchun raqamni tasdiqlash.\nTelefon raqamingizni yuborish uchun quyidagi tugmani bosing.`,
     shareButton: 'Raqamni yuborish',
+    openApp: 'Menyuni ochish',
     verified: '✅ Raqam tasdiqlandi. Ilovaga qayting.',
     code: (brand, code) =>
       `«${b(brand)}» ga kirish kodi: <b>${code}</b>\nBu kodni hech kimga bermang.`,
@@ -64,6 +67,7 @@ export const BOT_MESSAGES: Record<BotLang, Messages> = {
     askContact: (brand) =>
       `Phone verification for “${b(brand)}”.\nTap the button below to share your phone number.`,
     shareButton: 'Share phone number',
+    openApp: 'Open menu',
     verified: '✅ Phone number confirmed. Return to the app.',
     code: (brand, code) =>
       `Your sign-in code for “${b(brand)}”: <b>${code}</b>\nDo not share this code with anyone.`,

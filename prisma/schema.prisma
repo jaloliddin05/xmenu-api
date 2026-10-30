@@ -688,6 +688,13 @@ model organization_telegram_bot {
   webhook_secret  String
   is_enabled      Boolean      @default(true)
 
+  // Bot profile the owner edited: { ru|uz|en: { name, description, shortDescription, menuButtonText } }.
+  // NULL = never edited, values come from the venue's own data (domain/bot-profile.ts).
+  profile         Json?
+  // Outcome of the last push of the profile to Telegram, per item (domain/bot-profile.ts SyncResult)
+  synced_at       DateTime?
+  sync_result     Json?
+
   created_at      DateTime     @default(now())
   updated_at      DateTime     @updatedAt
 }

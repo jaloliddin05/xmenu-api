@@ -1040,6 +1040,195 @@
         ]
       }
     },
+    "/telegram-bot": {
+      "get": {
+        "operationId": "TelegramBotController_status",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramBotFullStatusDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No or invalid owner token"
+          },
+          "403": {
+            "description": "The user has no organization"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Connection status of the venue bot and the profile pushed to it",
+        "tags": [
+          "Telegram bot"
+        ]
+      },
+      "put": {
+        "operationId": "TelegramBotController_connect",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectTelegramBotDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramBotFullStatusDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid_bot_token (malformed or rejected by Telegram), webhook_setup_failed, webhook_url_not_https (server PUBLIC_API_URL is not https)"
+          },
+          "401": {
+            "description": "No or invalid owner token"
+          },
+          "403": {
+            "description": "The user has no organization"
+          },
+          "409": {
+            "description": "bot_already_connected: the bot belongs to another venue"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Connect or replace the bot: checks the token with Telegram, registers the webhook, stores the token encrypted, then pushes the profile (name, descriptions, /start command, menu button). A failed profile push does not fail the connection: see lastSync",
+        "tags": [
+          "Telegram bot"
+        ]
+      },
+      "delete": {
+        "operationId": "TelegramBotController_disconnect",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "401": {
+            "description": "No or invalid owner token"
+          },
+          "403": {
+            "description": "The user has no organization"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Disconnect the bot and remove its webhook",
+        "tags": [
+          "Telegram bot"
+        ]
+      }
+    },
+    "/telegram-bot/profile": {
+      "put": {
+        "operationId": "TelegramBotController_saveProfile",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveBotProfileDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramBotFullStatusDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "validation_error with errors[] (ru.name, uz.description, ...): lengths, empty fields, languages not enabled for the venue"
+          },
+          "401": {
+            "description": "No or invalid owner token"
+          },
+          "403": {
+            "description": "The user has no organization"
+          },
+          "404": {
+            "description": "bot_not_connected"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Save the bot profile (per language) and push it to Telegram",
+        "tags": [
+          "Telegram bot"
+        ]
+      }
+    },
+    "/telegram-bot/sync": {
+      "post": {
+        "operationId": "TelegramBotController_sync",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramBotFullStatusDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No or invalid owner token"
+          },
+          "403": {
+            "description": "The user has no organization"
+          },
+          "404": {
+            "description": "bot_not_connected"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Push the saved profile to Telegram again (e.g. after a failed item)",
+        "tags": [
+          "Telegram bot"
+        ]
+      }
+    },
     "/customers/me": {
       "get": {
         "operationId": "CustomerController_getMe",
@@ -1249,110 +1438,6 @@
         "summary": "Manzilni o'chirish. Asosiy o'chirilsa, eng yangisi asosiy bo'ladi",
         "tags": [
           "Customer addresses"
-        ]
-      }
-    },
-    "/telegram-bot": {
-      "get": {
-        "operationId": "TelegramBotController_status",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TelegramBotStatusDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "No or invalid owner token"
-          },
-          "403": {
-            "description": "The user has no organization"
-          }
-        },
-        "security": [
-          {
-            "access-token": []
-          }
-        ],
-        "summary": "Connection status of the venue bot",
-        "tags": [
-          "Telegram bot"
-        ]
-      },
-      "put": {
-        "operationId": "TelegramBotController_connect",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ConnectTelegramBotDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TelegramBotStatusDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "invalid_bot_token (malformed or rejected by Telegram), webhook_setup_failed, webhook_url_not_https (server PUBLIC_API_URL is not https)"
-          },
-          "401": {
-            "description": "No or invalid owner token"
-          },
-          "403": {
-            "description": "The user has no organization"
-          },
-          "409": {
-            "description": "bot_already_connected: the bot belongs to another venue"
-          }
-        },
-        "security": [
-          {
-            "access-token": []
-          }
-        ],
-        "summary": "Connect or replace the bot: checks the token with Telegram, registers the webhook, stores the token encrypted",
-        "tags": [
-          "Telegram bot"
-        ]
-      },
-      "delete": {
-        "operationId": "TelegramBotController_disconnect",
-        "parameters": [],
-        "responses": {
-          "204": {
-            "description": ""
-          },
-          "401": {
-            "description": "No or invalid owner token"
-          },
-          "403": {
-            "description": "The user has no organization"
-          }
-        },
-        "security": [
-          {
-            "access-token": []
-          }
-        ],
-        "summary": "Disconnect the bot and remove its webhook",
-        "tags": [
-          "Telegram bot"
         ]
       }
     },
@@ -4364,6 +4449,163 @@
           "slug"
         ]
       },
+      "SyncItemDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "failed",
+              "skipped_no_url"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "description": "Error text from Telegram when status is failed"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "SyncResultDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/SyncItemDto"
+          },
+          "description": {
+            "$ref": "#/components/schemas/SyncItemDto"
+          },
+          "shortDescription": {
+            "$ref": "#/components/schemas/SyncItemDto"
+          },
+          "commands": {
+            "$ref": "#/components/schemas/SyncItemDto"
+          },
+          "menuButton": {
+            "$ref": "#/components/schemas/SyncItemDto"
+          }
+        },
+        "required": [
+          "name",
+          "description",
+          "shortDescription",
+          "commands",
+          "menuButton"
+        ]
+      },
+      "LastSyncDto": {
+        "type": "object",
+        "properties": {
+          "syncedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "result": {
+            "$ref": "#/components/schemas/SyncResultDto"
+          }
+        },
+        "required": [
+          "syncedAt",
+          "result"
+        ]
+      },
+      "TelegramBotFullStatusDto": {
+        "type": "object",
+        "properties": {
+          "connected": {
+            "type": "boolean",
+            "example": true
+          },
+          "username": {
+            "type": "string",
+            "nullable": true,
+            "example": "venue_bot"
+          },
+          "link": {
+            "type": "string",
+            "nullable": true,
+            "example": "https://t.me/venue_bot"
+          },
+          "webhookUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "Registered automatically on connect; shown for diagnostics only",
+            "example": "https://api.example.uz/telegram/bot/0b6a6c3e-7c1f-4b8e-9d4e-3f2a1b0c9d8e/webhook"
+          },
+          "isEnabled": {
+            "type": "boolean",
+            "example": true
+          },
+          "profile": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": {
+              "$ref": "#/components/schemas/BotProfileFieldsDto"
+            },
+            "description": "Per venue language (ru, uz, en): saved values over the defaults built from the venue data. null while no bot is connected"
+          },
+          "isDefault": {
+            "type": "boolean",
+            "description": "false once the owner saved the profile"
+          },
+          "deliveryUrl": {
+            "type": "string",
+            "nullable": true,
+            "example": "https://cafe-example.xmenu.uz",
+            "description": "Address the menu button opens (DELIVERY_URL_TEMPLATE); null: the button is not set"
+          },
+          "lastSync": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LastSyncDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "connected",
+          "username",
+          "link",
+          "webhookUrl",
+          "isEnabled",
+          "profile",
+          "isDefault",
+          "deliveryUrl",
+          "lastSync"
+        ]
+      },
+      "ConnectTelegramBotDto": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "Bot token from @BotFather",
+            "example": "123456789:AA..."
+          }
+        },
+        "required": [
+          "token"
+        ]
+      },
+      "SaveBotProfileDto": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/BotProfileFieldsDto"
+            },
+            "description": "Fields per language; only languages enabled in the venue settings. Languages left out keep their values"
+          }
+        },
+        "required": [
+          "profile"
+        ]
+      },
       "UpdateCustomerDto": {
         "type": "object",
         "properties": {
@@ -4428,55 +4670,6 @@
         },
         "required": [
           "address"
-        ]
-      },
-      "TelegramBotStatusDto": {
-        "type": "object",
-        "properties": {
-          "connected": {
-            "type": "boolean",
-            "example": true
-          },
-          "username": {
-            "type": "string",
-            "nullable": true,
-            "example": "venue_bot"
-          },
-          "link": {
-            "type": "string",
-            "nullable": true,
-            "example": "https://t.me/venue_bot"
-          },
-          "webhookUrl": {
-            "type": "string",
-            "nullable": true,
-            "description": "Registered automatically on connect; shown for diagnostics only",
-            "example": "https://api.example.uz/telegram/bot/0b6a6c3e-7c1f-4b8e-9d4e-3f2a1b0c9d8e/webhook"
-          },
-          "isEnabled": {
-            "type": "boolean",
-            "example": true
-          }
-        },
-        "required": [
-          "connected",
-          "username",
-          "link",
-          "webhookUrl",
-          "isEnabled"
-        ]
-      },
-      "ConnectTelegramBotDto": {
-        "type": "object",
-        "properties": {
-          "token": {
-            "type": "string",
-            "description": "Bot token from @BotFather",
-            "example": "123456789:AA..."
-          }
-        },
-        "required": [
-          "token"
         ]
       },
       "BranchViewDto": {

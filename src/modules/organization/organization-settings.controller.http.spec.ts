@@ -5,6 +5,7 @@ import { createHttpApp, staffToken } from 'src/infra/testing/http-app.fake';
 import { PrismaService } from '../_prisma/prisma.service';
 import { FileService } from '../file/file.service';
 import { RevalidateService } from '../revalidate-queue/revalidate.service';
+import { TelegramBotProfileService } from '../telegram/telegram-bot-profile.service';
 import { TenantService } from '../tenant/tenant.service';
 import { RevalidateService } from '../revalidate-queue/revalidate.service';
 import { OrganizationSettingsController } from './organization-settings.controller';
@@ -88,6 +89,7 @@ describe('GET/PUT /organization/:id/settings', () => {
           { provide: RevalidateService, useValue: {} },
           { provide: TenantService, useValue: { invalidate } },
           { provide: RevalidateService, useValue: { addRevalidationJob } },
+          { provide: TelegramBotProfileService, useValue: { refreshMenuButton: jest.fn() } },
         ],
       },
       [

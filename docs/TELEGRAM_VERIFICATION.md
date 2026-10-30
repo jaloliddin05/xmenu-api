@@ -92,6 +92,9 @@ Webhook и секрет ставятся автоматически, рукам�
    `/telegram/bot/{id}/webhook` с заголовком секрета; повторное подключение, смена бота и `DELETE /telegram-bot`.
 2. Mini App: приходит ли после `requestContact()` в бота обычное сообщение `contact` с `user_id` отправителя.
 3. Сайт: цепочка `deepLink` → `/start` → кнопка контакта → код в чате → `otp/verify`.
+4. Автонастройка (`PUT /telegram-bot`, `PUT /telegram-bot/profile`, `POST /telegram-bot/sync`, см. `API.md`): имя, описания и
+   команда `/start` реально появились у бота (по языкам), кнопка меню открывает `https://{slug}.xmenu.uz` как Mini App,
+   `DELETE /telegram-bot` вернул стандартную кнопку, смена slug перенастроила кнопку; ответ Telegram на частую смену имени.
 
 ## Известные ограничения и следующие шаги
 
