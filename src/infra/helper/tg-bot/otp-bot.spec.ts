@@ -1,10 +1,10 @@
-// otp-bot.ts builds its TelegramBot client once at module-load time (not
+// otp-bot.ts reads its token and chat id once at module-load time (not
 // through Nest DI), so the only way to test it without a real network call
-// is to mock the module *before* importing otp-bot. Each test gets a fresh
-// module registry (jest.resetModules + dynamic import) so the mocked
-// constructor is captured per-test rather than shared/stale across them.
+// is to mock axios *before* importing otp-bot. Each test gets a fresh
+// module registry (jest.resetModules + require) so the env is picked up
+// per-test rather than shared/stale across them.
 
-type SendMessageArgs = [chatId: string, message: string, options?: unknown];
+type PostArgs = [url: string, body: Record<string, unknown>, config?: unknown];
 
 describe('sendCustomerOtpSms', () => {
   const OTP_BOT = 'test-bot-token';
@@ -17,12 +17,29 @@ describe('sendCustomerOtpSms', () => {
   });
 
   function loadWithMockedBot() {
-    const sendMessage = jest
-      .fn<Promise<void>, SendMessageArgs>()
-      .mockResolvedValue(undefined);
-    jest.doMock('node-telegram-bot-api', () =>
-      jest.fn().mockImplementation(() => ({ sendMessage })),
-    );
+    const post = jest.fn<Promise<unknown>, PostArgs>().mockResolvedValue({});
+    jest.doMock('axios', () => ({
+      __esModule: true,
+      default: { post, isAxiosError: () => false },
+    }));
+    // Same shape as the old bot mock: (chatId, text, extra body fields).
+    const sendMessage = {
+      get mock() {
+        return {
+          calls: post.mock.calls.map(([, body]) => {
+            const { chat_id, text, ...options } = body;
+            return [
+              chat_id as string,
+              text as string,
+              Object.keys(options).length ? options : undefined,
+            ] as [string, string, unknown];
+          }),
+        };
+      },
+      get post() {
+        return post;
+      },
+    };
 
     // This project's Jest runs ts-jest under plain CommonJS (no
     // --experimental-vm-modules), so `await import()` doesn't pick up
@@ -40,7 +57,10 @@ describe('sendCustomerOtpSms', () => {
 
     await otpBot.sendCustomerOtpSms('+998901234567', text);
 
-    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(sendMessage.post).toHaveBeenCalledTimes(1);
+    expect(sendMessage.post.mock.calls[0][0]).toBe(
+      `https://api.telegram.org/bot${OTP_BOT}/sendMessage`,
+    );
     const [chatId, message, options] = sendMessage.mock.calls[0];
     expect(chatId).toBe(XMENU_CHAT_ID);
     expect(message).toContain('+998901234567');
@@ -73,5 +93,17 @@ describe('sendCustomerOtpSms', () => {
 
     const [, message] = sendMessage.mock.calls[0];
     expect(message).toContain(text);
+  });
+
+  it('rejects without leaking the bot token when Telegram is unreachable', async () => {
+    const { otpBot, sendMessage } = loadWithMockedBot();
+    sendMessage.post.mockRejectedValueOnce(
+      new Error(`connect ETIMEDOUT https://api.telegram.org/bot${OTP_BOT}/sendMessage`),
+    );
+
+    const result = otpBot.sendCustomerOtpSms('+998901234567', 'any text');
+
+    await expect(result).rejects.toThrow('Telegram sendMessage failed');
+    await expect(result).rejects.not.toThrow(OTP_BOT);
   });
 });

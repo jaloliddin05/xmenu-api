@@ -1,9 +1,28 @@
-import TelegramBot from 'node-telegram-bot-api';
+import axios from 'axios';
 
 const TELEGRAM_TOKEN = process.env.OTP_BOT || '';
 const CHAT_ID = process.env.XMENU_CHAT_ID || '';
 
-const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: false });
+// Plain Bot API call. The token is part of the URL, so a failure is rethrown
+// with the Telegram description only: axios errors carry the request URL.
+async function sendMessage(
+  chatId: string,
+  text: string,
+  options: { parse_mode?: 'Markdown' } = {},
+): Promise<void> {
+  try {
+    await axios.post(
+      `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`,
+      { chat_id: chatId, text, ...options },
+      { timeout: 8000 },
+    );
+  } catch (e) {
+    const description = axios.isAxiosError<{ description?: string }>(e)
+      ? (e.response?.data?.description ?? e.code ?? 'request failed')
+      : 'request failed';
+    throw new Error(`Telegram sendMessage failed: ${description}`);
+  }
+}
 
 // SmsProvider=telegram uchun: mijoz va egasi (staff) OTP'lari shu orqali
 // guruhga boradi (CustomerOtpService scope bo'yicha matnni tayyorlaydi).
@@ -24,7 +43,7 @@ export async function sendCustomerOtpSms(
 ): Promise<void> {
   const message = `🧪 Test SMS → ${phone}\n${text}`;
 
-  await bot.sendMessage(CHAT_ID, message);
+  await sendMessage(CHAT_ID, message);
 }
 
 export async function sendApplicationToTelegram(data: {
@@ -42,5 +61,5 @@ export async function sendApplicationToTelegram(data: {
   if (data.plan) message += `\n💰 Tarif: *${data.plan}*`;
   if (data.description) message += `\n🗒️ Izoh: *${data.description}*`;
 
-  await bot.sendMessage(CHAT_ID, message, { parse_mode: 'Markdown' });
+  await sendMessage(CHAT_ID, message, { parse_mode: 'Markdown' });
 }

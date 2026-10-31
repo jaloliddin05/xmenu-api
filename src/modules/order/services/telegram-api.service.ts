@@ -7,7 +7,7 @@ export interface TelegramMessageResult {
 }
 
 /**
- * Telegram Bot API (HTTP). node-telegram-bot-api (otp-bot.ts) polling'siz
+ * Telegram Bot API (HTTP). otp-bot.ts polling'siz
  * ishlaydi, lekin callback_query / editMessageText / secret_token webhooks
  * uchun yupqa va tekshiriladigan klient qulayroq. Token: TELEGRAM_BOT_TOKEN
  * (Mini App bilan bir xil bot; alohida restoran boti kerak bo'lsa
