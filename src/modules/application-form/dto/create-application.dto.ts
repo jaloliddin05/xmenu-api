@@ -1,50 +1,34 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
 import { ApplicationFrom } from '@prisma/client';
 
+/** Landing contact form (public). Column limits follow `application` in prisma; `from` is NOT NULL there. */
 export class CreateApplicationDto {
-  @ApiProperty({
-          description: `fullName`,
-          example: '',
-          required: false,
-  })
-  @IsString()
+  @ApiPropertyOptional({ maxLength: 120, example: 'Aziz Karimov' })
   @IsOptional()
-  fullName: string;
-
-  @ApiProperty({
-        description: `phone`,
-        example: '',
-        required: false,
-  })
   @IsString()
-  @IsOptional()
-  phone: string;
+  @MaxLength(120)
+  fullName?: string;
 
- @ApiProperty({
-        description: `plan`,
-        example: '',
-        required: false,
-  })
+  @ApiPropertyOptional({ maxLength: 32, example: '+998901234567' })
+  @IsOptional()
   @IsString()
-  @IsOptional()
-  plan: string;
+  @MaxLength(32)
+  phone?: string;
 
-  @ApiProperty({
-        description: `from`,
-        example: '',
-        required: false,
-  })
+  @ApiPropertyOptional({ maxLength: 64, example: 'basic' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  plan?: string;
+
+  @ApiProperty({ enum: ApplicationFrom, example: ApplicationFrom.web })
   @IsEnum(ApplicationFrom)
-  @IsOptional()
   from: ApplicationFrom;
 
-  @ApiProperty({
-        description: `description`,
-        example: '',
-        required: false,
-  })
-  @IsString()
+  @ApiPropertyOptional({ maxLength: 2000 })
   @IsOptional()
-  description: string;
+  @IsString()
+  @MaxLength(2000)
+  description?: string;
 }
