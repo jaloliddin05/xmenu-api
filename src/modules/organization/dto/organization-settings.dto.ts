@@ -82,6 +82,15 @@ export class LatLngDto {
  * whole document: every field must be sent, null clears a nullable one.
  */
 export class OrganizationSettingsDto implements OrganizationSettings {
+  @ApiPropertyOptional({
+    readOnly: true,
+    description:
+      'Answer-only: theme over the platform neutral colors, every key, for the preview. Accepted in a request so a GET answer can be sent back unchanged; ignored.',
+  })
+  @IsOptional()
+  @IsObject()
+  effectiveTheme?: Record<string, string>;
+
   @ApiProperty({
     type: ThemeDto,
     nullable: true,

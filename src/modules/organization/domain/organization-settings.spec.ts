@@ -1,8 +1,12 @@
 import { Prisma } from '@prisma/client';
+import { PLATFORM_THEME } from './platform-defaults';
 import {
+  HEX_COLOR_RE,
   OrganizationSettings,
   parseBounds,
   parseTheme,
+  resolveTheme,
+  THEME_KEYS,
   settingsProblems,
   toSettingsData,
   toSettingsView,
@@ -201,5 +205,25 @@ describe('toSettingsData / toSettingsView', () => {
       mapZoom: null,
       mapBounds: null,
     });
+  });
+});
+
+describe('platform theme', () => {
+  it('has exactly the theme keys, all valid colors', () => {
+    expect(Object.keys(PLATFORM_THEME).sort()).toEqual([...THEME_KEYS].sort());
+    for (const color of Object.values(PLATFORM_THEME))
+      expect(color).toMatch(HEX_COLOR_RE);
+  });
+
+  it('resolveTheme fills what the owner left out and keeps what they chose', () => {
+    expect(resolveTheme(null)).toEqual(PLATFORM_THEME);
+    expect(resolveTheme({ brand: '#00AA55' })).toEqual({
+      ...PLATFORM_THEME,
+      brand: '#00AA55',
+    });
+  });
+
+  it('platform brand is not the old red', () => {
+    expect(PLATFORM_THEME.brand).not.toBe('#EE2E17');
   });
 });

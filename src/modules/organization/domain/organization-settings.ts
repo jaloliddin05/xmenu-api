@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import type { organization_settings } from '@prisma/client';
 import { isLang, Lang } from 'src/infra/http/request-helpers';
 import type { FieldError } from 'src/infra/validators/validation-errors';
+import { PLATFORM_THEME } from './platform-defaults';
 
 /** Brand colors a front-end can override; any key may be missing (the front-end keeps its neutral value). */
 export const THEME_KEYS = [
@@ -66,6 +67,11 @@ export function parseBounds(value: unknown): Bounds | null {
   const b = point(ne);
   if (!a || !b || a[0] >= b[0] || a[1] >= b[1]) return null;
   return [a, b];
+}
+
+/** The stored theme over the platform's neutral colors: always every key (platform-defaults.ts). */
+export function resolveTheme(stored: Theme | null): Required<Theme> {
+  return { ...PLATFORM_THEME, ...stored };
 }
 
 /** Theme stored as JSON: only known keys with valid colors survive. */

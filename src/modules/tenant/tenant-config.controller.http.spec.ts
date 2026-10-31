@@ -1,3 +1,4 @@
+import { PLATFORM_THEME } from 'src/modules/organization/domain/platform-defaults';
 import { INestApplication, Logger } from '@nestjs/common';
 import request from 'supertest';
 import { createHttpApp } from 'src/infra/testing/http-app.fake';
@@ -169,7 +170,7 @@ describe('GET /tenant/config', () => {
       bannerUrl: null,
       description: 'Описание',
       foundedYear: 2015,
-      theme: { brand: '#EE2E17' },
+      theme: { ...PLATFORM_THEME, brand: '#EE2E17' },
       locale: {
         defaultLanguage: 'uz',
         languages: ['uz', 'ru', 'en'],
@@ -204,7 +205,7 @@ describe('GET /tenant/config', () => {
     expect((await config(FULL).expect(200)).body.description).toBe('Tavsif');
   });
 
-  it('answers null for everything the owner has not filled in, inventing nothing', async () => {
+  it('answers null for everything the owner has not filled in, except the theme: platform neutral colors', async () => {
     const res = await config(BARE).expect(200);
     expect(res.body).toEqual({
       id: BARE,
@@ -215,7 +216,7 @@ describe('GET /tenant/config', () => {
       bannerUrl: null,
       description: null,
       foundedYear: null,
-      theme: null,
+      theme: PLATFORM_THEME,
       locale: {
         defaultLanguage: 'ru',
         languages: ['ru', 'uz', 'en'],

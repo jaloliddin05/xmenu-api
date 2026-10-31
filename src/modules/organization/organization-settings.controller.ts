@@ -11,10 +11,20 @@ import {
 } from '@nestjs/swagger';
 import { requireStaffOrganizationId } from 'src/infra/http/request-helpers';
 import { OrganizationSettingsDto } from './dto/organization-settings.dto';
+import {
+  OrganizationSettings,
+  resolveTheme,
+} from './domain/organization-settings';
 import { OrganizationService } from './services/organization.service';
 import { OrganizationSettingsService } from './services/organization-settings.service';
 
 type StaffRequest = Parameters<typeof requireStaffOrganizationId>[0];
+
+/** The answer carries the full theme (stored over platform defaults) for the dashboard preview. */
+const withEffectiveTheme = (s: OrganizationSettings) => ({
+  ...s,
+  effectiveTheme: resolveTheme(s.theme),
+});
 
 /** Owner (dashboard): brand colors, languages, currency, contacts and map of the venue. */
 @ApiTags('Organization')
@@ -37,7 +47,7 @@ export class OrganizationSettingsController {
   get(@Param('id') id: string, @Req() req: StaffRequest) {
     const organizationId = requireStaffOrganizationId(req);
     this.organizations.assertOwn(id, organizationId);
-    return this.settings.get(organizationId);
+    return this.settings.get(organizationId).then(withEffectiveTheme);
   }
 
   @Put(':id/settings')
@@ -56,6 +66,6 @@ export class OrganizationSettingsController {
   ) {
     const organizationId = requireStaffOrganizationId(req);
     this.organizations.assertOwn(id, organizationId);
-    return this.settings.replace(organizationId, dto);
+    return this.settings.replace(organizationId, dto).then(withEffectiveTheme);
   }
 }

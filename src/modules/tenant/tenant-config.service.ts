@@ -3,7 +3,7 @@ import type { Lang } from 'src/infra/http/request-helpers';
 import { publicFileUrl } from 'src/modules/menu/menu.mapper';
 import { CustomerAuthException } from 'src/modules/auth/errors/customer-auth.exception';
 import { OrderSettingsService } from 'src/modules/order/services/order-settings.service';
-import { toSettingsView } from 'src/modules/organization/domain/organization-settings';
+import { resolveTheme, toSettingsView } from 'src/modules/organization/domain/organization-settings';
 import { PrismaService } from '../_prisma/prisma.service';
 import { FulfillmentMode, TenantConfigDto } from './dto/tenant-config.dto';
 import type { Tenant } from './tenant.service';
@@ -85,7 +85,7 @@ export class TenantConfigService {
       bannerUrl: publicFileUrl(org.banner?.url),
       description: pickDescription(org.translations, lang, s.defaultLanguage),
       foundedYear: s.foundedYear,
-      theme: s.theme,
+      theme: resolveTheme(s.theme),
       locale: {
         defaultLanguage: s.defaultLanguage,
         languages: s.languages,

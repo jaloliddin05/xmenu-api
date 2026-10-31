@@ -1,3 +1,4 @@
+import { PLATFORM_THEME } from './domain/platform-defaults';
 import { INestApplication } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import request from 'supertest';
@@ -123,6 +124,7 @@ describe('GET/PUT /organization/:id/settings', () => {
     const res = await get().expect(200);
     expect(res.body).toEqual({
       theme: null,
+      effectiveTheme: PLATFORM_THEME,
       currency: 'UZS',
       defaultLanguage: 'ru',
       languages: ['ru', 'uz', 'en'],
@@ -140,7 +142,11 @@ describe('GET/PUT /organization/:id/settings', () => {
 
   it('replaces the settings, reads them back and refreshes the tenant cache', async () => {
     const res = await put(VALID).expect(200);
-    expect(res.body).toEqual({ ...VALID, supportTelegram: 'demo_cafe' });
+    expect(res.body).toEqual({
+      ...VALID,
+      supportTelegram: 'demo_cafe',
+      effectiveTheme: { ...PLATFORM_THEME, ...VALID.theme },
+    });
     expect(invalidate).toHaveBeenCalledWith(ORG_A);
     expect(addRevalidationJob).toHaveBeenCalledWith({ tenantId: ORG_A, route: 'settings' });
 
@@ -155,7 +161,16 @@ describe('GET/PUT /organization/:id/settings', () => {
       Object.entries(VALID).map(([k, v]) => [k, kept.includes(k) ? v : null]),
     );
     const res = await put(cleared).expect(200);
-    expect(res.body).toEqual(cleared);
+    expect(res.body).toEqual({ ...cleared, effectiveTheme: PLATFORM_THEME });
+  });
+
+  it('accepts a GET answer sent back unchanged: effectiveTheme is ignored, not stored', async () => {
+    await put(VALID).expect(200);
+    const answer = (await get().expect(200)).body;
+    const res = await put({ ...answer, effectiveTheme: { brand: '#000000' } }).expect(200);
+    expect(res.body.theme).toEqual(VALID.theme);
+    expect(res.body.effectiveTheme.brand).toBe(VALID.theme.brand);
+    expect(rows[ORG_A].theme).toEqual(VALID.theme);
   });
 
   it('401 without a token', async () => {

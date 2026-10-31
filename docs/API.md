@@ -143,7 +143,9 @@ IP берётся из `X-Forwarded-For` только от локального 
   "id": "uuid", "slug": "cafe-example", "name": "Demo Cafe", "type": "cafe",
   "logoUrl": "https://files.example/image/organization/logo.png", "bannerUrl": null,
   "description": "текст на языке ответа", "foundedYear": null,
-  "theme": { "brand": "#EE2E17", "brandForeground": "#FFFFFF" },
+  "theme": { "background": "#FFFFFF", "foreground": "#1A1A1A", "surface": "#FFFFFF", "mutedSurface": "#F4F4F4",
+             "muted": "#6B6B6B", "brand": "#EE2E17", "brandForeground": "#FFFFFF", "danger": "#B42318",
+             "serviceArea": "#4A6FA5" },
   "locale": { "defaultLanguage": "ru", "languages": ["ru", "uz", "en"], "currency": "UZS" },
   "contacts": { "phone": null, "telegramUsername": null, "workingHours": null, "address": null },
   "fulfillment": { "modes": ["pickup"], "defaultMode": "pickup" },
@@ -152,9 +154,9 @@ IP берётся из `X-Forwarded-For` только от локального 
 }
 ```
 
-- Чего владелец не заполнил, приходит `null`; сервер ничего не подставляет. `theme` содержит только заданные цвета
-  (ключи `background, foreground, surface, mutedSurface, muted, brand, brandForeground, danger, serviceArea`),
-  остальное фронт берёт из своих нейтральных значений.
+- Чего владелец не заполнил, приходит `null`; сервер ничего не подставляет. Исключение — `theme`: он всегда полный
+  (все 9 ключей, не `null`): цвета владельца поверх нейтральных цветов платформы (таблица ниже). Фронты своих
+  нейтральных значений не держат и берут цвет из ответа.
 - `logoUrl`, `bannerUrl`: абсолютные URL от `PUBLIC_FILES_URL` (иначе `PUBLIC_API_URL`).
 - `description`: на языке ответа; пустое или отсутствующее берётся на языке заведения по умолчанию, иначе `null`.
 - `fulfillment.modes`: `pickup`, если есть активный филиал с самовывозом; `delivery`, если есть активный филиал с
@@ -221,6 +223,23 @@ IP берётся из `X-Forwarded-For` только от локального 
 
 Пока бот не подключён, `initData` Mini App проверяется платформенным ботом (`TELEGRAM_BOT_TOKEN`).
 
+### Цвета темы по умолчанию (`PLATFORM_THEME`)
+
+Единственный источник нейтральных цветов — `src/modules/organization/domain/platform-defaults.ts`. Графитовая палитра без
+акцентного оттенка:
+
+| Ключ | Значение | Назначение |
+|---|---|---|
+| `background` | `#FFFFFF` | фон страницы |
+| `foreground` | `#1A1A1A` | основной текст |
+| `surface` | `#FFFFFF` | карточки, листы |
+| `mutedSurface` | `#F4F4F4` | приглушённые блоки |
+| `muted` | `#6B6B6B` | вторичный текст |
+| `brand` | `#2B2B2B` | акцент (кнопки, ссылки) |
+| `brandForeground` | `#FFFFFF` | текст на акценте |
+| `danger` | `#B42318` | ошибки (смысловой цвет, не бренд) |
+| `serviceArea` | `#4A6FA5` | зона доставки на карте |
+
 ## Настройки заведения (владелец)
 
 `GET /organization/:id/settings` и `PUT /organization/:id/settings` (JSON, токен владельца, только своя организация).
@@ -233,9 +252,16 @@ IP берётся из `X-Forwarded-For` только от локального 
   "supportPhone": "+998711234567", "supportTelegram": "demo_cafe", "supportHours": "10:00-23:00",
   "address": "Main street 1", "foundedYear": 2015, "city": "Tashkent",
   "mapCenter": { "lat": 41.31, "lng": 69.24 }, "mapZoom": 15,
-  "mapBounds": [[41.15, 69.0], [41.45, 69.45]]
+  "mapBounds": [[41.15, 69.0], [41.45, 69.45]],
+  "effectiveTheme": { "background": "#FFFFFF", "foreground": "#1A1A1A", "surface": "#FFFFFF", "mutedSurface": "#F4F4F4",
+                      "muted": "#4B494380", "brand": "#EE2E17", "brandForeground": "#FFFFFF", "danger": "#B42318",
+                      "serviceArea": "#4A6FA5" }
 }
 ```
+
+`theme` — то, что сохранил владелец (пустой остаётся `null`, чтение ничего не подставляет). `effectiveTheme` — только в
+ответе: `theme` поверх нейтральных цветов платформы, все 9 ключей, ровно то, что увидят посетители (для предпросмотра).
+В теле `PUT` поле принимается и игнорируется, поэтому ответ `GET` можно отправить обратно без правок.
 
 `PUT` заменяет документ целиком: каждое поле обязательно, `null` очищает необязательное. После регистрации:
 `UZS`, `ru`, `["ru","uz","en"]`, остальное `null`.

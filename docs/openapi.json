@@ -4296,6 +4296,11 @@
       "OrganizationSettingsDto": {
         "type": "object",
         "properties": {
+          "effectiveTheme": {
+            "type": "object",
+            "readOnly": true,
+            "description": "Answer-only: theme over the platform neutral colors, every key, for the preview. Accepted in a request so a GET answer can be sent back unchanged; ignored."
+          },
           "theme": {
             "nullable": true,
             "description": "Brand colors; a missing key keeps the front-end neutral value",
