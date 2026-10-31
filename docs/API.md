@@ -317,11 +317,16 @@ QR-меню и сайта доставки (`REVALIDATE.md`).
 - Файлы отдаются с `X-Content-Type-Options: nosniff`; всё, что не изображение, отдаётся как `attachment` с
   `Content-Security-Policy: sandbox`. Несуществующий файл: обычный `404` без пути на диске.
 - `POST /translation`: только с токеном владельца. Лимит на пользователя: `TRANSLATION_RATE_LIMIT` запросов за
-  `TRANSLATION_RATE_WINDOW_SECONDS` (по умолчанию 30 за 600 с), сверх лимита `429` с `code: rate_limited` и `retryAfter`.
+  `TRANSLATION_RATE_WINDOW_SECONDS` (по умолчанию 30 за 600 с) и отдельный лимит на IP клиента (все владельцы за ним):
+  `TRANSLATION_IP_RATE_LIMIT` за `TRANSLATION_IP_RATE_WINDOW_SECONDS` (60 за 600 с); сверх любого лимита `429` с
+  `code: rate_limited` и `retryAfter`.
   `text` до `TRANSLATION_MAX_TEXT` символов (2000), `promptName` до 100: иначе `400`. Сбой модели:
   `502 translation_failed`. Без `OPENAI_API_KEY` бэкенд стартует, а перевод отвечает `503 translation_unavailable`.
 - `GET /application`: только платформенные администраторы (`PLATFORM_ADMIN_USER_IDS`, пусто = никто): остальным `403`.
-  `POST /application` остаётся публичным и отвечает только `{ id }`.
+  `POST /application` остаётся публичным и отвечает только `{ id }`. Тело: `from` (`web` или `admin`) обязателен, иначе
+  `400 validation_error` с полем `from` (раньше пустое тело давало `500`); `fullName` до 120 символов, `phone` до 32,
+  `plan` до 64, `description` до 2000; лишние поля `400`. Не больше `APPLICATION_RATE_LIMIT` заявок с одного IP за
+  `APPLICATION_RATE_WINDOW_SECONDS` (5 в час), дальше `429 rate_limited`.
 - `GET /product?is_active=true|false`: фильтр по статусу блюда (параметр называется `is_active`). Другое значение: `400`,
   без параметра фильтра нет.
 - Ревалидация QR и сайта доставки: формат тела и ключи заданий в `docs/REVALIDATE.md`.
@@ -340,3 +345,35 @@ QR-меню и сайта доставки (`REVALIDATE.md`).
 Уже были на мапперах и не менялись: `GET /tenant/by-slug/:slug`, `GET /tenant/config`, `GET /menu`, `GET /branches`,
 `GET /checkout-config`, `/orders*`, `/auth/customer/*`. Вебхуки Click, Payme и Telegram отвечают в формате
 провайдера.
+
+## Лимиты публичных POST
+
+Глобальный `PublicRateLimitGuard` (`src/infra/http/public-rate-limit.ts`) считает POST-запросы к маршрутам с `@Public()`
+по IP клиента (Redis): `PUBLIC_POST_RATE_LIMIT` за `PUBLIC_POST_RATE_WINDOW_SECONDS` (120 за 60 с; мобильные операторы
+делят IP, поэтому лимит щедрый). Сверх лимита: `429`, `{ "code": "rate_limited", "retryAfter": <секунды> }` и заголовок
+`Retry-After`. Формат одинаков для владельцев и клиентов. Жёстче: `POST /application` (5 в час), `POST /translation`
+(по IP 60 за 600 с, сверх лимита на владельца). Эндпоинты со своими лимитами (OTP, вход владельцев) продолжают
+считаться по ним, общий лимит стоит над ними.
+
+Публичные POST (метка `@Public()`, считаются):
+- владельцы: `/auth/login`, `/auth/register`, `/auth/check-code`, `/auth/resend-code`, `/auth/refresh`, `/auth/logout`;
+- клиенты: `/auth/customer/otp/request`, `otp/verify`, `telegram/start`, `telegram/status`, `register`, `refresh`,
+  `logout`, `login`;
+- прочее: `/organization/check-slug`, `/application`;
+- с токеном клиента (`@Public()` только чтобы обойти токен владельца): `POST /orders`, `/orders/:id/cancel`,
+  `/orders/:id/payment/retry`, `POST /customers/me/addresses`, `…/:id/default`.
+
+Не считаются (вебхуки провайдеров приходят с их адресов): `POST /payments/click/:tenantId/prepare|complete`,
+`POST /payments/payme/:tenantId`, `POST /telegram/bot/:botKey/webhook`, `POST /telegram/orders/webhook`. Они защищены
+подписью или секретом. Общего лимита на остальные POST владельца нет: они требуют токен.
+
+## CORS
+
+`main.ts`: `enableCors({ origin: true })`, то есть сервер отражает любой `Origin`, `credentials` не включён.
+Почему так: авторизация только заголовком `Authorization: Bearer` (владелец) и `X-Tenant-Id` (клиент), куки бэкенд не
+ставит и не читает (`res.cookie` в коде нет). Браузер не добавляет такие заголовки сам, поэтому чужая страница не может
+действовать от имени посетителя, а публичные данные (меню, конфиг) и так открыты. Список разрешённых адресов вести
+нечем: фронты живут на `{slug}.xmenu.uz` (любой slug), позже на доменах ресторанов.
+Условия пересмотра (перейти на белый список через таблицу «хост → тенант»): появление куки или серверных сессий в
+браузере, `credentials: true`, перенос токенов в `HttpOnly`-куки, эндпоинт, полагающийся на IP или сетевое положение
+клиента, а не на токен.
