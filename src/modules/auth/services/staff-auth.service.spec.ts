@@ -464,6 +464,18 @@ describe('StaffAuthService (signup)', () => {
     });
 
     it('limits attempts per IP across phones', async () => {
+      // The loop makes LOGIN_IP_LIMIT + 1 failed logins, each a real bcrypt round (cost 10, ~150 ms),
+      // so it alone outlasts the 5 s test timeout. Only the IP counter is under test: compare is instant.
+      const realCompare = compareMock.getMockImplementation();
+      compareMock.mockImplementation(async () => false);
+      try {
+        await limitsAttemptsPerIp();
+      } finally {
+        compareMock.mockImplementation(realCompare);
+      }
+    });
+
+    async function limitsAttemptsPerIp() {
       for (let i = 0; i < LOGIN_IP_LIMIT; i++) {
         await failure(
           `+9989012345${String(i).padStart(2, '0')}`,
@@ -478,7 +490,7 @@ describe('StaffAuthService (signup)', () => {
       expect((await failure('+998909999999', 'nope', '10.0.0.2')).code).toBe(
         'invalid_credentials',
       );
-    });
+    }
   });
 
   it('never writes codes, passwords or full phones to the audit log', async () => {
