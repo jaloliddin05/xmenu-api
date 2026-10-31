@@ -62,5 +62,8 @@
 ## Окружение
 - `NEXT_PUBLIC_URL` (адрес QR), `REVALIDATE_SECRET` (совпадает с QR; при пустом секрете QR отвечает 503, задания
   повторяются и падают).
+- Проверка при старте (`revalidate-config.ts`): адрес цели задан, а секрет пуст (`NEXT_PUBLIC_URL` без
+  `REVALIDATE_SECRET` или `CLIENT_REVALIDATE_URL` без `CLIENT_REVALIDATE_SECRET`) → при `NODE_ENV=production` API не
+  запускается с понятной ошибкой, в остальных режимах предупреждение в логе.
 - `CLIENT_REVALIDATE_URL` (полный адрес приёмника, например `http://127.0.0.1:3002/api/revalidate` на том же
   сервере), `CLIENT_REVALIDATE_SECRET` (совпадает с клиентом). Пустой `CLIENT_REVALIDATE_URL`: заданий для клиента нет.
