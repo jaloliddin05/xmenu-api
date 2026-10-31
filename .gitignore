@@ -56,3 +56,8 @@ pids
 
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# Stray tsc output next to sources (the build goes to /dist)
+src/**/*.js
+src/**/*.js.map
+src/**/*.d.ts
