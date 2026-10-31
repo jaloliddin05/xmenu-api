@@ -1,17 +1,19 @@
 import { Worker } from 'bullmq';
 import axios from 'axios';
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { PrismaService } from '../_prisma/prisma.service';
 import { redisConfig } from './bull.config';
 import {
   buildClientBody,
   buildQrBody,
   describeRevalidate,
+  ResolvedChange,
   RevalidateJob,
 } from './revalidate-job';
 
 /** Where a job goes and what it sends; null when the target has nothing to do. */
 export function revalidateRequest(
-  job: RevalidateJob,
+  job: { target: RevalidateJob['target']; change: ResolvedChange },
   env = process.env,
 ): { url: string; body: object } | null {
   if (job.target === 'client') {
@@ -29,13 +31,13 @@ export class RevalidateProcessor implements OnModuleDestroy {
   private readonly logger = new Logger('Revalidate');
   private worker: Worker;
 
-  constructor() {
+  constructor(private readonly prisma: PrismaService) {
     this.worker = new Worker(
       'revalidate-queue',
       async (job) => {
         const data = job.data as RevalidateJob;
         const what = describeRevalidate(data, job.id);
-        const request = data?.change ? revalidateRequest(data) : null;
+        const request = await this.requestFor(data);
         if (!request) {
           this.logger.log(`Skipped: ${what}`);
           return { success: true, skipped: true };
@@ -56,6 +58,23 @@ export class RevalidateProcessor implements OnModuleDestroy {
 
     this.worker.on('completed', (job) => {
       this.logger.log(`Done: ${describeRevalidate(job.data ?? {}, job.id)}`);
+    });
+  }
+
+  /**
+   * The request for a job as of now: the slug is read by tenant id here, not taken from queuing time,
+   * so a retry after a rename addresses the new slug. A tenant that no longer exists has nothing to refresh.
+   */
+  async requestFor(data: RevalidateJob | undefined) {
+    if (!data?.change?.tenantId) return null;
+    const org = await this.prisma.organization.findUnique({
+      where: { id: data.change.tenantId },
+      select: { slug: true },
+    });
+    if (!org) return null;
+    return revalidateRequest({
+      ...data,
+      change: { ...data.change, slug: org.slug ?? null },
     });
   }
 

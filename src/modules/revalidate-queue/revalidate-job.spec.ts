@@ -1,11 +1,12 @@
 import { RevalidateService } from './revalidate.service';
-import { revalidateRequest } from './revalidate.processor';
+import { RevalidateProcessor, revalidateRequest } from './revalidate.processor';
 import {
   buildClientBody,
   buildQrBody,
   buildRevalidateJobId,
   describeRevalidate,
-  RevalidateJob,
+  queuedJob,
+  ResolvedChange,
   targetsFor,
 } from './revalidate-job';
 
@@ -13,8 +14,8 @@ const T1 = '11111111-1111-4111-8111-111111111111';
 const T2 = '22222222-2222-4222-8222-222222222222';
 const job = (
   target: 'qr' | 'client',
-  change: Partial<RevalidateJob['change']> = {},
-): RevalidateJob => ({
+  change: Partial<ResolvedChange> = {},
+): { target: 'qr' | 'client'; change: ResolvedChange } => ({
   target,
   change: { tenantId: T1, route: 'menu', slug: 'mant', ...change },
 });
@@ -196,24 +197,39 @@ describe('RevalidateService.addRevalidationJob', () => {
     expect(queue.remove.mock.calls.map((c: any[]) => c[0])).toEqual(ids);
   });
 
-  it('adds the client job when CLIENT_REVALIDATE_URL is set and reads a missing slug from the database', async () => {
+  it('adds the client job when CLIENT_REVALIDATE_URL is set; the queue holds no slug', async () => {
     process.env.CLIENT_REVALIDATE_URL = 'http://127.0.0.1:3002/api/revalidate';
     const { service, queue, findUnique } = make('mant');
-    await service.addRevalidationJob({ tenantId: T1, route: 'settings' });
-    expect(findUnique).toHaveBeenCalledWith({
-      where: { id: T1 },
-      select: { slug: true },
+    await service.addRevalidationJob({
+      tenantId: T1,
+      route: 'settings',
+      slug: 'queued-time-slug',
     });
+    expect(findUnique).not.toHaveBeenCalled();
     expect(queue.add.mock.calls.map((c: any[]) => c[1])).toEqual([
-      {
-        target: 'qr',
-        change: { tenantId: T1, route: 'settings', slug: 'mant' },
-      },
-      {
-        target: 'client',
-        change: { tenantId: T1, route: 'settings', slug: 'mant' },
-      },
+      { target: 'qr', change: { tenantId: T1, route: 'settings' } },
+      { target: 'client', change: { tenantId: T1, route: 'settings' } },
     ]);
+  });
+
+  it('keeps oldSlug in the queued job: it is the fact of the rename, not state', () => {
+    expect(
+      queuedJob('qr', {
+        tenantId: T1,
+        route: 'organization',
+        slug: 'b',
+        oldSlug: 'a',
+      }),
+    ).toEqual({
+      target: 'qr',
+      change: { tenantId: T1, route: 'organization', oldSlug: 'a' },
+    });
+    expect(
+      queuedJob('qr', { tenantId: T1, route: 'menu', oldSlug: null }).change,
+    ).toEqual({
+      tenantId: T1,
+      route: 'menu',
+    });
   });
 
   it('repeated edit of one tenant replaces its pending job', async () => {
@@ -233,5 +249,98 @@ describe('RevalidateService.addRevalidationJob', () => {
     expect(
       new Set(queue.add.mock.calls.map((c: any[]) => c[2].jobId)).size,
     ).toBe(1);
+  });
+});
+
+describe('RevalidateProcessor.requestFor', () => {
+  const env = { ...process.env };
+  beforeEach(() => {
+    process.env.NEXT_PUBLIC_URL = 'https://qr.xmenu.uz';
+    process.env.REVALIDATE_SECRET = 'q';
+    process.env.CLIENT_REVALIDATE_URL = 'http://127.0.0.1:3002/api/revalidate';
+    process.env.CLIENT_REVALIDATE_SECRET = 'c';
+  });
+  afterEach(() => {
+    process.env = { ...env };
+  });
+
+  const make = (rows: Record<string, { slug: string | null }>) => {
+    const processor = Object.create(
+      RevalidateProcessor.prototype,
+    ) as RevalidateProcessor;
+    Object.assign(processor, {
+      prisma: {
+        organization: {
+          findUnique: jest.fn(async ({ where }: any) => rows[where.id] ?? null),
+        },
+      },
+    });
+    return processor;
+  };
+
+  it('uses the slug at execution time: a rename between queuing and running', async () => {
+    const rows = { [T1]: { slug: 'old-name' } };
+    const processor = make(rows);
+    const queued = queuedJob('qr', {
+      tenantId: T1,
+      route: 'menu',
+      slug: 'old-name',
+    });
+    rows[T1].slug = 'new-name'; // renamed while the job waited or was retried
+    expect((await processor.requestFor(queued))?.body).toEqual({
+      route: 'menu',
+      slug: 'new-name',
+      secret: 'q',
+    });
+    expect(
+      (
+        await processor.requestFor(
+          queuedJob('client', { tenantId: T1, route: 'branches' }),
+        )
+      )?.body,
+    ).toMatchObject({ tenantId: T1, slug: 'new-name' });
+  });
+
+  it('sends the slug change with the current slug as newSlug', async () => {
+    const processor = make({ [T1]: { slug: 'b' } });
+    const queued = queuedJob('qr', {
+      tenantId: T1,
+      route: 'organization',
+      oldSlug: 'a',
+    });
+    expect((await processor.requestFor(queued))?.body).toEqual({
+      route: 'organization',
+      id: T1,
+      newSlug: 'b',
+      oldSlug: 'a',
+      secret: 'q',
+    });
+  });
+
+  it('skips a tenant that is gone, a tenant without a slug (QR) and a job without a tenant', async () => {
+    const processor = make({ [T2]: { slug: null } });
+    expect(
+      await processor.requestFor(
+        queuedJob('qr', { tenantId: T1, route: 'menu' }),
+      ),
+    ).toBeNull();
+    expect(
+      await processor.requestFor(
+        queuedJob('qr', { tenantId: T2, route: 'menu' }),
+      ),
+    ).toBeNull();
+    expect(await processor.requestFor(undefined)).toBeNull();
+    expect(await processor.requestFor({ target: 'qr' } as any)).toBeNull();
+  });
+
+  it('still reads jobs queued by the previous format (slug inside)', async () => {
+    const processor = make({ [T1]: { slug: 'fresh' } });
+    const legacy = {
+      target: 'qr',
+      change: { tenantId: T1, route: 'menu', slug: 'stale' },
+    } as any;
+    expect((await processor.requestFor(legacy))?.body).toMatchObject({
+      slug: 'fresh',
+    });
   });
 });

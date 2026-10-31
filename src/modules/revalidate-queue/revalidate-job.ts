@@ -10,7 +10,10 @@ export type RevalidateTarget = 'qr' | 'client';
 export interface TenantChange {
   tenantId: string;
   route: RevalidateRoute;
-  /** Current slug; RevalidateService reads it from the database when omitted. */
+  /**
+   * Callers may pass the slug they know, but it is not queued: the processor reads the current slug
+   * by tenantId when the job runs, so a rename between queuing and running cannot send a stale one.
+   */
   slug?: string | null;
   /** Previous slug, only when the slug changed. */
   oldSlug?: string | null;
@@ -18,7 +21,23 @@ export interface TenantChange {
 
 export interface RevalidateJob {
   target: RevalidateTarget;
-  change: TenantChange & { slug: string | null };
+  /** As queued: tenantId, route and oldSlug. `slug` is filled in by the processor (resolveJobSlug). */
+  change: TenantChange;
+}
+
+/** The job as it goes to the front-end: the slug is the tenant's current one (null: no slug). */
+export type ResolvedChange = TenantChange & { slug: string | null };
+
+/** What the queue stores: no slug, it is read at execution time. */
+export function queuedJob(
+  target: RevalidateTarget,
+  change: TenantChange,
+): RevalidateJob {
+  const { tenantId, route, oldSlug } = change;
+  return {
+    target,
+    change: oldSlug ? { tenantId, route, oldSlug } : { tenantId, route },
+  };
 }
 
 /** Targets that care about a change: the QR menu shows no branches. */
@@ -63,10 +82,7 @@ export function describeRevalidate(
  * `organization` route with id, newSlug and oldSlug; anything else re-renders the menu by slug.
  * Returns null when there is nothing the QR app can revalidate (no slug).
  */
-export function buildQrBody(
-  c: RevalidateJob['change'],
-  secret: string | undefined,
-) {
+export function buildQrBody(c: ResolvedChange, secret: string | undefined) {
   if (c.route === 'organization' && c.oldSlug && c.oldSlug !== c.slug) {
     return {
       route: 'organization',
@@ -81,10 +97,7 @@ export function buildQrBody(
 }
 
 /** Body for the delivery site's /api/revalidate (receiver: xmenu-client). */
-export function buildClientBody(
-  c: RevalidateJob['change'],
-  secret: string | undefined,
-) {
+export function buildClientBody(c: ResolvedChange, secret: string | undefined) {
   return {
     secret,
     tenantId: c.tenantId,

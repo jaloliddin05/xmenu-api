@@ -1,11 +1,10 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { Queue } from 'bullmq';
-import { PrismaService } from '../_prisma/prisma.service';
 import { redisConfig } from './bull.config';
 import {
   buildRevalidateJobId,
   describeRevalidate,
-  RevalidateJob,
+  queuedJob,
   TenantChange,
   targetsFor,
 } from './revalidate-job';
@@ -23,23 +22,15 @@ export class RevalidateService implements OnModuleDestroy {
     },
   });
 
-  constructor(private readonly prisma: PrismaService) {}
-
-  /** Schedules revalidation of every front-end that shows this tenant (after 20 s, collapsing repeats). */
+  /**
+   * Schedules revalidation of every front-end that shows this tenant (after 20 s, collapsing repeats).
+   * Only the tenant id, route and old slug are queued; the processor reads the rest when the job runs.
+   */
   async addRevalidationJob(change: TenantChange) {
-    const slug =
-      change.slug !== undefined
-        ? change.slug
-        : ((
-            await this.prisma.organization.findUnique({
-              where: { id: change.tenantId },
-              select: { slug: true },
-            })
-          )?.slug ?? null);
     const clientEnabled = Boolean(process.env.CLIENT_REVALIDATE_URL?.trim());
 
     for (const target of targetsFor(change.route, clientEnabled)) {
-      const job: RevalidateJob = { target, change: { ...change, slug } };
+      const job = queuedJob(target, change);
       const jobId = buildRevalidateJobId(job);
       try {
         await this.queue.remove(jobId);
