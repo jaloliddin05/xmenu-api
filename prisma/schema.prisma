@@ -481,6 +481,13 @@ enum OrganizationType {
   other        @map("other")
 }
 
+// Ordering front-ends: the website ({slug}.xmenu.uz), the venue's Telegram Mini App, or both
+enum DeliveryMode {
+  site     @map("site")
+  miniapp  @map("miniapp")
+  both     @map("both")
+}
+
 model organization {
   id           String            @id @default(uuid())
   int_id       Int               @unique @default(autoincrement())
@@ -488,6 +495,14 @@ model organization {
   slug         String?           @unique
   type         OrganizationType  @default(other)
   is_active     Boolean           @default(false)
+  // Channels (PUT /organization/:id/channels); new venues get PLATFORM_CHANNELS (platform-defaults.ts).
+  qr_enabled       Boolean       @default(true)
+  // The ordering channel: website and/or Mini App orders, delivery and pickup alike
+  delivery_enabled Boolean       @default(false)
+  delivery_mode    DeliveryMode  @default(site)
+  // Set by POST /organization/:id/publish once the checklist passes; NULL = never published or paused.
+  // Orders need delivery_enabled AND published_at (domain/publication.ts orderingProblem).
+  published_at     DateTime?
   url          String?
   created_at   DateTime          @default(now())
   translations organization_translation[]

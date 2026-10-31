@@ -11,7 +11,7 @@ import { TenantService } from 'src/modules/tenant/tenant.service';
 import { assertOwnTranslations } from 'src/modules/product/services/menu-ownership';
 import { TelegramBotProfileService } from 'src/modules/telegram/telegram-bot-profile.service';
 import { randomSlug, SLUG_MAX, slugify } from '../domain/slug';
-import { PLATFORM_ORDER_SETTINGS, PLATFORM_SETTINGS } from '../domain/platform-defaults';
+import { PLATFORM_CHANNELS, PLATFORM_ORDER_SETTINGS, PLATFORM_SETTINGS } from '../domain/platform-defaults';
 import { PublicOrganization, toPublicOrganization } from '../domain/public-organization';
 import { parseTenantId } from 'src/modules/tenant/tenant-key';
 
@@ -63,6 +63,7 @@ export class OrganizationService {
         slug,
         type,
         owner_id,
+        ...PLATFORM_CHANNELS,
         // Settings rows always exist; readers never substitute missing values (platform-defaults.ts)
         settings: { create: { ...PLATFORM_SETTINGS } },
         order_settings: { create: { ...PLATFORM_ORDER_SETTINGS } },

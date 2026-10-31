@@ -40,3 +40,14 @@ export const PLATFORM_ORDER_SETTINGS = {
   payment_timeout_seconds: 900,
   max_active_orders: 5,
 };
+
+/**
+ * Channels of a new venue: the QR menu works right after signup, ordering (website and/or Mini App) is
+ * off until the owner turns it on and publishes (domain/publication.ts). The website is the default
+ * ordering front-end: it needs no Telegram bot.
+ */
+export const PLATFORM_CHANNELS = {
+  qr_enabled: true,
+  delivery_enabled: false,
+  delivery_mode: 'site',
+} as const;
