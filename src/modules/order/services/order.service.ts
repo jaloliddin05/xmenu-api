@@ -14,6 +14,7 @@ import { computeTotals, deliveryZoneProblem, hashOrderRequest } from '../domain/
 import { priceLines, PricingProduct } from '../domain/order-pricing';
 import { ACTIVE_STATUSES, CUSTOMER_CANCELLABLE, OrderStatusName } from '../domain/order-state-machine';
 import type { Tenant } from 'src/modules/tenant/tenant.service';
+import { orderingProblem } from 'src/modules/organization/domain/publication';
 import { OrderSettingsService } from './order-settings.service';
 import { InvalidTransitionError, OrderNotFoundError, OrderTransitionService } from './order-transition.service';
 import { OrderWithItems, toOrderView } from './order-view';
@@ -39,7 +40,7 @@ export class OrderService {
   // ------------------------------------------------------------------ create
 
   /**
-   * POST /orders. Tartib: takror so'rovmi? → mijoz → filial/ish vaqti → manzil/zona →
+   * POST /orders. Tartib: takror so'rovmi? → mijoz → kanal va nashr → filial/ish vaqti → manzil/zona →
    * to'lov usuli → narxlash (bazadan) → summa/minimum → faol buyurtmalar chegarasi →
    * yozish (bitta tranzaksiya). Birinchi topilgan muammo darhol xato qaytaradi.
    */
@@ -67,6 +68,9 @@ export class OrderService {
     });
     if (!customer) throw new CustomerAuthException('invalid_token');
     if (customer.status === 'blocked') throw new CustomerAuthException('customer_blocked');
+
+    // Ordering channel and publication, read fresh (not from the tenant cache): a pause applies at once
+    await this.assertOrderingOpen(organizationId);
 
     const settings = await this.settings.get(organizationId);
     const mode = dto.fulfillmentMode;
@@ -343,6 +347,20 @@ export class OrderService {
         },
       })
       .then((rows) => new Map(rows.map((p) => [p.id, p as unknown as PricingProduct])));
+  }
+
+  private async assertOrderingOpen(organizationId: string) {
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { delivery_enabled: true, published_at: true },
+    });
+    const problem = org
+      ? orderingProblem({ deliveryEnabled: org.delivery_enabled, publishedAt: org.published_at })
+      : 'ordering_channel_disabled';
+    if (problem === 'ordering_channel_disabled') {
+      throw new CustomerAuthException(problem, 'The venue does not take online orders');
+    }
+    if (problem) throw new CustomerAuthException(problem, 'The venue is not taking orders right now');
   }
 
   private async chooseBranch(organizationId: string, mode: 'delivery' | 'pickup', requestedId?: string) {

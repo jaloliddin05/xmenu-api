@@ -48,6 +48,8 @@ export type CustomerErrorCode =
   | 'order_not_found'
   | 'settings_missing'
   | 'delivery_unavailable_no_zone'
+  | 'ordering_channel_disabled'
+  | 'ordering_not_published'
   | 'internal_error';
 
 const STATUS: Record<CustomerErrorCode, number> = {
@@ -86,6 +88,9 @@ const STATUS: Record<CustomerErrorCode, number> = {
   fulfillment_unavailable: 422,
   // The venue has not drawn a delivery zone yet: delivery is off, pickup may still work
   delivery_unavailable_no_zone: 422,
+  // Orders (delivery and pickup) need the ordering channel on and published (organization/domain/publication.ts)
+  ordering_channel_disabled: 422,
+  ordering_not_published: 422,
   branch_closed: 409,
   branch_hours_not_set: 422,
   payment_method_unavailable: 422,
