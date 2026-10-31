@@ -1006,6 +1006,219 @@
         ]
       }
     },
+    "/organization/{id}/publication": {
+      "get": {
+        "operationId": "OrganizationPublicationController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicationViewDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No or invalid owner token"
+          },
+          "403": {
+            "description": "The user has no organization"
+          },
+          "404": {
+            "description": "Not your organization (any other id looks missing)"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Publication state, channels and the readiness checklist",
+        "tags": [
+          "Organization"
+        ]
+      }
+    },
+    "/organization/{id}/channels": {
+      "put": {
+        "operationId": "OrganizationPublicationController_setChannels",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChannelsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicationViewDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "validation_error with errors[] (qr, delivery.enabled, delivery.mode)"
+          },
+          "401": {
+            "description": "No or invalid owner token"
+          },
+          "403": {
+            "description": "The user has no organization"
+          },
+          "404": {
+            "description": "Not your organization (any other id looks missing)"
+          },
+          "422": {
+            "description": "telegram_bot_required: mode miniapp or both without a connected, enabled venue bot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramBotRequiredErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Replace channels: QR menu and ordering (enabled, mode). Turning ordering off also unpublishes",
+        "tags": [
+          "Organization"
+        ]
+      }
+    },
+    "/organization/{id}/publish": {
+      "post": {
+        "operationId": "OrganizationPublicationController_publish",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicationViewDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No or invalid owner token"
+          },
+          "403": {
+            "description": "The user has no organization"
+          },
+          "404": {
+            "description": "Not your organization (any other id looks missing)"
+          },
+          "409": {
+            "description": "publication_incomplete: details.missing lists the todo items",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicationIncompleteErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Publish: checks the checklist and opens orders. Already published: 200, publishedAt unchanged",
+        "tags": [
+          "Organization"
+        ]
+      }
+    },
+    "/organization/{id}/unpublish": {
+      "post": {
+        "operationId": "OrganizationPublicationController_unpublish",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicationViewDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No or invalid owner token"
+          },
+          "403": {
+            "description": "The user has no organization"
+          },
+          "404": {
+            "description": "Not your organization (any other id looks missing)"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Pause: orders close, the QR menu keeps working, channels stay as they are. Repeating is fine",
+        "tags": [
+          "Organization"
+        ]
+      }
+    },
     "/tenant/by-slug/{slug}": {
       "get": {
         "operationId": "TenantController_bySlug",
@@ -4441,6 +4654,202 @@
           "mapBounds"
         ]
       },
+      "DeliveryChannelDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "example": true,
+            "description": "Ordering channel: website and/or Mini App orders (delivery and pickup). false also unpublishes"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "site",
+              "miniapp",
+              "both"
+            ],
+            "example": "site",
+            "description": "site: {slug}.xmenu.uz; miniapp: the Telegram Mini App; both. miniapp and both need a connected bot"
+          }
+        },
+        "required": [
+          "enabled",
+          "mode"
+        ]
+      },
+      "ChannelsDto": {
+        "type": "object",
+        "properties": {
+          "qr": {
+            "type": "boolean",
+            "example": true,
+            "description": "QR menu; the QR front-end reads it from GET /tenant/config (channels.qr)"
+          },
+          "delivery": {
+            "$ref": "#/components/schemas/DeliveryChannelDto"
+          }
+        },
+        "required": [
+          "qr",
+          "delivery"
+        ]
+      },
+      "ChecklistItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "enum": [
+              "delivery_channel",
+              "venue_name",
+              "venue_slug",
+              "menu_category",
+              "menu_product",
+              "branch",
+              "delivery_zone",
+              "telegram_bot"
+            ],
+            "example": "branch"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "done",
+              "todo",
+              "not_required"
+            ],
+            "example": "todo",
+            "description": "todo blocks publication; not_required: the item does not apply (no delivering branch, website mode)"
+          },
+          "hint": {
+            "type": "string",
+            "nullable": true,
+            "example": "Укажите у филиала часы работы (или «круглосуточно»)",
+            "description": "What to fix, in Russian; null unless status is todo"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "hint"
+        ]
+      },
+      "PublicationViewDto": {
+        "type": "object",
+        "properties": {
+          "published": {
+            "type": "boolean",
+            "example": false,
+            "description": "Orders are open: published implies delivery.enabled"
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "When the current publication started; null when not published or paused"
+          },
+          "ready": {
+            "type": "boolean",
+            "example": false,
+            "description": "No checklist item is todo. A published venue may become not ready (menu, branch or zone edited later): it stays published"
+          },
+          "channels": {
+            "$ref": "#/components/schemas/ChannelsDto"
+          },
+          "checklist": {
+            "description": "Every item, always in the same order",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChecklistItemDto"
+            }
+          }
+        },
+        "required": [
+          "published",
+          "publishedAt",
+          "ready",
+          "channels",
+          "checklist"
+        ]
+      },
+      "TelegramBotRequiredErrorDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "number",
+            "example": 422
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "telegram_bot_required"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "example": "Connect the venue Telegram bot before choosing the Mini App"
+          }
+        },
+        "required": [
+          "status",
+          "timestamp",
+          "code",
+          "message"
+        ]
+      },
+      "PublicationMissingDto": {
+        "type": "object",
+        "properties": {
+          "missing": {
+            "description": "Items with status todo",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChecklistItemDto"
+            }
+          }
+        },
+        "required": [
+          "missing"
+        ]
+      },
+      "PublicationIncompleteErrorDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "number",
+            "example": 409
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "publication_incomplete"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "example": "Publication checklist is not complete"
+          },
+          "details": {
+            "$ref": "#/components/schemas/PublicationMissingDto"
+          }
+        },
+        "required": [
+          "status",
+          "timestamp",
+          "code",
+          "message",
+          "details"
+        ]
+      },
       "TenantRefDto": {
         "type": "object",
         "properties": {
@@ -6337,12 +6746,59 @@
           "address"
         ]
       },
+      "TenantDeliveryChannelDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "example": true,
+            "description": "The owner turned ordering on (website and/or Mini App, delivery and pickup)"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "site",
+              "miniapp",
+              "both"
+            ],
+            "example": "site",
+            "description": "site: {slug}.xmenu.uz; miniapp: the Telegram Mini App; both"
+          },
+          "published": {
+            "type": "boolean",
+            "example": true,
+            "description": "Orders are open: enabled and published. false = never published or paused by the owner; POST /orders answers 422"
+          }
+        },
+        "required": [
+          "enabled",
+          "mode",
+          "published"
+        ]
+      },
+      "TenantChannelsDto": {
+        "type": "object",
+        "properties": {
+          "qr": {
+            "type": "boolean",
+            "example": true,
+            "description": "QR menu turned on by the owner"
+          },
+          "delivery": {
+            "$ref": "#/components/schemas/TenantDeliveryChannelDto"
+          }
+        },
+        "required": [
+          "qr",
+          "delivery"
+        ]
+      },
       "TenantFulfillmentDto": {
         "type": "object",
         "properties": {
           "modes": {
             "type": "array",
-            "description": "pickup: an active branch accepts pickup. delivery: an active branch accepts delivery and a delivery zone is set. Empty without branches",
+            "description": "Empty unless channels.delivery.published. pickup: an active branch accepts pickup. delivery: an active branch accepts delivery and a delivery zone is set. Empty without branches",
             "items": {
               "type": "string",
               "enum": [
@@ -6512,6 +6968,9 @@
           "contacts": {
             "$ref": "#/components/schemas/TenantContactsDto"
           },
+          "channels": {
+            "$ref": "#/components/schemas/TenantChannelsDto"
+          },
           "fulfillment": {
             "$ref": "#/components/schemas/TenantFulfillmentDto"
           },
@@ -6531,6 +6990,7 @@
           "theme",
           "locale",
           "contacts",
+          "channels",
           "fulfillment",
           "map"
         ]

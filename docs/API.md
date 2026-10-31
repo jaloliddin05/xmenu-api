@@ -148,6 +148,7 @@ IP берётся из `X-Forwarded-For` только от локального 
              "serviceArea": "#4A6FA5" },
   "locale": { "defaultLanguage": "ru", "languages": ["ru", "uz", "en"], "currency": "UZS" },
   "contacts": { "phone": null, "telegramUsername": null, "workingHours": null, "address": null },
+  "channels": { "qr": true, "delivery": { "enabled": true, "mode": "site", "published": true } },
   "fulfillment": { "modes": ["pickup"], "defaultMode": "pickup" },
   "map": { "center": [41.311081, 69.240562], "zoom": 15, "city": "Ташкент",
            "bounds": [[41.15, 69.0], [41.45, 69.45]], "deliveryZone": null }
@@ -159,12 +160,17 @@ IP берётся из `X-Forwarded-For` только от локального 
   нейтральных значений не держат и берут цвет из ответа.
 - `logoUrl`, `bannerUrl`: абсолютные URL от `PUBLIC_FILES_URL` (иначе `PUBLIC_API_URL`).
 - `description`: на языке ответа; пустое или отсутствующее берётся на языке заведения по умолчанию, иначе `null`.
-- `fulfillment.modes`: `pickup`, если есть активный филиал с самовывозом; `delivery`, если есть активный филиал с
-  доставкой **и** задана зона доставки. Нет филиалов: `[]`, `defaultMode: null`. Деньги (сбор, минимум, ETA,
-  способы оплаты) остаются в `GET /checkout-config`.
+- `channels` (раздел «Каналы и публикация» ниже): `qr`: QR-меню включено владельцем (QR-фронт при `false` показывает
+  «Меню недоступно», бэкенд меню не закрывает); `delivery.enabled`: владелец включил заказы (сайт и/или Mini App,
+  доставка и самовывоз); `delivery.mode`: `site`, `miniapp` или `both`; `delivery.published`: заказы открыты
+  (включено **и** опубликовано). При `published: false` `POST /orders` отвечает `422` (`ordering_channel_disabled` или
+  `ordering_not_published`), меню, филиалы и карта отдаются как обычно (предпросмотр).
+- `fulfillment.modes`: пусто, пока `channels.delivery.published` не `true`. Иначе `pickup`, если есть активный филиал с
+  самовывозом; `delivery`, если есть активный филиал с доставкой **и** задана зона доставки. Нет филиалов: `[]`,
+  `defaultMode: null`. Деньги (сбор, минимум, ETA, способы оплаты) остаются в `GET /checkout-config`.
 - `map.center` `[lat, lng]`, `map.bounds` `[[юго-запад], [северо-восток]]`, `map.deliveryZone` полигон
   `[[lat, lng], ...]` или `null` (доставки нет).
-- Полей `contacts.country` и каналов (`channels`) пока нет.
+- Поля `contacts.country` пока нет.
 
 **Язык и валюта клиентских ответов** (`/menu`, `/branches`, `/orders`, `/tenant/config`): берётся первый язык из
 `?lang=` или `Accept-Language`, который есть в `languages` заведения; иначе язык заведения по умолчанию. Если
@@ -288,6 +294,96 @@ QR-меню и сайта доставки (`REVALIDATE.md`).
 
 Зона доставки, сбор, минимум, ETA и тайм-ауты правятся `PUT /order-settings` (строка тоже создаётся при
 регистрации; `deliveryZone: null` выключает доставку).
+
+## Каналы и публикация (владелец)
+
+Каналы заведения: QR-меню (включено сразу после регистрации) и заказы (канал «доставка»: заказы с сайта
+`{slug}.xmenu.uz` и/или из Telegram Mini App, доставка и самовывоз; после регистрации выключен, режим `site`). Заказы
+открыты, только когда канал включён **и** заведение опубликовано. Публикация проверяет чеклист, снятие публикации
+(пауза) закрывает заказы, QR-меню продолжает работать. Опубликовано всегда означает включено: выключение канала
+снимает публикацию, после повторного включения нужен новый `publish` с проверкой.
+
+Эндпоинты (JSON, токен владельца, только своя организация; без токена `401`, нет организации `403`, чужой id `404`
+без чтения и записи). Все четыре при успехе отвечают `200` в одной форме:
+
+| Запрос | Что делает |
+|---|---|
+| `GET /organization/:id/publication` | состояние и чеклист |
+| `PUT /organization/:id/channels` | заменяет каналы целиком; `delivery.enabled: false` снимает публикацию |
+| `POST /organization/:id/publish` | проверяет чеклист и открывает заказы; уже опубликовано → `200`, `publishedAt` прежний |
+| `POST /organization/:id/unpublish` | пауза: `published_at = null`, каналы не меняются; повтор → `200` |
+
+```json
+{
+  "published": false,
+  "publishedAt": null,
+  "ready": false,
+  "channels": { "qr": true, "delivery": { "enabled": true, "mode": "site" } },
+  "checklist": [
+    { "id": "delivery_channel", "status": "done", "hint": null },
+    { "id": "venue_name", "status": "done", "hint": null },
+    { "id": "venue_slug", "status": "done", "hint": null },
+    { "id": "menu_category", "status": "done", "hint": null },
+    { "id": "menu_product", "status": "todo", "hint": "Добавьте хотя бы одно активное блюдо в активную категорию" },
+    { "id": "branch", "status": "todo", "hint": "Укажите у филиала часы работы (или «круглосуточно»)" },
+    { "id": "delivery_zone", "status": "todo", "hint": "Нарисуйте зону доставки или отключите доставку в филиалах" },
+    { "id": "telegram_bot", "status": "not_required", "hint": null }
+  ]
+}
+```
+
+- `published`: заказы открыты. `publishedAt`: начало текущей публикации (ISO), `null` без публикации и на паузе.
+- `ready`: в чеклисте нет `todo`. Опубликованное заведение может стать неготовым (меню, филиал или зона изменены
+  позже): публикация не снимается, `ready: false` показывает, что исправить, а заказ упирается в обычные проверки
+  (`branch_hours_not_set`, `delivery_unavailable_no_zone` и т. д.).
+- `checklist`: всегда все пункты в одном порядке. `status`: `done`, `todo` (блокирует публикацию) или
+  `not_required` (пункт не относится к заведению). `hint`: что исправить, по-русски, только при `todo`; дашборд может
+  показывать свои тексты по `id`.
+
+| `id` | Выполнен, когда |
+|---|---|
+| `delivery_channel` | канал заказов включён (`channels.delivery.enabled`) |
+| `venue_name` | название не пустое |
+| `venue_slug` | slug задан и проходит проверку (3–63 символа, не зарезервирован) |
+| `menu_category` | есть активная категория |
+| `menu_product` | есть активное блюдо в активной категории |
+| `branch` | есть активный филиал, у которого одновременно: часы работы хотя бы в один день (`is24h` подходит, `isClosed` нет), точка на карте (не `0, 0`), самовывоз или доставка |
+| `delivery_zone` | задана зона (`PUT /order-settings`); `not_required`, если ни один активный филиал не принимает доставку |
+| `telegram_bot` | бот заведения подключён и включён (`/telegram-bot`); `not_required` в режиме `site` |
+
+Логотип, цвета, контакты и ключи Click/Payme публикацию не блокируют; наличные доступны всегда.
+
+`PUT /organization/:id/channels`, тело целиком (лишние поля → `400`):
+
+```json
+{ "qr": true, "delivery": { "enabled": true, "mode": "site" } }
+```
+
+`mode`: `site`, `miniapp`, `both`. Ошибки: `400 validation_error` с `errors[]` (`qr`, `delivery`, `delivery.enabled`,
+`delivery.mode`); `miniapp` или `both` без подключённого и включённого бота → `422 telegram_bot_required` (ничего не
+сохраняется, даже при `enabled: false`).
+
+`POST /organization/:id/publish` с невыполненными пунктами → `409 publication_incomplete`, ничего не пишется:
+
+```json
+{
+  "status": 409, "timestamp": "2026-10-31T10:00:00.000Z", "code": "publication_incomplete",
+  "message": "Publication checklist is not complete",
+  "details": { "missing": [ { "id": "branch", "status": "todo", "hint": "Добавьте филиал: адрес, точка на карте и часы работы" } ] }
+}
+```
+
+Параллельные запросы: запись идёт в одной транзакции с блокировкой строки организации (`SELECT … FOR UPDATE`), поэтому
+`publish`, `unpublish` и `channels` одного заведения выполняются по очереди, а чеклист читается в той же транзакции.
+Из параллельных `publish` время ставит ровно один (условная запись), все получают один и тот же `publishedAt`.
+
+Реальное изменение (каналы, публикация, пауза) ставит ревалидацию QR-меню и сайта доставки с `route: "channels"`
+(`REVALIDATE.md`); запрос без изменений её не ставит.
+
+Заказы (`POST /orders`, доставка и самовывоз) при выключенном канале → `422 ordering_channel_disabled`, при
+включённом без публикации или на паузе → `422 ordering_not_published`. Состояние читается из БД при каждом заказе
+(не из кэша тенанта), пауза действует сразу. Повтор уже созданного заказа (тот же `Idempotency-Key`), отмена и
+повторная оплата не блокируются.
 
 ## Доступ к данным админки
 

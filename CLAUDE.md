@@ -78,6 +78,25 @@ test, `npm run openapi` + `git diff --exit-code docs/`, lint без блокир
   с кодом `invalid_settings` (`fieldErrorsException`). `ErrorFilter` (staff) всегда ставит `code` (иначе по
   статусу), пробрасывает `errors` и `details`, логирует только 5xx (без стектрейсов 4xx).
 
+## Каналы и публикация
+Контракт: `docs/API.md`, «Каналы и публикация». Код: `organization/domain/publication.ts` (чеклист, `orderingProblem`),
+`PublicationService`, `OrganizationPublicationController`.
+- Поля в `organization`: `qr_enabled` (по умолчанию `true`), `delivery_enabled` (`false`; канал заказов: сайт и/или Mini
+  App, доставка и самовывоз), `delivery_mode` (`site` | `miniapp` | `both`, по умолчанию `site`), `published_at`.
+  У колонок есть `DEFAULT` в БД (миграция на непустой БД), новое заведение получает `PLATFORM_CHANNELS` явно.
+- Заказы открыты при `delivery_enabled && published_at`. Выключение канала обнуляет `published_at`; `miniapp` и `both`
+  требуют подключённого включённого бота (`422 telegram_bot_required`).
+- `POST /publish` проверяет чеклист (`409 publication_incomplete`, `details.missing`); уже опубликованное отвечает 200
+  без проверки. Запись в транзакции с `SELECT … FOR UPDATE` строки организации, `published_at` ставится условным
+  `updateMany`. Правки меню, филиалов и зоны эту блокировку не берут: опубликованное может стать неготовым, публикация
+  не снимается.
+- `POST /orders` читает состояние из БД (не из кэша тенанта): `422 ordering_channel_disabled` / `ordering_not_published`.
+  `GET /tenant/config` отдаёт `channels`, `fulfillment.modes` пуст без публикации. `channels.qr` бэкенд не применяет
+  (меню отдаётся), его читает QR-фронт.
+- Изменения ставят ревалидацию с `route: 'channels'` (QR и клиент).
+- Бот удалён (`DELETE /telegram-bot`) при режиме `miniapp`/`both`: режим остаётся, пункт `telegram_bot` в чеклисте
+  становится `todo`, публикация не снимается.
+
 ## Филиалы
 - Часы считает `branch/domain/branch-hours.ts` (одна функция для `GET /branches` и `POST /orders`). Филиал без
   расписания закрыт: `isOpen: false`, `opensAt: null`, заказ → `422 branch_hours_not_set`. Круглосуточно: `is24h`
@@ -139,7 +158,6 @@ Payme вручную через ops-чат.
   `product/services/menu-ownership.ts`; чужой id в пути или в теле → 404. Новые эндпоинты админки делай так же.
 
 ## Что нужно построить
-- Статус публикации тенанта и флаги каналов (QR, доставка, режим: сайт, Mini App, оба). Публикация проверяет обязательное.
 - Интерфейс провайдера доставки (создать, отменить, статус, вебхук) и адаптер собственных курьеров; внешние сервисы
   (Noor, Yandex, Millennium) по мере доступа к API.
 - Уведомления о заказах через бота ресторана (сейчас платформенный бот из env).

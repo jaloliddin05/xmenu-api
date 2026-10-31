@@ -64,11 +64,16 @@ Webhook'и Click/Payme переводят заказ `awaiting_payment → pendi
 
 Ответ `201` — объект заказа (ниже).
 
-Порядок проверок на сервере: повтор по ключу → клиент (не заблокирован) → филиал и
-его часы → адрес и зона доставки → способ оплаты → расчёт по БД (`item_unavailable`,
+Порядок проверок на сервере: повтор по ключу → клиент (не заблокирован) → канал заказов
+и публикация заведения → филиал и его часы → адрес и зона доставки → способ оплаты → расчёт по БД (`item_unavailable`,
 `invalid_modifiers`, `invalid_order`) → `price_changed` → `min_order_not_reached` →
 лимит активных заказов. Первая найденная проблема возвращается сразу.
 
+* **Канал и публикация.** Заказ (доставка и самовывоз) принимается, только если владелец
+  включил канал заказов и опубликовал заведение (`API.md`, «Каналы и публикация»). Канал
+  выключен → `422 ordering_channel_disabled`, включён без публикации или на паузе →
+  `422 ordering_not_published`. `GET /tenant/config` в этом случае отдаёт
+  `channels.delivery.published: false` и пустой `fulfillment.modes`.
 * **Филиал.** pickup — `branchId` обязателен, филиал должен быть открыт. delivery —
   `branchId` лишь подсказка: если он закрыт или не доставляет, берётся первый открытый
   филиал с доставкой; если открытых нет — `branch_closed` с ближайшим `opensAt`.
@@ -148,6 +153,8 @@ cash ─────────────────────▶ pending_
 | 400 | `idempotency_key_required` | — | (ошибка клиента: нет/некорректный `Idempotency-Key`) |
 | 400/422 | `validation_error`, `invalid_order` | для `invalid_order` сверх 50 одного блюда: `{ items: [{ itemId, quantity, max }] }` | сообщение |
 | 422 | `fulfillment_unavailable` | — | сообщение (филиал не делает самовывоз/доставку) |
+| 422 | `ordering_channel_disabled` | — | заведение не принимает заказы онлайн: оформление скрыто |
+| 422 | `ordering_not_published` | — | заказы временно не принимаются (не опубликовано или пауза) |
 | 429 | `too_many_active_orders` | `retryAfter` | сообщение |
 | 422 | `invalid_modifiers` | `{ items: [{ index, itemId, reason, groupId? }] }` (`reason`: `missing_required`, `below_min`, `above_max`, `unknown_group`, `unknown_option`, `duplicate_group`, `duplicate_option`) | строки помечаются, «Убрать» |
 | 409 | `item_unavailable` | `{ items: [{ index, reason }] }` | то же |

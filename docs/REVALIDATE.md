@@ -16,6 +16,7 @@
 | `organization` | имя, тип, slug, логотип, баннер, описание (`PUT /organization/:id`) | `OrganizationService.update` |
 | `settings` | настройки заведения (`PUT /organization/:id/settings`), настройки заказа и зона (`PUT /order-settings`) | `OrganizationSettingsService.replace`, `OrderSettingsController` |
 | `branches` | филиалы, часы работы, исключения | `BranchService` |
+| `channels` | каналы (QR, заказы, режим) и публикация (`PUT /organization/:id/channels`, `publish`, `unpublish`) | `PublicationService` |
 
 Поля: `tenantId` (id организации), `route`, `oldSlug` (только при смене slug, иначе `null`). Вызывающий может передать
 `slug`, но в очередь он не попадает: процессор читает текущий slug по `tenantId` в момент выполнения задания (в том числе
@@ -33,7 +34,7 @@
 { "route": "organization", "id": "<org id>", "newSlug": "…", "oldSlug": "…", "secret": "<REVALIDATE_SECRET>" }
 ```
 Смена slug (`organization` с `oldSlug`, отличным от `slug`) уходит вторым видом, всё остальное (`menu`, `settings`,
-`organization` без смены slug) первым. Без slug задание QR пропускается.
+`organization` без смены slug, `channels`) первым. Без slug задание QR пропускается.
 
 ### Что читает QR (`xmenu-qr/src/app/api/revalidate/route.js`)
 `{ route, slug, secret, data }`; `id`, `slug`, `oldSlug`, `newSlug` принимаются и на верхнем уровне, и в `data`.
@@ -46,7 +47,7 @@
 {
   "secret": "<CLIENT_REVALIDATE_SECRET>",
   "tenantId": "<org id>",
-  "route": "menu | organization | settings | branches",
+  "route": "menu | organization | settings | branches | channels",
   "slug": "mant",
   "oldSlug": null
 }
