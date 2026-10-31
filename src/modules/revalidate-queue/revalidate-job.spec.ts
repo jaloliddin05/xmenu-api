@@ -31,6 +31,7 @@ describe('revalidate job ids', () => {
       job('qr', { tenantId: T2 }),
       job('qr', { route: 'organization' }),
       job('client', { route: 'settings' }),
+      job('client', { route: 'channels' }),
     ].map(buildRevalidateJobId);
     expect(new Set(ids).size).toBe(ids.length);
   });
@@ -62,6 +63,8 @@ describe('targets', () => {
     expect(targetsFor('settings', true)).toEqual(['qr', 'client']);
     expect(targetsFor('branches', false)).toEqual([]);
     expect(targetsFor('branches', true)).toEqual(['client']);
+    expect(targetsFor('channels', false)).toEqual(['qr']);
+    expect(targetsFor('channels', true)).toEqual(['qr', 'client']);
   });
 });
 
@@ -101,6 +104,12 @@ describe('request bodies', () => {
       secret: 's',
     });
     expect(buildQrBody(job('qr', { slug: null }).change, 's')).toBeNull();
+    // A channel change re-renders the QR menu by slug, like settings
+    expect(buildQrBody(job('qr', { route: 'channels' }).change, 's')).toEqual({
+      route: 'menu',
+      slug: 'mant',
+      secret: 's',
+    });
   });
 
   it('sends the client { secret, tenantId, route, slug, oldSlug }', () => {

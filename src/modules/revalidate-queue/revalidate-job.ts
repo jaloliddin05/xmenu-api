@@ -4,7 +4,13 @@
  *  - client: the delivery site (`CLIENT_REVALIDATE_URL`, `CLIENT_REVALIDATE_SECRET`), skipped when the URL is empty.
  * Format: docs/REVALIDATE.md.
  */
-export type RevalidateRoute = 'menu' | 'organization' | 'settings' | 'branches';
+export type RevalidateRoute =
+  | 'menu'
+  | 'organization'
+  | 'settings'
+  | 'branches'
+  /** Channel flags or publication (QR flag for the QR menu, ordering state for the delivery site). */
+  | 'channels';
 export type RevalidateTarget = 'qr' | 'client';
 
 export interface TenantChange {
