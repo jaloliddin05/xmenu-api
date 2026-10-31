@@ -17,6 +17,7 @@ async function bootstrap() {
   // req.ip is the client (per-IP auth limits) and a direct caller cannot spoof it.
   app.set('trust proxy', 'loopback');
 
+  // Why origin: true is acceptable and when to revisit it: docs/API.md, "CORS".
   // Bearer-token arxitektura: hech qaysi endpoint cookie ishlatmaydi
   // (grep -rn "res.cookie" src bo'sh natija beradi), shuning uchun
   // credentials:true kerak emas va faqat xavfni oshiradi — origin:true

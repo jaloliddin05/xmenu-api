@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Prisma client
+        run: npx prisma generate
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test -- --ci
+
+      # openapi.json is generated from the code; a diff means it was not regenerated and committed
+      - name: Contract is up to date
+        run: |
+          npm run openapi
+          git diff --exit-code docs/
+
+      # Report only: the old code base still has hundreds of lint errors (see CLAUDE.md)
+      - name: Lint (report, does not block)
+        run: npm run lint
+        continue-on-error: true
