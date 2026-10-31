@@ -52,9 +52,61 @@ export function isValidSlug(value: unknown): value is string {
 
 export const SLUG_RULE = `${SLUG_MIN}-${SLUG_MAX} chars: a-z, 0-9 and single dashes between words; must not look like an id or be a name reserved by the platform`;
 
-/** Slug proposed from a venue name; names without latin letters or digits get a random one. */
+const CYRILLIC: Record<string, string> = {
+  а: 'a',
+  б: 'b',
+  в: 'v',
+  г: 'g',
+  д: 'd',
+  е: 'e',
+  ё: 'yo',
+  ж: 'j',
+  з: 'z',
+  и: 'i',
+  й: 'y',
+  к: 'k',
+  л: 'l',
+  м: 'm',
+  н: 'n',
+  о: 'o',
+  п: 'p',
+  р: 'r',
+  с: 's',
+  т: 't',
+  у: 'u',
+  ф: 'f',
+  х: 'kh',
+  ц: 'ts',
+  ч: 'ch',
+  ш: 'sh',
+  щ: 'shch',
+  ъ: '',
+  ы: 'y',
+  ь: '',
+  э: 'e',
+  ю: 'yu',
+  я: 'ya',
+  // Uzbek cyrillic
+  ў: 'o',
+  қ: 'q',
+  ғ: 'g',
+  ҳ: 'h',
+};
+const UZBEK_ONLY = /[ўқғҳ]/;
+
+/**
+ * Cyrillic (Russian and Uzbek) to latin letters; other characters are kept for slugify to clean.
+ * 'х' is 'kh' in Russian but 'x' in Uzbek, so a name with an Uzbek-only letter is read as Uzbek.
+ */
+export function transliterate(text: string): string {
+  const lower = text.toLowerCase();
+  const table = UZBEK_ONLY.test(lower) ? { ...CYRILLIC, х: 'x' } : CYRILLIC;
+  return [...lower].map((ch) => table[ch] ?? (ch === '№' ? '' : ch)).join('');
+}
+
+/** Slug proposed from a venue name; names that leave no valid slug get a random one. */
 export function slugify(name: string, maxLength = SLUG_MAX): string {
-  const slug = name
+  const slug = transliterate(name)
     .toLowerCase()
     .trim()
     .replace(/[\s_]+/g, '-')

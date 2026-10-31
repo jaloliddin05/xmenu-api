@@ -36,8 +36,23 @@ describe('slug rules', () => {
     expect(slugify('Burger--King')).toBe('burger-king');
   });
 
-  it('gives names without latin letters a random valid slug', () => {
-    for (const name of ['Мант', '', '!!!', 'ab', 'API', 'Dashboard']) {
+  it('transliterates Russian and Uzbek cyrillic', () => {
+    expect(slugify('Кафе Браузер')).toBe('kafe-brauzer');
+    expect(slugify('Ўзбек ошхонаси')).toBe('ozbek-oshxonasi');
+    expect(slugify('Шашлык №1')).toBe('shashlyk-1');
+    expect(slugify('Мант')).toBe('mant');
+    expect(slugify('Хлеб и Щи')).toBe('khleb-i-shchi');
+    expect(slugify('Қовурдоқ ҳовли')).toBe('qovurdoq-hovli');
+  });
+
+  it('keeps transliterated proposals within the length limit', () => {
+    const s = slugify('Щ'.repeat(30));
+    expect(s.length).toBeLessThanOrEqual(63);
+    expect(isValidSlug(s)).toBe(true);
+  });
+
+  it('gives names with nothing usable a random valid slug', () => {
+    for (const name of ['寿司', '', '!!!', 'ab', 'API', 'Dashboard', 'Админ']) {
       const s = slugify(name);
       expect(s).toMatch(/^venue-[a-z0-9]{6}$/);
       expect(isValidSlug(s)).toBe(true);
