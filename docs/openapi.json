@@ -3417,6 +3417,7 @@
           },
           "logo": {
             "nullable": true,
+            "type": "object",
             "allOf": [
               {
                 "$ref": "#/components/schemas/StaffFileDto"
@@ -3425,6 +3426,7 @@
           },
           "banner": {
             "nullable": true,
+            "type": "object",
             "allOf": [
               {
                 "$ref": "#/components/schemas/StaffFileDto"
@@ -3486,6 +3488,7 @@
           },
           "organization": {
             "nullable": true,
+            "type": "object",
             "allOf": [
               {
                 "$ref": "#/components/schemas/StaffOrganizationDto"
@@ -3636,7 +3639,7 @@
             "$ref": "#/components/schemas/StaffUserDto"
           },
           "success": {
-            "type": "number",
+            "type": "boolean",
             "enum": [
               true
             ]
@@ -3752,7 +3755,7 @@
             "$ref": "#/components/schemas/CustomerUserDto"
           },
           "isNewUser": {
-            "type": "number",
+            "type": "boolean",
             "enum": [
               false
             ]
@@ -3769,7 +3772,7 @@
         "type": "object",
         "properties": {
           "isNewUser": {
-            "type": "number",
+            "type": "boolean",
             "enum": [
               true
             ]
@@ -3788,13 +3791,13 @@
         "type": "object",
         "properties": {
           "isNewUser": {
-            "type": "number",
+            "type": "boolean",
             "enum": [
               true
             ]
           },
           "requiresPhone": {
-            "type": "number",
+            "type": "boolean",
             "enum": [
               true
             ]
@@ -4351,6 +4354,7 @@
           },
           "logo": {
             "nullable": true,
+            "type": "object",
             "allOf": [
               {
                 "$ref": "#/components/schemas/PublicFileDto"
@@ -4359,6 +4363,7 @@
           },
           "banner": {
             "nullable": true,
+            "type": "object",
             "allOf": [
               {
                 "$ref": "#/components/schemas/PublicFileDto"
@@ -4522,6 +4527,7 @@
           "theme": {
             "nullable": true,
             "description": "Brand colors; a missing key keeps the front-end neutral value",
+            "type": "object",
             "allOf": [
               {
                 "$ref": "#/components/schemas/ThemeDto"
@@ -4599,6 +4605,7 @@
           },
           "mapCenter": {
             "nullable": true,
+            "type": "object",
             "allOf": [
               {
                 "$ref": "#/components/schemas/LatLngDto"
@@ -4978,6 +4985,7 @@
           },
           "lastSync": {
             "nullable": true,
+            "type": "object",
             "allOf": [
               {
                 "$ref": "#/components/schemas/LastSyncDto"
@@ -5524,6 +5532,7 @@
           },
           "nutrition": {
             "nullable": true,
+            "type": "object",
             "allOf": [
               {
                 "$ref": "#/components/schemas/MenuNutritionDto"
@@ -5793,6 +5802,7 @@
           "payment": {
             "nullable": true,
             "description": "null for cash",
+            "type": "object",
             "allOf": [
               {
                 "$ref": "#/components/schemas/OrderPaymentDto"
@@ -6031,6 +6041,7 @@
           "payment": {
             "nullable": true,
             "description": "null for cash",
+            "type": "object",
             "allOf": [
               {
                 "$ref": "#/components/schemas/OrderPaymentDto"
@@ -6956,6 +6967,7 @@
           "theme": {
             "nullable": true,
             "description": "Brand colors; a missing key (or null theme) means the front-end neutral value",
+            "type": "object",
             "allOf": [
               {
                 "$ref": "#/components/schemas/ThemeDto"
