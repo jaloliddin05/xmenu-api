@@ -5,6 +5,7 @@ import {
   SetMetadata,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import type { Request } from 'express';
 import { PUBLIC_KEY } from 'src/modules/auth/decorators/public.decorator';
 import { RateLimitService } from 'src/modules/auth/services/rate-limit.service';
 import type { RateRule } from 'src/modules/auth/services/rate-limit.service';
@@ -57,7 +58,7 @@ export class PublicRateLimitGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     if (context.getType() !== 'http') return true;
-    const req = context.switchToHttp().getRequest();
+    const req = context.switchToHttp().getRequest<Request>();
     if (req.method !== 'POST') return true;
 
     const targets = [context.getHandler(), context.getClass()];
@@ -68,9 +69,7 @@ export class PublicRateLimitGuard implements CanActivate {
 
     const { ip } = requestCtx(req);
     const general = publicPostRate();
-    const rules: RateRule[] = [
-      { key: `pubpost:all:${ip}`, ...general },
-    ];
+    const rules: RateRule[] = [{ key: `pubpost:all:${ip}`, ...general }];
     const extra = this.reflector.getAllAndOverride<
       PublicRateLimitOptions | undefined
     >(EXTRA_KEY, targets);

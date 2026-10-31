@@ -26,7 +26,9 @@ describe('POST /application (public landing form)', () => {
   beforeEach(() => create.mockClear());
 
   const post = (body: unknown) =>
-    request(app.getHttpServer()).post('/application').send(body as object);
+    request(app.getHttpServer())
+      .post('/application')
+      .send(body as object);
 
   it('creates the application and answers only the id', async () => {
     const res = await post({
