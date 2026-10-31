@@ -97,6 +97,10 @@ describe('GET /tenant/config', () => {
         name: 'Demo Cafe',
         type: 'cafe',
         is_active: true,
+        qr_enabled: true,
+        delivery_enabled: true,
+        delivery_mode: 'both',
+        published_at: new Date('2026-10-31T10:00:00Z'),
         logo: { url: '/image/organization/logo.png' },
         banner: null,
         translations: [
@@ -129,6 +133,10 @@ describe('GET /tenant/config', () => {
         name: 'Bare',
         type: 'other',
         is_active: true,
+        qr_enabled: true,
+        delivery_enabled: false,
+        delivery_mode: 'site',
+        published_at: null,
         logo: null,
         banner: null,
         translations: [
@@ -182,6 +190,10 @@ describe('GET /tenant/config', () => {
         workingHours: '10:00-23:00',
         address: 'Main street 1',
       },
+      channels: {
+        qr: true,
+        delivery: { enabled: true, mode: 'both', published: true },
+      },
       fulfillment: { modes: ['delivery', 'pickup'], defaultMode: 'delivery' },
       map: {
         center: [41.31, 69.24],
@@ -228,6 +240,10 @@ describe('GET /tenant/config', () => {
         workingHours: null,
         address: null,
       },
+      channels: {
+        qr: true,
+        delivery: { enabled: false, mode: 'site', published: false },
+      },
       fulfillment: { modes: [], defaultMode: null },
       map: {
         center: null,
@@ -239,7 +255,14 @@ describe('GET /tenant/config', () => {
     });
   });
 
+  const publishBare = () =>
+    Object.assign(orgs[BARE], {
+      delivery_enabled: true,
+      published_at: new Date('2026-10-31T10:00:00Z'),
+    });
+
   it('offers delivery only with a delivery zone', async () => {
+    publishBare();
     branches[BARE] = [
       { is_active: true, accepts_delivery: true, accepts_pickup: true },
       { is_active: false, accepts_delivery: true, accepts_pickup: true },
@@ -251,7 +274,42 @@ describe('GET /tenant/config', () => {
     });
   });
 
+  it.each<[string, Record<string, unknown>]>([
+    ['ordering is off', { delivery_enabled: false, published_at: null }],
+    [
+      'ordering is on but not published',
+      { delivery_enabled: true, published_at: null },
+    ],
+    [
+      'ordering is off with a stale publication',
+      {
+        delivery_enabled: false,
+        published_at: new Date('2026-10-31T10:00:00Z'),
+      },
+    ],
+  ])(
+    'offers no mode while %s, whatever the branches and zone',
+    async (_, state) => {
+      Object.assign(orgs[FULL], state);
+      const res = await config(FULL).expect(200);
+      expect(res.body.fulfillment).toEqual({ modes: [], defaultMode: null });
+      expect(res.body.channels.delivery).toEqual({
+        enabled: state.delivery_enabled,
+        mode: 'both',
+        published: false,
+      });
+      // The map and zone stay: the site can still show them while orders are paused
+      expect(res.body.map.deliveryZone).toEqual(ZONE);
+    },
+  );
+
+  it('reports a QR menu the owner turned off', async () => {
+    orgs[FULL].qr_enabled = false;
+    expect((await config(FULL).expect(200)).body.channels.qr).toBe(false);
+  });
+
   it('ignores inactive branches', async () => {
+    publishBare();
     branches[BARE] = [
       { is_active: false, accepts_delivery: true, accepts_pickup: true },
     ];

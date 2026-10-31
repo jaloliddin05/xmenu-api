@@ -4,6 +4,7 @@ import { publicFileUrl } from 'src/modules/menu/menu.mapper';
 import { CustomerAuthException } from 'src/modules/auth/errors/customer-auth.exception';
 import { OrderSettingsService } from 'src/modules/order/services/order-settings.service';
 import { resolveTheme, toSettingsView } from 'src/modules/organization/domain/organization-settings';
+import { orderingOpen } from 'src/modules/organization/domain/publication';
 import { PrismaService } from '../_prisma/prisma.service';
 import { FulfillmentMode, TenantConfigDto } from './dto/tenant-config.dto';
 import type { Tenant } from './tenant.service';
@@ -21,12 +22,17 @@ export function pickDescription(
   return null;
 }
 
-/** Modes a customer can actually order with: delivery also needs a delivery zone (order.service.ts). */
+/**
+ * Modes a customer can actually order with (order.service.ts): none while ordering is off or not
+ * published (domain/publication.ts), delivery also needs a delivery zone.
+ */
 export function fulfillmentModes(
   branches: { accepts_delivery: boolean; accepts_pickup: boolean }[],
   hasDeliveryZone: boolean,
+  ordering = true,
 ): FulfillmentMode[] {
   const modes: FulfillmentMode[] = [];
+  if (!ordering) return modes;
   if (hasDeliveryZone && branches.some((b) => b.accepts_delivery))
     modes.push('delivery');
   if (branches.some((b) => b.accepts_pickup)) modes.push('pickup');
@@ -55,6 +61,10 @@ export class TenantConfigService {
           banner: { select: { url: true } },
           translations: { select: { lang: true, description: true } },
           settings: true,
+          qr_enabled: true,
+          delivery_enabled: true,
+          delivery_mode: true,
+          published_at: true,
         },
       }),
       this.orderSettings.get(tenant.id),
@@ -75,7 +85,15 @@ export class TenantConfigService {
     }
 
     const s = toSettingsView(org.settings);
-    const modes = fulfillmentModes(branches, ordering.deliveryZone !== null);
+    const published = orderingOpen({
+      deliveryEnabled: org.delivery_enabled,
+      publishedAt: org.published_at,
+    });
+    const modes = fulfillmentModes(
+      branches,
+      ordering.deliveryZone !== null,
+      published,
+    );
     return {
       id: org.id,
       slug: org.slug ?? '',
@@ -96,6 +114,14 @@ export class TenantConfigService {
         telegramUsername: s.supportTelegram,
         workingHours: s.supportHours,
         address: s.address,
+      },
+      channels: {
+        qr: org.qr_enabled,
+        delivery: {
+          enabled: org.delivery_enabled,
+          mode: org.delivery_mode,
+          published,
+        },
       },
       fulfillment: { modes, defaultMode: modes[0] ?? null },
       map: {
