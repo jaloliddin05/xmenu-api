@@ -21,7 +21,7 @@ Env: см. `.env.example` (полный). Ключевые: `JWT_*`, `OTP_*`, `S
 `MINIAPP_URL`, `UPLOAD_MAX_BYTES`, `PLATFORM_ADMIN_USER_IDS`, `TRANSLATION_*`, `OPENAI_API_KEY` (необязателен: без него
 `/translation` → 503 `translation_unavailable`), `NEXT_PUBLIC_URL` + `REVALIDATE_SECRET` (QR),
 `CLIENT_REVALIDATE_URL` + `CLIENT_REVALIDATE_SECRET` (сайт доставки), `DELIVERY_URL_TEMPLATE` (адрес Mini App для кнопки бота), `STAFF_REFRESH_TTL_DAYS`,
-`STAFF_SESSION_ABSOLUTE_DAYS`. Окончания строк LF (`.gitattributes`, `.editorconfig`).
+`STAFF_SESSION_ABSOLUTE_DAYS`, `PUBLIC_POST_RATE_*`, `APPLICATION_RATE_*`, `TRANSLATION_IP_RATE_*` (лимиты по IP). Окончания строк LF (`.gitattributes`, `.editorconfig`).
 
 ## Схема Prisma
 Не правь `prisma/schema.prisma` руками: он собирается из `src/modules/*/models/*.prisma` командой
@@ -39,8 +39,9 @@ Env: см. `.env.example` (полный). Ключевые: `JWT_*`, `OTP_*`, `S
 ## Контракт API
 Единое место: `docs/API.md` и `docs/openapi.json`. Подробности: `docs/ORDERS_API.md`, `docs/BRANCHES_API.md`,
 `docs/BACKEND_ORDERS.md`, `docs/TELEGRAM_VERIFICATION.md`. Меняешь контроллер или DTO: добавь `@ApiProperty` и
-`@ApiOperation`, запусти `npm run openapi`, закоммить результат вместе с кодом. Проверки контракта в CI пока нет
-(в `.github/workflows` только `deploy.yml`).
+`@ApiOperation`, запусти `npm run openapi`, закоммить результат вместе с кодом. `.github/workflows/ci.yml` (build,
+test, `npm run openapi` + `git diff --exit-code docs/`, lint без блокировки) проверяет это на PR; на GitHub ещё не
+запускался, `deploy.yml` отдельный и без проверок.
 
 ## Тенантность
 - Тенант только по `organization.id` (UUID, не меняется): `parseTenantId` (`tenant/tenant-key.ts`), `TenantService.resolve`
@@ -53,7 +54,8 @@ Env: см. `.env.example` (полный). Ключевые: `JWT_*`, `OTP_*`, `S
 - Публичные ответы только через маппер или DTO со списком полей, не строкой БД: `GET /organization/slug/:slug` →
   `toPublicOrganization` (`organization/domain/public-organization.ts`, только активные), `toStaffUser` для
   владельца. Новый публичный эндпоинт делай так же.
-- Slug: `organization/domain/slug.ts` (3–63 символа, `a-z0-9` и дефисы, не UUID, не из `RESERVED_SLUGS`: slug становится поддоменом `{slug}.xmenu.uz`), дубликат → 409 `slug_taken`.
+- Slug: `organization/domain/slug.ts` (`slugify`: кириллица ru/uz транслитерируется, случайный `venue-xxxxxx` только если
+  годного slug не вышло; 3–63 символа, `a-z0-9` и дефисы, не UUID, не из `RESERVED_SLUGS`: slug становится поддоменом `{slug}.xmenu.uz`), дубликат → 409 `slug_taken`.
 - `Tenant` несёт `defaultLanguage`, `languages`, `currency` из `organization_settings`: язык ответа
   `resolveLang(req, tenant)`, запасной язык перевода `pickTranslation(list, lang, tenant.defaultLanguage)`, валюта
   меню, `/checkout-config` и заказа из настроек. Константы `'ru'` и `'UZS'` в коде ответов не используются.
@@ -64,7 +66,9 @@ Env: см. `.env.example` (полный). Ключевые: `JWT_*`, `OTP_*`, `S
 - `organization_settings` (бренд, валюта, языки, контакты, карта) и `organization_order_settings` (сбор, минимумы,
   ETA, тайм-ауты, зона): по одной строке на заведение, обе создаются в `OrganizationService.create` при регистрации
   значениями из `organization/domain/platform-defaults.ts`. У колонок нет `DEFAULT` в БД.
-- Чтение никогда не подставляет значения: нет строки → `settings_missing` (500) с логом.
+- Чтение не подставляет значения: нет строки → `settings_missing` (500) с логом. Исключение — тема:
+  `PLATFORM_THEME` (`platform-defaults.ts`, 9 нейтральных цветов) и `resolveTheme()` дают полную `theme` в
+  `GET /tenant/config` и `effectiveTheme` в ответах `GET/PUT /organization/:id/settings` (хранимая `theme` не меняется).
 - Владелец: `GET/PUT /organization/:id/settings` (PUT заменяет документ целиком, проверки в
   `organization/domain/organization-settings.ts` и DTO), `GET/PUT /order-settings`.
 - Нет зоны доставки (`delivery_zone = null`) → доставка недоступна: `POST /orders` отвечает
@@ -165,18 +169,25 @@ Payme), Telegram webhook и кнопки, боты заведений (`PUT /tel
   валидатором, остаётся на диске без записи в БД. Файлы, загруженные до этой защиты, не проверялись: отдача делает
   любой не-образ `attachment` + `sandbox`, сами файлы не чистились.
 - Ревалидация: ключ задания `revalidate-{target}-{route}-{tenantId}`, цели QR и сайт доставки (`docs/REVALIDATE.md`);
-  приёмника в `xmenu-client` ещё нет (задача C2), без `CLIENT_REVALIDATE_URL` задания клиенту не ставятся. В
+  в очередь идут tenantId, route, oldSlug, актуальный slug читается при выполнении; при заданном адресе цели и пустом
+  секрете production не стартует (`revalidate-config.ts`); без `CLIENT_REVALIDATE_URL` задания клиенту не ставятся. В
   `GET /application` читать могут только id из `PLATFORM_ADMIN_USER_IDS`.
 - Группы допов, созданные до миграции `additional_product_group_organization` и не привязанные к блюду, без владельца
   (недоступны никому); можно удалить вручную.
 - Кэш тенанта и настроек заказа в памяти процесса (30 с): после `PUT` другие процессы pm2 видят старые имя, slug,
   язык, валюту и зону до 30 с. `is_active` через API не меняется (только в БД), сброса для него нет.
-- Скомпилированные `.js/.d.ts/.js.map` в `src/config` (не должны быть в репозитории).
+- `GET /organization/slug/:slug` ещё открыт: закрыть, когда QR перейдёт на `by-slug` + `tenant/config` (Q2).
 - `npm run lint` (без `--fix`) не проходит (около 230 ошибок `recommendedTypeChecked` в старом коде:
-  нетипизированный `@Req() req`, `any` из конфигов и passport, код заказов и платежей), в CI lint не запускается.
+  нетипизированный `@Req() req`, `any` из конфигов и passport, код заказов и платежей), в CI lint запускается без блокировки (отчёт).
   Новые файлы проходят. Для `*.spec.ts` и `*.fake.ts` правила `no-unsafe-*` и `require-await` выключены.
   `.gitattributes` (`eol=lf`) добавлен; рабочая копия, выгруженная раньше с `core.autocrlf=true`, остаётся в CRLF,
   пока файлы не перевыгрузить (`git rm --cached -r . && git reset --hard` на чистом дереве).
+
+## Лимиты публичных POST
+`PublicRateLimitGuard` (`infra/http/public-rate-limit.ts`, глобальный `APP_GUARD`): POST к `@Public()` маршрутам по IP через
+`RateLimitService`; `@PublicRateLimit` добавляет строже (`/application`), `@SkipPublicRateLimit` снимает (вебхуки Click,
+Payme, Telegram). Новый публичный POST с `@Public()` попадает под общий лимит сам; вебхук провайдера пометь Skip.
+CORS `origin: true` оставлен осознанно, обоснование в `docs/API.md`.
 
 ## Правила
 - Никаких захардкоженных кодов и секретов. Не логируй токены ботов, ключи провайдеров, OTP-коды.
