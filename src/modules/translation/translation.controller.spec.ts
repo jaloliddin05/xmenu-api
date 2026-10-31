@@ -64,6 +64,20 @@ describe('TranslationController', () => {
     expect(translate).toHaveBeenCalledTimes(3);
   });
 
+  it('also limits per client IP across owners', async () => {
+    process.env.TRANSLATION_IP_RATE_LIMIT = '2';
+    try {
+      expect((await post('u1', ok)).status).toBe(201);
+      expect((await post('u2', ok)).status).toBe(201);
+      const res = await post('u3', ok);
+      expect(res.status).toBe(429);
+      expect(res.body.code).toBe('rate_limited');
+      expect(translate).toHaveBeenCalledTimes(2);
+    } finally {
+      delete process.env.TRANSLATION_IP_RATE_LIMIT;
+    }
+  });
+
   it('limits per user, not globally', async () => {
     for (let i = 0; i < 3; i++) await post('u1', ok);
     expect((await post('u2', ok)).status).toBe(201);

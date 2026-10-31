@@ -1,3 +1,4 @@
+import { SkipPublicRateLimit } from 'src/infra/http/public-rate-limit';
 import { Body, Controller, Headers, HttpCode, Logger, Param, Post } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
@@ -18,6 +19,7 @@ import { PrismaPaymeStore } from '../stores/prisma-payme.store';
  */
 @ApiExcludeController()
 @Public()
+@SkipPublicRateLimit()
 @Controller('payments/payme/:tenantId')
 export class PaymeController {
   private readonly logger = new Logger('Payme');

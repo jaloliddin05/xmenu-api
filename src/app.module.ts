@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
+import { PublicRateLimitGuard } from './infra/http/public-rate-limit';
 import { ConfigModule } from '@nestjs/config';
 
 import configuration from './config'
@@ -46,5 +48,6 @@ import { TelegramModule } from './modules/telegram/telegram.module';
     TranslationModule,
     UserModule
   ],
+  providers: [{ provide: APP_GUARD, useClass: PublicRateLimitGuard }],
 })
 export class AppModule {}

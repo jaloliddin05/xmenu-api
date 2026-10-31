@@ -1,3 +1,4 @@
+import { SkipPublicRateLimit } from 'src/infra/http/public-rate-limit';
 import { Body, Controller, Headers, HttpCode, Logger, Post, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { timingSafeEqual } from 'crypto';
 import { ApiExcludeController } from '@nestjs/swagger';
@@ -30,6 +31,7 @@ interface CallbackQuery {
  */
 @ApiExcludeController()
 @Public()
+@SkipPublicRateLimit()
 @Controller('telegram/orders')
 export class TelegramOrdersController {
   private readonly logger = new Logger('TelegramOrders');

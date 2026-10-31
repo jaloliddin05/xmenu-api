@@ -3,7 +3,8 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { TranslationService } from './translation.service';
 import { TranslationDto } from './dto';
 import { RateLimitService } from '../auth/services/rate-limit.service';
-import { translationRate } from './translation.limits';
+import { translationIpRate, translationRate } from './translation.limits';
+import { requestCtx } from 'src/infra/http/request-helpers';
 
 @ApiTags('Translation')
 @Controller('translation')
@@ -20,7 +21,11 @@ export class TranslationController {
     const userId = req?.user?.id;
     if (!userId) throw new UnauthorizedException();
     const { limit, ttlSeconds } = translationRate();
-    await this.rateLimit.hit([{ key: `translation:user:${userId}`, limit, ttlSeconds }]);
+    const ipRate = translationIpRate();
+    await this.rateLimit.hit([
+      { key: `translation:user:${userId}`, limit, ttlSeconds },
+      { key: `translation:ip:${requestCtx(req).ip}`, ...ipRate },
+    ]);
     return await this.translationService.translate(data.text, data.promptName);
   }
 

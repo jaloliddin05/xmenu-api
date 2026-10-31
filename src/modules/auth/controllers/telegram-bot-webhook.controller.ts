@@ -1,3 +1,4 @@
+import { SkipPublicRateLimit } from 'src/infra/http/public-rate-limit';
 import {
   Body,
   Controller,
@@ -25,6 +26,7 @@ const UUID_RE = /^[0-9a-fA-F-]{36}$/;
  */
 @ApiExcludeController()
 @Public()
+@SkipPublicRateLimit()
 @Controller('telegram/bot')
 export class TelegramBotWebhookController {
   private readonly logger = new Logger('TelegramBotWebhook');

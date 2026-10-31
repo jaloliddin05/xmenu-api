@@ -1,4 +1,5 @@
 import { Body, Controller, HttpCode, Logger, Param, Post } from '@nestjs/common';
+import { SkipPublicRateLimit } from 'src/infra/http/public-rate-limit';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
 import { Public } from 'src/modules/auth/decorators/public.decorator';
@@ -19,6 +20,7 @@ import { PrismaClickStore } from '../stores/prisma-click.store';
  */
 @ApiExcludeController()
 @Public()
+@SkipPublicRateLimit()
 @Controller('payments/click/:tenantId')
 export class ClickController {
   private readonly logger = new Logger('Click');

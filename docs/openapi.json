@@ -35,7 +35,7 @@
             }
           }
         },
-        "summary": "Landing contact form (public); answers { id }",
+        "summary": "Landing contact form (public, 5 per hour per IP, 429 rate_limited); answers { id }",
         "tags": [
           "Application"
         ]
@@ -3097,30 +3097,35 @@
         "properties": {
           "fullName": {
             "type": "string",
-            "description": "fullName",
-            "example": ""
+            "maxLength": 120,
+            "example": "Aziz Karimov"
           },
           "phone": {
             "type": "string",
-            "description": "phone",
-            "example": ""
+            "maxLength": 32,
+            "example": "+998901234567"
           },
           "plan": {
             "type": "string",
-            "description": "plan",
-            "example": ""
+            "maxLength": 64,
+            "example": "basic"
           },
           "from": {
             "type": "string",
-            "description": "from",
-            "example": ""
+            "enum": [
+              "admin",
+              "web"
+            ],
+            "example": "web"
           },
           "description": {
             "type": "string",
-            "description": "description",
-            "example": ""
+            "maxLength": 2000
           }
-        }
+        },
+        "required": [
+          "from"
+        ]
       },
       "LoginDto": {
         "type": "object",
