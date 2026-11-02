@@ -41,7 +41,8 @@ Env: см. `.env.example` (полный). Ключевые: `JWT_*`, `OTP_*`, `S
 `docs/BACKEND_ORDERS.md`, `docs/TELEGRAM_VERIFICATION.md`. Меняешь контроллер или DTO: добавь `@ApiProperty` и
 `@ApiOperation`, запусти `npm run openapi`, закоммить результат вместе с кодом. `.github/workflows/ci.yml` (build,
 test, `npm run openapi` + `git diff --exit-code docs/`, lint без блокировки) проверяет это на PR; на GitHub ещё не
-запускался, `deploy.yml` отдельный и без проверок.
+запускался (шаги: чистая БД `migrate deploy`, `migrate diff` без расхождений, `scripts/check-migration-upgrade.sh`, build, test, openapi); `deploy.yml` отдельный и без проверок.
+Локально те же шаги: временные БД (`createdb xmenu_ci`, `xmenu_ci_shadow`, `xmenu_upgrade`), `DATABASE_URL=… npx prisma migrate deploy`, `npx prisma migrate diff --from-url $DATABASE_URL --to-schema-datamodel prisma/schema.prisma --exit-code`, `DATABASE_URL=<пустая БД> scripts/check-migration-upgrade.sh`, затем `npm run build`, `npm test`, `npm run openapi && git diff --exit-code docs/`. В Windows psql принимает URL только через `--dbname=`.
 
 ## Тенантность
 - Тенант только по `organization.id` (UUID, не меняется): `parseTenantId` (`tenant/tenant-key.ts`), `TenantService.resolve`
@@ -195,7 +196,7 @@ Payme), Telegram webhook и кнопки, боты заведений (`PUT /tel
 - Кэш тенанта и настроек заказа в памяти процесса (30 с): после `PUT` другие процессы pm2 видят старые имя, slug,
   язык, валюту и зону до 30 с. `is_active` через API не меняется (только в БД), сброса для него нет.
 - `GET /organization/slug/:slug` ещё открыт: закрыть, когда QR перейдёт на `by-slug` + `tenant/config` (Q2).
-- `npm run lint` (без `--fix`) не проходит (около 230 ошибок `recommendedTypeChecked` в старом коде:
+- `npm run lint` (без `--fix`) не проходит (2026-11-02: 196 ошибок правил `recommendedTypeChecked` и около 1800 `prettier/prettier` в старом коде по аудиту `audit/WAVE3.md`; в клоне с `core.autocrlf=true` prettier добавляет ещё ~12 тыс. `␍`; не prettier: 
   нетипизированный `@Req() req`, `any` из конфигов и passport, код заказов и платежей), в CI lint запускается без блокировки (отчёт).
   Новые файлы проходят. Для `*.spec.ts` и `*.fake.ts` правила `no-unsafe-*` и `require-await` выключены.
   `.gitattributes` (`eol=lf`) добавлен; рабочая копия, выгруженная раньше с `core.autocrlf=true`, остаётся в CRLF,
