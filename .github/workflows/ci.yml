@@ -9,6 +9,36 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: xmenu_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      PG_ADMIN_URL: postgresql://postgres:postgres@localhost:5432
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/xmenu_ci
+      REDIS_URL: redis://localhost:6379
+
     steps:
       - uses: actions/checkout@v4
 
@@ -22,6 +52,23 @@ jobs:
       - name: Prisma client
         run: npx prisma generate
 
+      # Migrations on a clean database, then the result must equal prisma/schema.prisma
+      - name: Migrations apply on a clean database
+        run: npx prisma migrate deploy
+
+      - name: Migrations match the schema (no drift)
+        run: |
+          npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma/schema.prisma --exit-code
+          psql --dbname="$PG_ADMIN_URL/postgres" -c 'create database xmenu_ci_shadow'
+          npx prisma migrate diff --from-migrations prisma/migrations --to-schema-datamodel prisma/schema.prisma \
+            --shadow-database-url "$PG_ADMIN_URL/xmenu_ci_shadow" --exit-code
+
+      # The channels/publication migration on a database that already has a venue
+      - name: Migration upgrade on a non-empty database
+        run: |
+          psql --dbname="$PG_ADMIN_URL/postgres" -c 'create database xmenu_upgrade'
+          DATABASE_URL="$PG_ADMIN_URL/xmenu_upgrade" scripts/check-migration-upgrade.sh
+
       - name: Build
         run: npm run build
 
@@ -34,7 +81,7 @@ jobs:
           npm run openapi
           git diff --exit-code docs/
 
-      # Report only: the old code base still has hundreds of lint errors (see CLAUDE.md)
+      # Report only: the old code base still has many lint errors (see CLAUDE.md)
       - name: Lint (report, does not block)
         run: npm run lint
         continue-on-error: true
