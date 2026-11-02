@@ -115,10 +115,25 @@ describe('validateProfileInput', () => {
 });
 
 describe('deliveryUrl', () => {
+  // an undefined template falls back to process.env.DELIVERY_URL_TEMPLATE: isolate it from the shell
+  const saved = process.env.DELIVERY_URL_TEMPLATE;
+  beforeEach(() => {
+    delete process.env.DELIVERY_URL_TEMPLATE;
+  });
+  afterEach(() => {
+    if (saved === undefined) delete process.env.DELIVERY_URL_TEMPLATE;
+    else process.env.DELIVERY_URL_TEMPLATE = saved;
+  });
+
   it('substitutes the slug into an https template', () => {
     expect(deliveryUrl('mant', 'https://{slug}.xmenu.uz')).toBe(
       'https://mant.xmenu.uz',
     );
+  });
+
+  it('reads the template from DELIVERY_URL_TEMPLATE when none is passed', () => {
+    process.env.DELIVERY_URL_TEMPLATE = 'https://{slug}.xmenu.uz';
+    expect(deliveryUrl('mant')).toBe('https://mant.xmenu.uz');
   });
 
   it('is null without a template, a {slug} placeholder, a slug or https', () => {

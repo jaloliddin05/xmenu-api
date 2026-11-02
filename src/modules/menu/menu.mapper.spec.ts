@@ -35,6 +35,22 @@ const category = (over: Partial<MenuCategoryRow> = {}): MenuCategoryRow =>
 
 const locale = (lang: 'ru' | 'uz' | 'en', fallback: 'ru' | 'uz' | 'en' = 'ru', currency = 'UZS') => ({ lang, fallback, currency });
 
+// toMenuView reads PUBLIC_FILES_URL / PUBLIC_API_URL from process.env: the tests must not depend on the shell
+const FILE_ENV = ['PUBLIC_FILES_URL', 'PUBLIC_API_URL'] as const;
+const savedEnv: Record<string, string | undefined> = {};
+beforeEach(() => {
+  for (const key of FILE_ENV) {
+    savedEnv[key] = process.env[key];
+    delete process.env[key];
+  }
+});
+afterEach(() => {
+  for (const key of FILE_ENV) {
+    if (savedEnv[key] === undefined) delete process.env[key];
+    else process.env[key] = savedEnv[key];
+  }
+});
+
 describe('toMenuView', () => {
   it('maps categories, items and the language fallback', () => {
     const ru = toMenuView([category()], locale('ru'));
