@@ -8,12 +8,11 @@ const CHAT_ID = process.env.XMENU_CHAT_ID || '';
 async function sendMessage(
   chatId: string,
   text: string,
-  options: { parse_mode?: 'Markdown' } = {},
 ): Promise<void> {
   try {
     await axios.post(
       `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`,
-      { chat_id: chatId, text, ...options },
+      { chat_id: chatId, text },
       { timeout: 8000 },
     );
   } catch (e) {
@@ -46,20 +45,30 @@ export async function sendCustomerOtpSms(
   await sendMessage(CHAT_ID, message);
 }
 
+// Landing form notification. Returns false without any network call when the bot is not
+// configured. Plain text on purpose (see above): a name with _ * [ must not break the message.
 export async function sendApplicationToTelegram(data: {
   fullName?: string;
   phone?: string;
   from?: string;
   plan?: string;
   description?: string;
-}) {
-  let message = `📝 *Yangi zayavka!*`;
+}): Promise<boolean> {
+  if (!TELEGRAM_TOKEN || !CHAT_ID) return false;
 
-  if (data.fullName) message += `\n👤 Ism: *${data.fullName}*`;
-  if (data.phone) message += `\n📞 Telefon: *${data.phone}*`;
-  if (data.from) message += `\n📍 Qayerdan: *${data.from}*`;
-  if (data.plan) message += `\n💰 Tarif: *${data.plan}*`;
-  if (data.description) message += `\n🗒️ Izoh: *${data.description}*`;
+  let message = `📝 Yangi zayavka!`;
 
-  await sendMessage(CHAT_ID, message, { parse_mode: 'Markdown' });
+  if (data.fullName) message += `
+👤 Ism: ${data.fullName}`;
+  if (data.phone) message += `
+📞 Telefon: ${data.phone}`;
+  if (data.from) message += `
+📍 Qayerdan: ${data.from}`;
+  if (data.plan) message += `
+💰 Tarif: ${data.plan}`;
+  if (data.description) message += `
+🗒️ Izoh: ${data.description}`;
+
+  await sendMessage(CHAT_ID, message);
+  return true;
 }

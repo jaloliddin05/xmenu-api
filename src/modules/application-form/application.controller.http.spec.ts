@@ -1,6 +1,7 @@
 jest.mock('src/infra/helper/tg-bot/otp-bot', () => ({
   sendApplicationToTelegram: jest.fn(),
 }));
+import { sendApplicationToTelegram } from 'src/infra/helper/tg-bot/otp-bot';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { createHttpApp } from 'src/infra/testing/http-app.fake';
@@ -36,6 +37,13 @@ describe('POST /application (public landing form)', () => {
       fullName: 'Aziz',
       phone: '+998901234567',
     }).expect(201);
+    expect(res.body).toEqual({ id: 'app-1' });
+    expect(create).toHaveBeenCalledTimes(1);
+  });
+
+  it('is 201 and saved even when Telegram is unreachable', async () => {
+    (sendApplicationToTelegram as jest.Mock).mockRejectedValueOnce(new Error('Telegram sendMessage failed: ETIMEDOUT'));
+    const res = await post({ from: 'web', fullName: 'Ali_Baba *[' }).expect(201);
     expect(res.body).toEqual({ id: 'app-1' });
     expect(create).toHaveBeenCalledTimes(1);
   });
