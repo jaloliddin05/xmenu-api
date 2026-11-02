@@ -42,7 +42,7 @@ export class StaffRegisterDto {
   })
   @IsString()
   @Transform(trim)
-  @Length(1, 100)
+  @Length(2, 100)
   readonly name: string;
 
   @ApiProperty({

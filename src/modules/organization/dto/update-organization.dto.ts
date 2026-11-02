@@ -3,12 +3,16 @@ import { Type, Transform, plainToInstance } from "class-transformer";
 import {
   IsString,
   IsOptional,
+  Length,
   IsUUID,
   IsArray,
   ValidateBy,
   ValidateNested,
 } from "class-validator";
 import { isValidSlug, SLUG_RULE } from "../domain/slug";
+
+const trim = ({ value }: { value: unknown }) =>
+  typeof value === "string" ? value.trim() : value;
 
 class UpdateOrganizationTranslationDto {
   @ApiProperty({ example: "translation-uuid" })
@@ -31,9 +35,11 @@ class UpdateOrganizationDto {
   @IsString()
   type?: string;
 
-  @ApiProperty({ description: `name`, required: false })
+  @ApiProperty({ description: `Venue name, 2-100 characters after trimming`, required: false, minLength: 2, maxLength: 100 })
   @IsOptional()
   @IsString()
+  @Transform(trim)
+  @Length(2, 100)
   readonly name?: string;
 
   @ApiProperty({ description: `Public slug: ${SLUG_RULE}. Taken by another venue: 409 slug_taken`, example: "cafe-example", required: false })

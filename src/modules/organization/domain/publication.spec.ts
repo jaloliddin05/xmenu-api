@@ -48,6 +48,7 @@ describe('evaluateChecklist', () => {
   it.each<[ChecklistId, Partial<PublicationFacts>]>([
     ['delivery_channel', { deliveryEnabled: false }],
     ['venue_name', { name: '   ' }],
+    ['venue_name', { name: '' }], // rows saved before the name became required
     ['venue_slug', { slug: null }],
     ['venue_slug', { slug: 'Bad Slug' }],
     ['venue_slug', { slug: 'api' }],

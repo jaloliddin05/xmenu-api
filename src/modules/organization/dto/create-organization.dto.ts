@@ -1,5 +1,6 @@
 import { ApiProperty } from "@nestjs/swagger"
-import { IsEnum, IsNotEmpty, IsOptional, IsString } from "class-validator"
+import { Transform } from "class-transformer"
+import { IsEnum, IsNotEmpty, IsString, Length } from "class-validator"
 import { OrganizationTypeEnum } from "../models/organization.model"
 
 class CreateOrganizationDto {
@@ -17,8 +18,9 @@ class CreateOrganizationDto {
         example: '',
         required: false,
     })
-    @IsNotEmpty()
     @IsString()
+    @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
+    @Length(2, 100)
     readonly name: string
 }
 
