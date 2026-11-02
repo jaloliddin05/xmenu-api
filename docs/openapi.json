@@ -33,6 +33,26 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "validation_error with errors[] (from is required)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate_limited: 5 per hour per IP, retryAfter in seconds",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
           }
         },
         "summary": "Landing contact form (public, 5 per hour per IP, 429 rate_limited); answers { id }",
@@ -1031,13 +1051,34 @@
             }
           },
           "401": {
-            "description": "No or invalid owner token"
+            "description": "No or invalid owner token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
           },
           "403": {
-            "description": "The user has no organization"
+            "description": "The user has no organization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
           },
           "404": {
-            "description": "Not your organization (any other id looks missing)"
+            "description": "Not your organization (any other id looks missing)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1086,16 +1127,44 @@
             }
           },
           "400": {
-            "description": "validation_error with errors[] (qr, delivery.enabled, delivery.mode)"
+            "description": "validation_error with errors[] (qr, delivery.enabled, delivery.mode)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
           },
           "401": {
-            "description": "No or invalid owner token"
+            "description": "No or invalid owner token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
           },
           "403": {
-            "description": "The user has no organization"
+            "description": "The user has no organization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
           },
           "404": {
-            "description": "Not your organization (any other id looks missing)"
+            "description": "Not your organization (any other id looks missing)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
           },
           "422": {
             "description": "telegram_bot_required: mode miniapp or both without a connected, enabled venue bot",
@@ -1144,13 +1213,34 @@
             }
           },
           "401": {
-            "description": "No or invalid owner token"
+            "description": "No or invalid owner token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
           },
           "403": {
-            "description": "The user has no organization"
+            "description": "The user has no organization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
           },
           "404": {
-            "description": "Not your organization (any other id looks missing)"
+            "description": "Not your organization (any other id looks missing)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
           },
           "409": {
             "description": "publication_incomplete: details.missing lists the todo items",
@@ -1199,13 +1289,34 @@
             }
           },
           "401": {
-            "description": "No or invalid owner token"
+            "description": "No or invalid owner token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
           },
           "403": {
-            "description": "The user has no organization"
+            "description": "The user has no organization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
           },
           "404": {
-            "description": "Not your organization (any other id looks missing)"
+            "description": "Not your organization (any other id looks missing)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -3340,6 +3451,75 @@
           "from"
         ]
       },
+      "FieldErrorDto": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string",
+            "example": "name",
+            "description": "Path in the request body, e.g. `theme.brand`, `languages[1]`"
+          },
+          "reason": {
+            "type": "string",
+            "example": "length",
+            "description": "Constraint name or domain rule"
+          },
+          "message": {
+            "type": "string",
+            "example": "name must be longer than or equal to 2 characters"
+          }
+        },
+        "required": [
+          "field",
+          "reason",
+          "message"
+        ]
+      },
+      "ErrorResponseDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "number",
+            "example": 400
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "code": {
+            "type": "string",
+            "example": "validation_error",
+            "description": "Stable machine-readable code"
+          },
+          "message": {
+            "type": "string",
+            "example": "Validation failed"
+          },
+          "errors": {
+            "description": "Failed fields (400 validation_error)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldErrorDto"
+            }
+          },
+          "retryAfter": {
+            "type": "number",
+            "example": 3600,
+            "description": "Seconds to wait (429 rate_limited), also the Retry-After header"
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Extra data of some codes"
+          }
+        },
+        "required": [
+          "status",
+          "timestamp",
+          "code",
+          "message"
+        ]
+      },
       "LoginDto": {
         "type": "object",
         "properties": {
@@ -4403,7 +4583,9 @@
           },
           "name": {
             "type": "string",
-            "description": "name"
+            "description": "Venue name, 2-100 characters after trimming",
+            "minLength": 2,
+            "maxLength": 100
           },
           "slug": {
             "type": "string",

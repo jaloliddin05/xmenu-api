@@ -393,6 +393,8 @@ QR-меню и сайта доставки (`REVALIDATE.md`).
 - `/user/:id`, `/user/change-password/:id`: только свой id. Новый пароль 8–72 символа.
 - `/organization/:id` (GET, PUT, DELETE) и `/organization/:id/settings`: только своя. `PUT` и `DELETE` сбрасывают
   кэш заведения (имя, slug) в своём процессе.
+- `name` (регистрация, создание и `PUT /organization/:id`): после обрезки пробелов 2–100 символов, иначе
+  `400 validation_error` с полем `name`. Ранее сохранённые пустые названия читаются без ошибок (чеклист: `venue_name` = `todo`).
 - `slug` в `PUT /organization/:id` и `POST /organization/check-slug`: 3–63 символа `a-z`, `0-9` и одиночные
   дефисы между словами, не похож на UUID и не из зарезервированных имён (`www`, `api`, `app`, `qr`, `order`,
   `dashboard`, `admin`, `staging` и др.: slug становится поддоменом `{slug}.xmenu.uz`); иначе `400 invalid_slug`. Занят другим заведением → `409 slug_taken`.
@@ -422,7 +424,9 @@ QR-меню и сайта доставки (`REVALIDATE.md`).
   `POST /application` остаётся публичным и отвечает только `{ id }`. Тело: `from` (`web` или `admin`) обязателен, иначе
   `400 validation_error` с полем `from` (раньше пустое тело давало `500`); `fullName` до 120 символов, `phone` до 32,
   `plan` до 64, `description` до 2000; лишние поля `400`. Не больше `APPLICATION_RATE_LIMIT` заявок с одного IP за
-  `APPLICATION_RATE_WINDOW_SECONDS` (5 в час), дальше `429 rate_limited`.
+  `APPLICATION_RATE_WINDOW_SECONDS` (5 в час), дальше `429 rate_limited`. Заявка сохраняется всегда; уведомление в
+  Telegram best-effort (сбой пишется в лог без токена, ответ `201`; без `OTP_BOT`/`XMENU_CHAT_ID` внешних вызовов нет),
+  текст уходит без Markdown. Схемы `400` и `429` в OpenAPI (`ErrorResponseDto`).
 - `GET /product?is_active=true|false`: фильтр по статусу блюда (параметр называется `is_active`). Другое значение: `400`,
   без параметра фильтра нет.
 - Ревалидация QR и сайта доставки: формат тела и ключи заданий в `docs/REVALIDATE.md`.
@@ -455,7 +459,7 @@ QR-меню и сайта доставки (`REVALIDATE.md`).
 - владельцы: `/auth/login`, `/auth/register`, `/auth/check-code`, `/auth/resend-code`, `/auth/refresh`, `/auth/logout`;
 - клиенты: `/auth/customer/otp/request`, `otp/verify`, `telegram/start`, `telegram/status`, `register`, `refresh`,
   `logout`, `login`;
-- прочее: `/organization/check-slug`, `/application`;
+- прочее: `/application`. `POST /organization/check-slug` не публичный: нужен токен владельца (без него `401`), общий лимит его не считает;
 - с токеном клиента (`@Public()` только чтобы обойти токен владельца): `POST /orders`, `/orders/:id/cancel`,
   `/orders/:id/payment/retry`, `POST /customers/me/addresses`, `…/:id/default`.
 

@@ -27,6 +27,7 @@ import {
   PublicationViewDto,
   TelegramBotRequiredErrorDto,
 } from './dto/publication.dto';
+import { ErrorResponseDto } from 'src/infra/validators/error-response.dto';
 import { OrganizationService } from './services/organization.service';
 import { PublicationService } from './services/publication.service';
 
@@ -35,9 +36,10 @@ type StaffRequest = Parameters<typeof requireStaffOrganizationId>[0];
 /** Owner (dashboard): channels (QR menu, ordering) and publication of the venue. */
 @ApiTags('Organization')
 @ApiBearerAuth('access-token')
-@ApiUnauthorizedResponse({ description: 'No or invalid owner token' })
-@ApiForbiddenResponse({ description: 'The user has no organization' })
+@ApiUnauthorizedResponse({ type: ErrorResponseDto, description: 'No or invalid owner token' })
+@ApiForbiddenResponse({ type: ErrorResponseDto, description: 'The user has no organization' })
 @ApiNotFoundResponse({
+  type: ErrorResponseDto,
   description: 'Not your organization (any other id looks missing)',
 })
 @Controller('organization')
@@ -69,6 +71,7 @@ export class OrganizationPublicationController {
   })
   @ApiOkResponse({ type: PublicationViewDto })
   @ApiBadRequestResponse({
+    type: ErrorResponseDto,
     description:
       'validation_error with errors[] (qr, delivery.enabled, delivery.mode)',
   })
