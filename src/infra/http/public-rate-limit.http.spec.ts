@@ -146,5 +146,12 @@ describe('PublicRateLimitGuard', () => {
       await post('/application', '10.0.0.3', {}).expect(400);
       await post('/application', '10.0.0.3', {}).expect(429);
     });
+
+    it('the application limit counts requests, not saved applications: rejected ones use it up', async () => {
+      await post('/application', '10.0.0.4', {}).expect(400);
+      await post('/application', '10.0.0.4', { from: 'bad' }).expect(400);
+      await post('/application', '10.0.0.4', valid).expect(429);
+      expect(create).not.toHaveBeenCalled();
+    });
   });
 });
