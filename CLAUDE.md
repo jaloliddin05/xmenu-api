@@ -69,7 +69,7 @@ test, `npm run openapi` + `git diff --exit-code docs/`, lint без блокир
   значениями из `organization/domain/platform-defaults.ts`. У колонок нет `DEFAULT` в БД.
 - Чтение не подставляет значения: нет строки → `settings_missing` (500) с логом. Исключение — тема:
   `PLATFORM_THEME` (`platform-defaults.ts`, 9 нейтральных цветов) и `resolveTheme()` дают полную `theme` в
-  `GET /tenant/config` и `effectiveTheme` в ответах `GET/PUT /organization/:id/settings` (хранимая `theme` не меняется).
+  `GET /tenant/config` и `effectiveTheme` и `platformTheme` (чистые цвета платформы) в ответах `GET/PUT /organization/:id/settings` (хранимая `theme` не меняется).
 - Владелец: `GET/PUT /organization/:id/settings` (PUT заменяет документ целиком, проверки в
   `organization/domain/organization-settings.ts` и DTO), `GET/PUT /order-settings`.
 - Нет зоны доставки (`delivery_zone = null`) → доставка недоступна: `POST /orders` отвечает

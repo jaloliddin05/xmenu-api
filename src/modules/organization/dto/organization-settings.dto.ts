@@ -91,6 +91,15 @@ export class OrganizationSettingsDto implements OrganizationSettings {
   @IsObject()
   effectiveTheme?: Record<string, string>;
 
+  @ApiPropertyOptional({
+    readOnly: true,
+    description:
+      'Answer-only: the neutral platform colors, every key (what a cleared color falls back to). Accepted in a request so a GET answer can be sent back unchanged; ignored.',
+  })
+  @IsOptional()
+  @IsObject()
+  platformTheme?: Record<string, string>;
+
   @ApiProperty({
     type: ThemeDto,
     nullable: true,
