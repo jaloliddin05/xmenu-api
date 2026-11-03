@@ -194,7 +194,13 @@ describe('GET /tenant/config', () => {
         qr: true,
         delivery: { enabled: true, mode: 'both', published: true },
       },
-      fulfillment: { modes: ['delivery', 'pickup'], defaultMode: 'delivery' },
+      fulfillment: {
+        modes: ['delivery', 'pickup'],
+        defaultMode: 'delivery',
+        deliveryOffered: true,
+        deliveryAvailable: true,
+        deliveryUnavailableReason: null,
+      },
       map: {
         center: [41.31, 69.24],
         centerSource: 'saved',
@@ -245,7 +251,13 @@ describe('GET /tenant/config', () => {
         qr: true,
         delivery: { enabled: false, mode: 'site', published: false },
       },
-      fulfillment: { modes: [], defaultMode: null },
+      fulfillment: {
+        modes: [],
+        defaultMode: null,
+        deliveryOffered: false,
+        deliveryAvailable: false,
+        deliveryUnavailableReason: 'not_offered',
+      },
       map: {
         center: null,
         centerSource: null,
@@ -273,14 +285,39 @@ describe('GET /tenant/config', () => {
     expect(res.body.fulfillment).toEqual({
       modes: ['pickup'],
       defaultMode: 'pickup',
+      deliveryOffered: true,
+      deliveryAvailable: false,
+      deliveryUnavailableReason: 'no_zone',
     });
   });
 
-  it.each<[string, Record<string, unknown>]>([
-    ['ordering is off', { delivery_enabled: false, published_at: null }],
+  it('says delivery is not offered when no active branch takes it, even if pickup works', async () => {
+    publishBare();
+    branches[BARE] = [
+      { is_active: true, accepts_delivery: false, accepts_pickup: true },
+    ];
+    orderRows[BARE] = ordering(ZONE);
+    app.get(OrderSettingsService).invalidate(BARE);
+    const res = await config(BARE).expect(200);
+    expect(res.body.fulfillment).toEqual({
+      modes: ['pickup'],
+      defaultMode: 'pickup',
+      deliveryOffered: false,
+      deliveryAvailable: false,
+      deliveryUnavailableReason: 'not_offered',
+    });
+  });
+
+  it.each<[string, Record<string, unknown>, string]>([
+    [
+      'ordering is off',
+      { delivery_enabled: false, published_at: null },
+      'channel_disabled',
+    ],
     [
       'ordering is on but not published',
       { delivery_enabled: true, published_at: null },
+      'not_published',
     ],
     [
       'ordering is off with a stale publication',
@@ -288,13 +325,20 @@ describe('GET /tenant/config', () => {
         delivery_enabled: false,
         published_at: new Date('2026-10-31T10:00:00Z'),
       },
+      'channel_disabled',
     ],
   ])(
     'offers no mode while %s, whatever the branches and zone',
-    async (_, state) => {
+    async (_, state, reason) => {
       Object.assign(orgs[FULL], state);
       const res = await config(FULL).expect(200);
-      expect(res.body.fulfillment).toEqual({ modes: [], defaultMode: null });
+      expect(res.body.fulfillment).toEqual({
+        modes: [],
+        defaultMode: null,
+        deliveryOffered: true,
+        deliveryAvailable: false,
+        deliveryUnavailableReason: reason,
+      });
       expect(res.body.channels.delivery).toEqual({
         enabled: state.delivery_enabled,
         mode: 'both',

@@ -16,6 +16,15 @@ import type { MapCenterSource } from '../map-view';
 export const FULFILLMENT_MODES = ['delivery', 'pickup'] as const;
 export type FulfillmentMode = (typeof FULFILLMENT_MODES)[number];
 
+export const DELIVERY_UNAVAILABLE_REASONS = [
+  'not_offered',
+  'channel_disabled',
+  'not_published',
+  'no_zone',
+] as const;
+export type DeliveryUnavailableReason =
+  (typeof DELIVERY_UNAVAILABLE_REASONS)[number];
+
 const LAT_LNG = {
   type: 'array',
   items: { type: 'number' },
@@ -102,6 +111,28 @@ export class TenantFulfillmentDto {
     description: 'First of modes; null when modes is empty',
   })
   defaultMode: FulfillmentMode | null;
+
+  @ApiProperty({
+    example: true,
+    description:
+      'An active branch accepts delivery. false = the venue has no delivery by choice (hide the delivery tab); independent of publication and the zone',
+  })
+  deliveryOffered: boolean;
+
+  @ApiProperty({
+    example: true,
+    description: 'Delivery can be ordered right now: modes contains delivery',
+  })
+  deliveryAvailable: boolean;
+
+  @ApiProperty({
+    enum: DELIVERY_UNAVAILABLE_REASONS,
+    nullable: true,
+    example: null,
+    description:
+      'null when deliveryAvailable. not_offered: no active branch takes delivery; channel_disabled: the owner turned ordering off; not_published: not published or paused; no_zone: the delivery zone is not set. The first that applies, in this order',
+  })
+  deliveryUnavailableReason: DeliveryUnavailableReason | null;
 }
 
 export class TenantMapDto {
