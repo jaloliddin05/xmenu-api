@@ -1,4 +1,11 @@
-import { NotFoundException } from '@nestjs/common';
+import { INestApplication, NotFoundException } from '@nestjs/common';
+import request from 'supertest';
+import { createHttpApp } from 'src/infra/testing/http-app.fake';
+import { FileService } from 'src/modules/file/file.service';
+import { RevalidateService } from 'src/modules/revalidate-queue/revalidate.service';
+import { TelegramBotProfileService } from 'src/modules/telegram/telegram-bot-profile.service';
+import { TenantService } from 'src/modules/tenant/tenant.service';
+import { PrismaService } from '../_prisma/prisma.service';
 import { OrganizationController } from './organization.controller';
 import { OrganizationService } from './services/organization.service';
 
@@ -38,15 +45,36 @@ describe('Public organization endpoints', () => {
       NotFoundException,
     );
   });
+});
 
-  it('slug: looks up active venues only and 404s otherwise', async () => {
-    findFirst.mockResolvedValue(null);
-    await expect(controller.findOneBySlug('mant', 'ru')).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
-    expect(findFirst.mock.calls[0][0].where).toEqual({
-      slug: 'mant',
-      is_active: true,
+describe('GET /organization/slug/:slug (removed)', () => {
+  let app: INestApplication;
+  const findFirst = jest.fn();
+  const findUnique = jest.fn();
+
+  beforeAll(async () => {
+    app = await createHttpApp({
+      controllers: [OrganizationController],
+      providers: [
+        OrganizationService,
+        {
+          provide: PrismaService,
+          useValue: { organization: { findFirst, findUnique } },
+        },
+        { provide: FileService, useValue: {} },
+        { provide: RevalidateService, useValue: {} },
+        { provide: TenantService, useValue: {} },
+        { provide: TelegramBotProfileService, useValue: {} },
+      ],
     });
+  });
+  afterAll(() => app.close());
+
+  it('no longer serves the public menu: the route is gone (404) and nothing is read', async () => {
+    await request(app.getHttpServer())
+      .get('/organization/slug/mant')
+      .expect(404);
+    expect(findFirst).not.toHaveBeenCalled();
+    expect(findUnique).not.toHaveBeenCalled();
   });
 });

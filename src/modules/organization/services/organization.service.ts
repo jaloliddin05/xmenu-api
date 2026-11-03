@@ -12,7 +12,6 @@ import { assertOwnTranslations } from 'src/modules/product/services/menu-ownersh
 import { TelegramBotProfileService } from 'src/modules/telegram/telegram-bot-profile.service';
 import { randomSlug, SLUG_MAX, slugify } from '../domain/slug';
 import { PLATFORM_CHANNELS, PLATFORM_ORDER_SETTINGS, PLATFORM_SETTINGS } from '../domain/platform-defaults';
-import { PublicOrganization, toPublicOrganization } from '../domain/public-organization';
 import { parseTenantId } from 'src/modules/tenant/tenant-key';
 
 const slugTaken = () => new ConflictException({ message: 'Slug is already taken', code: 'slug_taken' });
@@ -127,86 +126,6 @@ export class OrganizationService {
       select: { slug: true },
     });
     return organization?.slug ?? null;
-  }
-
-  /** Public QR menu of an active venue: only the fields in PublicOrganization. */
-  async findBySlug(slug: string, lang): Promise<PublicOrganization> {
-    const organization = await this.prismaService.organization.findFirst({
-      where: { slug, is_active: true },
-      include: {
-        logo: true,
-        banner: true,
-        translations: {
-          where: { lang },
-          select: { id: true, lang: true, description: true },
-        },
-
-        // CATEGORY  
-        categories: {
-          where: { is_active: true },        // ← faqat active
-          orderBy: { index: 'asc' },         // ← sort
-
-          include: {
-            translations: {
-              where: { lang },
-              select: { id: true, lang: true, title: true },
-            },
-
-            // PRODUCT
-            products: {
-              where: { is_active: true },    // ← faqat active product
-              orderBy: { index: 'asc' },     // ← sort
-
-              include: {
-                images: true,
-
-                translations: {
-                  where: { lang },
-                  select: {
-                    id: true,
-                    lang: true,
-                    title: true,
-                    description: true,
-                  },
-                },
-
-                additional_product_groups: {
-                  include: {
-                    translations: {
-                      where: { lang },
-                      select: {
-                        id: true,
-                        lang: true,
-                        title: true,
-                      },
-                    },
-
-                    additional_products: {
-                      include: {
-                        translations: {
-                          where: { lang },
-                          select: {
-                            id: true,
-                            lang: true,
-                            title: true,
-                          },
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    });
-
-    if (!organization) {
-      throw new NotFoundException(`Organization with slug "${slug}" not found`);
-    }
-
-    return toPublicOrganization(organization);
   }
 
 

@@ -851,45 +851,6 @@
         ]
       }
     },
-    "/organization/slug/{slug}": {
-      "get": {
-        "operationId": "OrganizationController_findOneBySlug",
-        "parameters": [
-          {
-            "name": "slug",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "lang",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PublicOrganizationDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Public QR menu of an active venue (only public fields; 404 for unknown or inactive)",
-        "tags": [
-          "Organization"
-        ]
-      }
-    },
     "/organization/check-slug": {
       "post": {
         "operationId": "OrganizationController_checkSlug",
@@ -4287,293 +4248,6 @@
           "newPassword"
         ]
       },
-      "PublicFileDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "url": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "url"
-        ]
-      },
-      "DescriptionTranslationDto": {
-        "type": "object",
-        "properties": {
-          "lang": {
-            "type": "string",
-            "example": "ru"
-          },
-          "description": {
-            "type": "string",
-            "nullable": true
-          }
-        },
-        "required": [
-          "lang",
-          "description"
-        ]
-      },
-      "TitleTranslationDto": {
-        "type": "object",
-        "properties": {
-          "lang": {
-            "type": "string",
-            "example": "ru"
-          },
-          "title": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "lang",
-          "title"
-        ]
-      },
-      "ProductTranslationDto": {
-        "type": "object",
-        "properties": {
-          "lang": {
-            "type": "string",
-            "example": "ru"
-          },
-          "title": {
-            "type": "string"
-          },
-          "description": {
-            "type": "string",
-            "nullable": true
-          }
-        },
-        "required": [
-          "lang",
-          "title",
-          "description"
-        ]
-      },
-      "PublicModifierDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "price": {
-            "type": "number"
-          },
-          "translations": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/TitleTranslationDto"
-            }
-          }
-        },
-        "required": [
-          "id",
-          "price",
-          "translations"
-        ]
-      },
-      "PublicModifierGroupDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "is_required": {
-            "type": "boolean"
-          },
-          "is_multiple": {
-            "type": "boolean"
-          },
-          "min_selected": {
-            "type": "number",
-            "nullable": true
-          },
-          "max_selected": {
-            "type": "number",
-            "nullable": true
-          },
-          "translations": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/TitleTranslationDto"
-            }
-          },
-          "additional_products": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PublicModifierDto"
-            }
-          }
-        },
-        "required": [
-          "id",
-          "is_required",
-          "is_multiple",
-          "min_selected",
-          "max_selected",
-          "translations",
-          "additional_products"
-        ]
-      },
-      "PublicProductDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "price": {
-            "type": "number"
-          },
-          "weight": {
-            "type": "number",
-            "nullable": true
-          },
-          "protein": {
-            "type": "number",
-            "nullable": true
-          },
-          "kcal": {
-            "type": "number",
-            "nullable": true
-          },
-          "fat": {
-            "type": "number",
-            "nullable": true
-          },
-          "carbohydrate": {
-            "type": "number",
-            "nullable": true
-          },
-          "unit": {
-            "type": "string",
-            "enum": [
-              "gr",
-              "ml"
-            ]
-          },
-          "images": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PublicFileDto"
-            }
-          },
-          "translations": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ProductTranslationDto"
-            }
-          },
-          "additional_product_groups": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PublicModifierGroupDto"
-            }
-          }
-        },
-        "required": [
-          "id",
-          "price",
-          "weight",
-          "protein",
-          "kcal",
-          "fat",
-          "carbohydrate",
-          "unit",
-          "images",
-          "translations",
-          "additional_product_groups"
-        ]
-      },
-      "PublicCategoryDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "translations": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/TitleTranslationDto"
-            }
-          },
-          "products": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PublicProductDto"
-            }
-          }
-        },
-        "required": [
-          "id",
-          "translations",
-          "products"
-        ]
-      },
-      "PublicOrganizationDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "slug": {
-            "type": "string",
-            "nullable": true
-          },
-          "type": {
-            "type": "string",
-            "example": "restaurant"
-          },
-          "logo": {
-            "nullable": true,
-            "type": "object",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/PublicFileDto"
-              }
-            ]
-          },
-          "banner": {
-            "nullable": true,
-            "type": "object",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/PublicFileDto"
-              }
-            ]
-          },
-          "translations": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/DescriptionTranslationDto"
-            }
-          },
-          "categories": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PublicCategoryDto"
-            }
-          }
-        },
-        "required": [
-          "id",
-          "name",
-          "slug",
-          "type",
-          "logo",
-          "banner",
-          "translations",
-          "categories"
-        ]
-      },
       "UpdateOrganizationDto": {
         "type": "object",
         "properties": {
@@ -4626,6 +4300,67 @@
             }
           }
         }
+      },
+      "FullThemeDto": {
+        "type": "object",
+        "properties": {
+          "background": {
+            "type": "string",
+            "example": "#F4F4F4",
+            "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+          },
+          "foreground": {
+            "type": "string",
+            "example": "#21201F",
+            "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+          },
+          "surface": {
+            "type": "string",
+            "example": "#FFFFFF",
+            "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+          },
+          "mutedSurface": {
+            "type": "string",
+            "example": "#EFEFEF",
+            "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+          },
+          "muted": {
+            "type": "string",
+            "example": "#4B494380",
+            "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+          },
+          "brand": {
+            "type": "string",
+            "example": "#EE2E17",
+            "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+          },
+          "brandForeground": {
+            "type": "string",
+            "example": "#FFFFFF",
+            "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+          },
+          "danger": {
+            "type": "string",
+            "example": "#E53935",
+            "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+          },
+          "serviceArea": {
+            "type": "string",
+            "example": "#5B6FE8",
+            "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+          }
+        },
+        "required": [
+          "background",
+          "foreground",
+          "surface",
+          "mutedSurface",
+          "muted",
+          "brand",
+          "brandForeground",
+          "danger",
+          "serviceArea"
+        ]
       },
       "ThemeDto": {
         "type": "object",
@@ -4702,14 +4437,22 @@
         "type": "object",
         "properties": {
           "effectiveTheme": {
-            "type": "object",
             "readOnly": true,
-            "description": "Answer-only: theme over the platform neutral colors, every key, for the preview. Accepted in a request so a GET answer can be sent back unchanged; ignored."
+            "description": "Answer-only: theme over the platform neutral colors, every key, for the preview. Accepted in a request so a GET answer can be sent back unchanged; ignored.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FullThemeDto"
+              }
+            ]
           },
           "platformTheme": {
-            "type": "object",
             "readOnly": true,
-            "description": "Answer-only: the neutral platform colors, every key (what a cleared color falls back to). Accepted in a request so a GET answer can be sent back unchanged; ignored."
+            "description": "Answer-only: the neutral platform colors, every key (what a cleared color falls back to). Accepted in a request so a GET answer can be sent back unchanged; ignored.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FullThemeDto"
+              }
+            ]
           },
           "theme": {
             "nullable": true,
@@ -7024,11 +6767,36 @@
             ],
             "nullable": true,
             "description": "First of modes; null when modes is empty"
+          },
+          "deliveryOffered": {
+            "type": "boolean",
+            "example": true,
+            "description": "An active branch accepts delivery. false = the venue has no delivery by choice (hide the delivery tab); independent of publication and the zone"
+          },
+          "deliveryAvailable": {
+            "type": "boolean",
+            "example": true,
+            "description": "Delivery can be ordered right now: modes contains delivery"
+          },
+          "deliveryUnavailableReason": {
+            "type": "string",
+            "enum": [
+              "not_offered",
+              "channel_disabled",
+              "not_published",
+              "no_zone"
+            ],
+            "nullable": true,
+            "example": null,
+            "description": "null when deliveryAvailable. not_offered: no active branch takes delivery; channel_disabled: the owner turned ordering off; not_published: not published or paused; no_zone: the delivery zone is not set. The first that applies, in this order"
           }
         },
         "required": [
           "modes",
-          "defaultMode"
+          "defaultMode",
+          "deliveryOffered",
+          "deliveryAvailable",
+          "deliveryUnavailableReason"
         ]
       },
       "TenantMapDto": {
@@ -7046,12 +6814,24 @@
               41.311081,
               69.240562
             ],
-            "description": "[lat, lng]"
+            "description": "[lat, lng]. The saved view; without one, the middle of the delivery zone, else of the branches. null only when the venue has no zone and no branch with coordinates"
+          },
+          "centerSource": {
+            "type": "string",
+            "enum": [
+              "saved",
+              "zone",
+              "branches"
+            ],
+            "nullable": true,
+            "example": "saved",
+            "description": "Where center comes from: saved (owner), zone (delivery zone bounding box), branches (branch coordinates); null when center is null"
           },
           "zoom": {
             "type": "number",
             "nullable": true,
-            "example": 15
+            "example": 15,
+            "description": "Saved zoom; without one a computed zoom fitting the zone or branches (10-17) when center is computed; null for a saved center without a zoom"
           },
           "city": {
             "type": "string",
@@ -7111,6 +6891,7 @@
         },
         "required": [
           "center",
+          "centerSource",
           "zoom",
           "city",
           "bounds",
@@ -7163,12 +6944,10 @@
             "example": 2015
           },
           "theme": {
-            "nullable": true,
-            "description": "Brand colors; a missing key (or null theme) means the front-end neutral value",
-            "type": "object",
+            "description": "Brand colors over the platform neutral colors: always all 9 keys, never null. Front-ends keep no neutral values of their own",
             "allOf": [
               {
-                "$ref": "#/components/schemas/ThemeDto"
+                "$ref": "#/components/schemas/FullThemeDto"
               }
             ]
           },

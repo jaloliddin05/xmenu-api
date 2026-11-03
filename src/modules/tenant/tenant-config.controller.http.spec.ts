@@ -194,9 +194,16 @@ describe('GET /tenant/config', () => {
         qr: true,
         delivery: { enabled: true, mode: 'both', published: true },
       },
-      fulfillment: { modes: ['delivery', 'pickup'], defaultMode: 'delivery' },
+      fulfillment: {
+        modes: ['delivery', 'pickup'],
+        defaultMode: 'delivery',
+        deliveryOffered: true,
+        deliveryAvailable: true,
+        deliveryUnavailableReason: null,
+      },
       map: {
         center: [41.31, 69.24],
+        centerSource: 'saved',
         zoom: 15,
         city: 'Tashkent',
         bounds: [
@@ -244,9 +251,16 @@ describe('GET /tenant/config', () => {
         qr: true,
         delivery: { enabled: false, mode: 'site', published: false },
       },
-      fulfillment: { modes: [], defaultMode: null },
+      fulfillment: {
+        modes: [],
+        defaultMode: null,
+        deliveryOffered: false,
+        deliveryAvailable: false,
+        deliveryUnavailableReason: 'not_offered',
+      },
       map: {
         center: null,
+        centerSource: null,
         zoom: null,
         city: null,
         bounds: null,
@@ -271,14 +285,39 @@ describe('GET /tenant/config', () => {
     expect(res.body.fulfillment).toEqual({
       modes: ['pickup'],
       defaultMode: 'pickup',
+      deliveryOffered: true,
+      deliveryAvailable: false,
+      deliveryUnavailableReason: 'no_zone',
     });
   });
 
-  it.each<[string, Record<string, unknown>]>([
-    ['ordering is off', { delivery_enabled: false, published_at: null }],
+  it('says delivery is not offered when no active branch takes it, even if pickup works', async () => {
+    publishBare();
+    branches[BARE] = [
+      { is_active: true, accepts_delivery: false, accepts_pickup: true },
+    ];
+    orderRows[BARE] = ordering(ZONE);
+    app.get(OrderSettingsService).invalidate(BARE);
+    const res = await config(BARE).expect(200);
+    expect(res.body.fulfillment).toEqual({
+      modes: ['pickup'],
+      defaultMode: 'pickup',
+      deliveryOffered: false,
+      deliveryAvailable: false,
+      deliveryUnavailableReason: 'not_offered',
+    });
+  });
+
+  it.each<[string, Record<string, unknown>, string]>([
+    [
+      'ordering is off',
+      { delivery_enabled: false, published_at: null },
+      'channel_disabled',
+    ],
     [
       'ordering is on but not published',
       { delivery_enabled: true, published_at: null },
+      'not_published',
     ],
     [
       'ordering is off with a stale publication',
@@ -286,13 +325,20 @@ describe('GET /tenant/config', () => {
         delivery_enabled: false,
         published_at: new Date('2026-10-31T10:00:00Z'),
       },
+      'channel_disabled',
     ],
   ])(
     'offers no mode while %s, whatever the branches and zone',
-    async (_, state) => {
+    async (_, state, reason) => {
       Object.assign(orgs[FULL], state);
       const res = await config(FULL).expect(200);
-      expect(res.body.fulfillment).toEqual({ modes: [], defaultMode: null });
+      expect(res.body.fulfillment).toEqual({
+        modes: [],
+        defaultMode: null,
+        deliveryOffered: true,
+        deliveryAvailable: false,
+        deliveryUnavailableReason: reason,
+      });
       expect(res.body.channels.delivery).toEqual({
         enabled: state.delivery_enabled,
         mode: 'both',
@@ -302,6 +348,56 @@ describe('GET /tenant/config', () => {
       expect(res.body.map.deliveryZone).toEqual(ZONE);
     },
   );
+
+  describe('map view without a saved center', () => {
+    const unsave = () =>
+      Object.assign(orgs[FULL].settings, {
+        map_center_lat: null,
+        map_center_lng: null,
+        map_zoom: null,
+      });
+
+    it('centers on the delivery zone', async () => {
+      unsave();
+      const { map } = (await config(FULL).expect(200)).body;
+      expect(map.centerSource).toBe('zone');
+      expect(map.center[0]).toBeCloseTo(41.3575, 6);
+      expect(map.center[1]).toBeCloseTo(69.2655, 6);
+      expect(map.zoom).toBe(12);
+    });
+
+    it('centers on the branches when there is no zone, skipping (0, 0) and inactive ones', async () => {
+      unsave();
+      orderRows[FULL] = ordering(null);
+      branches[FULL] = [
+        { is_active: true, latitude: 41.3, longitude: 69.2 },
+        { is_active: true, latitude: 41.32, longitude: 69.3 },
+        { is_active: true, latitude: 0, longitude: 0 },
+        { is_active: false, latitude: 10, longitude: 10 },
+      ];
+      const { map } = (await config(FULL).expect(200)).body;
+      expect(map.centerSource).toBe('branches');
+      expect(map.center[0]).toBeCloseTo(41.31, 6);
+      expect(map.center[1]).toBeCloseTo(69.25, 6);
+    });
+
+    it('keeps the saved zoom next to a computed center', async () => {
+      unsave();
+      orgs[FULL].settings.map_zoom = 14;
+      const { map } = (await config(FULL).expect(200)).body;
+      expect(map.centerSource).toBe('zone');
+      expect(map.zoom).toBe(14);
+    });
+
+    it('stays null for a venue with neither zone nor branch coordinates', async () => {
+      unsave();
+      orderRows[FULL] = ordering(null);
+      branches[FULL] = [{ is_active: true, latitude: 0, longitude: 0 }];
+      const { map } = (await config(FULL).expect(200)).body;
+      expect(map.center).toBeNull();
+      expect(map.centerSource).toBeNull();
+    });
+  });
 
   it('reports a QR menu the owner turned off', async () => {
     orgs[FULL].qr_enabled = false;

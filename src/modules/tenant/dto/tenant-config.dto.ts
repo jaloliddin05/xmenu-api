@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { LANGS } from 'src/infra/http/request-helpers';
 import type { Lang } from 'src/infra/http/request-helpers';
-import { ThemeDto } from 'src/modules/organization/dto/organization-settings.dto';
+import { FullThemeDto } from 'src/modules/organization/dto/organization-settings.dto';
 import { SUPPORTED_CURRENCIES } from 'src/modules/organization/domain/organization-settings';
 import { DELIVERY_MODES } from 'src/modules/organization/domain/publication';
 import type { DeliveryMode } from 'src/modules/organization/domain/publication';
@@ -10,8 +10,20 @@ import type {
   LatLng,
 } from 'src/modules/organization/domain/organization-settings';
 
+import { MAP_CENTER_SOURCES } from '../map-view';
+import type { MapCenterSource } from '../map-view';
+
 export const FULFILLMENT_MODES = ['delivery', 'pickup'] as const;
 export type FulfillmentMode = (typeof FULFILLMENT_MODES)[number];
+
+export const DELIVERY_UNAVAILABLE_REASONS = [
+  'not_offered',
+  'channel_disabled',
+  'not_published',
+  'no_zone',
+] as const;
+export type DeliveryUnavailableReason =
+  (typeof DELIVERY_UNAVAILABLE_REASONS)[number];
 
 const LAT_LNG = {
   type: 'array',
@@ -99,6 +111,28 @@ export class TenantFulfillmentDto {
     description: 'First of modes; null when modes is empty',
   })
   defaultMode: FulfillmentMode | null;
+
+  @ApiProperty({
+    example: true,
+    description:
+      'An active branch accepts delivery. false = the venue has no delivery by choice (hide the delivery tab); independent of publication and the zone',
+  })
+  deliveryOffered: boolean;
+
+  @ApiProperty({
+    example: true,
+    description: 'Delivery can be ordered right now: modes contains delivery',
+  })
+  deliveryAvailable: boolean;
+
+  @ApiProperty({
+    enum: DELIVERY_UNAVAILABLE_REASONS,
+    nullable: true,
+    example: null,
+    description:
+      'null when deliveryAvailable. not_offered: no active branch takes delivery; channel_disabled: the owner turned ordering off; not_published: not published or paused; no_zone: the delivery zone is not set. The first that applies, in this order',
+  })
+  deliveryUnavailableReason: DeliveryUnavailableReason | null;
 }
 
 export class TenantMapDto {
@@ -106,11 +140,27 @@ export class TenantMapDto {
     ...LAT_LNG,
     nullable: true,
     example: [41.311081, 69.240562],
-    description: '[lat, lng]',
+    description:
+      '[lat, lng]. The saved view; without one, the middle of the delivery zone, else of the branches. null only when the venue has no zone and no branch with coordinates',
   })
   center: LatLng | null;
 
-  @ApiProperty({ type: Number, nullable: true, example: 15 })
+  @ApiProperty({
+    enum: MAP_CENTER_SOURCES,
+    nullable: true,
+    example: 'saved',
+    description:
+      'Where center comes from: saved (owner), zone (delivery zone bounding box), branches (branch coordinates); null when center is null',
+  })
+  centerSource: MapCenterSource | null;
+
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    example: 15,
+    description:
+      'Saved zoom; without one a computed zoom fitting the zone or branches (10-17) when center is computed; null for a saved center without a zoom',
+  })
   zoom: number | null;
 
   @ApiProperty({ type: String, nullable: true, example: 'Tashkent' })
@@ -185,12 +235,11 @@ export class TenantConfigDto {
   foundedYear: number | null;
 
   @ApiProperty({
-    type: ThemeDto,
-    nullable: true,
+    type: FullThemeDto,
     description:
-      'Brand colors; a missing key (or null theme) means the front-end neutral value',
+      'Brand colors over the platform neutral colors: always all 9 keys, never null. Front-ends keep no neutral values of their own',
   })
-  theme: ThemeDto | null;
+  theme: FullThemeDto;
 
   @ApiProperty({ type: TenantLocaleDto })
   locale: TenantLocaleDto;

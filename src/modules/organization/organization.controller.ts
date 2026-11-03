@@ -1,6 +1,5 @@
-import { BadRequestException, NotFoundException, Controller, Get, Post, Body, Param, Delete, Put, HttpCode, HttpStatus, UseInterceptors, UploadedFiles, Query, Req } from '@nestjs/common';
+import { BadRequestException, NotFoundException, Controller, Get, Post, Body, Param, Delete, Put, HttpCode, HttpStatus, UseInterceptors, UploadedFiles, Req } from '@nestjs/common';
 import { ApiBody, ApiConsumes, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { PublicOrganizationDto } from './dto/public-organization.dto';
 import { OrganizationService } from './services/organization.service';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { MulterStorage } from 'src/infra/helper/upload/multer-upload';
@@ -32,15 +31,6 @@ export class OrganizationController {
     const slug = await this.organizationService.findActiveSlug(id);
     if (!slug) throw new NotFoundException('Organization not found');
     return slug;
-  }
-
-  @Public()
-  @Get('/slug/:slug')
-  @ApiOperation({ summary: 'Public QR menu of an active venue (only public fields; 404 for unknown or inactive)' })
-  @ApiOkResponse({ type: PublicOrganizationDto })
-  @HttpCode(HttpStatus.OK)
-  async findOneBySlug(@Param('slug') slug: string, @Query('lang') lang: string) {
-    return await this.organizationService.findBySlug(slug,lang);
   }
 
   @Post('check-slug')

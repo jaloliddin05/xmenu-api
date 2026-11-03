@@ -149,8 +149,9 @@ IP берётся из `X-Forwarded-For` только от локального 
   "locale": { "defaultLanguage": "ru", "languages": ["ru", "uz", "en"], "currency": "UZS" },
   "contacts": { "phone": null, "telegramUsername": null, "workingHours": null, "address": null },
   "channels": { "qr": true, "delivery": { "enabled": true, "mode": "site", "published": true } },
-  "fulfillment": { "modes": ["pickup"], "defaultMode": "pickup" },
-  "map": { "center": [41.311081, 69.240562], "zoom": 15, "city": "Ташкент",
+  "fulfillment": { "modes": ["pickup"], "defaultMode": "pickup", "deliveryOffered": true, "deliveryAvailable": false,
+                   "deliveryUnavailableReason": "no_zone" },
+  "map": { "center": [41.311081, 69.240562], "centerSource": "saved", "zoom": 15, "city": "Ташкент",
            "bounds": [[41.15, 69.0], [41.45, 69.45]], "deliveryZone": null }
 }
 ```
@@ -168,7 +169,19 @@ IP берётся из `X-Forwarded-For` только от локального 
 - `fulfillment.modes`: пусто, пока `channels.delivery.published` не `true`. Иначе `pickup`, если есть активный филиал с
   самовывозом; `delivery`, если есть активный филиал с доставкой **и** задана зона доставки. Нет филиалов: `[]`,
   `defaultMode: null`. Деньги (сбор, минимум, ETA, способы оплаты) остаются в `GET /checkout-config`.
-- `map.center` `[lat, lng]`, `map.bounds` `[[юго-запад], [северо-восток]]`, `map.deliveryZone` полигон
+- `fulfillment.deliveryOffered`: есть активный филиал с доставкой (не зависит от публикации и зоны); `false` значит,
+  что доставки у заведения нет по выбору, вкладку «Доставка» не показывать. `deliveryAvailable`: доставку можно
+  заказать сейчас (`modes` содержит `delivery`). `deliveryUnavailableReason`: `null`, если доступна; иначе первая
+  из причин в таком порядке: `not_offered` (нет филиала с доставкой), `channel_disabled` (владелец выключил заказы),
+  `not_published` (не опубликовано или пауза), `no_zone` (зона доставки не задана).
+- `map.center` `[lat, lng]`: сохранённый вид карты; если его нет, середина ограничивающего прямоугольника зоны
+  доставки, иначе филиалов с координатами ((0, 0) пропускается). `null` только у заведения без зоны и без филиалов с
+  координатами. Источник в `map.centerSource`: `saved`, `zone`, `branches` (`null`, если центра нет). `map.zoom`:
+  сохранённый; если центр вычислен, а zoom не сохранён, подбирается по размеру зоны или филиалов (10-17, один
+  филиал 16); сохранённый центр без zoom остаётся с `zoom: null`. Чеклист публикации вид карты не требует.
+- В OpenAPI `theme` (всегда полный, не `null`), `platformTheme` и `effectiveTheme` описаны схемой `FullThemeDto`
+  со всеми 9 ключами.
+- `map.bounds` `[[юго-запад], [северо-восток]]`, `map.deliveryZone` полигон
   `[[lat, lng], ...]` или `null` (доставки нет).
 - Поля `contacts.country` пока нет.
 
@@ -443,10 +456,11 @@ QR-меню и сайта доставки (`REVALIDATE.md`).
 
 | Эндпоинт | Раньше отдавал лишнее | Теперь |
 |---|---|---|
-| `GET /organization/slug/:slug` (QR-меню) | строку `organization` целиком: `owner_id`, `order_seq`, `int_id`, `is_active`, `url`, `created_at`, `logo_id`, `banner_id`; файлы с `path` (путь на диске) и `product_id`; у категорий `organization_id`, `index`, `is_active`; у блюд `category_id`, `index`, `is_active`; у групп допов `product_id`, `organization_id`; у допов `additional_product_group_id`; id строк переводов; отвечал и для неактивных заведений | `PublicOrganizationDto`: `id, name, slug, type, logo { id, url }, banner, translations [{ lang, description }], categories [{ id, translations [{ lang, title }], products [{ id, price, weight, protein, kcal, fat, carbohydrate, unit, images [{ id, url }], translations [{ lang, title, description }], additional_product_groups [{ id, is_required, is_multiple, min_selected, max_selected, translations, additional_products [{ id, price, translations }] }] }] }]`; неактивное заведение → 404 |
 | `GET /organization/return-slug/:id` | slug любого заведения, в том числе неактивного, по UUID или числовому `int_id` | slug (текстом) только активного заведения и только по UUID, иначе 404 |
 | `POST /application` | созданную строку заявки целиком | `{ id }` |
 | `POST /auth/login`, `POST /auth/check-code` | `user` без пароля, но со всеми колонками организации (`owner_id`, `order_seq`, `int_id`, пути файлов) | `user` по списку полей (см. «Авторизация владельцев») |
+
+`GET /organization/slug/:slug` (прежнее публичное QR-меню) удалён: QR берёт заведение через `GET /tenant/by-slug/:slug`, `GET /tenant/config` и `GET /menu`; путь отвечает `404`.
 
 Уже были на мапперах и не менялись: `GET /tenant/by-slug/:slug`, `GET /tenant/config`, `GET /menu`, `GET /branches`,
 `GET /checkout-config`, `/orders*`, `/auth/customer/*`. Вебхуки Click, Payme и Telegram отвечают в формате

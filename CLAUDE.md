@@ -40,7 +40,7 @@ Env: см. `.env.example` (полный). Ключевые: `JWT_*`, `OTP_*`, `S
 Единое место: `docs/API.md` и `docs/openapi.json`. Подробности: `docs/ORDERS_API.md`, `docs/BRANCHES_API.md`,
 `docs/BACKEND_ORDERS.md`, `docs/TELEGRAM_VERIFICATION.md`. Меняешь контроллер или DTO: добавь `@ApiProperty` и
 `@ApiOperation`, запусти `npm run openapi`, закоммить результат вместе с кодом. `.github/workflows/ci.yml` (build,
-test, `npm run openapi` + `git diff --exit-code docs/`, lint без блокировки) проверяет это на PR; на GitHub запускался: на `main` 2026-10-31 `41178755985`, `41181531000` (упали на `npm ci`, lock-файл не совпадал с `package.json`), `41185810185` и 2026-11-03 `41597505450` (упал тест `organization-publication.controller.http.spec.ts`, `ECONNRESET`; исправлено на `fix/wave4-followups`, тестовое приложение слушает один порт вместо сервера на запрос). Шаги: чистая БД `migrate deploy`, `migrate diff` без расхождений, `scripts/check-migration-upgrade.sh`, build, test, openapi); `deploy.yml` отдельный и без проверок, запускается только вручную (`workflow_dispatch`), см. «Деплой».
+test, `npm run openapi` + `git diff --exit-code docs/`, lint без блокировки) проверяет это на PR; на GitHub запускался: на `main` 2026-10-31 `41178755985`, `41181531000` (упали на `npm ci`, lock-файл не совпадал с `package.json`), `41185810185` и 2026-11-03 `41597505450` (упал тест `organization-publication.controller.http.spec.ts`, `ECONNRESET`; исправлено в PR #1 (`fix/wave4-followups`, влит в `main`, `ci.yml` зелёный: `41667043527`), тестовое приложение слушает один порт вместо сервера на запрос). Шаги: чистая БД `migrate deploy`, `migrate diff` без расхождений, `scripts/check-migration-upgrade.sh`, build, test, openapi); `deploy.yml` отдельный и без проверок, запускается только вручную (`workflow_dispatch`), см. «Деплой».
 Локально те же шаги: временные БД (`createdb xmenu_ci`, `xmenu_ci_shadow`, `xmenu_upgrade`), `DATABASE_URL=… npx prisma migrate deploy`, `npx prisma migrate diff --from-url $DATABASE_URL --to-schema-datamodel prisma/schema.prisma --exit-code`, `DATABASE_URL=<пустая БД> scripts/check-migration-upgrade.sh`, затем `npm run build`, `npm test`, `npm run openapi && git diff --exit-code docs/`. В Windows psql принимает URL только через `--dbname=`.
 
 ## Тенантность
@@ -51,9 +51,8 @@ test, `npm run openapi` + `git diff --exit-code docs/`, lint без блокир
   (`tenant-config.service.ts`): незаполненное `null`, `delivery` в режимах только при заданной зоне.
 - Кэш тенанта (30 с, в памяти процесса) сбрасывают `PUT /organization/:id/settings`, `PUT` и `DELETE
   /organization/:id`; кэш настроек заказа сбрасывает `PUT /order-settings`. Другие процессы pm2 видят старое до 30 с.
-- Публичные ответы только через маппер или DTO со списком полей, не строкой БД: `GET /organization/slug/:slug` →
-  `toPublicOrganization` (`organization/domain/public-organization.ts`, только активные), `toStaffUser` для
-  владельца. Новый публичный эндпоинт делай так же.
+- Публичные ответы только через маппер или DTO со списком полей, не строкой БД: `GET /tenant/config`, `GET /menu`
+  собираются мапперами и DTO, `toStaffUser` для владельца. Новый публичный эндпоинт делай так же.
 - Slug: `organization/domain/slug.ts` (`slugify`: кириллица ru/uz транслитерируется, случайный `venue-xxxxxx` только если
   годного slug не вышло; 3–63 символа, `a-z0-9` и дефисы, не UUID, не из `RESERVED_SLUGS`: slug становится поддоменом `{slug}.xmenu.uz`), дубликат → 409 `slug_taken`.
 - `Tenant` несёт `defaultLanguage`, `languages`, `currency` из `organization_settings`: язык ответа
@@ -194,7 +193,6 @@ Payme), Telegram webhook и кнопки, боты заведений (`PUT /tel
   (недоступны никому); можно удалить вручную.
 - Кэш тенанта и настроек заказа в памяти процесса (30 с): после `PUT` другие процессы pm2 видят старые имя, slug,
   язык, валюту и зону до 30 с. `is_active` через API не меняется (только в БД), сброса для него нет.
-- `GET /organization/slug/:slug` ещё открыт: закрыть, когда QR перейдёт на `by-slug` + `tenant/config` (Q2).
 - `npm run lint` (без `--fix`) не проходит (замер 2026-11-03: 196 ошибок правил `recommendedTypeChecked` (нетипизированный
   `@Req() req`, `any` из конфигов и passport, код заказов и платежей) и 535 `prettier/prettier` в старом коде; в клоне с
   `core.autocrlf=true` prettier добавляет ещё ~12 тыс. `␍`), в CI lint запускается без блокировки (отчёт).
