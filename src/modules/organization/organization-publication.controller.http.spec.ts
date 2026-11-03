@@ -555,8 +555,13 @@ describe('Organization channels and publication (owner)', () => {
 
     it('parallel publishes: one write, the same publishedAt for everyone', async () => {
       venues[ORG_A] = ready(ORG_A);
-      const answers = await Promise.all(
+      // allSettled: a failed request must not leave the others running into the next test
+      const settled = await Promise.allSettled(
         Array.from({ length: 10 }, () => publish()),
+      );
+      expect(settled.map((r) => r.status)).toEqual(Array(10).fill('fulfilled'));
+      const answers = settled.map(
+        (r) => (r as PromiseFulfilledResult<request.Response>).value,
       );
       expect(answers.map((r) => r.status)).toEqual(Array(10).fill(200));
       const at = new Set(answers.map((r) => r.body.publishedAt));

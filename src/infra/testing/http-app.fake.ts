@@ -63,5 +63,8 @@ export async function createHttpApp(
   app.useGlobalPipes(createValidationPipe());
   app.useGlobalGuards(new AccessTokenUserGuard(app.get(Reflector)));
   await app.init();
+  // One listening server per app: otherwise supertest opens a new ephemeral server for every request, and
+  // parallel requests race for connections (ECONNRESET on slow runners).
+  await app.listen(0, '127.0.0.1');
   return app;
 }
