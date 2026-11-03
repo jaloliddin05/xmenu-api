@@ -1,5 +1,6 @@
 import {
   BranchSchedule,
+  branchStatus,
   DayHours,
   evaluateOpenState,
   formatHours,
@@ -134,5 +135,45 @@ describe('formatHours', () => {
 
   it('English labels', () => {
     expect(formatHours(everyDay('09:00', '23:00'), 'en')).toBe('Daily 09:00–23:00');
+  });
+});
+
+describe('branchStatus', () => {
+  const at = tashkent('2026-10-12T12:00:00');
+  const status = (schedule: BranchSchedule) => branchStatus(schedule, evaluateOpenState(schedule, at));
+  const base = (over: Partial<BranchSchedule> = {}): BranchSchedule => ({
+    timezone: 'Asia/Tashkent',
+    days: everyDay('09:00', '23:00'),
+    exceptions: [],
+    ...over,
+  });
+
+  it('open inside the hours, round the clock included', () => {
+    expect(status(base())).toBe('open');
+    expect(status(base({ days: [1, 2, 3, 4, 5, 6, 7].map((w) => day(w, '00:00', '00:00', { is24h: true })) }))).toBe('open');
+  });
+
+  it('closed_now when it opens later today or on another day', () => {
+    expect(status(base({ days: everyDay('15:00', '23:00') }))).toBe('closed_now');
+    expect(status(base({ days: [day(3, '09:00', '23:00')] }))).toBe('closed_now');
+  });
+
+  it('no_schedule when no hours were entered at all', () => {
+    expect(status(base({ days: [] }))).toBe('no_schedule');
+  });
+
+  it('closed_all_days when hours exist but every day is a day off', () => {
+    const off = [1, 2, 3, 4, 5, 6, 7].map((w) => day(w, '00:00', '00:00', { isClosed: true }));
+    expect(status(base({ days: off }))).toBe('closed_all_days');
+  });
+
+  it('closed_all_days for a schedule made only of closed exceptions', () => {
+    const exceptions = [{ date: '2026-10-12', opensAt: null, closesAt: null, is24h: false, isClosed: true }];
+    expect(status(base({ days: [], exceptions }))).toBe('closed_all_days');
+  });
+
+  it('a closed exception does not hide the weekly schedule: closed_now, not closed_all_days', () => {
+    const exceptions = [{ date: '2026-10-12', opensAt: null, closesAt: null, is24h: false, isClosed: true }];
+    expect(status(base({ exceptions }))).toBe('closed_now');
   });
 });

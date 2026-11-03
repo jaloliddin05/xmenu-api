@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import type { BranchStatus } from '../domain/branch-hours';
 import type { BranchView } from '../services/branch.service';
 
 /** One item of GET /branches (docs/BRANCHES_API.md). */
@@ -16,7 +17,7 @@ export class BranchViewDto implements BranchView {
   @ApiProperty({ type: String, nullable: true, example: '+998711234567' })
   phone: string | null;
   @ApiProperty({
-    description: 'false also when no working hours are set (hours is then an empty string)',
+    description: 'Open right now; false also when the branch has no working hours (see status)',
   })
   isOpen: boolean;
   @ApiProperty({
@@ -26,4 +27,10 @@ export class BranchViewDto implements BranchView {
     description: 'HH:mm when a closed branch opens next',
   })
   opensAt: string | null;
+  @ApiProperty({
+    enum: ['open', 'closed_now', 'no_schedule', 'closed_all_days'],
+    description:
+      'open; closed_now (closed, opensAt says when it opens); no_schedule (owner never entered hours); closed_all_days (hours exist but nothing opens in the next 7 days)',
+  })
+  status: BranchStatus;
 }

@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
 import { Lang } from 'src/infra/http/request-helpers';
-import { evaluateOpenState, formatHours, hasSchedule, OpenState } from '../domain/branch-hours';
+import { BranchStatus, branchStatus, evaluateOpenState, formatHours, hasSchedule, OpenState } from '../domain/branch-hours';
 import { BranchWithSchedule, toSchedule } from './branch-schedule.mapper';
 import { RevalidateService } from 'src/modules/revalidate-queue/revalidate.service';
 import { CreateBranchDto, SetWorkingHoursDto, UpdateBranchDto, CreateHoursExceptionDto } from '../dto/branch.dto';
@@ -25,6 +25,7 @@ export interface BranchView {
   phone: string | null;
   isOpen: boolean;
   opensAt: string | null;
+  status: BranchStatus;
 }
 
 export function toBranchView(b: BranchWithSchedule, lang: Lang, now = new Date()): BranchView {
@@ -40,6 +41,7 @@ export function toBranchView(b: BranchWithSchedule, lang: Lang, now = new Date()
     phone: b.phone,
     isOpen: state.isOpen,
     opensAt: state.opensAt,
+    status: branchStatus(schedule, state),
   };
 }
 

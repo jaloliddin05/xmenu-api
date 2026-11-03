@@ -1,5 +1,5 @@
 import { NotFoundException } from '@nestjs/common';
-import { BranchService } from './branch.service';
+import { BranchService, toBranchView } from './branch.service';
 
 describe('BranchService: delivery site revalidation', () => {
   const ORG = 'org-1';
@@ -40,5 +40,36 @@ describe('BranchService: delivery site revalidation', () => {
       NotFoundException,
     );
     expect(revalidate.addRevalidationJob).not.toHaveBeenCalled();
+  });
+});
+
+describe('toBranchView: status', () => {
+  const row = (days: object[]) =>
+    ({
+      id: 'b-1',
+      title: 'A',
+      address: 'Street 1',
+      latitude: 41.3,
+      longitude: 69.2,
+      phone: null,
+      timezone: 'Asia/Tashkent',
+      working_hours: days,
+      hours_exceptions: [],
+    }) as any;
+  const now = new Date('2026-10-12T07:00:00Z'); // Monday 12:00 in Tashkent
+  const open = { weekday: 1, opens_at: '09:00', closes_at: '23:00', is_24h: false, is_closed: false };
+
+  it('no hours: no_schedule with an empty hours string', () => {
+    expect(toBranchView(row([]), 'ru', now)).toMatchObject({ status: 'no_schedule', hours: '', isOpen: false, opensAt: null });
+  });
+
+  it('every day off: closed_all_days, hours is empty too', () => {
+    const off = [1, 2, 3, 4, 5, 6, 7].map((weekday) => ({ ...open, weekday, is_closed: true }));
+    expect(toBranchView(row(off), 'ru', now)).toMatchObject({ status: 'closed_all_days', hours: '', isOpen: false, opensAt: null });
+  });
+
+  it('open today: open', () => {
+    const days = [1, 2, 3, 4, 5, 6, 7].map((weekday) => ({ ...open, weekday }));
+    expect(toBranchView(row(days), 'ru', now)).toMatchObject({ status: 'open', isOpen: true });
   });
 });

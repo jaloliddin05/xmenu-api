@@ -5315,13 +5315,23 @@
           },
           "isOpen": {
             "type": "boolean",
-            "description": "false also when no working hours are set (hours is then an empty string)"
+            "description": "Open right now; false also when the branch has no working hours (see status)"
           },
           "opensAt": {
             "type": "string",
             "nullable": true,
             "example": "09:00",
             "description": "HH:mm when a closed branch opens next"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "closed_now",
+              "no_schedule",
+              "closed_all_days"
+            ],
+            "description": "open; closed_now (closed, opensAt says when it opens); no_schedule (owner never entered hours); closed_all_days (hours exist but nothing opens in the next 7 days)"
           }
         },
         "required": [
@@ -5333,7 +5343,8 @@
           "hours",
           "phone",
           "isOpen",
-          "opensAt"
+          "opensAt",
+          "status"
         ]
       },
       "CreateBranchDto": {
