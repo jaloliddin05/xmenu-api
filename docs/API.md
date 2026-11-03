@@ -443,10 +443,11 @@ QR-меню и сайта доставки (`REVALIDATE.md`).
 
 | Эндпоинт | Раньше отдавал лишнее | Теперь |
 |---|---|---|
-| `GET /organization/slug/:slug` (QR-меню) | строку `organization` целиком: `owner_id`, `order_seq`, `int_id`, `is_active`, `url`, `created_at`, `logo_id`, `banner_id`; файлы с `path` (путь на диске) и `product_id`; у категорий `organization_id`, `index`, `is_active`; у блюд `category_id`, `index`, `is_active`; у групп допов `product_id`, `organization_id`; у допов `additional_product_group_id`; id строк переводов; отвечал и для неактивных заведений | `PublicOrganizationDto`: `id, name, slug, type, logo { id, url }, banner, translations [{ lang, description }], categories [{ id, translations [{ lang, title }], products [{ id, price, weight, protein, kcal, fat, carbohydrate, unit, images [{ id, url }], translations [{ lang, title, description }], additional_product_groups [{ id, is_required, is_multiple, min_selected, max_selected, translations, additional_products [{ id, price, translations }] }] }] }]`; неактивное заведение → 404 |
 | `GET /organization/return-slug/:id` | slug любого заведения, в том числе неактивного, по UUID или числовому `int_id` | slug (текстом) только активного заведения и только по UUID, иначе 404 |
 | `POST /application` | созданную строку заявки целиком | `{ id }` |
 | `POST /auth/login`, `POST /auth/check-code` | `user` без пароля, но со всеми колонками организации (`owner_id`, `order_seq`, `int_id`, пути файлов) | `user` по списку полей (см. «Авторизация владельцев») |
+
+`GET /organization/slug/:slug` (прежнее публичное QR-меню) удалён: QR берёт заведение через `GET /tenant/by-slug/:slug`, `GET /tenant/config` и `GET /menu`; путь отвечает `404`.
 
 Уже были на мапперах и не менялись: `GET /tenant/by-slug/:slug`, `GET /tenant/config`, `GET /menu`, `GET /branches`,
 `GET /checkout-config`, `/orders*`, `/auth/customer/*`. Вебхуки Click, Payme и Telegram отвечают в формате

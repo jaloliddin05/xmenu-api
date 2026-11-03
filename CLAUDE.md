@@ -51,9 +51,8 @@ test, `npm run openapi` + `git diff --exit-code docs/`, lint без блокир
   (`tenant-config.service.ts`): незаполненное `null`, `delivery` в режимах только при заданной зоне.
 - Кэш тенанта (30 с, в памяти процесса) сбрасывают `PUT /organization/:id/settings`, `PUT` и `DELETE
   /organization/:id`; кэш настроек заказа сбрасывает `PUT /order-settings`. Другие процессы pm2 видят старое до 30 с.
-- Публичные ответы только через маппер или DTO со списком полей, не строкой БД: `GET /organization/slug/:slug` →
-  `toPublicOrganization` (`organization/domain/public-organization.ts`, только активные), `toStaffUser` для
-  владельца. Новый публичный эндпоинт делай так же.
+- Публичные ответы только через маппер или DTO со списком полей, не строкой БД: `GET /tenant/config`, `GET /menu`
+  собираются мапперами и DTO, `toStaffUser` для владельца. Новый публичный эндпоинт делай так же.
 - Slug: `organization/domain/slug.ts` (`slugify`: кириллица ru/uz транслитерируется, случайный `venue-xxxxxx` только если
   годного slug не вышло; 3–63 символа, `a-z0-9` и дефисы, не UUID, не из `RESERVED_SLUGS`: slug становится поддоменом `{slug}.xmenu.uz`), дубликат → 409 `slug_taken`.
 - `Tenant` несёт `defaultLanguage`, `languages`, `currency` из `organization_settings`: язык ответа
@@ -194,7 +193,6 @@ Payme), Telegram webhook и кнопки, боты заведений (`PUT /tel
   (недоступны никому); можно удалить вручную.
 - Кэш тенанта и настроек заказа в памяти процесса (30 с): после `PUT` другие процессы pm2 видят старые имя, slug,
   язык, валюту и зону до 30 с. `is_active` через API не меняется (только в БД), сброса для него нет.
-- `GET /organization/slug/:slug` ещё открыт: закрыть, когда QR перейдёт на `by-slug` + `tenant/config` (Q2).
 - `npm run lint` (без `--fix`) не проходит (замер 2026-11-03: 196 ошибок правил `recommendedTypeChecked` (нетипизированный
   `@Req() req`, `any` из конфигов и passport, код заказов и платежей) и 535 `prettier/prettier` в старом коде; в клоне с
   `core.autocrlf=true` prettier добавляет ещё ~12 тыс. `␍`), в CI lint запускается без блокировки (отчёт).
