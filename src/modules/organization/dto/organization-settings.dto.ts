@@ -63,6 +63,22 @@ export class ThemeDto implements Theme {
   @Color('#5B6FE8') serviceArea?: string;
 }
 
+const FullColor = (example: string) =>
+  ApiProperty({ example, pattern: HEX_COLOR_RE.source });
+
+/** A theme with every key: the answer-only views (theme in /tenant/config, platformTheme, effectiveTheme). */
+export class FullThemeDto implements Required<Theme> {
+  @FullColor('#F4F4F4') background: string;
+  @FullColor('#21201F') foreground: string;
+  @FullColor('#FFFFFF') surface: string;
+  @FullColor('#EFEFEF') mutedSurface: string;
+  @FullColor('#4B494380') muted: string;
+  @FullColor('#EE2E17') brand: string;
+  @FullColor('#FFFFFF') brandForeground: string;
+  @FullColor('#E53935') danger: string;
+  @FullColor('#5B6FE8') serviceArea: string;
+}
+
 export class LatLngDto {
   @ApiProperty({ example: 41.311081, minimum: -90, maximum: 90 })
   @IsNumber({ allowNaN: false, allowInfinity: false })
@@ -83,6 +99,7 @@ export class LatLngDto {
  */
 export class OrganizationSettingsDto implements OrganizationSettings {
   @ApiPropertyOptional({
+    type: FullThemeDto,
     readOnly: true,
     description:
       'Answer-only: theme over the platform neutral colors, every key, for the preview. Accepted in a request so a GET answer can be sent back unchanged; ignored.',
@@ -92,6 +109,7 @@ export class OrganizationSettingsDto implements OrganizationSettings {
   effectiveTheme?: Record<string, string>;
 
   @ApiPropertyOptional({
+    type: FullThemeDto,
     readOnly: true,
     description:
       'Answer-only: the neutral platform colors, every key (what a cleared color falls back to). Accepted in a request so a GET answer can be sent back unchanged; ignored.',

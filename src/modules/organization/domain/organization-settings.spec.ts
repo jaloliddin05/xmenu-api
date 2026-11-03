@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client';
+import { FullThemeDto } from '../dto/organization-settings.dto';
 import { PLATFORM_THEME } from './platform-defaults';
 import {
   HEX_COLOR_RE,
@@ -104,7 +105,10 @@ describe('settingsProblems', () => {
       NOW,
     );
     expect(problems).toHaveLength(1);
-    expect(problems[0]).toMatchObject({ field: 'mapBounds', reason: 'invalidBounds' });
+    expect(problems[0]).toMatchObject({
+      field: 'mapBounds',
+      reason: 'invalidBounds',
+    });
   });
 
   it('requires the map center inside the bounds when both are set', () => {
@@ -213,6 +217,25 @@ describe('platform theme', () => {
     expect(Object.keys(PLATFORM_THEME).sort()).toEqual([...THEME_KEYS].sort());
     for (const color of Object.values(PLATFORM_THEME))
       expect(color).toMatch(HEX_COLOR_RE);
+  });
+
+  it('is described in OpenAPI by FullThemeDto with exactly the theme keys, all required', () => {
+    // @nestjs/swagger keys: DECORATORS_PREFIX is 'swagger'
+    const props: string[] = Reflect.getMetadata(
+      'swagger/apiModelPropertiesArray',
+      FullThemeDto.prototype,
+    );
+    expect(props.map((p) => p.replace(/^:/, '')).sort()).toEqual(
+      [...THEME_KEYS].sort(),
+    );
+    for (const key of THEME_KEYS) {
+      const meta = Reflect.getMetadata(
+        'swagger/apiModelProperties',
+        FullThemeDto.prototype,
+        key,
+      );
+      expect(meta.required).not.toBe(false);
+    }
   });
 
   it('resolveTheme fills what the owner left out and keeps what they chose', () => {

@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { LANGS } from 'src/infra/http/request-helpers';
 import type { Lang } from 'src/infra/http/request-helpers';
-import { ThemeDto } from 'src/modules/organization/dto/organization-settings.dto';
+import { FullThemeDto } from 'src/modules/organization/dto/organization-settings.dto';
 import { SUPPORTED_CURRENCIES } from 'src/modules/organization/domain/organization-settings';
 import { DELIVERY_MODES } from 'src/modules/organization/domain/publication';
 import type { DeliveryMode } from 'src/modules/organization/domain/publication';
@@ -235,12 +235,11 @@ export class TenantConfigDto {
   foundedYear: number | null;
 
   @ApiProperty({
-    type: ThemeDto,
-    nullable: true,
+    type: FullThemeDto,
     description:
-      'Brand colors; a missing key (or null theme) means the front-end neutral value',
+      'Brand colors over the platform neutral colors: always all 9 keys, never null. Front-ends keep no neutral values of their own',
   })
-  theme: ThemeDto | null;
+  theme: FullThemeDto;
 
   @ApiProperty({ type: TenantLocaleDto })
   locale: TenantLocaleDto;
