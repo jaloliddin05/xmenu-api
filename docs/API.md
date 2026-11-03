@@ -149,8 +149,9 @@ IP берётся из `X-Forwarded-For` только от локального 
   "locale": { "defaultLanguage": "ru", "languages": ["ru", "uz", "en"], "currency": "UZS" },
   "contacts": { "phone": null, "telegramUsername": null, "workingHours": null, "address": null },
   "channels": { "qr": true, "delivery": { "enabled": true, "mode": "site", "published": true } },
-  "fulfillment": { "modes": ["pickup"], "defaultMode": "pickup" },
-  "map": { "center": [41.311081, 69.240562], "zoom": 15, "city": "Ташкент",
+  "fulfillment": { "modes": ["pickup"], "defaultMode": "pickup", "deliveryOffered": true, "deliveryAvailable": false,
+                   "deliveryUnavailableReason": "no_zone" },
+  "map": { "center": [41.311081, 69.240562], "centerSource": "saved", "zoom": 15, "city": "Ташкент",
            "bounds": [[41.15, 69.0], [41.45, 69.45]], "deliveryZone": null }
 }
 ```
@@ -168,7 +169,19 @@ IP берётся из `X-Forwarded-For` только от локального 
 - `fulfillment.modes`: пусто, пока `channels.delivery.published` не `true`. Иначе `pickup`, если есть активный филиал с
   самовывозом; `delivery`, если есть активный филиал с доставкой **и** задана зона доставки. Нет филиалов: `[]`,
   `defaultMode: null`. Деньги (сбор, минимум, ETA, способы оплаты) остаются в `GET /checkout-config`.
-- `map.center` `[lat, lng]`, `map.bounds` `[[юго-запад], [северо-восток]]`, `map.deliveryZone` полигон
+- `fulfillment.deliveryOffered`: есть активный филиал с доставкой (не зависит от публикации и зоны); `false` значит,
+  что доставки у заведения нет по выбору, вкладку «Доставка» не показывать. `deliveryAvailable`: доставку можно
+  заказать сейчас (`modes` содержит `delivery`). `deliveryUnavailableReason`: `null`, если доступна; иначе первая
+  из причин в таком порядке: `not_offered` (нет филиала с доставкой), `channel_disabled` (владелец выключил заказы),
+  `not_published` (не опубликовано или пауза), `no_zone` (зона доставки не задана).
+- `map.center` `[lat, lng]`: сохранённый вид карты; если его нет, середина ограничивающего прямоугольника зоны
+  доставки, иначе филиалов с координатами ((0, 0) пропускается). `null` только у заведения без зоны и без филиалов с
+  координатами. Источник в `map.centerSource`: `saved`, `zone`, `branches` (`null`, если центра нет). `map.zoom`:
+  сохранённый; если центр вычислен, а zoom не сохранён, подбирается по размеру зоны или филиалов (10-17, один
+  филиал 16); сохранённый центр без zoom остаётся с `zoom: null`. Чеклист публикации вид карты не требует.
+- В OpenAPI `theme` (всегда полный, не `null`), `platformTheme` и `effectiveTheme` описаны схемой `FullThemeDto`
+  со всеми 9 ключами.
+- `map.bounds` `[[юго-запад], [северо-восток]]`, `map.deliveryZone` полигон
   `[[lat, lng], ...]` или `null` (доставки нет).
 - Поля `contacts.country` пока нет.
 
