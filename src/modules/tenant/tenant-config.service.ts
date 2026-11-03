@@ -7,6 +7,8 @@ import { resolveTheme, toSettingsView } from 'src/modules/organization/domain/or
 import { orderingOpen } from 'src/modules/organization/domain/publication';
 import { PrismaService } from '../_prisma/prisma.service';
 import { FulfillmentMode, TenantConfigDto } from './dto/tenant-config.dto';
+import { resolveMapView } from './map-view';
+import type { LatLng } from 'src/modules/organization/domain/organization-settings';
 import type { Tenant } from './tenant.service';
 
 /** Description in the response language, else in the venue's default language; blank counts as missing. */
@@ -37,6 +39,19 @@ export function fulfillmentModes(
     modes.push('delivery');
   if (branches.some((b) => b.accepts_pickup)) modes.push('pickup');
   return modes;
+}
+
+/** Branch coordinates for the map; (0, 0) is what an empty map pin gives, not a real place. */
+export function branchPoints(
+  branches: { latitude?: number | null; longitude?: number | null }[],
+): LatLng[] {
+  const points: LatLng[] = [];
+  for (const { latitude, longitude } of branches) {
+    if (typeof latitude !== 'number' || typeof longitude !== 'number') continue;
+    if (latitude === 0 && longitude === 0) continue;
+    points.push([latitude, longitude]);
+  }
+  return points;
 }
 
 @Injectable()
@@ -70,7 +85,12 @@ export class TenantConfigService {
       this.orderSettings.get(tenant.id),
       this.prisma.branch.findMany({
         where: { organization_id: tenant.id, is_active: true },
-        select: { accepts_delivery: true, accepts_pickup: true },
+        select: {
+          accepts_delivery: true,
+          accepts_pickup: true,
+          latitude: true,
+          longitude: true,
+        },
       }),
     ]);
     if (!org) throw new CustomerAuthException('tenant_not_found');
@@ -93,6 +113,11 @@ export class TenantConfigService {
       branches,
       ordering.deliveryZone !== null,
       published,
+    );
+    const view = resolveMapView(
+      { center: s.mapCenter, zoom: s.mapZoom },
+      ordering.deliveryZone,
+      branchPoints(branches),
     );
     return {
       id: org.id,
@@ -125,8 +150,9 @@ export class TenantConfigService {
       },
       fulfillment: { modes, defaultMode: modes[0] ?? null },
       map: {
-        center: s.mapCenter ? [s.mapCenter.lat, s.mapCenter.lng] : null,
-        zoom: s.mapZoom,
+        center: view.center,
+        centerSource: view.centerSource,
+        zoom: view.zoom,
         city: s.city,
         bounds: s.mapBounds,
         deliveryZone: ordering.deliveryZone,

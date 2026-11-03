@@ -197,6 +197,7 @@ describe('GET /tenant/config', () => {
       fulfillment: { modes: ['delivery', 'pickup'], defaultMode: 'delivery' },
       map: {
         center: [41.31, 69.24],
+        centerSource: 'saved',
         zoom: 15,
         city: 'Tashkent',
         bounds: [
@@ -247,6 +248,7 @@ describe('GET /tenant/config', () => {
       fulfillment: { modes: [], defaultMode: null },
       map: {
         center: null,
+        centerSource: null,
         zoom: null,
         city: null,
         bounds: null,
@@ -302,6 +304,56 @@ describe('GET /tenant/config', () => {
       expect(res.body.map.deliveryZone).toEqual(ZONE);
     },
   );
+
+  describe('map view without a saved center', () => {
+    const unsave = () =>
+      Object.assign(orgs[FULL].settings, {
+        map_center_lat: null,
+        map_center_lng: null,
+        map_zoom: null,
+      });
+
+    it('centers on the delivery zone', async () => {
+      unsave();
+      const { map } = (await config(FULL).expect(200)).body;
+      expect(map.centerSource).toBe('zone');
+      expect(map.center[0]).toBeCloseTo(41.3575, 6);
+      expect(map.center[1]).toBeCloseTo(69.2655, 6);
+      expect(map.zoom).toBe(12);
+    });
+
+    it('centers on the branches when there is no zone, skipping (0, 0) and inactive ones', async () => {
+      unsave();
+      orderRows[FULL] = ordering(null);
+      branches[FULL] = [
+        { is_active: true, latitude: 41.3, longitude: 69.2 },
+        { is_active: true, latitude: 41.32, longitude: 69.3 },
+        { is_active: true, latitude: 0, longitude: 0 },
+        { is_active: false, latitude: 10, longitude: 10 },
+      ];
+      const { map } = (await config(FULL).expect(200)).body;
+      expect(map.centerSource).toBe('branches');
+      expect(map.center[0]).toBeCloseTo(41.31, 6);
+      expect(map.center[1]).toBeCloseTo(69.25, 6);
+    });
+
+    it('keeps the saved zoom next to a computed center', async () => {
+      unsave();
+      orgs[FULL].settings.map_zoom = 14;
+      const { map } = (await config(FULL).expect(200)).body;
+      expect(map.centerSource).toBe('zone');
+      expect(map.zoom).toBe(14);
+    });
+
+    it('stays null for a venue with neither zone nor branch coordinates', async () => {
+      unsave();
+      orderRows[FULL] = ordering(null);
+      branches[FULL] = [{ is_active: true, latitude: 0, longitude: 0 }];
+      const { map } = (await config(FULL).expect(200)).body;
+      expect(map.center).toBeNull();
+      expect(map.centerSource).toBeNull();
+    });
+  });
 
   it('reports a QR menu the owner turned off', async () => {
     orgs[FULL].qr_enabled = false;

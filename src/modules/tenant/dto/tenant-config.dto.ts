@@ -10,6 +10,9 @@ import type {
   LatLng,
 } from 'src/modules/organization/domain/organization-settings';
 
+import { MAP_CENTER_SOURCES } from '../map-view';
+import type { MapCenterSource } from '../map-view';
+
 export const FULFILLMENT_MODES = ['delivery', 'pickup'] as const;
 export type FulfillmentMode = (typeof FULFILLMENT_MODES)[number];
 
@@ -106,11 +109,27 @@ export class TenantMapDto {
     ...LAT_LNG,
     nullable: true,
     example: [41.311081, 69.240562],
-    description: '[lat, lng]',
+    description:
+      '[lat, lng]. The saved view; without one, the middle of the delivery zone, else of the branches. null only when the venue has no zone and no branch with coordinates',
   })
   center: LatLng | null;
 
-  @ApiProperty({ type: Number, nullable: true, example: 15 })
+  @ApiProperty({
+    enum: MAP_CENTER_SOURCES,
+    nullable: true,
+    example: 'saved',
+    description:
+      'Where center comes from: saved (owner), zone (delivery zone bounding box), branches (branch coordinates); null when center is null',
+  })
+  centerSource: MapCenterSource | null;
+
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    example: 15,
+    description:
+      'Saved zoom; without one a computed zoom fitting the zone or branches (10-17) when center is computed; null for a saved center without a zoom',
+  })
   zoom: number | null;
 
   @ApiProperty({ type: String, nullable: true, example: 'Tashkent' })
