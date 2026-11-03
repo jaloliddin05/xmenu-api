@@ -179,6 +179,18 @@ export function evaluateOpenState(
   return { isOpen: false, opensAt: null };
 }
 
+export type BranchStatus = 'open' | 'closed_now' | 'no_schedule' | 'closed_all_days';
+
+/**
+ * Why a branch is (not) open, for the UI to pick a message. closed_all_days: a schedule exists but no
+ * opening falls in the next seven days (every weekday marked closed, or only closed exceptions).
+ */
+export function branchStatus(schedule: BranchSchedule, state: OpenState): BranchStatus {
+  if (!hasSchedule(schedule)) return 'no_schedule';
+  if (state.isOpen) return 'open';
+  return state.opensAt === null ? 'closed_all_days' : 'closed_now';
+}
+
 function formatMinutes(total: number): string {
   const m = total % DAY;
   return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;

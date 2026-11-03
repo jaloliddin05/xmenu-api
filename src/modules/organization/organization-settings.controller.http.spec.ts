@@ -125,6 +125,7 @@ describe('GET/PUT /organization/:id/settings', () => {
     expect(res.body).toEqual({
       theme: null,
       effectiveTheme: PLATFORM_THEME,
+      platformTheme: PLATFORM_THEME,
       currency: 'UZS',
       defaultLanguage: 'ru',
       languages: ['ru', 'uz', 'en'],
@@ -146,6 +147,7 @@ describe('GET/PUT /organization/:id/settings', () => {
       ...VALID,
       supportTelegram: 'demo_cafe',
       effectiveTheme: { ...PLATFORM_THEME, ...VALID.theme },
+      platformTheme: PLATFORM_THEME,
     });
     expect(invalidate).toHaveBeenCalledWith(ORG_A);
     expect(addRevalidationJob).toHaveBeenCalledWith({ tenantId: ORG_A, route: 'settings' });
@@ -161,7 +163,11 @@ describe('GET/PUT /organization/:id/settings', () => {
       Object.entries(VALID).map(([k, v]) => [k, kept.includes(k) ? v : null]),
     );
     const res = await put(cleared).expect(200);
-    expect(res.body).toEqual({ ...cleared, effectiveTheme: PLATFORM_THEME });
+    expect(res.body).toEqual({
+      ...cleared,
+      effectiveTheme: PLATFORM_THEME,
+      platformTheme: PLATFORM_THEME,
+    });
   });
 
   it('accepts a GET answer sent back unchanged: effectiveTheme is ignored, not stored', async () => {
@@ -170,6 +176,17 @@ describe('GET/PUT /organization/:id/settings', () => {
     const res = await put({ ...answer, effectiveTheme: { brand: '#000000' } }).expect(200);
     expect(res.body.theme).toEqual(VALID.theme);
     expect(res.body.effectiveTheme.brand).toBe(VALID.theme.brand);
+    expect(rows[ORG_A].theme).toEqual(VALID.theme);
+  });
+
+  it('platformTheme stays the platform colors when the owner saved their own; sent back it is ignored', async () => {
+    await put(VALID).expect(200);
+    const answer = (await get().expect(200)).body;
+    expect(answer.platformTheme).toEqual(PLATFORM_THEME);
+    expect(answer.effectiveTheme.brand).toBe(VALID.theme.brand);
+    expect(answer.platformTheme.brand).not.toBe(VALID.theme.brand);
+    const res = await put({ ...answer, platformTheme: { brand: '#000000' } }).expect(200);
+    expect(res.body.platformTheme).toEqual(PLATFORM_THEME);
     expect(rows[ORG_A].theme).toEqual(VALID.theme);
   });
 

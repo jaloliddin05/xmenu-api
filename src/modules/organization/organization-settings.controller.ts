@@ -15,15 +15,20 @@ import {
   OrganizationSettings,
   resolveTheme,
 } from './domain/organization-settings';
+import { PLATFORM_THEME } from './domain/platform-defaults';
 import { OrganizationService } from './services/organization.service';
 import { OrganizationSettingsService } from './services/organization-settings.service';
 
 type StaffRequest = Parameters<typeof requireStaffOrganizationId>[0];
 
-/** The answer carries the full theme (stored over platform defaults) for the dashboard preview. */
+/**
+ * The answer carries the full theme (stored over platform defaults) for the dashboard preview, and the
+ * platform colors alone, so a cleared field can say what it falls back to.
+ */
 const withEffectiveTheme = (s: OrganizationSettings) => ({
   ...s,
   effectiveTheme: resolveTheme(s.theme),
+  platformTheme: { ...PLATFORM_THEME },
 });
 
 /** Owner (dashboard): brand colors, languages, currency, contacts and map of the venue. */

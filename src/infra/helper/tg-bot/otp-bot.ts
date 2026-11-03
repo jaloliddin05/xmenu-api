@@ -5,10 +5,7 @@ const CHAT_ID = process.env.XMENU_CHAT_ID || '';
 
 // Plain Bot API call. The token is part of the URL, so a failure is rethrown
 // with the Telegram description only: axios errors carry the request URL.
-async function sendMessage(
-  chatId: string,
-  text: string,
-): Promise<void> {
+async function sendMessage(chatId: string, text: string): Promise<void> {
   try {
     await axios.post(
       `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`,
@@ -56,18 +53,13 @@ export async function sendApplicationToTelegram(data: {
 }): Promise<boolean> {
   if (!TELEGRAM_TOKEN || !CHAT_ID) return false;
 
-  let message = `📝 Yangi zayavka!`;
-
-  if (data.fullName) message += `
-👤 Ism: ${data.fullName}`;
-  if (data.phone) message += `
-📞 Telefon: ${data.phone}`;
-  if (data.from) message += `
-📍 Qayerdan: ${data.from}`;
-  if (data.plan) message += `
-💰 Tarif: ${data.plan}`;
-  if (data.description) message += `
-🗒️ Izoh: ${data.description}`;
+  const lines = ['📝 Yangi zayavka!'];
+  if (data.fullName) lines.push(`👤 Ism: ${data.fullName}`);
+  if (data.phone) lines.push(`📞 Telefon: ${data.phone}`);
+  if (data.from) lines.push(`📍 Qayerdan: ${data.from}`);
+  if (data.plan) lines.push(`💰 Tarif: ${data.plan}`);
+  if (data.description) lines.push(`🗒️ Izoh: ${data.description}`);
+  const message = lines.join('\n');
 
   await sendMessage(CHAT_ID, message);
   return true;

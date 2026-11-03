@@ -45,7 +45,7 @@
             }
           },
           "429": {
-            "description": "rate_limited: 5 per hour per IP, retryAfter in seconds",
+            "description": "rate_limited: 5 requests per hour per IP (requests rejected by validation count too), retryAfter in seconds",
             "content": {
               "application/json": {
                 "schema": {
@@ -55,7 +55,7 @@
             }
           }
         },
-        "summary": "Landing contact form (public, 5 per hour per IP, 429 rate_limited); answers { id }",
+        "summary": "Landing contact form (public, 5 requests per hour per IP, invalid ones included, 429 rate_limited); answers { id }",
         "tags": [
           "Application"
         ]
@@ -4706,6 +4706,11 @@
             "readOnly": true,
             "description": "Answer-only: theme over the platform neutral colors, every key, for the preview. Accepted in a request so a GET answer can be sent back unchanged; ignored."
           },
+          "platformTheme": {
+            "type": "object",
+            "readOnly": true,
+            "description": "Answer-only: the neutral platform colors, every key (what a cleared color falls back to). Accepted in a request so a GET answer can be sent back unchanged; ignored."
+          },
           "theme": {
             "nullable": true,
             "description": "Brand colors; a missing key keeps the front-end neutral value",
@@ -5315,13 +5320,23 @@
           },
           "isOpen": {
             "type": "boolean",
-            "description": "false also when no working hours are set (hours is then an empty string)"
+            "description": "Open right now; false also when the branch has no working hours (see status)"
           },
           "opensAt": {
             "type": "string",
             "nullable": true,
             "example": "09:00",
             "description": "HH:mm when a closed branch opens next"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "closed_now",
+              "no_schedule",
+              "closed_all_days"
+            ],
+            "description": "open; closed_now (closed, opensAt says when it opens); no_schedule (owner never entered hours); closed_all_days (hours exist but nothing opens in the next 7 days)"
           }
         },
         "required": [
@@ -5333,7 +5348,8 @@
           "hours",
           "phone",
           "isOpen",
-          "opensAt"
+          "opensAt",
+          "status"
         ]
       },
       "CreateBranchDto": {

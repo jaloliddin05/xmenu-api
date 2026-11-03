@@ -1,12 +1,8 @@
 name: CI/CD Pipeline (Test & Deploy) 🚀
 
+# Manual only while there is no production: see "Деплой" in CLAUDE.md before enabling push triggers.
 on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
+  workflow_dispatch:
 
 jobs:
   deploy:

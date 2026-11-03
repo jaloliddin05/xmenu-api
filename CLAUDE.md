@@ -40,8 +40,7 @@ Env: см. `.env.example` (полный). Ключевые: `JWT_*`, `OTP_*`, `S
 Единое место: `docs/API.md` и `docs/openapi.json`. Подробности: `docs/ORDERS_API.md`, `docs/BRANCHES_API.md`,
 `docs/BACKEND_ORDERS.md`, `docs/TELEGRAM_VERIFICATION.md`. Меняешь контроллер или DTO: добавь `@ApiProperty` и
 `@ApiOperation`, запусти `npm run openapi`, закоммить результат вместе с кодом. `.github/workflows/ci.yml` (build,
-test, `npm run openapi` + `git diff --exit-code docs/`, lint без блокировки) проверяет это на PR; на GitHub ещё не
-запускался (шаги: чистая БД `migrate deploy`, `migrate diff` без расхождений, `scripts/check-migration-upgrade.sh`, build, test, openapi); `deploy.yml` отдельный и без проверок.
+test, `npm run openapi` + `git diff --exit-code docs/`, lint без блокировки) проверяет это на PR; на GitHub запускался: на `main` 2026-10-31 `41178755985`, `41181531000` (упали на `npm ci`, lock-файл не совпадал с `package.json`), `41185810185` и 2026-11-03 `41597505450` (упал тест `organization-publication.controller.http.spec.ts`, `ECONNRESET`; исправлено на `fix/wave4-followups`, тестовое приложение слушает один порт вместо сервера на запрос). Шаги: чистая БД `migrate deploy`, `migrate diff` без расхождений, `scripts/check-migration-upgrade.sh`, build, test, openapi); `deploy.yml` отдельный и без проверок, запускается только вручную (`workflow_dispatch`), см. «Деплой».
 Локально те же шаги: временные БД (`createdb xmenu_ci`, `xmenu_ci_shadow`, `xmenu_upgrade`), `DATABASE_URL=… npx prisma migrate deploy`, `npx prisma migrate diff --from-url $DATABASE_URL --to-schema-datamodel prisma/schema.prisma --exit-code`, `DATABASE_URL=<пустая БД> scripts/check-migration-upgrade.sh`, затем `npm run build`, `npm test`, `npm run openapi && git diff --exit-code docs/`. В Windows psql принимает URL только через `--dbname=`.
 
 ## Тенантность
@@ -69,7 +68,7 @@ test, `npm run openapi` + `git diff --exit-code docs/`, lint без блокир
   значениями из `organization/domain/platform-defaults.ts`. У колонок нет `DEFAULT` в БД.
 - Чтение не подставляет значения: нет строки → `settings_missing` (500) с логом. Исключение — тема:
   `PLATFORM_THEME` (`platform-defaults.ts`, 9 нейтральных цветов) и `resolveTheme()` дают полную `theme` в
-  `GET /tenant/config` и `effectiveTheme` в ответах `GET/PUT /organization/:id/settings` (хранимая `theme` не меняется).
+  `GET /tenant/config` и `effectiveTheme` и `platformTheme` (чистые цвета платформы) в ответах `GET/PUT /organization/:id/settings` (хранимая `theme` не меняется).
 - Владелец: `GET/PUT /organization/:id/settings` (PUT заменяет документ целиком, проверки в
   `organization/domain/organization-settings.ts` и DTO), `GET/PUT /order-settings`.
 - Нет зоны доставки (`delivery_zone = null`) → доставка недоступна: `POST /orders` отвечает
@@ -113,7 +112,7 @@ Payme вручную через ops-чат.
 Телефон + OTP (HMAC-хеш кода, TTL, лимит попыток, cooldown) через `SmsProvider`; refresh-токены с ротацией и
 сессиями. `CustomerOtpService.issue()` не зависит от канала доставки (SMS или Telegram), лимиты по телефону общие.
 Целевые параметры: `OTP_LENGTH=6`, `OTP_TTL_SECONDS=300`, `OTP_MAX_ATTEMPTS=5`, `OTP_COOLDOWN_SECONDS=60`
-По умолчанию 6, длина приходит в `codeLength`; дашборд её читает, клиент доставки пока ждёт 4.
+По умолчанию 6, длина приходит в `codeLength`; дашборд и клиент доставки читают её из ответа (вход с 6 цифрами прошёл в браузере, WAVE4).
 `TelegramInitDataService.verifyForTenant` проверяет `initData` токеном бота заведения (иначе платформенным
 `TELEGRAM_BOT_TOKEN`) и входом не является.
 
@@ -196,11 +195,28 @@ Payme), Telegram webhook и кнопки, боты заведений (`PUT /tel
 - Кэш тенанта и настроек заказа в памяти процесса (30 с): после `PUT` другие процессы pm2 видят старые имя, slug,
   язык, валюту и зону до 30 с. `is_active` через API не меняется (только в БД), сброса для него нет.
 - `GET /organization/slug/:slug` ещё открыт: закрыть, когда QR перейдёт на `by-slug` + `tenant/config` (Q2).
-- `npm run lint` (без `--fix`) не проходит (2026-11-02: 196 ошибок правил `recommendedTypeChecked` и около 1800 `prettier/prettier` в старом коде по аудиту `audit/WAVE3.md`; в клоне с `core.autocrlf=true` prettier добавляет ещё ~12 тыс. `␍`; не prettier: 
-  нетипизированный `@Req() req`, `any` из конфигов и passport, код заказов и платежей), в CI lint запускается без блокировки (отчёт).
-  Новые файлы проходят. Для `*.spec.ts` и `*.fake.ts` правила `no-unsafe-*` и `require-await` выключены.
+- `npm run lint` (без `--fix`) не проходит (замер 2026-11-03: 196 ошибок правил `recommendedTypeChecked` (нетипизированный
+  `@Req() req`, `any` из конфигов и passport, код заказов и платежей) и 535 `prettier/prettier` в старом коде; в клоне с
+  `core.autocrlf=true` prettier добавляет ещё ~12 тыс. `␍`), в CI lint запускается без блокировки (отчёт).
+  Файлы, добавленные волной 3, отформатированы; в них остаются 3 ошибки правил (`no-unsafe-*`, `no-unused-vars`)
+  в `create-organization.dto.ts` и `update-organization.dto.ts`. Для `*.spec.ts` и `*.fake.ts` правила `no-unsafe-*` и
+  `require-await` выключены.
   `.gitattributes` (`eol=lf`) добавлен; рабочая копия, выгруженная раньше с `core.autocrlf=true`, остаётся в CRLF,
   пока файлы не перевыгрузить (`git rm --cached -r . && git reset --hard` на чистом дереве).
+
+## Деплой (когда появится прод)
+`.github/workflows/deploy.yml` запускается только вручную (`workflow_dispatch`): сервера и прода нет, а прежний триггер
+на `push` и `pull_request` падал при каждом пуше. Для настоящего деплоя нужно:
+- Ключ вместо SSH-пароля: `SSH_PRIVATE_KEY` в секретах, `key:` в `appleboy/ssh-action`, отдельный пользователь без
+  `sudo -s`, пароль входа отключён.
+- Окружения GitHub (`staging`, `production`): свои секреты (`SSH_HOST`, `SSH_USER`, ключ), у `production` ручное
+  подтверждение; деплой запускается после зелёного `ci.yml` (`needs` или `workflow_run`), не на `pull_request`.
+- Порядок на сервере: бэкап (`pg_dump` в файл с датой, проверить, что файл не пустой) → `git fetch` и checkout нужного
+  коммита (без `git stash` и `git pull` поверх правок) → `npm ci` (не `npm i`) → `npm run build` →
+  `npx prisma migrate deploy` → `pm2 reload xmenu-backend` → проверка живости и откат на предыдущий коммит и дамп,
+  если проверка не прошла. Миграции только после бэкапа и только `migrate deploy`.
+- Прод не стартует с `SMS_PROVIDER=console`, `OTP_DEV_MODE`, пустым `REVALIDATE_SECRET` (проверки уже в коде); перед
+  первым запуском: staging, бэкапы по расписанию, чек-лист безопасности (корневой `CLAUDE.md`, очередь, п. 5).
 
 ## Лимиты публичных POST
 `PublicRateLimitGuard` (`infra/http/public-rate-limit.ts`, глобальный `APP_GUARD`): POST к `@Public()` маршрутам по IP через

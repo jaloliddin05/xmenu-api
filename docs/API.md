@@ -261,13 +261,18 @@ IP берётся из `X-Forwarded-For` только от локального 
   "mapBounds": [[41.15, 69.0], [41.45, 69.45]],
   "effectiveTheme": { "background": "#FFFFFF", "foreground": "#1A1A1A", "surface": "#FFFFFF", "mutedSurface": "#F4F4F4",
                       "muted": "#4B494380", "brand": "#EE2E17", "brandForeground": "#FFFFFF", "danger": "#B42318",
+                      "serviceArea": "#4A6FA5" },
+  "platformTheme": { "background": "#FFFFFF", "foreground": "#1A1A1A", "surface": "#FFFFFF", "mutedSurface": "#F4F4F4",
+                      "muted": "#6B6B6B", "brand": "#2B2B2B", "brandForeground": "#FFFFFF", "danger": "#B42318",
                       "serviceArea": "#4A6FA5" }
 }
 ```
 
 `theme` — то, что сохранил владелец (пустой остаётся `null`, чтение ничего не подставляет). `effectiveTheme` — только в
 ответе: `theme` поверх нейтральных цветов платформы, все 9 ключей, ровно то, что увидят посетители (для предпросмотра).
-В теле `PUT` поле принимается и игнорируется, поэтому ответ `GET` можно отправить обратно без правок.
+`platformTheme` — тоже только в ответе: нейтральные цвета платформы (9 ключей) без цветов владельца; ими становится
+очищенное поле, по ним подписывается «по умолчанию» (`effectiveTheme` для этого не годится: там уже цвет владельца).
+В теле `PUT` оба поля принимаются и игнорируются, поэтому ответ `GET` можно отправить обратно без правок.
 
 `PUT` заменяет документ целиком: каждое поле обязательно, `null` очищает необязательное. После регистрации:
 `UZS`, `ru`, `["ru","uz","en"]`, остальное `null`.
@@ -423,8 +428,9 @@ QR-меню и сайта доставки (`REVALIDATE.md`).
 - `GET /application`: только платформенные администраторы (`PLATFORM_ADMIN_USER_IDS`, пусто = никто): остальным `403`.
   `POST /application` остаётся публичным и отвечает только `{ id }`. Тело: `from` (`web` или `admin`) обязателен, иначе
   `400 validation_error` с полем `from` (раньше пустое тело давало `500`); `fullName` до 120 символов, `phone` до 32,
-  `plan` до 64, `description` до 2000; лишние поля `400`. Не больше `APPLICATION_RATE_LIMIT` заявок с одного IP за
-  `APPLICATION_RATE_WINDOW_SECONDS` (5 в час), дальше `429 rate_limited`. Заявка сохраняется всегда; уведомление в
+  `plan` до 64, `description` до 2000; лишние поля `400`. Не больше `APPLICATION_RATE_LIMIT` **запросов** с одного IP за
+  `APPLICATION_RATE_WINDOW_SECONDS` (5 в час), дальше `429 rate_limited`; считаются и запросы, отклонённые валидацией
+  (`400`): лимит стоит в guard до проверки тела, так поток мусора тоже ограничен. Заявка сохраняется всегда; уведомление в
   Telegram best-effort (сбой пишется в лог без токена, ответ `201`; без `OTP_BOT`/`XMENU_CHAT_ID` внешних вызовов нет),
   текст уходит без Markdown. Схемы `400` и `429` в OpenAPI (`ErrorResponseDto`).
 - `GET /product?is_active=true|false`: фильтр по статусу блюда (параметр называется `is_active`). Другое значение: `400`,
