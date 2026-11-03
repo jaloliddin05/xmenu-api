@@ -1,5 +1,5 @@
-import { ApiProperty } from "@nestjs/swagger";
-import { Type, Transform, plainToInstance } from "class-transformer";
+import { ApiProperty } from '@nestjs/swagger';
+import { Type, Transform, plainToInstance } from 'class-transformer';
 import {
   IsString,
   IsOptional,
@@ -8,22 +8,22 @@ import {
   IsArray,
   ValidateBy,
   ValidateNested,
-} from "class-validator";
-import { isValidSlug, SLUG_RULE } from "../domain/slug";
+} from 'class-validator';
+import { isValidSlug, SLUG_RULE } from '../domain/slug';
 
 const trim = ({ value }: { value: unknown }) =>
-  typeof value === "string" ? value.trim() : value;
+  typeof value === 'string' ? value.trim() : value;
 
 class UpdateOrganizationTranslationDto {
-  @ApiProperty({ example: "translation-uuid" })
+  @ApiProperty({ example: 'translation-uuid' })
   @IsUUID()
   readonly id: string;
 
-  @ApiProperty({ example: "en" })
+  @ApiProperty({ example: 'en' })
   @IsString()
   readonly lang: string;
 
-  @ApiProperty({ example: "Fresh and healthy", required: false })
+  @ApiProperty({ example: 'Fresh and healthy', required: false })
   @IsOptional()
   @IsString()
   readonly description?: string;
@@ -35,22 +35,37 @@ class UpdateOrganizationDto {
   @IsString()
   type?: string;
 
-  @ApiProperty({ description: `Venue name, 2-100 characters after trimming`, required: false, minLength: 2, maxLength: 100 })
+  @ApiProperty({
+    description: `Venue name, 2-100 characters after trimming`,
+    required: false,
+    minLength: 2,
+    maxLength: 100,
+  })
   @IsOptional()
   @IsString()
   @Transform(trim)
   @Length(2, 100)
   readonly name?: string;
 
-  @ApiProperty({ description: `Public slug: ${SLUG_RULE}. Taken by another venue: 409 slug_taken`, example: "cafe-example", required: false })
+  @ApiProperty({
+    description: `Public slug: ${SLUG_RULE}. Taken by another venue: 409 slug_taken`,
+    example: 'cafe-example',
+    required: false,
+  })
   @IsOptional()
-  @ValidateBy({ name: "isSlug", validator: { validate: isValidSlug, defaultMessage: () => `slug: ${SLUG_RULE}` } })
+  @ValidateBy({
+    name: 'isSlug',
+    validator: {
+      validate: isValidSlug,
+      defaultMessage: () => `slug: ${SLUG_RULE}`,
+    },
+  })
   readonly slug?: string;
 
   @ApiProperty({
     description: `logo`,
-    type: "string",
-    format: "binary",
+    type: 'string',
+    format: 'binary',
     required: false,
   })
   @IsOptional()
@@ -58,8 +73,8 @@ class UpdateOrganizationDto {
 
   @ApiProperty({
     description: `banner`,
-    type: "string",
-    format: "binary",
+    type: 'string',
+    format: 'binary',
     required: false,
   })
   @IsOptional()
@@ -67,9 +82,9 @@ class UpdateOrganizationDto {
 
   @ApiProperty({
     example: [
-      { id: "uuid1", lang: "en", description: "Fresh and healthy" },
-      { id: "uuid2", lang: "uz", description: "Yangi va foydali" },
-      { id: "uuid3", lang: "ru", description: "Свежий и полезный" },
+      { id: 'uuid1', lang: 'en', description: 'Fresh and healthy' },
+      { id: 'uuid2', lang: 'uz', description: 'Yangi va foydali' },
+      { id: 'uuid3', lang: 'ru', description: 'Свежий и полезный' },
     ],
     required: false,
   })
@@ -78,13 +93,13 @@ class UpdateOrganizationDto {
   @ValidateNested({ each: true })
   @Transform(({ value }) => {
     // ⚙️ 1️⃣ Agar form-data dan string kelsa → JSON.parse
-    if (typeof value === "string") {
+    if (typeof value === 'string') {
       try {
         const parsed = JSON.parse(value);
         // ⚙️ 2️⃣ parsed ni class-transformer instance ga aylantiramiz
         return plainToInstance(UpdateOrganizationTranslationDto, parsed);
       } catch (error) {
-        console.error("❌ Invalid JSON in translations:", value);
+        console.error('❌ Invalid JSON in translations:', value);
         return [];
       }
     }
