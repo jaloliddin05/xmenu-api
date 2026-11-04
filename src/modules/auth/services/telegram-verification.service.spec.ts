@@ -48,7 +48,7 @@ function setup(opts: { bot?: typeof BOT | null; devMode?: boolean } = {}) {
   };
   const svc = new TelegramVerificationService(
     redis as any,
-    { telegramVerifyTtlSeconds: 300 } as any,
+    { telegramVerifyTtlSeconds: 300, otpLength: 6 } as any,
     bots as any,
     initData as any,
     otp as any,
@@ -380,6 +380,7 @@ describe('status and webhook hygiene', () => {
     expect(await svc.status(TENANT, r.sessionId, CTX)).toEqual({
       status: 'code_sent',
       phone: PHONE,
+      codeLength: 6,
     });
   });
 

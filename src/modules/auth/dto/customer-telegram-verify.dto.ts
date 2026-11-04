@@ -72,6 +72,13 @@ export class CustomerTelegramStatusResponseDto {
   })
   phone?: string;
 
+  @ApiPropertyOptional({
+    example: 6,
+    description:
+      'code_sent: number of digits in the code (same as codeLength of otp/request)',
+  })
+  codeLength?: number;
+
   @ApiPropertyOptional({ description: 'verified only' })
   isNewUser?: boolean;
 
