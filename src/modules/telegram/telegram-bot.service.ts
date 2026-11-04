@@ -14,6 +14,7 @@ import {
 } from 'src/modules/payment/domain/payment-crypto';
 import { errorMessage } from 'src/infra/helper/error-text';
 import { RevalidateService } from 'src/modules/revalidate-queue/revalidate.service';
+import { hashWebhookSecret } from './domain/webhook-secret';
 import { TelegramClient, telegramErrorText } from './telegram-client';
 
 /** A venue's own bot, ready to use (token decrypted). `botKey` is the row id and never changes. */
@@ -22,7 +23,8 @@ export interface TenantBot {
   organizationId: string;
   username: string;
   token: string;
-  webhookSecret: string;
+  /** sha256 hex of the webhook secret_token (domain/webhook-secret.ts) */
+  webhookSecretHash: string;
 }
 
 export interface BotStatus {
@@ -39,7 +41,7 @@ interface BotRow {
   telegram_bot_id: string;
   username: string;
   token_encrypted: string;
-  webhook_secret: string;
+  webhook_secret_hash: string;
   is_enabled: boolean;
 }
 
@@ -97,7 +99,7 @@ export class TelegramBotService {
       organizationId: row.organization_id,
       username: row.username,
       token,
-      webhookSecret: row.webhook_secret,
+      webhookSecretHash: row.webhook_secret_hash,
     };
   }
 
@@ -209,7 +211,7 @@ export class TelegramBotService {
       telegram_bot_id: telegramBotId,
       username: me.username,
       token_encrypted: encryptConfig({ token }, key),
-      webhook_secret: webhookSecret,
+      webhook_secret_hash: hashWebhookSecret(webhookSecret),
       is_enabled: true,
     };
     await this.prisma.organization_telegram_bot.upsert({

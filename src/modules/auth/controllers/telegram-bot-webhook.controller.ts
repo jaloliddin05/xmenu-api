@@ -11,7 +11,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
-import { timingSafeEqual } from 'crypto';
+import { webhookSecretMatches } from 'src/modules/telegram/domain/webhook-secret';
 import { TelegramBotService } from 'src/modules/telegram/telegram-bot.service';
 import { Public } from '../decorators/public.decorator';
 import { TelegramVerificationService } from '../services/telegram-verification.service';
@@ -21,7 +21,8 @@ const UUID_RE = /^[0-9a-fA-F-]{36}$/;
 
 /**
  * Webhook of a venue's own bot (registered by PUT /telegram-bot). The URL carries the bot's
- * stable id, never the slug. Telegram's secret_token header is compared in constant time.
+ * stable id, never the slug. Telegram's secret_token header is hashed and compared with the stored
+ * hash in constant time.
  * Always answers 200 for authentic requests so Telegram does not retry failed handling.
  */
 @ApiExcludeController()
@@ -47,9 +48,7 @@ export class TelegramBotWebhookController {
     const bot = await this.bots.byKey(botKey);
     if (!bot) throw new NotFoundException();
 
-    const given = Buffer.from(secret ?? '');
-    const expected = Buffer.from(bot.webhookSecret);
-    if (given.length !== expected.length || !timingSafeEqual(given, expected)) {
+    if (!webhookSecretMatches(secret, bot.webhookSecretHash)) {
       throw new UnauthorizedException();
     }
 

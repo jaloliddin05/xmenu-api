@@ -10,7 +10,7 @@ const BOT = {
   organizationId: 'tenant-1',
   username: 'mant_bot',
   token: '111111:TOKEN',
-  webhookSecret: 's',
+  webhookSecretHash: 'h',
 };
 const CTX = { ip: '1.2.3.4', userAgent: 'jest' };
 const PHONE = '+998901234567';
