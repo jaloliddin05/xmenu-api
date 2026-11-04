@@ -6,7 +6,9 @@
 # 1. applies every migration before $TARGET_MIGRATION (default: channels_publication),
 # 2. inserts a venue with settings, as it would exist before that migration,
 # 3. applies the remaining migrations (`prisma migrate deploy`),
-# 4. checks the existing row kept its data and got the column defaults.
+# 4. checks the existing row kept its data and got the column defaults,
+# 5. checks the tenant_domain rules on that venue (one verified host per venue, pending claims by
+#    several venues, cascade on delete).
 #
 # DATABASE_URL must point at an EMPTY scratch database: the script refuses to run otherwise.
 # Needs psql and the project's dependencies (npx prisma). Exit code 1 on any mismatch.
@@ -78,7 +80,46 @@ if [ "$orders" != '10000|50000|25|40' ]; then
   exit 1
 fi
 
+echo "== tenant_domain on the existing venue"
+ORG='00000000-0000-4000-8000-000000000001'
+OTHER='00000000-0000-4000-8000-000000000002'
+domains="$("${PSQL[@]}" -c "select count(*) from tenant_domain")"
+if [ "$domains" != "0" ]; then
+  echo "FAIL: tenant_domain has $domains rows after the upgrade, expected 0" >&2
+  exit 1
+fi
+"${PSQL[@]}" <<SQL
+insert into organization (id, name, slug, type, is_active) values ('$OTHER', 'Other', 'other-cafe', 'cafe', true);
+insert into tenant_domain (id, organization_id, host, verification_token)
+values ('00000000-0000-4000-8000-0000000000d1', '$ORG', 'restaurant.uz', 'token-a'),
+       ('00000000-0000-4000-8000-0000000000d2', '$OTHER', 'restaurant.uz', 'token-b');
+update tenant_domain set status = 'verified', verified_host = host, verified_at = now()
+where id = '00000000-0000-4000-8000-0000000000d1';
+SQL
+pending="$("${PSQL[@]}" -c "select string_agg(status || '|' || coalesce(verified_host, 'NULL'), ',' order by id) from tenant_domain")"
+if [ "$pending" != 'verified|restaurant.uz,pending|NULL' ]; then
+  echo "FAIL: tenant_domain rows are '$pending'" >&2
+  exit 1
+fi
+must_fail() {
+  if "${PSQL[@]}" -c "$2" >/dev/null 2>&1; then
+    echo "FAIL: $1 was accepted" >&2
+    exit 1
+  fi
+}
+must_fail "a second venue verifying the same host" \
+  "update tenant_domain set status = 'verified', verified_host = host where id = '00000000-0000-4000-8000-0000000000d2'"
+must_fail "the same host twice for one venue" \
+  "insert into tenant_domain (id, organization_id, host, verification_token) values ('00000000-0000-4000-8000-0000000000d3', '$ORG', 'restaurant.uz', 'token-c')"
+"${PSQL[@]}" -c "delete from organization where id = '$OTHER'"
+left="$("${PSQL[@]}" -c "select count(*) from tenant_domain where organization_id = '$OTHER'")"
+if [ "$left" != "0" ]; then
+  echo "FAIL: deleting a venue left $left of its domains" >&2
+  exit 1
+fi
+"${PSQL[@]}" -c "delete from tenant_domain"
+
 echo "== schema matches the datamodel"
 npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel "$ROOT/prisma/schema.prisma" --exit-code
 
-echo "OK: $TARGET_MIGRATION applies on a non-empty database with correct defaults"
+echo "OK: $TARGET_MIGRATION and later migrations apply on a non-empty database with correct defaults"

@@ -515,6 +515,7 @@ model organization {
   order_settings    organization_order_settings?
   payment_providers organization_payment_provider[]
   telegram_bot      organization_telegram_bot?
+  domains           tenant_domain[]
   additional_product_groups additional_product_group[]
   // Tenant ichidagi buyurtma raqami hisoblagichi (atomik UPDATE ... RETURNING)
   order_seq    Int               @default(1000)
@@ -713,6 +714,37 @@ model organization_telegram_bot {
   created_at      DateTime     @default(now())
   updated_at      DateTime     @updatedAt
 }
+enum TenantDomainStatus {
+  pending   @map("pending")
+  verified  @map("verified")
+}
+
+// The venue's own hosts for the delivery site (restaurant.uz, order.restaurant.uz, a dev tunnel).
+// Platform subdomains ({slug}.PLATFORM_DOMAIN) are resolved by slug and never stored here.
+// Several venues may have the same host pending (each with its own token); only one can verify it:
+// verified_host is unique and set only while verified, so a pending claim never blocks the real owner.
+model tenant_domain {
+  id                 String             @id @default(uuid())
+  organization_id    String
+  organization       organization       @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+
+  // Canonical: ASCII (IDN as punycode), lower case, no port, no trailing dot (tenant/host.ts)
+  host               String
+  status             TenantDomainStatus @default(pending)
+  // = host while verified, NULL otherwise: one verified host belongs to one venue
+  verified_host      String?            @unique
+  // Value of the TXT record _xmenu-verify.<host>; published in DNS, not a secret
+  verification_token String
+  verified_at        DateTime?
+  // Outcome of the last ownership check (record_not_found | token_mismatch | dns_error), NULL after success
+  last_check_at      DateTime?
+  last_check_error   String?
+
+  created_at         DateTime           @default(now())
+
+  @@unique([organization_id, host])
+}
+
 model translation_prompt {
   id        Int      @id @default(autoincrement())
   title     String

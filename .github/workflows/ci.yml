@@ -63,7 +63,7 @@ jobs:
           npx prisma migrate diff --from-migrations prisma/migrations --to-schema-datamodel prisma/schema.prisma \
             --shadow-database-url "$PG_ADMIN_URL/xmenu_ci_shadow" --exit-code
 
-      # The channels/publication migration on a database that already has a venue
+      # Channels/publication and later migrations (tenant_domain) on a database that already has a venue
       - name: Migration upgrade on a non-empty database
         run: |
           psql --dbname="$PG_ADMIN_URL/postgres" -c 'create database xmenu_upgrade'
