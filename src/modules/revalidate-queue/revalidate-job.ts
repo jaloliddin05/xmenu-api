@@ -10,7 +10,9 @@ export type RevalidateRoute =
   | 'settings'
   | 'branches'
   /** Channel flags or publication (QR flag for the QR menu, ordering state for the delivery site). */
-  | 'channels';
+  | 'channels'
+  /** A venue domain was verified or removed (delivery site only: the QR menu has no venue hosts). */
+  | 'domains';
 export type RevalidateTarget = 'qr' | 'client';
 
 export interface TenantChange {
@@ -23,6 +25,8 @@ export interface TenantChange {
   slug?: string | null;
   /** Previous slug, only when the slug changed. */
   oldSlug?: string | null;
+  /** Route `domains`: the venue host that was verified or removed (canonical form, tenant/host.ts). */
+  host?: string | null;
 }
 
 export interface RevalidateJob {
@@ -39,31 +43,40 @@ export function queuedJob(
   target: RevalidateTarget,
   change: TenantChange,
 ): RevalidateJob {
-  const { tenantId, route, oldSlug } = change;
+  const { tenantId, route, oldSlug, host } = change;
   return {
     target,
-    change: oldSlug ? { tenantId, route, oldSlug } : { tenantId, route },
+    change: {
+      tenantId,
+      route,
+      ...(oldSlug ? { oldSlug } : {}),
+      ...(host ? { host } : {}),
+    },
   };
 }
 
-/** Targets that care about a change: the QR menu shows no branches. */
+/** Targets that care about a change: the QR menu shows no branches and has no venue hosts. */
 export function targetsFor(
   route: RevalidateRoute,
   clientEnabled: boolean,
 ): RevalidateTarget[] {
-  const targets: RevalidateTarget[] = route === 'branches' ? [] : ['qr'];
+  const targets: RevalidateTarget[] =
+    route === 'branches' || route === 'domains' ? [] : ['qr'];
   if (clientEnabled) targets.push('client');
   return targets;
 }
 
 /**
  * Job id: one pending job per target, route and tenant, so repeated edits within the delay collapse and
- * different tenants never replace each other. BullMQ custom ids must not contain ':'.
+ * different tenants never replace each other. A domain change also keys on the host: two hosts changed
+ * within the delay are two jobs, each tells the front-end which host to drop. BullMQ custom ids must
+ * not contain ':'.
  */
 export function buildRevalidateJobId(job: RevalidateJob): string {
-  const { tenantId, route } = job.change;
+  const { tenantId, route, host } = job.change;
   if (!tenantId) throw new Error('Revalidation job without tenantId');
-  return `revalidate-${job.target}-${route}-${encodeURIComponent(tenantId)}`;
+  const id = `revalidate-${job.target}-${route}-${encodeURIComponent(tenantId)}`;
+  return host ? `${id}-${encodeURIComponent(host)}` : id;
 }
 
 /** Short, readable description for logs (never an object). */
@@ -79,6 +92,7 @@ export function describeRevalidate(
   ];
   if (c.oldSlug) parts.push(`slug ${c.oldSlug} -> ${c.slug ?? '?'}`);
   else if (c.slug) parts.push(`slug=${c.slug}`);
+  if (c.host) parts.push(`host=${c.host}`);
   if (jobId) parts.push(`job=${jobId}`);
   return parts.join(' ');
 }
@@ -110,5 +124,6 @@ export function buildClientBody(c: ResolvedChange, secret: string | undefined) {
     route: c.route,
     slug: c.slug,
     oldSlug: c.oldSlug ?? null,
+    host: c.host ?? null,
   };
 }

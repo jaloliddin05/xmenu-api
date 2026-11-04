@@ -32,8 +32,23 @@ describe('revalidate job ids', () => {
       job('qr', { route: 'organization' }),
       job('client', { route: 'settings' }),
       job('client', { route: 'channels' }),
+      job('client', { route: 'domains', host: 'restaurant.uz' }),
+      job('client', { route: 'domains', host: 'order.restaurant.uz' }),
     ].map(buildRevalidateJobId);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('keys a domain change on the host too', () => {
+    const id = buildRevalidateJobId(
+      job('client', { route: 'domains', host: 'xn--80ajzcicfi.uz' }),
+    );
+    expect(id).toBe(`revalidate-client-domains-${T1}-xn--80ajzcicfi.uz`);
+    expect(id).not.toMatch(/:/);
+    expect(
+      describeRevalidate(
+        job('client', { route: 'domains', slug: null, host: 'a.uz' }),
+      ),
+    ).toBe(`target=client route=domains tenant=${T1} host=a.uz`);
   });
 
   it('does not depend on the slug, so repeated edits of one tenant collapse per route', () => {
@@ -65,6 +80,8 @@ describe('targets', () => {
     expect(targetsFor('branches', true)).toEqual(['client']);
     expect(targetsFor('channels', false)).toEqual(['qr']);
     expect(targetsFor('channels', true)).toEqual(['qr', 'client']);
+    expect(targetsFor('domains', false)).toEqual([]);
+    expect(targetsFor('domains', true)).toEqual(['client']);
   });
 });
 
@@ -112,7 +129,7 @@ describe('request bodies', () => {
     });
   });
 
-  it('sends the client { secret, tenantId, route, slug, oldSlug }', () => {
+  it('sends the client { secret, tenantId, route, slug, oldSlug, host }', () => {
     expect(
       buildClientBody(
         job('client', { route: 'organization', slug: 'new', oldSlug: 'old' })
@@ -125,6 +142,7 @@ describe('request bodies', () => {
       route: 'organization',
       slug: 'new',
       oldSlug: 'old',
+      host: null,
     });
     expect(
       buildClientBody(job('client', { route: 'branches' }).change, 'c'),
@@ -134,6 +152,20 @@ describe('request bodies', () => {
       route: 'branches',
       slug: 'mant',
       oldSlug: null,
+      host: null,
+    });
+    expect(
+      buildClientBody(
+        job('client', { route: 'domains', host: 'restaurant.uz' }).change,
+        'c',
+      ),
+    ).toEqual({
+      secret: 'c',
+      tenantId: T1,
+      route: 'domains',
+      slug: 'mant',
+      oldSlug: null,
+      host: 'restaurant.uz',
     });
   });
 
@@ -239,6 +271,25 @@ describe('RevalidateService.addRevalidationJob', () => {
       tenantId: T1,
       route: 'menu',
     });
+  });
+
+  it('queues a domain change for the client only, with the host', async () => {
+    process.env.CLIENT_REVALIDATE_URL = 'http://127.0.0.1:3002/api/revalidate';
+    const { service, queue } = make();
+    await service.addRevalidationJob({
+      tenantId: T1,
+      route: 'domains',
+      host: 'restaurant.uz',
+    });
+    expect(queue.add.mock.calls.map((c: any[]) => [c[1], c[2].jobId])).toEqual([
+      [
+        {
+          target: 'client',
+          change: { tenantId: T1, route: 'domains', host: 'restaurant.uz' },
+        },
+        `revalidate-client-domains-${T1}-restaurant.uz`,
+      ],
+    ]);
   });
 
   it('repeated edit of one tenant replaces its pending job', async () => {
