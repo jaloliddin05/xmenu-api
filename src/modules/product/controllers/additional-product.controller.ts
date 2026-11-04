@@ -19,7 +19,10 @@ import {
   UpdateAdditionalProductDto,
   UpdateAdditionalProductGroupDto,
 } from '../dto/update-additional-product.dto';
-import { requireStaffOrganizationId } from 'src/infra/http/request-helpers';
+import {
+  requireStaffOrganizationId,
+  type StaffRequest,
+} from 'src/infra/http/request-helpers';
 
 @ApiTags('Additional-Product')
 @Controller('additional-product')
@@ -33,7 +36,7 @@ export class AdditionalProductController {
   @HttpCode(HttpStatus.CREATED)
   async createAdditionalProductGroup(
     @Body() dto: CreateAdditionalProductGroupDto,
-    @Req() req,
+    @Req() req: StaffRequest,
   ) {
     return await this.additionalProductService.createGroup(
       dto,
@@ -47,7 +50,7 @@ export class AdditionalProductController {
   @HttpCode(HttpStatus.CREATED)
   async createAdditionalProduct(
     @Body() dto: CreateAdditionalProductDto,
-    @Req() req,
+    @Req() req: StaffRequest,
   ) {
     return await this.additionalProductService.createAdditionalProduct(
       dto,
@@ -61,7 +64,7 @@ export class AdditionalProductController {
   async updateGroup(
     @Param('id') id: string,
     @Body() dto: UpdateAdditionalProductGroupDto,
-    @Req() req,
+    @Req() req: StaffRequest,
   ) {
     return this.additionalProductService.updateGroup(
       id,
@@ -77,7 +80,7 @@ export class AdditionalProductController {
   async updateAdditionalProduct(
     @Param('id') id: string,
     @Body() dto: UpdateAdditionalProductDto,
-    @Req() req,
+    @Req() req: StaffRequest,
   ) {
     return this.additionalProductService.updateAdditionalProduct(
       id,
@@ -90,7 +93,7 @@ export class AdditionalProductController {
   @Delete('/group/:id')
   @ApiOperation({ summary: 'Method: delete' })
   @HttpCode(HttpStatus.NO_CONTENT)
-  async deleteGroup(@Param('id') id: string, @Req() req) {
+  async deleteGroup(@Param('id') id: string, @Req() req: StaffRequest) {
     return await this.additionalProductService.deleteGroup(
       id,
       requireStaffOrganizationId(req),
@@ -101,7 +104,7 @@ export class AdditionalProductController {
   @Delete(':id')
   @ApiOperation({ summary: 'Method: delete' })
   @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@Param('id') id: string, @Req() req) {
+  async remove(@Param('id') id: string, @Req() req: StaffRequest) {
     return await this.additionalProductService.delete(
       id,
       requireStaffOrganizationId(req),

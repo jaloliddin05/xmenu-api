@@ -66,3 +66,12 @@ export function pickTranslation<T extends { lang: string }>(
     list[0]
   );
 }
+
+/** The request as seen by staff routes: the global guard puts the staff user on `req.user`. */
+export interface StaffRequest {
+  user: {
+    id: string;
+    // requireStaffOrganizationId() runs first and rejects staff without an organization (403)
+    organization: { id: string; slug: string };
+  };
+}

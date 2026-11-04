@@ -13,7 +13,10 @@ import {
   Req,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { requireStaffOrganizationId } from 'src/infra/http/request-helpers';
+import {
+  requireStaffOrganizationId,
+  type StaffRequest,
+} from 'src/infra/http/request-helpers';
 import {
   CreateBranchDto,
   CreateHoursExceptionDto,
@@ -35,13 +38,13 @@ export class BranchAdminController {
   @ApiOperation({
     summary: 'Barcha filiallar (yashirinlari ham) jadvali bilan',
   })
-  list(@Req() req) {
+  list(@Req() req: StaffRequest) {
     return this.branches.listAdmin(requireStaffOrganizationId(req));
   }
 
   @Post()
   @ApiOperation({ summary: 'Filial yaratish' })
-  create(@Body() dto: CreateBranchDto, @Req() req) {
+  create(@Body() dto: CreateBranchDto, @Req() req: StaffRequest) {
     return this.branches.create(requireStaffOrganizationId(req), dto);
   }
 
@@ -52,7 +55,7 @@ export class BranchAdminController {
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateBranchDto,
-    @Req() req,
+    @Req() req: StaffRequest,
   ) {
     return this.branches.update(requireStaffOrganizationId(req), id, dto);
   }
@@ -62,7 +65,7 @@ export class BranchAdminController {
   setWorkingHours(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: SetWorkingHoursDto,
-    @Req() req,
+    @Req() req: StaffRequest,
   ) {
     return this.branches.setWorkingHours(
       requireStaffOrganizationId(req),
@@ -78,7 +81,7 @@ export class BranchAdminController {
   addException(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: CreateHoursExceptionDto,
-    @Req() req,
+    @Req() req: StaffRequest,
   ) {
     return this.branches.addException(requireStaffOrganizationId(req), id, dto);
   }
@@ -89,7 +92,7 @@ export class BranchAdminController {
   async removeException(
     @Param('id', ParseUUIDPipe) id: string,
     @Param('exceptionId', ParseUUIDPipe) exceptionId: string,
-    @Req() req,
+    @Req() req: StaffRequest,
   ) {
     await this.branches.removeException(
       requireStaffOrganizationId(req),
@@ -102,7 +105,7 @@ export class BranchAdminController {
   @ApiOperation({
     summary: "O'chirish (buyurtmasi bor filial faqat yashiriladi)",
   })
-  remove(@Param('id', ParseUUIDPipe) id: string, @Req() req) {
+  remove(@Param('id', ParseUUIDPipe) id: string, @Req() req: StaffRequest) {
     return this.branches.remove(requireStaffOrganizationId(req), id);
   }
 }

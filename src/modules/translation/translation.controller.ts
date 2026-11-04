@@ -8,11 +8,12 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { Request } from 'express';
 import { TranslationService } from './translation.service';
 import { TranslationDto } from './dto';
 import { RateLimitService } from '../auth/services/rate-limit.service';
 import { translationIpRate, translationRate } from './translation.limits';
-import { requestCtx } from 'src/infra/http/request-helpers';
+import { requestCtx, type StaffRequest } from 'src/infra/http/request-helpers';
 
 @ApiTags('Translation')
 @Controller('translation')
@@ -28,7 +29,10 @@ export class TranslationController {
       'Translate menu text (owner token required; rate limited per owner, 429 rate_limited)',
   })
   @HttpCode(HttpStatus.CREATED)
-  async create(@Body() data: TranslationDto, @Req() req) {
+  async create(
+    @Body() data: TranslationDto,
+    @Req() req: StaffRequest & Request,
+  ) {
     const userId = req?.user?.id;
     if (!userId) throw new UnauthorizedException();
     const { limit, ttlSeconds } = translationRate();

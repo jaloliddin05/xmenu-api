@@ -7,7 +7,10 @@ import {
   Req,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { requireStaffOrganizationId } from 'src/infra/http/request-helpers';
+import {
+  requireStaffOrganizationId,
+  type StaffRequest,
+} from 'src/infra/http/request-helpers';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
 import { parseZone } from '../domain/order-money';
@@ -29,7 +32,7 @@ export class OrderSettingsController {
   @ApiOperation({
     summary: 'Current ordering settings (the row is created at signup)',
   })
-  get(@Req() req) {
+  get(@Req() req: StaffRequest) {
     return this.settings.get(requireStaffOrganizationId(req));
   }
 
@@ -37,7 +40,7 @@ export class OrderSettingsController {
   @ApiOperation({
     summary: "Sozlamalarni saqlash (faqat yuborilgan maydonlar o'zgaradi)",
   })
-  async update(@Req() req, @Body() dto: UpdateOrderSettingsDto) {
+  async update(@Req() req: StaffRequest, @Body() dto: UpdateOrderSettingsDto) {
     const organizationId = requireStaffOrganizationId(req);
 
     if (dto.deliveryZone != null && parseZone(dto.deliveryZone) === null) {

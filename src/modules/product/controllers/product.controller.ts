@@ -35,7 +35,10 @@ import { MulterStorage } from 'src/infra/helper/upload/multer-upload';
 import MoveProductDto from '../dto/move-product.dto';
 import { UpdateProductDto } from '../dto/update-product.dto';
 import { UploadProductImagesDto } from '../dto/product-image.dot';
-import { requireStaffOrganizationId } from 'src/infra/http/request-helpers';
+import {
+  requireStaffOrganizationId,
+  type StaffRequest,
+} from 'src/infra/http/request-helpers';
 
 @ApiTags('Product')
 @Controller('product')
@@ -59,7 +62,7 @@ export class ProductController {
     @Query('is_active', new OptionalBoolPipe('is_active'))
     is_active: boolean | undefined,
     @Query('title') title: string,
-    @Req() req,
+    @Req() req: StaffRequest,
   ) {
     return await this.productService.findAll(
       requireStaffOrganizationId(req),
@@ -73,7 +76,7 @@ export class ProductController {
   @Get('/:id')
   @ApiOperation({ summary: 'Method: get one' })
   @HttpCode(HttpStatus.OK)
-  async findOne(@Param('id') id: string, @Req() req) {
+  async findOne(@Param('id') id: string, @Req() req: StaffRequest) {
     return await this.productService.findById(
       id,
       requireStaffOrganizationId(req),
@@ -82,7 +85,7 @@ export class ProductController {
 
   @Post()
   @ApiOperation({ summary: 'Create new product with translations and options' })
-  async create(@Body() dto: CreateProductDto, @Req() req) {
+  async create(@Body() dto: CreateProductDto, @Req() req: StaffRequest) {
     return await this.productService.createProduct(
       dto,
       requireStaffOrganizationId(req),
@@ -95,7 +98,7 @@ export class ProductController {
   async update(
     @Param('id') id: string,
     @Body() dto: UpdateProductDto,
-    @Req() req,
+    @Req() req: StaffRequest,
   ) {
     return await this.productService.updateProduct(
       id,
@@ -108,7 +111,7 @@ export class ProductController {
   @Patch('/index')
   @ApiOperation({ summary: 'Method: update index' })
   @HttpCode(HttpStatus.OK)
-  async updateIndex(@Body() data: MoveProductDto, @Req() req) {
+  async updateIndex(@Body() data: MoveProductDto, @Req() req: StaffRequest) {
     return await this.productService.moveProduct(
       data,
       requireStaffOrganizationId(req),
@@ -135,7 +138,7 @@ export class ProductController {
   async activateProduct(
     @Param('id') id: string,
     @Body('is_active') is_active: boolean,
-    @Req() req,
+    @Req() req: StaffRequest,
   ) {
     return await this.productService.updateIsActive(
       id,
@@ -158,7 +161,7 @@ export class ProductController {
     @Param('id') id: string,
     @UploadedFiles() files: { images?: Express.Multer.File[] },
     @Body() dto: UploadProductImagesDto,
-    @Req() req,
+    @Req() req: StaffRequest,
   ) {
     return this.productService.addProductImages(
       id,
@@ -170,7 +173,7 @@ export class ProductController {
   @Delete(':id')
   @ApiOperation({ summary: 'Method: delete' })
   @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@Param('id') id: string, @Req() req) {
+  async remove(@Param('id') id: string, @Req() req: StaffRequest) {
     return await this.productService.delete(
       id,
       requireStaffOrganizationId(req),
@@ -181,7 +184,7 @@ export class ProductController {
   @Delete('/image/:id')
   @ApiOperation({ summary: 'Method: delete image' })
   @HttpCode(HttpStatus.NO_CONTENT)
-  async removeImage(@Param('id') id: string, @Req() req) {
+  async removeImage(@Param('id') id: string, @Req() req: StaffRequest) {
     return await this.productService.deleteImage(
       id,
       requireStaffOrganizationId(req),

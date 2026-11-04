@@ -17,7 +17,10 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { StaffOrderListDto, StaffOrderViewDto } from '../dto/order-view.dto';
-import { requireStaffOrganizationId } from 'src/infra/http/request-helpers';
+import {
+  requireStaffOrganizationId,
+  type StaffRequest,
+} from 'src/infra/http/request-helpers';
 import { ORDER_STATUSES, OrderStatusName } from '../domain/order-state-machine';
 import {
   AcceptOrderDto,
@@ -46,7 +49,7 @@ export class StaffOrderController {
   @ApiQuery({ name: 'cursor', required: false })
   @ApiQuery({ name: 'limit', required: false })
   list(
-    @Req() req,
+    @Req() req: StaffRequest,
     @Query('status') status?: string,
     @Query('branchId') branchId?: string,
     @Query('cursor') cursor?: string,
@@ -69,7 +72,7 @@ export class StaffOrderController {
   @Get(':id')
   @ApiOperation({ summary: 'Buyurtma tafsiloti (mijoz, status tarixi bilan)' })
   @ApiOkResponse({ type: StaffOrderViewDto })
-  get(@Req() req, @Param('id', ParseUUIDPipe) id: string) {
+  get(@Req() req: StaffRequest, @Param('id', ParseUUIDPipe) id: string) {
     return this.staff.get(requireStaffOrganizationId(req), id);
   }
 
@@ -78,7 +81,7 @@ export class StaffOrderController {
   @ApiOperation({ summary: 'Qabul qilish (ixtiyoriy: ETA)' })
   @ApiOkResponse({ type: StaffOrderViewDto })
   accept(
-    @Req() req,
+    @Req() req: StaffRequest,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: AcceptOrderDto,
   ) {
@@ -99,7 +102,7 @@ export class StaffOrderController {
   @ApiOperation({ summary: "Rad etish (to'langan bo'lsa pul qaytariladi)" })
   @ApiOkResponse({ type: StaffOrderViewDto })
   reject(
-    @Req() req,
+    @Req() req: StaffRequest,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: RejectOrderDto,
   ) {
@@ -118,7 +121,7 @@ export class StaffOrderController {
       "Keyingi bosqichga o'tkazish (tayyorlanmoqda → yo'lda/tayyor → yakunlandi)",
   })
   @ApiOkResponse({ type: StaffOrderViewDto })
-  advance(@Req() req, @Param('id', ParseUUIDPipe) id: string) {
+  advance(@Req() req: StaffRequest, @Param('id', ParseUUIDPipe) id: string) {
     return this.staff.act(
       requireStaffOrganizationId(req),
       id,
@@ -135,7 +138,7 @@ export class StaffOrderController {
   })
   @ApiOkResponse({ type: StaffOrderViewDto })
   setStatus(
-    @Req() req,
+    @Req() req: StaffRequest,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: SetOrderStatusDto,
   ) {

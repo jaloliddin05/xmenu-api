@@ -15,7 +15,10 @@ import {
 import { CreateCategoryDto, MoveCategoryDto, UpdateCategoryDto } from './dto';
 import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CategoryService } from './services/category.service';
-import { requireStaffOrganizationId } from 'src/infra/http/request-helpers';
+import {
+  requireStaffOrganizationId,
+  type StaffRequest,
+} from 'src/infra/http/request-helpers';
 
 @ApiTags('Category')
 @Controller('category')
@@ -25,7 +28,7 @@ export class CategoryController {
   @Get()
   @ApiOperation({ summary: 'Method: get all' })
   @HttpCode(HttpStatus.OK)
-  async findAll(@Query('lang') lang: string, @Req() req) {
+  async findAll(@Query('lang') lang: string, @Req() req: StaffRequest) {
     return await this.categoryService.findAll(
       lang,
       requireStaffOrganizationId(req),
@@ -40,7 +43,7 @@ export class CategoryController {
   async findAllForSelect(
     @Query('lang') lang: string,
     @Param('organizationId') organizationId: string,
-    @Req() req,
+    @Req() req: StaffRequest,
   ) {
     return await this.categoryService.getForSelect(
       organizationId,
@@ -52,7 +55,7 @@ export class CategoryController {
   @Get('/:id')
   @ApiOperation({ summary: 'Method: get one' })
   @HttpCode(HttpStatus.OK)
-  async findOne(@Param('id') id: string, @Req() req) {
+  async findOne(@Param('id') id: string, @Req() req: StaffRequest) {
     return await this.categoryService.findOne(
       id,
       requireStaffOrganizationId(req),
@@ -62,7 +65,7 @@ export class CategoryController {
   @Post()
   @ApiOperation({ summary: 'Method: create' })
   @HttpCode(HttpStatus.CREATED)
-  async create(@Body() data: CreateCategoryDto, @Req() req) {
+  async create(@Body() data: CreateCategoryDto, @Req() req: StaffRequest) {
     return await this.categoryService.createCategory(
       data,
       requireStaffOrganizationId(req),
@@ -76,7 +79,7 @@ export class CategoryController {
   async update(
     @Param('id') id: string,
     @Body() data: UpdateCategoryDto,
-    @Req() req,
+    @Req() req: StaffRequest,
   ) {
     return await this.categoryService.update(
       id,
@@ -105,7 +108,7 @@ export class CategoryController {
   async activateCategory(
     @Param('id') id: string,
     @Body('is_active') is_active: boolean,
-    @Req() req,
+    @Req() req: StaffRequest,
   ) {
     return await this.categoryService.updateIsActive(
       id,
@@ -118,7 +121,7 @@ export class CategoryController {
   @Patch('/index')
   @ApiOperation({ summary: 'Method: update index' })
   @HttpCode(HttpStatus.OK)
-  async updateIndex(@Body() data: MoveCategoryDto, @Req() req) {
+  async updateIndex(@Body() data: MoveCategoryDto, @Req() req: StaffRequest) {
     return await this.categoryService.moveCategory(
       data,
       requireStaffOrganizationId(req),
@@ -129,7 +132,7 @@ export class CategoryController {
   @Delete(':id')
   @ApiOperation({ summary: 'Method: delete' })
   @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@Param('id') id: string, @Req() req) {
+  async remove(@Param('id') id: string, @Req() req: StaffRequest) {
     return await this.categoryService.delete(
       id,
       requireStaffOrganizationId(req),

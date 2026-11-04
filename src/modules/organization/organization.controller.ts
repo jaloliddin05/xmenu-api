@@ -26,7 +26,10 @@ import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { MulterStorage } from 'src/infra/helper/upload/multer-upload';
 import UpdateOrganizationDto from './dto/update-organization.dto';
 import { Public } from '../auth/decorators/public.decorator';
-import { requireStaffOrganizationId } from 'src/infra/http/request-helpers';
+import {
+  requireStaffOrganizationId,
+  type StaffRequest,
+} from 'src/infra/http/request-helpers';
 import { isValidSlug, SLUG_RULE } from './domain/slug';
 
 @ApiTags('Organization')
@@ -37,7 +40,7 @@ export class OrganizationController {
   @Get(':id')
   @ApiOperation({ summary: 'Method: get one (your own organization only)' })
   @HttpCode(HttpStatus.OK)
-  async findOne(@Param('id') id: string, @Req() req) {
+  async findOne(@Param('id') id: string, @Req() req: StaffRequest) {
     const organization = await this.organizationService.findOne(id);
     this.organizationService.assertOwn(
       organization.id,
@@ -105,7 +108,7 @@ export class OrganizationController {
     @Body() data: UpdateOrganizationDto,
     @UploadedFiles()
     files: { banner?: Express.Multer.File[]; logo?: Express.Multer.File[] },
-    @Req() req,
+    @Req() req: StaffRequest,
   ) {
     const banner = files?.banner?.[0];
     const logo = files?.logo?.[0];
@@ -121,7 +124,7 @@ export class OrganizationController {
   @Delete(':id')
   @ApiOperation({ summary: 'Method: delete' })
   @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@Param('id') id: string, @Req() req) {
+  async remove(@Param('id') id: string, @Req() req: StaffRequest) {
     return await this.organizationService.delete(
       id,
       requireStaffOrganizationId(req),

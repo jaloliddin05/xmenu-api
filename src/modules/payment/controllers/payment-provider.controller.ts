@@ -11,7 +11,10 @@ import {
   Req,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { requireStaffOrganizationId } from 'src/infra/http/request-helpers';
+import {
+  requireStaffOrganizationId,
+  type StaffRequest,
+} from 'src/infra/http/request-helpers';
 import { UpsertPaymentProviderDto } from '../dto/payment-provider.dto';
 import type { OnlineProvider } from '../services/payment-config.service';
 import { PaymentConfigService } from '../services/payment-config.service';
@@ -32,7 +35,7 @@ export class PaymentProviderController {
     summary:
       'Yoqilgan/sozlangan provayderlar + kabinetga kiritiladigan webhook manzillari',
   })
-  async list(@Req() req) {
+  async list(@Req() req: StaffRequest) {
     const orgId = requireStaffOrganizationId(req);
     const base = (process.env.PUBLIC_API_URL ?? '').replace(/\/$/, '');
     return {
@@ -56,7 +59,7 @@ export class PaymentProviderController {
     @Param('provider', new ParseEnumPipe(ProviderParam))
     provider: OnlineProvider,
     @Body() dto: UpsertPaymentProviderDto,
-    @Req() req,
+    @Req() req: StaffRequest,
   ) {
     return this.configs.upsert(
       requireStaffOrganizationId(req),
@@ -72,7 +75,7 @@ export class PaymentProviderController {
   async disable(
     @Param('provider', new ParseEnumPipe(ProviderParam))
     provider: OnlineProvider,
-    @Req() req,
+    @Req() req: StaffRequest,
   ) {
     await this.configs.setEnabled(
       requireStaffOrganizationId(req),

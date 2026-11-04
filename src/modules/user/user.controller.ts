@@ -1,3 +1,4 @@
+import type { StaffRequest } from 'src/infra/http/request-helpers';
 import {
   Controller,
   Get,
@@ -37,7 +38,7 @@ export class UserController {
   @Get('/me')
   @ApiOperation({ summary: 'Method: returns user' })
   @HttpCode(HttpStatus.OK)
-  async getMe(@Req() req) {
+  async getMe(@Req() req: StaffRequest) {
     return await this.userService.findOne(req.user.id);
   }
 
@@ -53,7 +54,7 @@ export class UserController {
   async update(
     @Body() data: UpdateUserDto,
     @Param('id') id: string,
-    @Req() req,
+    @Req() req: StaffRequest,
     @UploadedFile(FileUploadValidationForOptional) file: Express.Multer.File,
   ) {
     return this.userService.update(assertSelf(req, id), data, file);
@@ -65,7 +66,7 @@ export class UserController {
   async changePassword(
     @Body() data: ChangePasswordDto,
     @Param('id') id: string,
-    @Req() req,
+    @Req() req: StaffRequest,
   ) {
     return await this.userService.changePassword(data, assertSelf(req, id));
   }
@@ -73,7 +74,7 @@ export class UserController {
   @Delete(':id')
   @ApiOperation({ summary: 'Method: delete' })
   @HttpCode(HttpStatus.NO_CONTENT)
-  remove(@Param('id') id: string, @Req() req) {
+  remove(@Param('id') id: string, @Req() req: StaffRequest) {
     return this.userService.delete(assertSelf(req, id));
   }
 }
