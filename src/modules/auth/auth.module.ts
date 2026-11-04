@@ -33,6 +33,11 @@ import { CustomerCleanupService } from './services/customer-cleanup.service';
 import { RateLimitService } from './services/rate-limit.service';
 import { TelegramInitDataService } from './services/telegram-init-data.service';
 import { TelegramVerificationService } from './services/telegram-verification.service';
+import {
+  BullTelegramUpdateQueue,
+  TELEGRAM_UPDATE_QUEUE,
+} from './services/telegram-update.queue';
+import { TelegramUpdateProcessor } from './services/telegram-update.processor';
 import { TelegramBotWebhookController } from './controllers/telegram-bot-webhook.controller';
 import { CustomerAccessTokenStrategy } from './passport-strategies/customer-access-token/customer-access-token.strategy';
 import { NoStoreMiddleware } from './middleware/no-store.middleware';
@@ -74,6 +79,8 @@ import { NoStoreMiddleware } from './middleware/no-store.middleware';
     RateLimitService,
     TelegramInitDataService,
     TelegramVerificationService,
+    { provide: TELEGRAM_UPDATE_QUEUE, useClass: BullTelegramUpdateQueue },
+    TelegramUpdateProcessor,
     CustomerAccessTokenStrategy,
     AccessTokenUserStrategy,
     JwtTokenService,

@@ -399,10 +399,21 @@ describe('status and webhook hygiene', () => {
     expect(otp.issue).not.toHaveBeenCalled();
   });
 
-  it('processes each update_id once and ignores groups and bots', async () => {
+  it('claims each update_id once per bot; a released claim can be taken again', async () => {
+    const { svc } = setup();
+    expect(await svc.claimUpdate('bot-1', 10)).toBe(true);
+    expect(await svc.claimUpdate('bot-1', 10)).toBe(false);
+    expect(await svc.claimUpdate('bot-2', 10)).toBe(true);
+    await svc.releaseUpdate('bot-1', 10);
+    expect(await svc.claimUpdate('bot-1', 10)).toBe(true);
+    // Without an id there is nothing to deduplicate by
+    expect(await svc.claimUpdate('bot-1', undefined)).toBe(true);
+    expect(await svc.claimUpdate('bot-1', undefined)).toBe(true);
+  });
+
+  it('ignores groups, bots and updates without a message', async () => {
     const { svc, sent, priv } = setup();
     const msg = priv({ text: '/start' });
-    await svc.handleUpdate(BOT, { update_id: 10, message: msg });
     await svc.handleUpdate(BOT, { update_id: 10, message: msg });
     expect(sent).toHaveLength(1);
     await svc.handleUpdate(BOT, {
