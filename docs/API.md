@@ -179,8 +179,8 @@ IP берётся из `X-Forwarded-For` только от локального 
   `ordering_not_published`), меню, филиалы и карта отдаются как обычно (предпросмотр).
 - `channels.auth`: как клиент может подтвердить номер, подсказка, чтобы не показывать нерабочую кнопку. `telegram`: у
   заведения подключён и включён бот (то же условие, что у `telegram/start`; иначе тот отвечает `503
-  telegram_unavailable`). `sms`: у платформы настроен SMS-провайдер (для Eskiz заданы `ESKIZ_EMAIL` и `ESKIZ_PASSWORD`,
-  `telegram` и `console` годятся всегда); это проверка настроек, не доступности: сбой провайдера приходит ответом
+  telegram_unavailable`). `sms`: у платформы настроен выбранный SMS-провайдер (`eskiz`: заданы `ESKIZ_EMAIL` и
+  `ESKIZ_PASSWORD`; `telegram`: заданы `OTP_BOT` и `XMENU_CHAT_ID`; `console`: только вне production); это проверка настроек, не доступности: сбой провайдера приходит ответом
   `503 sms_unavailable`. Подключение и отключение бота ставит ревалидацию `route: 'channels'`. Источник истины остаются
   сами эндпоинты.
 - `fulfillment.modes`: пусто, пока `channels.delivery.published` не `true`. Иначе `pickup`, если есть активный филиал с

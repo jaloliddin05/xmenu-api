@@ -417,6 +417,24 @@ describe('GET /tenant/config', () => {
     });
   });
 
+  it('reports no SMS when the telegram test provider lacks its bot or chat', async () => {
+    const saved = { ...process.env };
+    try {
+      process.env.SMS_PROVIDER = 'telegram';
+      delete process.env.OTP_BOT;
+      process.env.XMENU_CHAT_ID = '-100';
+      expect((await config(FULL).expect(200)).body.channels.auth.sms).toBe(
+        false,
+      );
+      process.env.OTP_BOT = '1:T';
+      expect((await config(FULL).expect(200)).body.channels.auth.sms).toBe(
+        true,
+      );
+    } finally {
+      process.env = saved;
+    }
+  });
+
   it('reports a QR menu the owner turned off', async () => {
     orgs[FULL].qr_enabled = false;
     expect((await config(FULL).expect(200)).body.channels.qr).toBe(false);

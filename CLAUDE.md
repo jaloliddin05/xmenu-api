@@ -110,7 +110,8 @@ test, `npm run openapi` + `git diff --exit-code docs/`, `format:check` и `lint`
   (меню отдаётся), его читает QR-фронт.
 - Изменения ставят ревалидацию с `route: 'channels'` (QR и клиент); её ставит и `TelegramBotService` при подключении и
   отключении бота. `channels.auth` `{ sms, telegram }` в `GET /tenant/config`: подсказка, как подтвердить номер
-  (`telegram` = включённый бот заведения, `sms` = `isSmsConfigured()` в `sms.module.ts`, проверка настроек, не пинг);
+  (`telegram` = включённый бот заведения, `sms` = `isSmsConfigured()` в `sms.module.ts`: учётные данные Eskiz, `OTP_BOT` и `XMENU_CHAT_ID` для `telegram`,
+  `console` вне production; проверка настроек, не пинг);
   источник истины остаются `otp/request` и `telegram/start`.
 - Бот удалён (`DELETE /telegram-bot`) при режиме `miniapp`/`both`: режим остаётся, пункт `telegram_bot` в чеклисте
   становится `todo`, публикация не снимается.
