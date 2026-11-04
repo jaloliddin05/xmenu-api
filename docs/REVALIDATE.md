@@ -6,7 +6,7 @@
 
 | Цель | Адрес | Секрет | Когда ставится |
 |---|---|---|---|
-| `qr` (`xmenu-qr`) | `{NEXT_PUBLIC_URL}/api/revalidate` | `REVALIDATE_SECRET` | все `route`, кроме `branches` |
+| `qr` (`xmenu-qr`) | `{NEXT_PUBLIC_URL}/api/revalidate` | `REVALIDATE_SECRET` | все `route`, кроме `branches` и `domains` |
 | `client` (`xmenu-client`) | `CLIENT_REVALIDATE_URL` (полный адрес) | `CLIENT_REVALIDATE_SECRET` | все `route`, если `CLIENT_REVALIDATE_URL` задан |
 
 ## Изменение (`TenantChange`)
@@ -17,14 +17,17 @@
 | `settings` | настройки заведения (`PUT /organization/:id/settings`), настройки заказа и зона (`PUT /order-settings`) | `OrganizationSettingsService.replace`, `OrderSettingsController` |
 | `branches` | филиалы, часы работы, исключения | `BranchService` |
 | `channels` | каналы (QR, заказы, режим) и публикация (`PUT /organization/:id/channels`, `publish`, `unpublish`) | `PublicationService` |
+| `domains` | свой домен подтверждён или подтверждённый удалён (`POST …/domains/:id/verify`, `DELETE …/domains/:id`, добавление при `DOMAIN_VERIFY_SKIP`) | `TenantDomainService` |
 
-Поля: `tenantId` (id организации), `route`, `oldSlug` (только при смене slug, иначе `null`). Вызывающий может передать
+Поля: `tenantId` (id организации), `route`, `oldSlug` (только при смене slug, иначе `null`), `host` (только для
+`domains`: подтверждённый или удалённый хост в каноническом виде, иначе `null`). Вызывающий может передать
 `slug`, но в очередь он не попадает: процессор читает текущий slug по `tenantId` в момент выполнения задания (в том числе
 при повторе после ошибки), поэтому переименование между постановкой и выполнением не отправит старый slug. Нет
 организации (удалена) → задание пропускается; нет slug → пропускается задание QR.
 
 ## Идентификатор задания
-`revalidate-{target}-{route}-{tenantId}` (части URI-кодируются, без `:`). Повторная правка того же тенанта и того же
+`revalidate-{target}-{route}-{tenantId}`, для `domains` `revalidate-client-domains-{tenantId}-{host}` (части
+URI-кодируются, без `:`; две правки разных доменов за 20 с дают два задания, каждое со своим хостом). Повторная правка того же тенанта и того же
 `route` за 20 с заменяет ожидающее задание; разные тенанты, цели и `route` друг друга не затирают. Slug в ключ не
 входит: он меняется, id нет.
 
@@ -47,15 +50,19 @@
 {
   "secret": "<CLIENT_REVALIDATE_SECRET>",
   "tenantId": "<org id>",
-  "route": "menu | organization | settings | branches | channels",
+  "route": "menu | organization | settings | branches | channels | domains",
   "slug": "mant",
-  "oldSlug": null
+  "oldSlug": null,
+  "host": null
 }
 ```
 - `tenantId` всегда есть; по нему клиент сбрасывает тег `tenant:{tenantId}` (рекомендуется: все данные тенанта в
   ISR помечены этим тегом).
 - `slug` текущий (может быть `null`, если slug не задан); `oldSlug` не `null` только при смене slug: старый поддомен
   `{oldSlug}.xmenu.uz` надо сбросить (истории slug нет, старый адрес после ревалидации отдаёт 404).
+- `host` не `null` только при `route: "domains"`: хост, который начал или перестал вести на заведение. Клиент
+  сбрасывает тег ответа by-host для этого хоста (рекомендуется `tenant-host:{host}`), остальное покрывает
+  `tenant:{tenantId}` (в том числе `primaryDomain` в конфиге).
 - `route` подсказывает, что изменилось; клиент может сбрасывать всё по тегу и не различать `route`.
 - Ожидаемые ответы: 200 при успехе; 401 при неверном секрете; 503, если секрет на стороне клиента пуст; 400 при плохом
   теле. Любой ответ, кроме 200, бэкенд считает ошибкой и повторяет (5 попыток, экспоненциально от 60 с).

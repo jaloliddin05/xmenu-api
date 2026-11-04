@@ -132,6 +132,15 @@ IP берётся из `X-Forwarded-For` только от локального 
 1. `GET /tenant/by-slug/:slug` (публичный, без заголовков) → `{ "id": "uuid", "slug": "cafe-example" }`.
    Только активные заведения. Неизвестный, неактивный, невалидный или UUID-подобный slug → `404 tenant_not_found`.
    `Cache-Control: public, max-age=60` (slug владелец может переименовать), ошибки `no-store`.
+   Сайт доставки вместо slug может передать хост, на котором его открыли: `GET /tenant/by-host/:host` (публичный) →
+   `{ "id": "uuid", "slug": "mant", "name": "Mant", "primaryDomain": "order.mant.uz" }`. Тенантом считается только
+   `{slug}.{PLATFORM_DOMAIN}` (ровно одна метка, те же правила slug, записи в таблице не нужно) или подтверждённый
+   свой домен заведения (раздел «Домены заведения»). Регистр, порт, точка в конце и IDN нормализуются
+   (`Order.Mant.uz:443` = `order.mant.uz`, `ресторан.uz` = `xn--80ajzcicfi.uz`; юникод в пути URL-кодируется).
+   Неподтверждённый или неизвестный домен, другой хост платформы (`api.xmenu.uz`, `a.b.xmenu.uz`, сам `xmenu.uz`),
+   неактивное заведение, IP или не-хост → `404 tenant_not_found`. `slug` бывает `null` (свой домен у заведения без
+   slug). Кэш как у by-slug. Заголовки `Host` и `X-Forwarded-Host` запроса к API бэкенд тенантом не считает: хост
+   приходит только параметром, от сервера сайта доставки.
 2. Дальше во все клиентские запросы заголовок `X-Tenant-Id: <id>`. Принимается только UUID организации: slug в
    заголовке → `404 tenant_not_found` без запроса в БД. Нет заголовка → `400 tenant_required`, неактивное
    заведение → `403 tenant_inactive`. Id не меняется при смене slug.
@@ -140,7 +149,7 @@ IP берётся из `X-Forwarded-For` только от локального 
 
 ```json
 {
-  "id": "uuid", "slug": "cafe-example", "name": "Demo Cafe", "type": "cafe",
+  "id": "uuid", "slug": "cafe-example", "name": "Demo Cafe", "primaryDomain": null, "type": "cafe",
   "logoUrl": "https://files.example/image/organization/logo.png", "bannerUrl": null,
   "description": "текст на языке ответа", "foundedYear": null,
   "theme": { "background": "#FFFFFF", "foreground": "#1A1A1A", "surface": "#FFFFFF", "mutedSurface": "#F4F4F4",
@@ -159,6 +168,8 @@ IP берётся из `X-Forwarded-For` только от локального 
 - Чего владелец не заполнил, приходит `null`; сервер ничего не подставляет. Исключение — `theme`: он всегда полный
   (все 9 ключей, не `null`): цвета владельца поверх нейтральных цветов платформы (таблица ниже). Фронты своих
   нейтральных значений не держат и берут цвет из ответа.
+- `primaryDomain`: самый ранний подтверждённый свой домен заведения (хост без схемы, ASCII/punycode) или `null`.
+  Платформенный адрес `{slug}.{PLATFORM_DOMAIN}` работает всегда и сюда не попадает.
 - `logoUrl`, `bannerUrl`: абсолютные URL от `PUBLIC_FILES_URL` (иначе `PUBLIC_API_URL`).
 - `description`: на языке ответа; пустое или отсутствующее берётся на языке заведения по умолчанию, иначе `null`.
 - `channels` (раздел «Каналы и публикация» ниже): `qr`: QR-меню включено владельцем (QR-фронт при `false` показывает
@@ -403,6 +414,54 @@ QR-меню и сайта доставки (`REVALIDATE.md`).
 (не из кэша тенанта), пауза действует сразу. Повтор уже созданного заказа (тот же `Idempotency-Key`), отмена и
 повторная оплата не блокируются.
 
+## Домены заведения (владелец)
+
+Свои хосты сайта доставки: `restaurant.uz`, `order.restaurant.uz`, в разработке хост туннеля (для проверки Mini App).
+Платформенный адрес `{slug}.{PLATFORM_DOMAIN}` (`PLATFORM_DOMAIN` из env, например `xmenu.uz`) есть у каждого
+заведения без записи. Код: `src/modules/tenant-domain/`, разбор хостов `src/modules/tenant/host.ts`.
+
+Эндпоинты (JSON, токен владельца, только своя организация; без токена `401`, нет организации `403`, чужой id
+организации `404` без чтения и записи, чужой или несуществующий id домена `404 domain_not_found`):
+
+| Запрос | Ответ |
+|---|---|
+| `GET /organization/:id/domains` | `200 { platformHost, primaryDomain, limit, items: [домен] }` |
+| `POST /organization/:id/domains { host }` | `201` домен (`pending`; при `DOMAIN_VERIFY_SKIP=true` сразу `verified`) |
+| `POST /organization/:id/domains/:domainId/verify` | `200` домен; уже подтверждённый отвечает как есть, без проверки |
+| `DELETE /organization/:id/domains/:domainId` | `204` |
+
+```json
+{
+  "id": "uuid", "host": "xn--80ajzcicfi.uz", "hostUnicode": "ресторан.uz", "status": "pending", "isPrimary": false,
+  "createdAt": "2026-11-04T10:00:00.000Z", "verifiedAt": null, "lastCheckAt": null, "lastCheckError": null,
+  "verification": { "type": "TXT", "name": "_xmenu-verify.xn--80ajzcicfi.uz", "value": "xmenu-verify=<token>" }
+}
+```
+
+- `platformHost`: `{slug}.{PLATFORM_DOMAIN}` или `null` (нет slug или `PLATFORM_DOMAIN`). `primaryDomain` и
+  `isPrimary`: самый ранний подтверждённый домен (`verifiedAt`, затем `host`); отдельного выбора основного нет, его
+  можно сменить только удалением. `limit`: 5 доменов на заведение, `pending` считаются.
+- Хост (`POST`): только имя, без схемы, пути и порта. Регистр, точка в конце и IDN нормализуются, хранится ASCII
+  (punycode) в нижнем регистре. Ошибки `400` с полем в `errors[]` (`field: "host"`, `reason` = код): `invalid_host`
+  (не имя домена, одна метка, схема, путь, порт), `platform_host` (`PLATFORM_DOMAIN` или любой хост под ним, в том
+  числе зарезервированные `api`, `qr`, `dashboard`), `reserved_host` (`localhost`, `.localhost`, `.local`,
+  `.internal`, `.invalid`, `.onion`, `.arpa`, IP). Нет поля → `400 validation_error`.
+- `409 domain_already_added`: у этого заведения уже есть такой хост (в любом регистре). `409 domain_taken`: хост
+  подтверждён другим заведением. `422 domain_limit_reached` (`details.limit`). Неподтверждённый хост другого заведения
+  добавлению не мешает: у каждого своя запись и свой токен, подтверждает тот, кто управляет DNS.
+- Проверка владения: TXT-запись `_xmenu-verify.<host>` со значением `xmenu-verify=<token>` (значения в
+  `verification`, запись лучше оставить и после подтверждения). Не прошла → `422 domain_verification_failed`,
+  `details.reason`: `record_not_found` (нет записи или имени), `token_mismatch` (запись есть, значение другое),
+  `dns_error` (тайм-аут, сбой DNS); `details.record` — ожидаемая запись. Причина и время сохраняются
+  (`lastCheckError`, `lastCheckAt`). Другое заведение подтвердило хост раньше → `409 domain_taken`
+  (`lastCheckError: "domain_taken"`).
+- `DOMAIN_VERIFY_SKIP=true` (только разработка): DNS не проверяется, домен подтверждается при добавлении. С
+  `NODE_ENV=production` приложение с этим флагом не стартует; без годного `PLATFORM_DOMAIN` в production тоже.
+- Подтверждение и удаление подтверждённого домена сбрасывают кэш тенанта и ставят ревалидацию сайта доставки
+  (`route: "domains"`, `host`; `docs/REVALIDATE.md`). Добавление и удаление `pending` публично ничего не меняют.
+- Подтверждённые домены повторно не проверяются (TXT можно удалить после подтверждения). TLS и nginx для своих
+  доменов бэкенд не настраивает.
+
 ## Доступ к данным админки
 
 Владелец видит и меняет только свою организацию. Любой id чужой организации (в пути или в теле: `category_id`,
@@ -461,6 +520,8 @@ QR-меню и сайта доставки (`REVALIDATE.md`).
 | `POST /auth/login`, `POST /auth/check-code` | `user` без пароля, но со всеми колонками организации (`owner_id`, `order_seq`, `int_id`, пути файлов) | `user` по списку полей (см. «Авторизация владельцев») |
 
 `GET /organization/slug/:slug` (прежнее публичное QR-меню) удалён: QR берёт заведение через `GET /tenant/by-slug/:slug`, `GET /tenant/config` и `GET /menu`; путь отвечает `404`.
+
+`GET /tenant/by-host/:host` (новый) отдаёт по списку полей `{ id, slug, name, primaryDomain }`.
 
 Уже были на мапперах и не менялись: `GET /tenant/by-slug/:slug`, `GET /tenant/config`, `GET /menu`, `GET /branches`,
 `GET /checkout-config`, `/orders*`, `/auth/customer/*`. Вебхуки Click, Payme и Telegram отвечают в формате
