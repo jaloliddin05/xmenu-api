@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../_prisma/prisma.service';
 import { FileService } from 'src/modules/file/file.service';
@@ -61,7 +62,7 @@ export class ProductService {
     isActive?: boolean,
     title?: string,
   ) {
-    const where: any = {};
+    const where: Prisma.productWhereInput = {};
     if (category_id) where['category_id'] = category_id;
     if (isActive !== undefined) where.is_active = isActive;
     if (title) {
@@ -349,7 +350,8 @@ export class ProductService {
     await this.findOwnProduct(productId, organizationId);
 
     // 🔸 2. Har bir rasmni FileService orqali yuklab olish
-    const uploadedFiles: any = [];
+    const uploadedFiles: Awaited<ReturnType<ProductService['uploadImage']>>[] =
+      [];
     for (const image of images) {
       const file = await this.uploadImage(image);
       uploadedFiles.push(file);

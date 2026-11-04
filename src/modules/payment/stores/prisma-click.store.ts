@@ -9,7 +9,7 @@ const toPayment = (p: {
   order_id: string;
   provider_transaction_id: string | null;
   amount: number;
-  status: any;
+  status: ClickPayment['status'];
 }): ClickPayment => ({
   seq: p.seq,
   orderId: p.order_id,

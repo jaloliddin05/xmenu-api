@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../_prisma/prisma.service';
 import { ChangePasswordDto, UpdateUserDto } from './dto';
@@ -56,7 +57,7 @@ export class UserService {
   }
 
   async update(id: string, data: UpdateUserDto, file?: Express.Multer.File) {
-    const avatar: any = {};
+    const avatar: { avatar_id?: string; url?: string } = {};
     if (file) {
       const newAvatar = await this.updateImage(file, id);
       avatar.avatar_id = newAvatar.id;
@@ -65,7 +66,8 @@ export class UserService {
 
     const user = await this.prismaService.user.update({
       where: { id },
-      data: { ...data, ...avatar },
+      // the DTO is looser than the Prisma input type
+      data: { ...data, ...avatar } as Prisma.userUncheckedUpdateInput,
       include: { avatar: true }, // agar file ma'lumotini ham qaytarmoqchi bo'lsangiz
     });
     return toStaffUser(user);

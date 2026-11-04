@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { Injectable, NotFoundException } from '@nestjs/common';
 
 import { PrismaService } from '../../_prisma/prisma.service';
@@ -64,7 +65,7 @@ export class AdditionalProductService {
     if (dto.product_id)
       await this.assertOwnProduct(dto.product_id, organizationId);
 
-    const data: any = {
+    const data: Prisma.additional_product_groupCreateInput = {
       is_multiple: dto.is_multiple ?? false,
       is_required: dto.is_required ?? false,
       min_selected: dto.min_selected,

@@ -217,7 +217,7 @@ export class PaymeProtocol {
     p: Record<string, any>,
     requirePayable = true,
   ): Promise<PaymeOrder> {
-    const orderId = p.account?.order_id;
+    const orderId = (p.account as { order_id?: unknown } | undefined)?.order_id;
     if (typeof orderId !== 'string' || !orderId)
       throw new PaymeRpcError(PAYME_ERROR.ORDER_NOT_FOUND, 'order_id');
 
@@ -309,7 +309,7 @@ export class PaymeProtocol {
 
   private async cancel(p: Record<string, any>) {
     const tx = await this.requireTx(p.id);
-    const reason = Number.isInteger(p.reason) ? p.reason : 10;
+    const reason = Number.isInteger(p.reason) ? (p.reason as number) : 10;
 
     if (tx.state === 1) {
       return this.cancelResult(
