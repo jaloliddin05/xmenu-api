@@ -85,12 +85,35 @@ export class TenantDeliveryChannelDto {
   published: boolean;
 }
 
+export class TenantAuthChannelsDto {
+  @ApiProperty({
+    example: true,
+    description:
+      'The platform can send SMS codes (provider configured). A provider outage still answers 503 sms_unavailable on otp/request',
+  })
+  sms: boolean;
+
+  @ApiProperty({
+    example: false,
+    description:
+      'The venue has an enabled Telegram bot, so telegram/start can work. false = it answers 503 telegram_unavailable: offer SMS only',
+  })
+  telegram: boolean;
+}
+
 export class TenantChannelsDto {
   @ApiProperty({
     example: true,
     description: 'QR menu turned on by the owner',
   })
   qr: boolean;
+
+  @ApiProperty({
+    type: TenantAuthChannelsDto,
+    description:
+      'Ways a customer can confirm a phone number. A hint to hide dead buttons; the endpoints stay the source of truth',
+  })
+  auth: TenantAuthChannelsDto;
 
   @ApiProperty({ type: TenantDeliveryChannelDto })
   delivery: TenantDeliveryChannelDto;

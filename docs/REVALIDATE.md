@@ -16,7 +16,7 @@
 | `organization` | имя, тип, slug, логотип, баннер, описание (`PUT /organization/:id`) | `OrganizationService.update` |
 | `settings` | настройки заведения (`PUT /organization/:id/settings`), настройки заказа и зона (`PUT /order-settings`) | `OrganizationSettingsService.replace`, `OrderSettingsController` |
 | `branches` | филиалы, часы работы, исключения | `BranchService` |
-| `channels` | каналы (QR, заказы, режим) и публикация (`PUT /organization/:id/channels`, `publish`, `unpublish`) | `PublicationService` |
+| `channels` | каналы (QR, заказы, режим) и публикация (`PUT /organization/:id/channels`, `publish`, `unpublish`) | `PublicationService`, `TelegramBotService` (подключение и отключение бота меняют `channels.auth.telegram`) |
 | `domains` | свой домен подтверждён или подтверждённый удалён (`POST …/domains/:id/verify`, `DELETE …/domains/:id`, добавление при `DOMAIN_VERIFY_SKIP`) | `TenantDomainService` |
 
 Поля: `tenantId` (id организации), `route`, `oldSlug` (только при смене slug, иначе `null`), `host` (только для

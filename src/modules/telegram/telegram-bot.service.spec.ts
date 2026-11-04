@@ -49,8 +49,13 @@ function setup() {
           : true,
     ),
   };
-  const svc = new TelegramBotService(prisma as any, client as any);
-  return { svc, prisma, client, rows };
+  const revalidate = { addRevalidationJob: jest.fn(async () => undefined) };
+  const svc = new TelegramBotService(
+    prisma as any,
+    client as any,
+    revalidate as any,
+  );
+  return { svc, prisma, client, rows, revalidate };
 }
 
 const withCode = (code: string) => ({
@@ -169,6 +174,29 @@ describe('TelegramBotService', () => {
       withCode('webhook_setup_failed'),
     );
     expect(rows.size).toBe(0);
+  });
+
+  it('connect and disconnect refresh the cached tenant config (channels.auth.telegram)', async () => {
+    const { svc, revalidate } = setup();
+    await svc.connect(ORG, TOKEN);
+    expect(revalidate.addRevalidationJob).toHaveBeenLastCalledWith({
+      tenantId: ORG,
+      route: 'channels',
+    });
+    revalidate.addRevalidationJob.mockClear();
+    await svc.disconnect(ORG);
+    expect(revalidate.addRevalidationJob).toHaveBeenCalledTimes(1);
+  });
+
+  it('a failed cache refresh does not fail connect', async () => {
+    const { svc, revalidate, rows } = setup();
+    revalidate.addRevalidationJob.mockRejectedValueOnce(
+      new Error('redis down'),
+    );
+    await expect(svc.connect(ORG, TOKEN)).resolves.toMatchObject({
+      connected: true,
+    });
+    expect(rows.size).toBe(1);
   });
 
   it('disconnect removes the webhook and the row', async () => {

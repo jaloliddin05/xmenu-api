@@ -26,6 +26,15 @@ export function resolveSmsProviderName(
   return name;
 }
 
+/**
+ * Whether the chosen provider has what it needs to send. A static configuration check, not a probe
+ * of the provider: a provider that is down still answers 503 sms_unavailable per request.
+ */
+export function isSmsConfigured(env: NodeJS.ProcessEnv = process.env): boolean {
+  if (resolveSmsProviderName(env) !== 'eskiz') return true;
+  return Boolean(env.ESKIZ_EMAIL && env.ESKIZ_PASSWORD);
+}
+
 @Module({
   imports: [
     HttpModule.registerAsync({

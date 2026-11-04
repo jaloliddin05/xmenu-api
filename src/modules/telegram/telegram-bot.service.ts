@@ -12,6 +12,8 @@ import {
   encryptConfig,
   parsePaymentConfigKey,
 } from 'src/modules/payment/domain/payment-crypto';
+import { errorMessage } from 'src/infra/helper/error-text';
+import { RevalidateService } from 'src/modules/revalidate-queue/revalidate.service';
 import { TelegramClient, telegramErrorText } from './telegram-client';
 
 /** A venue's own bot, ready to use (token decrypted). `botKey` is the row id and never changes. */
@@ -65,6 +67,7 @@ export class TelegramBotService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly client: TelegramClient,
+    private readonly revalidate: RevalidateService,
   ) {}
 
   private get key(): Buffer {
@@ -219,6 +222,7 @@ export class TelegramBotService {
     if (existing && existing.telegram_bot_id !== telegramBotId) {
       await this.dropWebhook(existing);
     }
+    await this.authChannelsChanged(organizationId);
     return this.status(organizationId);
   }
 
@@ -232,6 +236,22 @@ export class TelegramBotService {
     await this.prisma.organization_telegram_bot.delete({
       where: { organization_id: organizationId },
     });
+    await this.authChannelsChanged(organizationId);
+  }
+
+  /** GET /tenant/config channels.auth.telegram follows the bot row; front-ends cache that config. */
+  private async authChannelsChanged(organizationId: string) {
+    try {
+      await this.revalidate.addRevalidationJob({
+        tenantId: organizationId,
+        route: 'channels',
+      });
+    } catch (e) {
+      // The bot is already saved; a failed cache nudge must not fail the request (ISR expires on its own)
+      this.logger.warn(
+        `Revalidation after a bot change failed: ${errorMessage(e)}`,
+      );
+    }
   }
 
   /** The bot is no longer ours: give its menu button back to Telegram's default. Best effort. */

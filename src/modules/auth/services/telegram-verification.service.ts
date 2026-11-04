@@ -40,7 +40,7 @@ export interface TelegramStartResult {
 
 export type TelegramStatusResult =
   | { status: 'pending' }
-  | { status: 'code_sent'; phone: string }
+  | { status: 'code_sent'; phone: string; codeLength: number }
   | { status: 'expired' }
   | ({ status: 'verified' } & VerifyResult);
 
@@ -203,7 +203,11 @@ export class TelegramVerificationService {
       return { status: 'expired' };
     if (session.status === 'pending') return { status: 'pending' };
     if (session.status === 'code_sent')
-      return { status: 'code_sent', phone: session.phone! };
+      return {
+        status: 'code_sent',
+        phone: session.phone!,
+        codeLength: this.cfg.otpLength,
+      };
 
     // verified (instant mode): hand out the login result exactly once
     const usedKey = `tgv:used:${sessionId}`;

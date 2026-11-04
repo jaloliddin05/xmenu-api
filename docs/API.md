@@ -157,7 +157,7 @@ IP берётся из `X-Forwarded-For` только от локального 
              "serviceArea": "#4A6FA5" },
   "locale": { "defaultLanguage": "ru", "languages": ["ru", "uz", "en"], "currency": "UZS" },
   "contacts": { "phone": null, "telegramUsername": null, "workingHours": null, "address": null },
-  "channels": { "qr": true, "delivery": { "enabled": true, "mode": "site", "published": true } },
+  "channels": { "qr": true, "auth": { "sms": true, "telegram": false }, "delivery": { "enabled": true, "mode": "site", "published": true } },
   "fulfillment": { "modes": ["pickup"], "defaultMode": "pickup", "deliveryOffered": true, "deliveryAvailable": false,
                    "deliveryUnavailableReason": "no_zone" },
   "map": { "center": [41.311081, 69.240562], "centerSource": "saved", "zoom": 15, "city": "Ташкент",
@@ -177,6 +177,12 @@ IP берётся из `X-Forwarded-For` только от локального 
   доставка и самовывоз); `delivery.mode`: `site`, `miniapp` или `both`; `delivery.published`: заказы открыты
   (включено **и** опубликовано). При `published: false` `POST /orders` отвечает `422` (`ordering_channel_disabled` или
   `ordering_not_published`), меню, филиалы и карта отдаются как обычно (предпросмотр).
+- `channels.auth`: как клиент может подтвердить номер, подсказка, чтобы не показывать нерабочую кнопку. `telegram`: у
+  заведения подключён и включён бот (то же условие, что у `telegram/start`; иначе тот отвечает `503
+  telegram_unavailable`). `sms`: у платформы настроен SMS-провайдер (для Eskiz заданы `ESKIZ_EMAIL` и `ESKIZ_PASSWORD`,
+  `telegram` и `console` годятся всегда); это проверка настроек, не доступности: сбой провайдера приходит ответом
+  `503 sms_unavailable`. Подключение и отключение бота ставит ревалидацию `route: 'channels'`. Источник истины остаются
+  сами эндпоинты.
 - `fulfillment.modes`: пусто, пока `channels.delivery.published` не `true`. Иначе `pickup`, если есть активный филиал с
   самовывозом; `delivery`, если есть активный филиал с доставкой **и** задана зона доставки. Нет филиалов: `[]`,
   `defaultMode: null`. Деньги (сбор, минимум, ETA, способы оплаты) остаются в `GET /checkout-config`.
@@ -210,8 +216,9 @@ IP берётся из `X-Forwarded-For` только от локального 
 
 Альтернатива SMS: подтверждение номера через бота заведения, `POST /auth/customer/telegram/start` и
 `POST /auth/customer/telegram/status` (сценарии, статусы и защита: `TELEGRAM_VERIFICATION.md`). Нет бота у
-заведения → `503 telegram_unavailable`: показывать только SMS. В режиме сайта вход завершается обычным
-`otp/verify` с кодом из чата бота; в Mini App ответ `status: "verified"` уже содержит результат входа.
+заведения → `503 telegram_unavailable`: показывать только SMS (заранее это видно в `GET /tenant/config`,
+`channels.auth`). В режиме сайта вход завершается обычным
+`otp/verify` с кодом из чата бота (длина кода в `codeLength` ответа `telegram/status`); в Mini App ответ `status: "verified"` уже содержит результат входа.
 
 ## Бот заведения (владелец)
 
