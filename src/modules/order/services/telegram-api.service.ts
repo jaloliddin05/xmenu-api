@@ -42,16 +42,20 @@ export class TelegramApiService {
       return null;
     }
     try {
-      const { data } = await axios.post(
+      const { data } = await axios.post<{ result?: T }>(
         `https://api.telegram.org/bot${token}/${method}`,
         payload,
         { timeout: 8000 },
       );
       return (data?.result ?? null) as T | null;
-    } catch (e: any) {
+    } catch (e) {
+      const err = e as {
+        response?: { data?: { description?: string } };
+        code?: string;
+      };
       // Token URL'da — xato matniga tushib qolmasligi uchun faqat Telegram javobini loglaymiz.
       this.logger.warn(
-        `${method} failed: ${e?.response?.data?.description ?? e?.code ?? 'unknown error'}`,
+        `${method} failed: ${err?.response?.data?.description ?? err?.code ?? 'unknown error'}`,
       );
       return null;
     }

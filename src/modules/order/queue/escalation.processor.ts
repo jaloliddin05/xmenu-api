@@ -52,10 +52,12 @@ export class EscalationProcessor implements OnModuleInit, OnModuleDestroy {
         concurrency: 5,
       },
     );
-    this.worker.on('failed', (job, err) =>
-      this.logger.error(
-        `Job ${job?.name} (${job?.data?.orderId}) failed: ${errorMessage(err)}`,
-      ),
+    this.worker.on(
+      'failed',
+      (job: Job<{ orderId: string }> | undefined, err: Error) =>
+        this.logger.error(
+          `Job ${job?.name} (${job?.data?.orderId}) failed: ${errorMessage(err)}`,
+        ),
     );
   }
 

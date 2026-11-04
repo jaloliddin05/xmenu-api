@@ -47,16 +47,19 @@ export class RefundProcessor implements OnModuleInit, OnModuleDestroy {
         concurrency: 2,
       },
     );
-    this.worker.on('failed', (job, err) => {
-      const exhausted = job && job.attemptsMade >= (job.opts.attempts ?? 1);
-      this.logger.error(
-        `Refund job ${job?.data?.orderId} failed (${job?.attemptsMade}): ${errorMessage(err)}`,
-      );
-      if (exhausted)
-        void this.ops.alert(
-          `Не удалось вернуть деньги по заказу ${job?.data?.orderId}: ${errorMessage(err)}. Нужен ручной возврат.`,
+    this.worker.on(
+      'failed',
+      (job: Job<{ orderId: string }> | undefined, err: Error) => {
+        const exhausted = job && job.attemptsMade >= (job.opts.attempts ?? 1);
+        this.logger.error(
+          `Refund job ${job?.data?.orderId} failed (${job?.attemptsMade}): ${errorMessage(err)}`,
         );
-    });
+        if (exhausted)
+          void this.ops.alert(
+            `Не удалось вернуть деньги по заказу ${job?.data?.orderId}: ${errorMessage(err)}. Нужен ручной возврат.`,
+          );
+      },
+    );
   }
 
   async onModuleDestroy() {

@@ -25,7 +25,10 @@ export async function clickReversePayment(
   cfg: ClickConfig,
   paymentId: string,
 ): Promise<void> {
-  const { data } = await axios.delete(
+  const { data } = await axios.delete<{
+    error_code?: number;
+    error_note?: string;
+  }>(
     `https://api.click.uz/v2/merchant/payment/reversal/${encodeURIComponent(cfg.serviceId)}/${encodeURIComponent(paymentId)}`,
     {
       headers: {
