@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import axios from 'axios';
+import { telegramMethodUrl } from 'src/infra/telegram/telegram-api-url';
 
 export class TelegramApiError extends Error {
   constructor(
@@ -32,7 +33,7 @@ export class TelegramClient {
   ): Promise<T> {
     try {
       const { data } = await axios.post<TelegramResponse<T>>(
-        `https://api.telegram.org/bot${token}/${method}`,
+        telegramMethodUrl(token, method),
         payload,
         { timeout: timeoutMs },
       );

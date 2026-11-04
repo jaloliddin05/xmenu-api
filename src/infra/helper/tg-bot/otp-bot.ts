@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { telegramMethodUrl } from 'src/infra/telegram/telegram-api-url';
 
 const TELEGRAM_TOKEN = process.env.OTP_BOT || '';
 const CHAT_ID = process.env.XMENU_CHAT_ID || '';
@@ -8,7 +9,7 @@ const CHAT_ID = process.env.XMENU_CHAT_ID || '';
 async function sendMessage(chatId: string, text: string): Promise<void> {
   try {
     await axios.post(
-      `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`,
+      telegramMethodUrl(TELEGRAM_TOKEN, 'sendMessage'),
       { chat_id: chatId, text },
       { timeout: 8000 },
     );
