@@ -4447,6 +4447,11 @@
             "example": "+998901234567",
             "description": "code_sent: the phone the code was issued for"
           },
+          "codeLength": {
+            "type": "number",
+            "example": 6,
+            "description": "code_sent: number of digits in the code (same as codeLength of otp/request)"
+          },
           "isNewUser": {
             "type": "boolean",
             "description": "verified only"
@@ -7094,6 +7099,25 @@
           "address"
         ]
       },
+      "TenantAuthChannelsDto": {
+        "type": "object",
+        "properties": {
+          "sms": {
+            "type": "boolean",
+            "example": true,
+            "description": "The platform can send SMS codes (provider configured). A provider outage still answers 503 sms_unavailable on otp/request"
+          },
+          "telegram": {
+            "type": "boolean",
+            "example": false,
+            "description": "The venue has an enabled Telegram bot, so telegram/start can work. false = it answers 503 telegram_unavailable: offer SMS only"
+          }
+        },
+        "required": [
+          "sms",
+          "telegram"
+        ]
+      },
       "TenantDeliveryChannelDto": {
         "type": "object",
         "properties": {
@@ -7132,12 +7156,21 @@
             "example": true,
             "description": "QR menu turned on by the owner"
           },
+          "auth": {
+            "description": "Ways a customer can confirm a phone number. A hint to hide dead buttons; the endpoints stay the source of truth",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TenantAuthChannelsDto"
+              }
+            ]
+          },
           "delivery": {
             "$ref": "#/components/schemas/TenantDeliveryChannelDto"
           }
         },
         "required": [
           "qr",
+          "auth",
           "delivery"
         ]
       },

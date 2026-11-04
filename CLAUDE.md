@@ -108,7 +108,10 @@ test, `npm run openapi` + `git diff --exit-code docs/`, `format:check` и `lint`
 - `POST /orders` читает состояние из БД (не из кэша тенанта): `422 ordering_channel_disabled` / `ordering_not_published`.
   `GET /tenant/config` отдаёт `channels`, `fulfillment.modes` пуст без публикации. `channels.qr` бэкенд не применяет
   (меню отдаётся), его читает QR-фронт.
-- Изменения ставят ревалидацию с `route: 'channels'` (QR и клиент).
+- Изменения ставят ревалидацию с `route: 'channels'` (QR и клиент); её ставит и `TelegramBotService` при подключении и
+  отключении бота. `channels.auth` `{ sms, telegram }` в `GET /tenant/config`: подсказка, как подтвердить номер
+  (`telegram` = включённый бот заведения, `sms` = `isSmsConfigured()` в `sms.module.ts`, проверка настроек, не пинг);
+  источник истины остаются `otp/request` и `telegram/start`.
 - Бот удалён (`DELETE /telegram-bot`) при режиме `miniapp`/`both`: режим остаётся, пункт `telegram_bot` в чеклисте
   становится `todo`, публикация не снимается.
 
@@ -148,7 +151,8 @@ Payme вручную через ops-чат.
   дальше обычный `otp/verify`). Сессии в Redis (`tgv:*`, `TELEGRAM_VERIFY_TTL_SECONDS`). Контакт принимается только
   если `contact.user_id == from.id`.
 - Код из бота выдаёт `CustomerOtpService.issue()` (тот же хеш, попытки и лимиты по телефону, что у SMS).
-- Вход завершает `CustomerAuthService.completeVerifiedPhone` (общий для SMS и Telegram).
+- Вход завершает `CustomerAuthService.completeVerifiedPhone` (общий для SMS и Telegram). `telegram/status` с `code_sent`
+  отдаёт `codeLength` (`cfg.otpLength`, как `otp/request`).
 - Уведомления о заказах по-прежнему идут через платформенного бота (`telegram-orders.controller.ts`).
 
 ## Авторизация владельцев (staff)
