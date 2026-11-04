@@ -42,8 +42,12 @@ describe('POST /application (public landing form)', () => {
   });
 
   it('is 201 and saved even when Telegram is unreachable', async () => {
-    (sendApplicationToTelegram as jest.Mock).mockRejectedValueOnce(new Error('Telegram sendMessage failed: ETIMEDOUT'));
-    const res = await post({ from: 'web', fullName: 'Ali_Baba *[' }).expect(201);
+    (sendApplicationToTelegram as jest.Mock).mockRejectedValueOnce(
+      new Error('Telegram sendMessage failed: ETIMEDOUT'),
+    );
+    const res = await post({ from: 'web', fullName: 'Ali_Baba *[' }).expect(
+      201,
+    );
     expect(res.body).toEqual({ id: 'app-1' });
     expect(create).toHaveBeenCalledTimes(1);
   });

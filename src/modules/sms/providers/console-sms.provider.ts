@@ -8,7 +8,7 @@ export class ConsoleSmsProvider implements SmsProvider {
 
   async send(phone: string, text: string): Promise<void> {
     if (process.env.NODE_ENV === 'production') {
-      throw new Error('ConsoleSmsProvider production\'da ishlatilmaydi');
+      throw new Error("ConsoleSmsProvider production'da ishlatilmaydi");
     }
     this.logger.log(`[DEV SMS] ${phone}: ${text}`);
   }

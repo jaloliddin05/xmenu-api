@@ -36,7 +36,8 @@ export class OrganizationSettingsService {
     settings: OrganizationSettings,
   ): Promise<OrganizationSettings> {
     const problems = settingsProblems(settings);
-    if (problems.length) throw fieldErrorsException('invalid_settings', problems);
+    if (problems.length)
+      throw fieldErrorsException('invalid_settings', problems);
     await this.get(organizationId);
     const row = await this.prisma.organization_settings.update({
       where: { organization_id: organizationId },
@@ -44,7 +45,10 @@ export class OrganizationSettingsService {
     });
     // Customer endpoints read language and currency from the cached tenant
     this.tenants.invalidate(organizationId);
-    await this.revalidate.addRevalidationJob({ tenantId: organizationId, route: 'settings' });
+    await this.revalidate.addRevalidationJob({
+      tenantId: organizationId,
+      route: 'settings',
+    });
     return toSettingsView(row);
   }
 

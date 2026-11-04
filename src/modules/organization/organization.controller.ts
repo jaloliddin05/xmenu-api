@@ -1,5 +1,26 @@
-import { BadRequestException, NotFoundException, Controller, Get, Post, Body, Param, Delete, Put, HttpCode, HttpStatus, UseInterceptors, UploadedFiles, Req } from '@nestjs/common';
-import { ApiBody, ApiConsumes, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  BadRequestException,
+  NotFoundException,
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Delete,
+  Put,
+  HttpCode,
+  HttpStatus,
+  UseInterceptors,
+  UploadedFiles,
+  Req,
+} from '@nestjs/common';
+import {
+  ApiBody,
+  ApiConsumes,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { OrganizationService } from './services/organization.service';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { MulterStorage } from 'src/infra/helper/upload/multer-upload';
@@ -11,20 +32,26 @@ import { isValidSlug, SLUG_RULE } from './domain/slug';
 @ApiTags('Organization')
 @Controller('organization')
 export class OrganizationController {
-  constructor(private readonly organizationService: OrganizationService) { }
+  constructor(private readonly organizationService: OrganizationService) {}
 
   @Get(':id')
   @ApiOperation({ summary: 'Method: get one (your own organization only)' })
   @HttpCode(HttpStatus.OK)
   async findOne(@Param('id') id: string, @Req() req) {
     const organization = await this.organizationService.findOne(id);
-    this.organizationService.assertOwn(organization.id, requireStaffOrganizationId(req));
+    this.organizationService.assertOwn(
+      organization.id,
+      requireStaffOrganizationId(req),
+    );
     return organization;
   }
 
   @Public()
   @Get('return-slug/:id')
-  @ApiOperation({ summary: 'Slug of an active venue by organization id (UUID), as plain text; 404 otherwise' })
+  @ApiOperation({
+    summary:
+      'Slug of an active venue by organization id (UUID), as plain text; 404 otherwise',
+  })
   @ApiOkResponse({ schema: { type: 'string', example: 'mant' } })
   @HttpCode(HttpStatus.OK)
   async getSlugById(@Param('id') id: string) {
@@ -49,7 +76,11 @@ export class OrganizationController {
     },
   })
   async checkSlug(@Body('slug') slug: string) {
-    if (!isValidSlug(slug)) throw new BadRequestException({ message: `slug: ${SLUG_RULE}`, code: 'invalid_slug' });
+    if (!isValidSlug(slug))
+      throw new BadRequestException({
+        message: `slug: ${SLUG_RULE}`,
+        code: 'invalid_slug',
+      });
     const exists = await this.organizationService.isSlugExists(slug);
     return { exists };
   }
@@ -72,19 +103,28 @@ export class OrganizationController {
   async update(
     @Param('id') id: string,
     @Body() data: UpdateOrganizationDto,
-    @UploadedFiles() files: { banner?: Express.Multer.File[]; logo?: Express.Multer.File[] },
-    @Req() req
-    )
-    {
+    @UploadedFiles()
+    files: { banner?: Express.Multer.File[]; logo?: Express.Multer.File[] },
+    @Req() req,
+  ) {
     const banner = files?.banner?.[0];
     const logo = files?.logo?.[0];
-    return await this.organizationService.update(id, requireStaffOrganizationId(req), data, logo, banner);
+    return await this.organizationService.update(
+      id,
+      requireStaffOrganizationId(req),
+      data,
+      logo,
+      banner,
+    );
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Method: delete' })
   @HttpCode(HttpStatus.NO_CONTENT)
   async remove(@Param('id') id: string, @Req() req) {
-    return await this.organizationService.delete(id, requireStaffOrganizationId(req));
+    return await this.organizationService.delete(
+      id,
+      requireStaffOrganizationId(req),
+    );
   }
 }

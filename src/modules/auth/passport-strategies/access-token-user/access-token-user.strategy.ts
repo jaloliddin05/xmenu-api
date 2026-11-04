@@ -26,7 +26,7 @@ export class AccessTokenUserStrategy extends PassportStrategy(
   }
 
   async validate(payload: { sub: string; role: string }) {
-      const user = await this.authService.validateUserById(payload.sub);
-      return user;
+    const user = await this.authService.validateUserById(payload.sub);
+    return user;
   }
 }

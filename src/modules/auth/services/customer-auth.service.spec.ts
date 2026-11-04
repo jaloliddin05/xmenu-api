@@ -52,7 +52,9 @@ describe('CustomerAuthService.completeVerifiedPhone', () => {
   const PHONE = '+998901234567';
   const CUSTOMER = { id: 'cust-1', phone: PHONE, status: 'active' };
 
-  function service(opts: { existing?: object | null; telegramOwner?: object | null } = {}) {
+  function service(
+    opts: { existing?: object | null; telegramOwner?: object | null } = {},
+  ) {
     const customers = {
       findByPhone: jest.fn(async () =>
         opts.existing === undefined ? CUSTOMER : opts.existing,
@@ -63,7 +65,10 @@ describe('CustomerAuthService.completeVerifiedPhone', () => {
     const tx = { customer: { update: jest.fn(async () => undefined) } };
     const prisma = { $transaction: jest.fn(async (fn: any) => fn(tx)) };
     const sessions = {
-      createSession: jest.fn(async () => ({ accessToken: 'a', refreshToken: 'r' })),
+      createSession: jest.fn(async () => ({
+        accessToken: 'a',
+        refreshToken: 'r',
+      })),
     };
     const tokens = { signRegistration: jest.fn(() => 'reg-token') };
     const customerService = { toUser: jest.fn((c: any) => ({ id: c.id })) };

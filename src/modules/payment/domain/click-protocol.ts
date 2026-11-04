@@ -53,10 +53,18 @@ export interface ClickRequest {
 const md5 = (s: string) => createHash('md5').update(s).digest('hex');
 
 export function clickSign(req: ClickRequest, secretKey: string): string {
-  const base = [req.click_trans_id, req.service_id, secretKey, req.merchant_trans_id];
+  const base = [
+    req.click_trans_id,
+    req.service_id,
+    secretKey,
+    req.merchant_trans_id,
+  ];
   const tail = [req.amount, req.action, req.sign_time];
   // Complete (action=1) imzosiga merchant_prepare_id ham kiradi.
-  const parts = req.action === '1' ? [...base, req.merchant_prepare_id, ...tail] : [...base, ...tail];
+  const parts =
+    req.action === '1'
+      ? [...base, req.merchant_prepare_id, ...tail]
+      : [...base, ...tail];
   return md5(parts.map((p) => p ?? '').join(''));
 }
 
@@ -91,7 +99,12 @@ export interface ClickStore {
   findOrder(orderId: string): Promise<ClickOrder | null>;
   findPaymentBySeq(seq: number): Promise<ClickPayment | null>;
   findPaymentByClickId(clickTransId: string): Promise<ClickPayment | null>;
-  createPayment(orderId: string, clickTransId: string, amount: number, paydocId: string | undefined): Promise<ClickPayment>;
+  createPayment(
+    orderId: string,
+    clickTransId: string,
+    amount: number,
+    paydocId: string | undefined,
+  ): Promise<ClickPayment>;
   /**
    * To'lovni "paid" qiladi va buyurtmani pending_acceptance ga o'tkazadi (bitta
    * tranzaksiyada, buyurtma qatori bloklangan holda). Buyurtma shu orada bekor
@@ -116,26 +129,40 @@ export class ClickProtocol {
     private readonly cfg: { serviceId: string; secretKey: string },
   ) {}
 
-  async handle(action: 'prepare' | 'complete', req: ClickRequest): Promise<ClickResponse> {
+  async handle(
+    action: 'prepare' | 'complete',
+    req: ClickRequest,
+  ): Promise<ClickResponse> {
     const base = {
       click_trans_id: String(req.click_trans_id ?? ''),
       merchant_trans_id: String(req.merchant_trans_id ?? ''),
     };
-    const reply = (error: number, extra: Partial<ClickResponse> = {}): ClickResponse => ({
+    const reply = (
+      error: number,
+      extra: Partial<ClickResponse> = {},
+    ): ClickResponse => ({
       ...base,
       ...extra,
       error,
       error_note: NOTE[error] ?? 'Error',
     });
 
-    if (!req.click_trans_id || !req.merchant_trans_id || !req.amount || !req.sign_time) {
+    if (
+      !req.click_trans_id ||
+      !req.merchant_trans_id ||
+      !req.amount ||
+      !req.sign_time
+    ) {
       return reply(CLICK_ERROR.BAD_REQUEST);
     }
-    if (String(req.service_id) !== String(this.cfg.serviceId)) return reply(CLICK_ERROR.BAD_REQUEST);
-    if (!verifyClickSign(req, this.cfg.secretKey)) return reply(CLICK_ERROR.SIGN_FAILED);
+    if (String(req.service_id) !== String(this.cfg.serviceId))
+      return reply(CLICK_ERROR.BAD_REQUEST);
+    if (!verifyClickSign(req, this.cfg.secretKey))
+      return reply(CLICK_ERROR.SIGN_FAILED);
 
     const expectedAction = action === 'prepare' ? '0' : '1';
-    if (req.action !== expectedAction) return reply(CLICK_ERROR.ACTION_NOT_FOUND);
+    if (req.action !== expectedAction)
+      return reply(CLICK_ERROR.ACTION_NOT_FOUND);
 
     const order = await this.store.findOrder(req.merchant_trans_id);
     if (!order) return reply(CLICK_ERROR.ORDER_NOT_FOUND);
@@ -145,7 +172,9 @@ export class ClickProtocol {
       return reply(CLICK_ERROR.INCORRECT_AMOUNT);
     }
 
-    return action === 'prepare' ? this.prepare(req, order, reply) : this.complete(req, order, reply);
+    return action === 'prepare'
+      ? this.prepare(req, order, reply)
+      : this.complete(req, order, reply);
   }
 
   private async prepare(
@@ -158,8 +187,16 @@ export class ClickProtocol {
 
     // Takror prepare (Click qayta yuborishi mumkin) — o'sha tranzaksiyani qaytaramiz.
     const existing = await this.store.findPaymentByClickId(req.click_trans_id!);
-    const payment = existing ?? (await this.store.createPayment(order.id, req.click_trans_id!, order.total, req.click_paydoc_id));
-    if (payment.status === 'cancelled' || payment.status === 'failed') return reply(CLICK_ERROR.TRANSACTION_CANCELLED);
+    const payment =
+      existing ??
+      (await this.store.createPayment(
+        order.id,
+        req.click_trans_id!,
+        order.total,
+        req.click_paydoc_id,
+      ));
+    if (payment.status === 'cancelled' || payment.status === 'failed')
+      return reply(CLICK_ERROR.TRANSACTION_CANCELLED);
     if (payment.status === 'paid') return reply(CLICK_ERROR.ALREADY_PAID);
 
     return reply(CLICK_ERROR.OK, { merchant_prepare_id: payment.seq });
@@ -171,13 +208,22 @@ export class ClickProtocol {
     reply: (e: number, x?: Partial<ClickResponse>) => ClickResponse,
   ): Promise<ClickResponse> {
     const seq = Number(req.merchant_prepare_id);
-    const payment = Number.isInteger(seq) ? await this.store.findPaymentBySeq(seq) : null;
-    if (!payment || payment.orderId !== order.id || payment.clickTransId !== req.click_trans_id) {
+    const payment = Number.isInteger(seq)
+      ? await this.store.findPaymentBySeq(seq)
+      : null;
+    if (
+      !payment ||
+      payment.orderId !== order.id ||
+      payment.clickTransId !== req.click_trans_id
+    ) {
       return reply(CLICK_ERROR.TRANSACTION_NOT_FOUND);
     }
 
     // Takror complete — natija o'zgarmaydi (idempotent).
-    if (payment.status === 'paid') return reply(CLICK_ERROR.ALREADY_PAID, { merchant_confirm_id: payment.seq });
+    if (payment.status === 'paid')
+      return reply(CLICK_ERROR.ALREADY_PAID, {
+        merchant_confirm_id: payment.seq,
+      });
     if (payment.status === 'cancelled' || payment.status === 'failed') {
       return reply(CLICK_ERROR.TRANSACTION_CANCELLED);
     }
@@ -195,7 +241,8 @@ export class ClickProtocol {
       return reply(CLICK_ERROR.TRANSACTION_CANCELLED);
     }
 
-    if (!(await this.store.markPaid(payment))) return reply(CLICK_ERROR.TRANSACTION_CANCELLED);
+    if (!(await this.store.markPaid(payment)))
+      return reply(CLICK_ERROR.TRANSACTION_CANCELLED);
     return reply(CLICK_ERROR.OK, { merchant_confirm_id: payment.seq });
   }
 }

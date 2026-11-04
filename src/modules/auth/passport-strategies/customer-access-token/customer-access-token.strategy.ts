@@ -15,7 +15,10 @@ export const CUSTOMER_ACCESS_TOKEN = 'customer_access_token';
  * Xodim tokenlari (boshqa secret/aud) bu yerda o'tmaydi va aksincha.
  */
 @Injectable()
-export class CustomerAccessTokenStrategy extends PassportStrategy(Strategy, CUSTOMER_ACCESS_TOKEN) {
+export class CustomerAccessTokenStrategy extends PassportStrategy(
+  Strategy,
+  CUSTOMER_ACCESS_TOKEN,
+) {
   constructor(
     @Inject(CUSTOMER_AUTH_CONFIG) cfg: CustomerAuthConfig,
     private readonly sessions: CustomerSessionService,
@@ -31,13 +34,19 @@ export class CustomerAccessTokenStrategy extends PassportStrategy(Strategy, CUST
     });
   }
 
-  async validate(req: Request & { tenant?: { id: string } }, payload: { sub: string; tid: string; sid: string }) {
-    if (!payload?.sub || !payload.tid || !payload.sid) throw new CustomerAuthException('invalid_token');
+  async validate(
+    req: Request & { tenant?: { id: string } },
+    payload: { sub: string; tid: string; sid: string },
+  ) {
+    if (!payload?.sub || !payload.tid || !payload.sid)
+      throw new CustomerAuthException('invalid_token');
 
     // 403 (401 emas): klient refresh'ni aylantirib yubormasligi uchun
-    if (!req.tenant || payload.tid !== req.tenant.id) throw new CustomerAuthException('tenant_mismatch');
+    if (!req.tenant || payload.tid !== req.tenant.id)
+      throw new CustomerAuthException('tenant_mismatch');
 
-    if (await this.sessions.isSidDenied(payload.sid)) throw new CustomerAuthException('invalid_token');
+    if (await this.sessions.isSidDenied(payload.sid))
+      throw new CustomerAuthException('invalid_token');
 
     return { customerId: payload.sub, tenantId: payload.tid, sid: payload.sid };
   }

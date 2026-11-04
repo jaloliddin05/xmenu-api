@@ -28,11 +28,18 @@ export class OrderSettingsService {
     const hit = this.cache.get(organizationId);
     if (hit && Date.now() - hit.at < TTL_MS) return hit.value;
 
-    const row = await this.prisma.organization_order_settings.findUnique({ where: { organization_id: organizationId } });
+    const row = await this.prisma.organization_order_settings.findUnique({
+      where: { organization_id: organizationId },
+    });
     // The row is created at signup; a missing one is a data bug, never filled in with made-up values
     if (!row) {
-      this.logger.error(`organization_order_settings row missing for organization ${organizationId}`);
-      throw new CustomerAuthException('settings_missing', 'Venue settings are missing');
+      this.logger.error(
+        `organization_order_settings row missing for organization ${organizationId}`,
+      );
+      throw new CustomerAuthException(
+        'settings_missing',
+        'Venue settings are missing',
+      );
     }
     const value: OrderSettings = {
       deliveryServiceFee: row.delivery_service_fee,

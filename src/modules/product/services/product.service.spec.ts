@@ -214,7 +214,11 @@ describe('ProductService: organization ownership (IDOR)', () => {
 describe('ProductService.findAll: is_active filter (P-33)', () => {
   const run = async (isActive?: boolean) => {
     const findMany = jest.fn(async () => []);
-    const service = new ProductService({ product: { findMany } } as any, {} as any, {} as any);
+    const service = new ProductService(
+      { product: { findMany } } as any,
+      {} as any,
+      {} as any,
+    );
     await service.findAll('org-1', undefined as any, 'ru', isActive);
     return (findMany.mock.calls[0] as any)[0].where;
   };

@@ -9,7 +9,10 @@ describe('OptionalBoolPipe', () => {
     expect(pipe.transform('true')).toBe(true);
     expect(pipe.transform('false')).toBe(false);
   });
-  it.each(['1', 'TRUE', 'yes', 'null', '[object Object]'])('rejects %s with 400', (v) => {
-    expect(() => pipe.transform(v)).toThrow(BadRequestException);
-  });
+  it.each(['1', 'TRUE', 'yes', 'null', '[object Object]'])(
+    'rejects %s with 400',
+    (v) => {
+      expect(() => pipe.transform(v)).toThrow(BadRequestException);
+    },
+  );
 });

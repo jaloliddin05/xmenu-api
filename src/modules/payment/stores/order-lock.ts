@@ -6,6 +6,9 @@ import { Prisma } from '@prisma/client';
  * ular navbat bilan ishlaydi — "pul olindi, lekin buyurtma bekor" holati
  * bo'lmaydi.
  */
-export async function lockOrder(tx: Prisma.TransactionClient, orderId: string): Promise<void> {
+export async function lockOrder(
+  tx: Prisma.TransactionClient,
+  orderId: string,
+): Promise<void> {
   await tx.$queryRaw`SELECT id FROM customer_order WHERE id = ${orderId} FOR UPDATE`;
 }

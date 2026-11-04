@@ -29,7 +29,11 @@ export type OrderStatusName = (typeof ORDER_STATUSES)[number];
 export type OrderActorName = 'customer' | 'restaurant' | 'system' | 'payment';
 export type FulfillmentName = 'delivery' | 'pickup';
 
-type Rule = { to: OrderStatusName; actors: OrderActorName[]; only?: FulfillmentName };
+type Rule = {
+  to: OrderStatusName;
+  actors: OrderActorName[];
+  only?: FulfillmentName;
+};
 
 const RULES: Record<OrderStatusName, Rule[]> = {
   awaiting_payment: [
@@ -43,7 +47,10 @@ const RULES: Record<OrderStatusName, Rule[]> = {
   ],
   pending_acceptance: [
     { to: 'accepted', actors: ['restaurant'] },
-    { to: 'cancelled', actors: ['customer', 'restaurant', 'system', 'payment'] },
+    {
+      to: 'cancelled',
+      actors: ['customer', 'restaurant', 'system', 'payment'],
+    },
   ],
   accepted: [
     { to: 'preparing', actors: ['restaurant'] },
@@ -81,11 +88,13 @@ export function checkTransition(
 
   const rule = RULES[from].find((r) => r.to === to && r.actors.includes(actor));
   if (!rule) return { ok: false, reason: 'not_allowed' };
-  if (rule.only && rule.only !== fulfillment) return { ok: false, reason: 'wrong_fulfillment' };
+  if (rule.only && rule.only !== fulfillment)
+    return { ok: false, reason: 'wrong_fulfillment' };
   return { ok: true };
 }
 
-export const isFinalStatus = (s: OrderStatusName) => s === 'completed' || s === 'cancelled';
+export const isFinalStatus = (s: OrderStatusName) =>
+  s === 'completed' || s === 'cancelled';
 
 /** Mijoz ilovadan bekor qila oladigan holatlar (frontend CUSTOMER_CANCELLABLE bilan bir xil). */
 export const CUSTOMER_CANCELLABLE: ReadonlySet<OrderStatusName> = new Set([

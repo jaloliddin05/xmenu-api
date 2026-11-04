@@ -1,4 +1,8 @@
-import type { branch, branch_hours_exception, branch_working_hours } from '@prisma/client';
+import type {
+  branch,
+  branch_hours_exception,
+  branch_working_hours,
+} from '@prisma/client';
 import { BranchSchedule } from '../domain/branch-hours';
 
 export type BranchWithSchedule = branch & {

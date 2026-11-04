@@ -32,7 +32,12 @@ export class CustomerAuthEventService {
   async log(
     type: AuthEventType,
     ctx: RequestCtx,
-    data: { tenantId?: string; customerId?: string; phone?: string; meta?: Record<string, unknown> } = {},
+    data: {
+      tenantId?: string;
+      customerId?: string;
+      phone?: string;
+      meta?: Record<string, unknown>;
+    } = {},
   ): Promise<void> {
     const phone_masked = maskPhone(data.phone);
     this.logger.log(

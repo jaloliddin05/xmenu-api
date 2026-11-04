@@ -10,7 +10,10 @@ class CustomerRegisterDto {
   @IsString()
   name: string;
 
-  @ApiPropertyOptional({ description: 'Telegram WebApp initData — yangi mijozga Telegram ulash uchun' })
+  @ApiPropertyOptional({
+    description:
+      'Telegram WebApp initData — yangi mijozga Telegram ulash uchun',
+  })
   @IsOptional()
   @IsString()
   initData?: string;

@@ -13,10 +13,13 @@ export class EskizSmsProvider implements SmsProvider {
   private async login(): Promise<string> {
     const email = process.env.ESKIZ_EMAIL;
     const password = process.env.ESKIZ_PASSWORD;
-    if (!email || !password) throw new Error('ESKIZ_EMAIL / ESKIZ_PASSWORD sozlanmagan');
+    if (!email || !password)
+      throw new Error('ESKIZ_EMAIL / ESKIZ_PASSWORD sozlanmagan');
 
     const form = new URLSearchParams({ email, password });
-    const res = await axios.post(`${BASE}/auth/login`, form, { timeout: TIMEOUT_MS });
+    const res = await axios.post(`${BASE}/auth/login`, form, {
+      timeout: TIMEOUT_MS,
+    });
     const token = res.data?.data?.token;
     if (!token) throw new Error('Eskiz login: token qaytmadi');
     this.token = token;
@@ -47,7 +50,9 @@ export class EskizSmsProvider implements SmsProvider {
         await this.post(phone, text, fresh);
         return;
       }
-      this.logger.error(`Eskiz xatosi: status=${err?.response?.status ?? 'n/a'} ${err?.message}`);
+      this.logger.error(
+        `Eskiz xatosi: status=${err?.response?.status ?? 'n/a'} ${err?.message}`,
+      );
       throw err;
     }
   }

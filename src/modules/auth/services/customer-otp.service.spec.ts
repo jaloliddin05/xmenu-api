@@ -217,9 +217,16 @@ describe('CustomerOtpService', () => {
 
     it('without an ip (Telegram webhook) skips only the per-IP limit', async () => {
       for (let i = 0; i < 30; i++) {
-        await otp.request(TENANT, `+9989012345${String(i).padStart(2, '0')}`, IP);
+        await otp.request(
+          TENANT,
+          `+9989012345${String(i).padStart(2, '0')}`,
+          IP,
+        );
       }
-      await expectCode(otp.request(TENANT, '+998909999999', IP), 'rate_limited');
+      await expectCode(
+        otp.request(TENANT, '+998909999999', IP),
+        'rate_limited',
+      );
       await expect(
         otp.issue(TENANT, '+998909999999', { deliver: async () => undefined }),
       ).resolves.toBe(60);

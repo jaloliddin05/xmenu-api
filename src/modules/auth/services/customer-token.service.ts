@@ -20,7 +20,9 @@ export interface RegistrationClaims {
 export class CustomerTokenService {
   private readonly jwt = new JwtService();
 
-  constructor(@Inject(CUSTOMER_AUTH_CONFIG) private readonly cfg: CustomerAuthConfig) {}
+  constructor(
+    @Inject(CUSTOMER_AUTH_CONFIG) private readonly cfg: CustomerAuthConfig,
+  ) {}
 
   signAccess(customerId: string, tenantId: string, sid: string): string {
     return this.jwt.sign(
@@ -60,7 +62,8 @@ export class CustomerTokenService {
         audience: AUD_REGISTRATION,
       });
     } catch (err: any) {
-      if (err?.name === 'TokenExpiredError') throw new CustomerAuthException('registration_expired');
+      if (err?.name === 'TokenExpiredError')
+        throw new CustomerAuthException('registration_expired');
       throw new CustomerAuthException('invalid_registration_token');
     }
     if (payload.tid !== tenantId || !payload.phone || !payload.jti) {

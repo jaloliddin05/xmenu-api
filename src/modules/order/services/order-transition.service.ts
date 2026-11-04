@@ -41,7 +41,11 @@ export interface TransitionInput {
 }
 
 export type Effect =
-  | { type: 'status_changed'; from: OrderStatusName | null; to: OrderStatusName }
+  | {
+      type: 'status_changed';
+      from: OrderStatusName | null;
+      to: OrderStatusName;
+    }
   | { type: 'placed' }
   | { type: 'payment_window'; expiresAt: Date }
   | { type: 'refund' };
@@ -80,13 +84,24 @@ export class OrderTransitionService {
     private readonly queues: OrderQueueService,
   ) {}
 
-  async transitionInTx(tx: Prisma.TransactionClient, input: TransitionInput): Promise<TransitionResult> {
-    const order = await tx.customer_order.findUnique({ where: { id: input.orderId } });
+  async transitionInTx(
+    tx: Prisma.TransactionClient,
+    input: TransitionInput,
+  ): Promise<TransitionResult> {
+    const order = await tx.customer_order.findUnique({
+      where: { id: input.orderId },
+    });
     if (!order) throw new OrderNotFoundError(input.orderId);
 
     const from = order.status as OrderStatusName;
-    const check = checkTransition(from, input.to, input.actor, order.fulfillment as FulfillmentName);
-    if (!check.ok) throw new InvalidTransitionError(from, input.to, check.reason);
+    const check = checkTransition(
+      from,
+      input.to,
+      input.actor,
+      order.fulfillment as FulfillmentName,
+    );
+    if (!check.ok)
+      throw new InvalidTransitionError(from, input.to, check.reason);
 
     const now = new Date();
     const data: Prisma.customer_orderUncheckedUpdateManyInput = {
@@ -120,7 +135,11 @@ export class OrderTransitionService {
       case 'awaiting_payment':
         data.payment_status = 'pending';
         data.payment_expires_at = input.paymentExpiresAt ?? null;
-        if (input.paymentExpiresAt) effects.push({ type: 'payment_window', expiresAt: input.paymentExpiresAt });
+        if (input.paymentExpiresAt)
+          effects.push({
+            type: 'payment_window',
+            expiresAt: input.paymentExpiresAt,
+          });
         break;
       case 'cancelled':
         data.cancelled_by = input.actor === 'payment' ? 'system' : input.actor;
@@ -154,7 +173,9 @@ export class OrderTransitionService {
       },
     });
 
-    const fresh = await tx.customer_order.findUniqueOrThrow({ where: { id: order.id } });
+    const fresh = await tx.customer_order.findUniqueOrThrow({
+      where: { id: order.id },
+    });
     return { order: fresh, from, effects };
   }
 
@@ -162,17 +183,31 @@ export class OrderTransitionService {
   async transition(input: TransitionInput): Promise<TransitionResult> {
     for (let attempt = 1; ; attempt++) {
       try {
-        const result = await this.prisma.$transaction((tx) => this.transitionInTx(tx, input));
+        const result = await this.prisma.$transaction((tx) =>
+          this.transitionInTx(tx, input),
+        );
         this.dispatchEffects(result.order, result.effects);
         return result;
       } catch (e) {
         if (e instanceof VersionConflictError && attempt < 3) continue;
         if (e instanceof VersionConflictError) {
           // Qayta o'qiganda holat o'zgargan: eng ishonchli javob — endi o'tish ruxsat etilmasligi.
-          const now = await this.prisma.customer_order.findUnique({ where: { id: input.orderId }, select: { status: true, fulfillment: true } });
+          const now = await this.prisma.customer_order.findUnique({
+            where: { id: input.orderId },
+            select: { status: true, fulfillment: true },
+          });
           if (!now) throw new OrderNotFoundError(input.orderId);
-          const check = checkTransition(now.status as OrderStatusName, input.to, input.actor, now.fulfillment as FulfillmentName);
-          throw new InvalidTransitionError(now.status as OrderStatusName, input.to, check.ok ? 'not_allowed' : check.reason);
+          const check = checkTransition(
+            now.status as OrderStatusName,
+            input.to,
+            input.actor,
+            now.fulfillment as FulfillmentName,
+          );
+          throw new InvalidTransitionError(
+            now.status as OrderStatusName,
+            input.to,
+            check.ok ? 'not_allowed' : check.reason,
+          );
         }
         throw e;
       }
@@ -197,9 +232,15 @@ export class OrderTransitionService {
         switch (effect.type) {
           case 'placed': {
             const notified = await this.restaurant.notifyNewOrder(order.id);
-            if (!notified) this.logger.warn(`Buyurtma ${order.number}: restoranga Telegram xabari yuborilmadi (eskalatsiya baribir ishlaydi)`);
+            if (!notified)
+              this.logger.warn(
+                `Buyurtma ${order.number}: restoranga Telegram xabari yuborilmadi (eskalatsiya baribir ishlaydi)`,
+              );
             const s = await this.settings.get(order.organization_id);
-            await this.queues.scheduleAcceptanceEscalation(order.id, s.acceptanceTimeoutSeconds);
+            await this.queues.scheduleAcceptanceEscalation(
+              order.id,
+              s.acceptanceTimeoutSeconds,
+            );
             break;
           }
           case 'status_changed':
@@ -214,7 +255,9 @@ export class OrderTransitionService {
             break;
         }
       } catch (e: any) {
-        this.logger.error(`Effect ${effect.type} (order ${order.number}) failed: ${e?.message ?? e}`);
+        this.logger.error(
+          `Effect ${effect.type} (order ${order.number}) failed: ${e?.message ?? e}`,
+        );
       }
     }
   }

@@ -11,6 +11,8 @@ describe('ApplicationController access', () => {
 
   it('GET is not public and requires the platform admin guard', () => {
     expect(Reflect.getMetadata(PUBLIC_KEY, proto.findAll)).toBeUndefined();
-    expect(Reflect.getMetadata('__guards__', proto.findAll)).toContain(PlatformAdminGuard);
+    expect(Reflect.getMetadata('__guards__', proto.findAll)).toContain(
+      PlatformAdminGuard,
+    );
   });
 });

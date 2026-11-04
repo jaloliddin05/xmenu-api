@@ -4,7 +4,9 @@ export const LANGS = ['ru', 'uz', 'en'] as const;
 export type Lang = (typeof LANGS)[number];
 
 export function isLang(value: unknown): value is Lang {
-  return typeof value === 'string' && (LANGS as readonly string[]).includes(value);
+  return (
+    typeof value === 'string' && (LANGS as readonly string[]).includes(value)
+  );
 }
 
 /**
@@ -16,7 +18,8 @@ export function resolveLang(
   tenant: { languages: readonly Lang[]; defaultLanguage: Lang },
 ): Lang {
   const pick = (v: unknown): Lang | null => {
-    const code = typeof v === 'string' ? v.trim().toLowerCase().slice(0, 2) : '';
+    const code =
+      typeof v === 'string' ? v.trim().toLowerCase().slice(0, 2) : '';
     return isLang(code) && tenant.languages.includes(code) ? code : null;
   };
   const fromQuery = pick(req.query?.lang);
@@ -43,13 +46,23 @@ export function requestCtx(req: {
 }
 
 /** Xodim (staff) so'rovidan organization id; yo'q bo'lsa 403. Global guard `req.user` ni qo'yadi. */
-export function requireStaffOrganizationId(req: { user?: { organization?: { id?: string } | null } }): string {
+export function requireStaffOrganizationId(req: {
+  user?: { organization?: { id?: string } | null };
+}): string {
   const id = req.user?.organization?.id;
   if (!id) throw new ForbiddenException('User has no organization');
   return id;
 }
 
 /** Best translation: the requested language → the tenant's default language → the first one. */
-export function pickTranslation<T extends { lang: string }>(list: T[], lang: Lang, fallback: Lang): T | undefined {
-  return list.find((t) => t.lang === lang) ?? list.find((t) => t.lang === fallback) ?? list[0];
+export function pickTranslation<T extends { lang: string }>(
+  list: T[],
+  lang: Lang,
+  fallback: Lang,
+): T | undefined {
+  return (
+    list.find((t) => t.lang === lang) ??
+    list.find((t) => t.lang === fallback) ??
+    list[0]
+  );
 }

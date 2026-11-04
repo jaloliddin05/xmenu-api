@@ -1,6 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../_prisma/prisma.service';
-import { MenuCategoryRow, MenuLocale, MenuView, toMenuView } from './menu.mapper';
+import {
+  MenuCategoryRow,
+  MenuLocale,
+  MenuView,
+  toMenuView,
+} from './menu.mapper';
 
 /** is_active: Boolean? @default(true) — NULL ham "faol" hisoblanadi (eski yozuvlar). */
 export const ACTIVE = { OR: [{ is_active: true }, { is_active: null }] };
@@ -25,7 +30,10 @@ export class MenuService {
               orderBy: { created_at: 'asc' },
               include: {
                 translations: true,
-                additional_products: { orderBy: { created_at: 'asc' }, include: { translations: true } },
+                additional_products: {
+                  orderBy: { created_at: 'asc' },
+                  include: { translations: true },
+                },
               },
             },
           },

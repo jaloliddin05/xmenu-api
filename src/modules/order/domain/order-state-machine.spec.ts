@@ -6,8 +6,12 @@ import {
   OrderStatusName,
 } from './order-state-machine';
 
-const ok = (from: OrderStatusName, to: OrderStatusName, actor: OrderActorName, f: 'delivery' | 'pickup' = 'delivery') =>
-  checkTransition(from, to, actor, f).ok;
+const ok = (
+  from: OrderStatusName,
+  to: OrderStatusName,
+  actor: OrderActorName,
+  f: 'delivery' | 'pickup' = 'delivery',
+) => checkTransition(from, to, actor, f).ok;
 
 describe('order state machine', () => {
   it('happy path for a delivery order', () => {
@@ -22,12 +26,18 @@ describe('order state machine', () => {
     expect(ok('preparing', 'ready', 'restaurant', 'pickup')).toBe(true);
     expect(ok('preparing', 'ready', 'restaurant', 'delivery')).toBe(false);
     expect(ok('preparing', 'on_the_way', 'restaurant', 'pickup')).toBe(false);
-    expect(checkTransition('preparing', 'ready', 'restaurant', 'delivery')).toEqual({ ok: false, reason: 'wrong_fulfillment' });
+    expect(
+      checkTransition('preparing', 'ready', 'restaurant', 'delivery'),
+    ).toEqual({ ok: false, reason: 'wrong_fulfillment' });
   });
 
   it('only a payment event can make an order "paid", never the customer', () => {
-    expect(ok('awaiting_payment', 'pending_acceptance', 'customer')).toBe(false);
-    expect(ok('awaiting_payment', 'pending_acceptance', 'restaurant')).toBe(false);
+    expect(ok('awaiting_payment', 'pending_acceptance', 'customer')).toBe(
+      false,
+    );
+    expect(ok('awaiting_payment', 'pending_acceptance', 'restaurant')).toBe(
+      false,
+    );
     expect(ok('awaiting_payment', 'pending_acceptance', 'system')).toBe(false);
   });
 
@@ -39,7 +49,12 @@ describe('order state machine', () => {
   });
 
   it('customer can cancel only until the kitchen starts', () => {
-    for (const from of ['awaiting_payment', 'payment_failed', 'pending_acceptance', 'accepted'] as const) {
+    for (const from of [
+      'awaiting_payment',
+      'payment_failed',
+      'pending_acceptance',
+      'accepted',
+    ] as const) {
       expect(ok(from, 'cancelled', 'customer')).toBe(true);
     }
     for (const from of ['preparing', 'on_the_way', 'ready'] as const) {
@@ -70,12 +85,23 @@ describe('order state machine', () => {
 
   it('final states have no way out', () => {
     for (const to of ORDER_STATUSES) {
-      for (const actor of ['customer', 'restaurant', 'system', 'payment'] as const) {
-        expect(checkTransition('completed', to, actor, 'delivery').ok).toBe(false);
-        expect(checkTransition('cancelled', to, actor, 'delivery').ok).toBe(false);
+      for (const actor of [
+        'customer',
+        'restaurant',
+        'system',
+        'payment',
+      ] as const) {
+        expect(checkTransition('completed', to, actor, 'delivery').ok).toBe(
+          false,
+        );
+        expect(checkTransition('cancelled', to, actor, 'delivery').ok).toBe(
+          false,
+        );
       }
     }
-    expect(checkTransition('cancelled', 'accepted', 'restaurant', 'delivery')).toEqual({ ok: false, reason: 'final' });
+    expect(
+      checkTransition('cancelled', 'accepted', 'restaurant', 'delivery'),
+    ).toEqual({ ok: false, reason: 'final' });
   });
 
   it('no skipping: awaiting_payment cannot jump straight to preparing', () => {
@@ -84,7 +110,9 @@ describe('order state machine', () => {
   });
 
   it('nextRestaurantStatus follows the fulfillment type', () => {
-    expect(nextRestaurantStatus('pending_acceptance', 'delivery')).toBe('accepted');
+    expect(nextRestaurantStatus('pending_acceptance', 'delivery')).toBe(
+      'accepted',
+    );
     expect(nextRestaurantStatus('preparing', 'delivery')).toBe('on_the_way');
     expect(nextRestaurantStatus('preparing', 'pickup')).toBe('ready');
     expect(nextRestaurantStatus('ready', 'pickup')).toBe('completed');

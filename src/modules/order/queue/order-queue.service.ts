@@ -39,14 +39,24 @@ export class OrderQueueService implements OnModuleDestroy {
   private get escalationQueue(): Queue {
     return (this.escalation ??= new Queue(ESCALATION_QUEUE, {
       connection: bullConnection(),
-      defaultJobOptions: { removeOnComplete: true, removeOnFail: 100, attempts: 3, backoff: { type: 'exponential', delay: 5000 } },
+      defaultJobOptions: {
+        removeOnComplete: true,
+        removeOnFail: 100,
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 5000 },
+      },
     }));
   }
 
   private get refundQueue(): Queue {
     return (this.refunds ??= new Queue(REFUND_QUEUE, {
       connection: bullConnection(),
-      defaultJobOptions: { removeOnComplete: true, removeOnFail: false, attempts: 5, backoff: { type: 'exponential', delay: 60_000 } },
+      defaultJobOptions: {
+        removeOnComplete: true,
+        removeOnFail: false,
+        attempts: 5,
+        backoff: { type: 'exponential', delay: 60_000 },
+      },
     }));
   }
 
@@ -66,7 +76,10 @@ export class OrderQueueService implements OnModuleDestroy {
       this.escalationQueue.add(
         'payment-expiry',
         { orderId },
-        { jobId: `pay-exp-${orderId}-${expiresAt.getTime()}`, delay: Math.max(0, expiresAt.getTime() - Date.now()) },
+        {
+          jobId: `pay-exp-${orderId}-${expiresAt.getTime()}`,
+          delay: Math.max(0, expiresAt.getTime() - Date.now()),
+        },
       ),
     );
   }
@@ -75,14 +88,31 @@ export class OrderQueueService implements OnModuleDestroy {
     return this.safe('scheduleAcceptanceEscalation', async () => {
       for (const step of ESCALATION_STEPS) {
         if (step.afterSeconds >= timeoutSeconds) continue; // avto-bekordan keyin ma'nosiz
-        await this.escalationQueue.add(`esc-${step.name}`, { orderId }, { jobId: `esc-${orderId}-${step.name}`, delay: step.afterSeconds * 1000 });
+        await this.escalationQueue.add(
+          `esc-${step.name}`,
+          { orderId },
+          {
+            jobId: `esc-${orderId}-${step.name}`,
+            delay: step.afterSeconds * 1000,
+          },
+        );
       }
-      await this.escalationQueue.add('esc-cancel', { orderId }, { jobId: `esc-${orderId}-cancel`, delay: timeoutSeconds * 1000 });
+      await this.escalationQueue.add(
+        'esc-cancel',
+        { orderId },
+        { jobId: `esc-${orderId}-cancel`, delay: timeoutSeconds * 1000 },
+      );
     });
   }
 
   enqueueRefund(orderId: string) {
-    return this.safe('enqueueRefund', () => this.refundQueue.add('refund', { orderId }, { jobId: `refund-${orderId}` }));
+    return this.safe('enqueueRefund', () =>
+      this.refundQueue.add(
+        'refund',
+        { orderId },
+        { jobId: `refund-${orderId}` },
+      ),
+    );
   }
 
   async onModuleDestroy() {

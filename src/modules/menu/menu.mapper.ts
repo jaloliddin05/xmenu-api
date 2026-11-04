@@ -17,7 +17,9 @@ export type MenuProductRow = product & {
   images: file[];
   additional_product_groups: (additional_product_group & {
     translations: additional_product_group_translation[];
-    additional_products: (additional_product & { translations: additional_product_translation[] })[];
+    additional_products: (additional_product & {
+      translations: additional_product_translation[];
+    })[];
   })[];
 };
 
@@ -39,10 +41,16 @@ export interface MenuLocale {
  * Asos: PUBLIC_FILES_URL, bo'lmasa PUBLIC_API_URL (ServeStatic uploads'ni
  * backend ildizidan beradi). Allaqachon mutlaq bo'lsa tegilmaydi.
  */
-export function publicFileUrl(url: string | null | undefined, env: NodeJS.ProcessEnv = process.env): string | null {
+export function publicFileUrl(
+  url: string | null | undefined,
+  env: NodeJS.ProcessEnv = process.env,
+): string | null {
   if (!url) return null;
   if (/^https?:\/\//i.test(url)) return url;
-  const base = (env.PUBLIC_FILES_URL || env.PUBLIC_API_URL || '').replace(/\/+$/, '');
+  const base = (env.PUBLIC_FILES_URL || env.PUBLIC_API_URL || '').replace(
+    /\/+$/,
+    '',
+  );
   return base ? `${base}${url.startsWith('/') ? url : `/${url}`}` : url;
 }
 
@@ -51,7 +59,11 @@ const UNIT: Record<string, Record<Lang, string>> = {
   ml: { ru: 'мл', uz: 'ml', en: 'ml' },
 };
 
-export function formatWeight(weight: number | null, unit: string, lang: Lang): string {
+export function formatWeight(
+  weight: number | null,
+  unit: string,
+  lang: Lang,
+): string {
   if (weight == null || weight <= 0) return '';
   return `${Number.isInteger(weight) ? weight : weight.toFixed(1)} ${UNIT[unit]?.[lang] ?? unit}`;
 }
@@ -61,12 +73,23 @@ export function formatWeight(weight: number | null, unit: string, lang: Lang): s
  * bayroqdan: is_required → kamida 1, is_multiple=false → ko'pi bilan 1.
  * (Serverdagi tekshiruv — order-pricing.service — AYNAN shu funksiyadan foydalanadi.)
  */
-export function groupLimits(g: Pick<additional_product_group, 'is_required' | 'is_multiple' | 'min_selected' | 'max_selected'>, optionCount: number) {
+export function groupLimits(
+  g: Pick<
+    additional_product_group,
+    'is_required' | 'is_multiple' | 'min_selected' | 'max_selected'
+  >,
+  optionCount: number,
+) {
   const required = g.is_required === true;
   const multiple = g.is_multiple === true;
   const min = g.min_selected ?? (required ? 1 : 0);
   const max = g.max_selected ?? (multiple ? optionCount : 1);
-  return { required, multiple, min, max: Math.max(1, Math.min(max, optionCount)) };
+  return {
+    required,
+    multiple,
+    min,
+    max: Math.max(1, Math.min(max, optionCount)),
+  };
 }
 
 export function toMenuView(categories: MenuCategoryRow[], locale: MenuLocale) {
@@ -80,7 +103,10 @@ export function toMenuView(categories: MenuCategoryRow[], locale: MenuLocale) {
     .filter((c) => c.items.length > 0);
 }
 
-function toItemView(p: MenuProductRow, { lang, fallback, currency }: MenuLocale) {
+function toItemView(
+  p: MenuProductRow,
+  { lang, fallback, currency }: MenuLocale,
+) {
   const t = pickTranslation(p.translations, lang, fallback);
   const g = UNIT.gr[lang];
   const nutrition: Record<string, number | string> = {};

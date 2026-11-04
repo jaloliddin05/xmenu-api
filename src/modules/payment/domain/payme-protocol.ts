@@ -27,18 +27,66 @@ export const PAYME_ERROR = {
 } as const;
 
 const MESSAGES: Record<number, { ru: string; uz: string; en: string }> = {
-  [PAYME_ERROR.INVALID_REQUEST]: { ru: 'Неверный запрос', uz: "Noto'g'ri so'rov", en: 'Invalid request' },
-  [PAYME_ERROR.METHOD_NOT_FOUND]: { ru: 'Метод не найден', uz: 'Metod topilmadi', en: 'Method not found' },
-  [PAYME_ERROR.PARSE_ERROR]: { ru: 'Ошибка разбора JSON', uz: 'JSON xato', en: 'Parse error' },
-  [PAYME_ERROR.INSUFFICIENT_PRIVILEGE]: { ru: 'Недостаточно привилегий', uz: 'Huquq yetarli emas', en: 'Insufficient privilege' },
-  [PAYME_ERROR.SYSTEM_ERROR]: { ru: 'Системная ошибка', uz: 'Tizim xatosi', en: 'System error' },
-  [PAYME_ERROR.WRONG_AMOUNT]: { ru: 'Неверная сумма', uz: "Noto'g'ri summa", en: 'Wrong amount' },
-  [PAYME_ERROR.TRANSACTION_NOT_FOUND]: { ru: 'Транзакция не найдена', uz: 'Tranzaksiya topilmadi', en: 'Transaction not found' },
-  [PAYME_ERROR.CANT_CANCEL]: { ru: 'Невозможно отменить транзакцию', uz: 'Tranzaksiyani bekor qilib bo\'lmaydi', en: 'Unable to cancel transaction' },
-  [PAYME_ERROR.CANT_PERFORM]: { ru: 'Невозможно выполнить операцию', uz: 'Amalni bajarib bo\'lmaydi', en: 'Unable to perform operation' },
-  [PAYME_ERROR.ORDER_NOT_FOUND]: { ru: 'Заказ не найден', uz: 'Buyurtma topilmadi', en: 'Order not found' },
-  [PAYME_ERROR.ORDER_UNAVAILABLE]: { ru: 'Заказ недоступен для оплаты', uz: "Buyurtmani to'lab bo'lmaydi", en: 'Order is not payable' },
-  [PAYME_ERROR.ORDER_HAS_TRANSACTION]: { ru: 'По заказу уже есть транзакция', uz: 'Buyurtma bo\'yicha tranzaksiya mavjud', en: 'Order already has a transaction' },
+  [PAYME_ERROR.INVALID_REQUEST]: {
+    ru: 'Неверный запрос',
+    uz: "Noto'g'ri so'rov",
+    en: 'Invalid request',
+  },
+  [PAYME_ERROR.METHOD_NOT_FOUND]: {
+    ru: 'Метод не найден',
+    uz: 'Metod topilmadi',
+    en: 'Method not found',
+  },
+  [PAYME_ERROR.PARSE_ERROR]: {
+    ru: 'Ошибка разбора JSON',
+    uz: 'JSON xato',
+    en: 'Parse error',
+  },
+  [PAYME_ERROR.INSUFFICIENT_PRIVILEGE]: {
+    ru: 'Недостаточно привилегий',
+    uz: 'Huquq yetarli emas',
+    en: 'Insufficient privilege',
+  },
+  [PAYME_ERROR.SYSTEM_ERROR]: {
+    ru: 'Системная ошибка',
+    uz: 'Tizim xatosi',
+    en: 'System error',
+  },
+  [PAYME_ERROR.WRONG_AMOUNT]: {
+    ru: 'Неверная сумма',
+    uz: "Noto'g'ri summa",
+    en: 'Wrong amount',
+  },
+  [PAYME_ERROR.TRANSACTION_NOT_FOUND]: {
+    ru: 'Транзакция не найдена',
+    uz: 'Tranzaksiya topilmadi',
+    en: 'Transaction not found',
+  },
+  [PAYME_ERROR.CANT_CANCEL]: {
+    ru: 'Невозможно отменить транзакцию',
+    uz: "Tranzaksiyani bekor qilib bo'lmaydi",
+    en: 'Unable to cancel transaction',
+  },
+  [PAYME_ERROR.CANT_PERFORM]: {
+    ru: 'Невозможно выполнить операцию',
+    uz: "Amalni bajarib bo'lmaydi",
+    en: 'Unable to perform operation',
+  },
+  [PAYME_ERROR.ORDER_NOT_FOUND]: {
+    ru: 'Заказ не найден',
+    uz: 'Buyurtma topilmadi',
+    en: 'Order not found',
+  },
+  [PAYME_ERROR.ORDER_UNAVAILABLE]: {
+    ru: 'Заказ недоступен для оплаты',
+    uz: "Buyurtmani to'lab bo'lmaydi",
+    en: 'Order is not payable',
+  },
+  [PAYME_ERROR.ORDER_HAS_TRANSACTION]: {
+    ru: 'По заказу уже есть транзакция',
+    uz: "Buyurtma bo'yicha tranzaksiya mavjud",
+    en: 'Order already has a transaction',
+  },
 };
 
 export class PaymeRpcError extends Error {
@@ -50,15 +98,24 @@ export class PaymeRpcError extends Error {
   }
 
   toJSON() {
-    return { code: this.code, message: MESSAGES[this.code] ?? MESSAGES[PAYME_ERROR.SYSTEM_ERROR], data: this.data };
+    return {
+      code: this.code,
+      message: MESSAGES[this.code] ?? MESSAGES[PAYME_ERROR.SYSTEM_ERROR],
+      data: this.data,
+    };
   }
 }
 
 /** `Authorization: Basic base64("Paycom:<key>")` */
-export function verifyPaymeAuth(header: string | undefined, key: string): boolean {
+export function verifyPaymeAuth(
+  header: string | undefined,
+  key: string,
+): boolean {
   if (!header?.startsWith('Basic ')) return false;
   const expected = Buffer.from(`Paycom:${key}`);
-  const actual = Buffer.from(Buffer.from(header.slice(6), 'base64').toString('utf8'));
+  const actual = Buffer.from(
+    Buffer.from(header.slice(6), 'base64').toString('utf8'),
+  );
   return expected.length === actual.length && timingSafeEqual(expected, actual);
 }
 
@@ -88,7 +145,12 @@ export interface PaymeStore {
   findTx(paymeId: string): Promise<PaymeTx | null>;
   /** state 1 yoki 2 dagi tranzaksiya */
   findOpenTxByOrder(orderId: string): Promise<PaymeTx | null>;
-  createTx(orderId: string, paymeId: string, amountTiyin: number, createTime: number): Promise<PaymeTx>;
+  createTx(
+    orderId: string,
+    paymeId: string,
+    amountTiyin: number,
+    createTime: number,
+  ): Promise<PaymeTx>;
   /** state → 2; buyurtma to'langan (bitta tranzaksiyada) */
   performTx(tx: PaymeTx, now: number): Promise<PaymeTx>;
   /** state 1 → -1, state 2 → -2; buyurtma holati shunga mos yangilanadi */
@@ -111,10 +173,17 @@ export class PaymeProtocol {
   ) {}
 
   /** JSON-RPC javobi: { id, result } yoki { id, error } */
-  async handle(body: RpcRequest): Promise<{ id: unknown; result?: unknown; error?: unknown }> {
+  async handle(
+    body: RpcRequest,
+  ): Promise<{ id: unknown; result?: unknown; error?: unknown }> {
     const id = body?.id ?? null;
     try {
-      if (!body || typeof body.method !== 'string' || typeof body.params !== 'object' || body.params === null) {
+      if (
+        !body ||
+        typeof body.method !== 'string' ||
+        typeof body.params !== 'object' ||
+        body.params === null
+      ) {
         throw new PaymeRpcError(PAYME_ERROR.INVALID_REQUEST);
       }
       return { id, result: await this.dispatch(body.method, body.params) };
@@ -144,14 +213,21 @@ export class PaymeProtocol {
   }
 
   /** Buyurtmani topadi va to'lash mumkinligini/summani tekshiradi. */
-  private async requirePayable(p: Record<string, any>, requirePayable = true): Promise<PaymeOrder> {
+  private async requirePayable(
+    p: Record<string, any>,
+    requirePayable = true,
+  ): Promise<PaymeOrder> {
     const orderId = p.account?.order_id;
-    if (typeof orderId !== 'string' || !orderId) throw new PaymeRpcError(PAYME_ERROR.ORDER_NOT_FOUND, 'order_id');
+    if (typeof orderId !== 'string' || !orderId)
+      throw new PaymeRpcError(PAYME_ERROR.ORDER_NOT_FOUND, 'order_id');
 
     const order = await this.store.findOrder(orderId);
-    if (!order) throw new PaymeRpcError(PAYME_ERROR.ORDER_NOT_FOUND, 'order_id');
-    if (!Number.isInteger(p.amount) || p.amount !== order.totalTiyin) throw new PaymeRpcError(PAYME_ERROR.WRONG_AMOUNT);
-    if (requirePayable && !order.payable) throw new PaymeRpcError(PAYME_ERROR.ORDER_UNAVAILABLE, 'order_id');
+    if (!order)
+      throw new PaymeRpcError(PAYME_ERROR.ORDER_NOT_FOUND, 'order_id');
+    if (!Number.isInteger(p.amount) || p.amount !== order.totalTiyin)
+      throw new PaymeRpcError(PAYME_ERROR.WRONG_AMOUNT);
+    if (requirePayable && !order.payable)
+      throw new PaymeRpcError(PAYME_ERROR.ORDER_UNAVAILABLE, 'order_id');
     return order;
   }
 
@@ -161,17 +237,23 @@ export class PaymeProtocol {
   }
 
   private async create(p: Record<string, any>) {
-    if (typeof p.id !== 'string' || !p.id) throw new PaymeRpcError(PAYME_ERROR.INVALID_REQUEST);
+    if (typeof p.id !== 'string' || !p.id)
+      throw new PaymeRpcError(PAYME_ERROR.INVALID_REQUEST);
 
     const existing = await this.store.findTx(p.id);
     if (existing) {
       // Takror CreateTransaction — shu tranzaksiyaning holati (idempotent).
-      if (existing.state !== 1) throw new PaymeRpcError(PAYME_ERROR.CANT_PERFORM);
+      if (existing.state !== 1)
+        throw new PaymeRpcError(PAYME_ERROR.CANT_PERFORM);
       if (this.expired(existing)) {
         await this.store.cancelTx(existing, 4, this.now());
         throw new PaymeRpcError(PAYME_ERROR.CANT_PERFORM);
       }
-      return { create_time: existing.createTime, transaction: existing.ourId, state: existing.state };
+      return {
+        create_time: existing.createTime,
+        transaction: existing.ourId,
+        state: existing.state,
+      };
     }
 
     const order = await this.requirePayable(p);
@@ -179,12 +261,23 @@ export class PaymeProtocol {
     const open = await this.store.findOpenTxByOrder(order.id);
     if (open) {
       // Boshqa Payme tranzaksiyasi bu buyurtma uchun ochiq. Eskirgan bo'lsa yopamiz.
-      if (open.state === 1 && this.expired(open)) await this.store.cancelTx(open, 4, this.now());
-      else throw new PaymeRpcError(PAYME_ERROR.ORDER_HAS_TRANSACTION, 'order_id');
+      if (open.state === 1 && this.expired(open))
+        await this.store.cancelTx(open, 4, this.now());
+      else
+        throw new PaymeRpcError(PAYME_ERROR.ORDER_HAS_TRANSACTION, 'order_id');
     }
 
-    const tx = await this.store.createTx(order.id, p.id, p.amount, p.time ?? this.now());
-    return { create_time: tx.createTime, transaction: tx.ourId, state: tx.state };
+    const tx = await this.store.createTx(
+      order.id,
+      p.id,
+      p.amount,
+      p.time ?? this.now(),
+    );
+    return {
+      create_time: tx.createTime,
+      transaction: tx.ourId,
+      state: tx.state,
+    };
   }
 
   private async perform(p: Record<string, any>) {
@@ -200,13 +293,18 @@ export class PaymeProtocol {
 
     // Buyurtma bu orada bekor bo'lgan bo'lsa pul olinmaydi.
     const order = await this.store.findOrder(tx.orderId);
-    if (!order || !order.payable) throw new PaymeRpcError(PAYME_ERROR.CANT_PERFORM);
+    if (!order || !order.payable)
+      throw new PaymeRpcError(PAYME_ERROR.CANT_PERFORM);
 
     return this.performResult(await this.store.performTx(tx, this.now()));
   }
 
   private performResult(tx: PaymeTx) {
-    return { transaction: tx.ourId, perform_time: tx.performTime, state: tx.state };
+    return {
+      transaction: tx.ourId,
+      perform_time: tx.performTime,
+      state: tx.state,
+    };
   }
 
   private async cancel(p: Record<string, any>) {
@@ -214,18 +312,27 @@ export class PaymeProtocol {
     const reason = Number.isInteger(p.reason) ? p.reason : 10;
 
     if (tx.state === 1) {
-      return this.cancelResult(await this.store.cancelTx(tx, reason, this.now()));
+      return this.cancelResult(
+        await this.store.cancelTx(tx, reason, this.now()),
+      );
     }
     if (tx.state === 2) {
       // Pul olingan: taom allaqachon berilgan bo'lsa qaytarib bo'lmaydi.
-      if (!(await this.store.canRefund(tx))) throw new PaymeRpcError(PAYME_ERROR.CANT_CANCEL);
-      return this.cancelResult(await this.store.cancelTx(tx, reason, this.now()));
+      if (!(await this.store.canRefund(tx)))
+        throw new PaymeRpcError(PAYME_ERROR.CANT_CANCEL);
+      return this.cancelResult(
+        await this.store.cancelTx(tx, reason, this.now()),
+      );
     }
     return this.cancelResult(tx); // allaqachon bekor — idempotent
   }
 
   private cancelResult(tx: PaymeTx) {
-    return { transaction: tx.ourId, cancel_time: tx.cancelTime, state: tx.state };
+    return {
+      transaction: tx.ourId,
+      cancel_time: tx.cancelTime,
+      state: tx.state,
+    };
   }
 
   private async check(p: Record<string, any>) {
@@ -241,7 +348,8 @@ export class PaymeProtocol {
   }
 
   private async statement(p: Record<string, any>) {
-    if (!Number.isFinite(p.from) || !Number.isFinite(p.to)) throw new PaymeRpcError(PAYME_ERROR.INVALID_REQUEST);
+    if (!Number.isFinite(p.from) || !Number.isFinite(p.to))
+      throw new PaymeRpcError(PAYME_ERROR.INVALID_REQUEST);
     const list = await this.store.statement(p.from, p.to);
     return {
       transactions: list.map((tx) => ({
@@ -260,7 +368,8 @@ export class PaymeProtocol {
   }
 
   private async requireTx(id: unknown): Promise<PaymeTx> {
-    if (typeof id !== 'string' || !id) throw new PaymeRpcError(PAYME_ERROR.TRANSACTION_NOT_FOUND);
+    if (typeof id !== 'string' || !id)
+      throw new PaymeRpcError(PAYME_ERROR.TRANSACTION_NOT_FOUND);
     const tx = await this.store.findTx(id);
     if (!tx) throw new PaymeRpcError(PAYME_ERROR.TRANSACTION_NOT_FOUND);
     return tx;

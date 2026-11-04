@@ -174,18 +174,26 @@ export function evaluateOpenState(
       addDays(today.date, i),
       wrapWeekday(today.weekday + i),
     );
-    if (interval) return { isOpen: false, opensAt: formatMinutes(interval.start) };
+    if (interval)
+      return { isOpen: false, opensAt: formatMinutes(interval.start) };
   }
   return { isOpen: false, opensAt: null };
 }
 
-export type BranchStatus = 'open' | 'closed_now' | 'no_schedule' | 'closed_all_days';
+export type BranchStatus =
+  | 'open'
+  | 'closed_now'
+  | 'no_schedule'
+  | 'closed_all_days';
 
 /**
  * Why a branch is (not) open, for the UI to pick a message. closed_all_days: a schedule exists but no
  * opening falls in the next seven days (every weekday marked closed, or only closed exceptions).
  */
-export function branchStatus(schedule: BranchSchedule, state: OpenState): BranchStatus {
+export function branchStatus(
+  schedule: BranchSchedule,
+  state: OpenState,
+): BranchStatus {
   if (!hasSchedule(schedule)) return 'no_schedule';
   if (state.isOpen) return 'open';
   return state.opensAt === null ? 'closed_all_days' : 'closed_now';
@@ -236,7 +244,8 @@ export function formatHours(days: DayHours[], lang: HoursLang = 'ru'): string {
   const byDay = new Map(days.map((d) => [d.weekday, d]));
   const sigs = Array.from({ length: 7 }, (_, i) => signature(byDay.get(i + 1)));
 
-  const label = (sig: string) => (sig === '24h' ? w.all : sig === 'closed' ? w.closed : sig.replace('-', '–'));
+  const label = (sig: string) =>
+    sig === '24h' ? w.all : sig === 'closed' ? w.closed : sig.replace('-', '–');
 
   if (sigs.every((s) => s === sigs[0])) {
     if (sigs[0] === '24h') return w.all;
@@ -254,7 +263,8 @@ export function formatHours(days: DayHours[], lang: HoursLang = 'ru'): string {
   return runs
     .filter((r) => r.sig !== 'closed')
     .map((r) => {
-      const range = r.from === r.to ? w.days[r.from] : `${w.days[r.from]}–${w.days[r.to]}`;
+      const range =
+        r.from === r.to ? w.days[r.from] : `${w.days[r.from]}–${w.days[r.to]}`;
       return `${range} ${label(r.sig)}`;
     })
     .join(', ');

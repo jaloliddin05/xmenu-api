@@ -14,12 +14,22 @@ import {
   UploadedFiles,
   UseInterceptors,
   UsePipes,
-  ValidationPipe
+  ValidationPipe,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiConsumes, ApiQuery, ApiBody } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiConsumes,
+  ApiQuery,
+  ApiBody,
+} from '@nestjs/swagger';
 import { ProductService } from '../services/product.service';
 import { CreateProductDto } from '../dto/create-product.dto';
-import { FileFieldsInterceptor, FilesInterceptor } from '@nestjs/platform-express';
+import {
+  FileFieldsInterceptor,
+  FilesInterceptor,
+} from '@nestjs/platform-express';
 import { OptionalBoolPipe } from 'src/infra/http/optional-bool.pipe';
 import { MulterStorage } from 'src/infra/helper/upload/multer-upload';
 import MoveProductDto from '../dto/move-product.dto';
@@ -30,52 +40,80 @@ import { requireStaffOrganizationId } from 'src/infra/http/request-helpers';
 @ApiTags('Product')
 @Controller('product')
 export class ProductController {
-  constructor(private readonly productService: ProductService) { }
+  constructor(private readonly productService: ProductService) {}
 
   @Get()
   @ApiOperation({ summary: 'Method: get all' })
   @ApiQuery({ name: 'categoryId', required: false, description: 'uuid' })
-  @ApiQuery({ name: 'is_active', required: false, type: Boolean, description: '"true" or "false"; anything else is 400' })
+  @ApiQuery({
+    name: 'is_active',
+    required: false,
+    type: Boolean,
+    description: '"true" or "false"; anything else is 400',
+  })
   @ApiQuery({ name: 'title', required: false, description: '' })
   @HttpCode(HttpStatus.OK)
   async findAll(
-    @Query('lang') lang: string, 
+    @Query('lang') lang: string,
     @Query('categoryId') categoryId: string,
-    @Query('is_active', new OptionalBoolPipe('is_active')) is_active: boolean | undefined,
+    @Query('is_active', new OptionalBoolPipe('is_active'))
+    is_active: boolean | undefined,
     @Query('title') title: string,
-    @Req() req
+    @Req() req,
   ) {
-    return await this.productService.findAll(requireStaffOrganizationId(req),categoryId, lang,is_active,title);
+    return await this.productService.findAll(
+      requireStaffOrganizationId(req),
+      categoryId,
+      lang,
+      is_active,
+      title,
+    );
   }
 
   @Get('/:id')
   @ApiOperation({ summary: 'Method: get one' })
   @HttpCode(HttpStatus.OK)
-  async findOne( @Param('id') id: string, @Req() req) {
-    return await this.productService.findById(id, requireStaffOrganizationId(req));
+  async findOne(@Param('id') id: string, @Req() req) {
+    return await this.productService.findById(
+      id,
+      requireStaffOrganizationId(req),
+    );
   }
-
 
   @Post()
   @ApiOperation({ summary: 'Create new product with translations and options' })
-  async create(
-    @Body() dto: CreateProductDto,
-    @Req() req
-  ) {
-    return await this.productService.createProduct(dto, requireStaffOrganizationId(req), req?.user?.organization?.slug);
+  async create(@Body() dto: CreateProductDto, @Req() req) {
+    return await this.productService.createProduct(
+      dto,
+      requireStaffOrganizationId(req),
+      req?.user?.organization?.slug,
+    );
   }
 
   @Put('/:id')
   @ApiOperation({ summary: 'Update existing product' })
-  async update(@Param('id') id: string, @Body() dto: UpdateProductDto, @Req() req) {
-    return await this.productService.updateProduct(id, dto, requireStaffOrganizationId(req), req?.user?.organization?.slug);
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdateProductDto,
+    @Req() req,
+  ) {
+    return await this.productService.updateProduct(
+      id,
+      dto,
+      requireStaffOrganizationId(req),
+      req?.user?.organization?.slug,
+    );
   }
 
   @Patch('/index')
   @ApiOperation({ summary: 'Method: update index' })
   @HttpCode(HttpStatus.OK)
   async updateIndex(@Body() data: MoveProductDto, @Req() req) {
-    return await this.productService.moveProduct(data, requireStaffOrganizationId(req), req?.user?.organization?.slug);
+    return await this.productService.moveProduct(
+      data,
+      requireStaffOrganizationId(req),
+      req?.user?.organization?.slug,
+    );
   }
 
   @Patch(':id/activate')
@@ -94,8 +132,17 @@ export class ProductController {
     },
   })
   @HttpCode(HttpStatus.OK)
-  async activateProduct(@Param('id') id: string, @Body('is_active') is_active: boolean, @Req() req) {
-    return await this.productService.updateIsActive(id, is_active, requireStaffOrganizationId(req), req?.user?.organization?.slug);
+  async activateProduct(
+    @Param('id') id: string,
+    @Body('is_active') is_active: boolean,
+    @Req() req,
+  ) {
+    return await this.productService.updateIsActive(
+      id,
+      is_active,
+      requireStaffOrganizationId(req),
+      req?.user?.organization?.slug,
+    );
   }
 
   @Patch('/:id/images')
@@ -111,22 +158,33 @@ export class ProductController {
     @Param('id') id: string,
     @UploadedFiles() files: { images?: Express.Multer.File[] },
     @Body() dto: UploadProductImagesDto,
-    @Req() req
+    @Req() req,
   ) {
-    return this.productService.addProductImages(id, files?.images || [], requireStaffOrganizationId(req));
+    return this.productService.addProductImages(
+      id,
+      files?.images || [],
+      requireStaffOrganizationId(req),
+    );
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Method: delete' })
   @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@Param('id') id: string,@Req() req) {
-    return await this.productService.delete(id, requireStaffOrganizationId(req), req?.user?.organization?.slug);
+  async remove(@Param('id') id: string, @Req() req) {
+    return await this.productService.delete(
+      id,
+      requireStaffOrganizationId(req),
+      req?.user?.organization?.slug,
+    );
   }
 
   @Delete('/image/:id')
   @ApiOperation({ summary: 'Method: delete image' })
   @HttpCode(HttpStatus.NO_CONTENT)
   async removeImage(@Param('id') id: string, @Req() req) {
-    return await this.productService.deleteImage(id, requireStaffOrganizationId(req));
+    return await this.productService.deleteImage(
+      id,
+      requireStaffOrganizationId(req),
+    );
   }
 }

@@ -14,7 +14,13 @@ describe('OrganizationService.create', () => {
         update: jest.fn(async ({ where, data }) => ({ id: where.id, ...data })),
       },
     };
-    const service = new OrganizationService(db as any, {} as any, {} as any, {} as any, {} as any);
+    const service = new OrganizationService(
+      db as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
     return { db, service };
   }
 

@@ -1,5 +1,9 @@
 import { randomBytes } from 'crypto';
-import { decryptConfig, encryptConfig, parsePaymentConfigKey } from './payment-crypto';
+import {
+  decryptConfig,
+  encryptConfig,
+  parsePaymentConfigKey,
+} from './payment-crypto';
 
 const key = randomBytes(32);
 
@@ -25,7 +29,9 @@ describe('payment config crypto', () => {
   });
 
   it('rejects the wrong key', () => {
-    expect(() => decryptConfig(encryptConfig({ a: 1 }, key), randomBytes(32))).toThrow();
+    expect(() =>
+      decryptConfig(encryptConfig({ a: 1 }, key), randomBytes(32)),
+    ).toThrow();
   });
 
   it('accepts hex and base64 keys, refuses missing or short ones', () => {
@@ -40,10 +46,18 @@ describe('payment config crypto', () => {
 import { clickAuthHeader } from '../services/click-api';
 describe('clickAuthHeader', () => {
   it('is merchant_user_id:sha1(timestamp+secret):timestamp', () => {
-    const h = clickAuthHeader({ merchantUserId: '77', secretKey: 'sec' }, 1700000000);
+    const h = clickAuthHeader(
+      { merchantUserId: '77', secretKey: 'sec' },
+      1700000000,
+    );
     const [user, digest, ts] = h.split(':');
     expect(user).toBe('77');
     expect(ts).toBe('1700000000');
-    expect(digest).toBe(require('crypto').createHash('sha1').update('1700000000sec').digest('hex'));
+    expect(digest).toBe(
+      require('crypto')
+        .createHash('sha1')
+        .update('1700000000sec')
+        .digest('hex'),
+    );
   });
 });

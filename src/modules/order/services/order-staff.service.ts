@@ -1,8 +1,19 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
-import { nextRestaurantStatus, OrderStatusName } from '../domain/order-state-machine';
-import { InvalidTransitionError, OrderNotFoundError, OrderTransitionService } from './order-transition.service';
+import {
+  nextRestaurantStatus,
+  OrderStatusName,
+} from '../domain/order-state-machine';
+import {
+  InvalidTransitionError,
+  OrderNotFoundError,
+  OrderTransitionService,
+} from './order-transition.service';
 import { OrderWithItems, toOrderView } from './order-view';
 
 const INCLUDE = {
@@ -36,10 +47,16 @@ export class OrderStaffService {
     private readonly transitions: OrderTransitionService,
   ) {}
 
-  private toStaffView(order: Prisma.customer_orderGetPayload<{ include: typeof INCLUDE }>) {
+  private toStaffView(
+    order: Prisma.customer_orderGetPayload<{ include: typeof INCLUDE }>,
+  ) {
     return {
       ...toOrderView(order as unknown as OrderWithItems),
-      customer: { id: order.customer.id, name: order.customer.name, phone: order.customer.phone },
+      customer: {
+        id: order.customer.id,
+        name: order.customer.name,
+        phone: order.customer.phone,
+      },
       events: order.events.map((e) => ({
         from: e.from_status,
         to: e.to_status,
@@ -51,7 +68,15 @@ export class OrderStaffService {
     };
   }
 
-  async list(organizationId: string, q: { statuses?: OrderStatusName[]; branchId?: string; cursor?: string; limit?: number }) {
+  async list(
+    organizationId: string,
+    q: {
+      statuses?: OrderStatusName[];
+      branchId?: string;
+      cursor?: string;
+      limit?: number;
+    },
+  ) {
     const limit = Math.min(Math.max(q.limit ?? 30, 1), 100);
     const rows = await this.prisma.customer_order.findMany({
       where: {
@@ -65,20 +90,33 @@ export class OrderStaffService {
       include: INCLUDE,
     });
     const page = rows.slice(0, limit);
-    return { items: page.map((o) => this.toStaffView(o)), nextCursor: rows.length > limit ? page[page.length - 1].id : null };
+    return {
+      items: page.map((o) => this.toStaffView(o)),
+      nextCursor: rows.length > limit ? page[page.length - 1].id : null,
+    };
   }
 
   async get(organizationId: string, id: string) {
-    const order = await this.prisma.customer_order.findFirst({ where: { id, organization_id: organizationId }, include: INCLUDE });
+    const order = await this.prisma.customer_order.findFirst({
+      where: { id, organization_id: organizationId },
+      include: INCLUDE,
+    });
     if (!order) throw new NotFoundException('Order not found');
     return this.toStaffView(order);
   }
 
   /** Panel uchun: natijada yangilangan buyurtma. Ruxsat etilmagan o'tish — 409. */
-  async act(organizationId: string, id: string, action: RestaurantAction, actorId: string) {
+  async act(
+    organizationId: string,
+    id: string,
+    action: RestaurantAction,
+    actorId: string,
+  ) {
     const result = await this.perform(organizationId, id, action, actorId);
     if (!result.changed && result.conflict) {
-      throw new ConflictException(`Order is "${result.status}" — this action is not available`);
+      throw new ConflictException(
+        `Order is "${result.status}" — this action is not available`,
+      );
     }
     return this.get(organizationId, id);
   }
@@ -87,9 +125,17 @@ export class OrderStaffService {
    * Telegram tugmasi uchun: takror bosish xato emas (changed=false). `organizationId`
    * berilsa buyurtma o'sha tenantga tegishli bo'lishi shart.
    */
-  async perform(organizationId: string | null, id: string, action: RestaurantAction, actorId: string): Promise<ActionResult & { conflict: boolean }> {
+  async perform(
+    organizationId: string | null,
+    id: string,
+    action: RestaurantAction,
+    actorId: string,
+  ): Promise<ActionResult & { conflict: boolean }> {
     const order = await this.prisma.customer_order.findFirst({
-      where: { id, ...(organizationId ? { organization_id: organizationId } : {}) },
+      where: {
+        id,
+        ...(organizationId ? { organization_id: organizationId } : {}),
+      },
       select: { status: true, fulfillment: true },
     });
     if (!order) throw new NotFoundException('Order not found');
@@ -104,12 +150,14 @@ export class OrderStaffService {
         to,
         actor: 'restaurant',
         actorId,
-        reason: action.type === 'reject' ? (action.reason ?? 'declined') : undefined,
+        reason:
+          action.type === 'reject' ? (action.reason ?? 'declined') : undefined,
         eta: action.type === 'accept' ? action.eta : undefined,
       });
       return { changed: true, status: to, conflict: false };
     } catch (e) {
-      if (e instanceof OrderNotFoundError) throw new NotFoundException('Order not found');
+      if (e instanceof OrderNotFoundError)
+        throw new NotFoundException('Order not found');
       if (e instanceof InvalidTransitionError) {
         // Allaqachon shu holatda — takror bosish; boshqa holatda — haqiqiy konflikt.
         return { changed: false, status: e.from, conflict: e.from !== to };
@@ -118,7 +166,11 @@ export class OrderStaffService {
     }
   }
 
-  private target(action: RestaurantAction, from: OrderStatusName, fulfillment: string): OrderStatusName | null {
+  private target(
+    action: RestaurantAction,
+    from: OrderStatusName,
+    fulfillment: string,
+  ): OrderStatusName | null {
     switch (action.type) {
       case 'accept':
         return 'accepted';

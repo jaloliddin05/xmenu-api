@@ -1,59 +1,59 @@
-import { ApiProperty } from "@nestjs/swagger"
-import { IsArray, IsNotEmpty, IsOptional, IsString } from "class-validator"
+import { ApiProperty } from '@nestjs/swagger';
+import { IsArray, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class CreateCategoryDto {
-    @ApiProperty({
-        description: `title`,
-        example: [
-            {
-                title: 'string',
-                lang: 'en'
-            },
-            {
-                title: 'string',
-                lang: 'ru'
-            },
-             {
-                title: 'string',
-                lang: 'uz'
-            }
-        ],
-        required: false,
-    })
-    @IsNotEmpty()
-    @IsArray()
-    translations: CreateCategoryTranslationDto[];
+  @ApiProperty({
+    description: `title`,
+    example: [
+      {
+        title: 'string',
+        lang: 'en',
+      },
+      {
+        title: 'string',
+        lang: 'ru',
+      },
+      {
+        title: 'string',
+        lang: 'uz',
+      },
+    ],
+    required: false,
+  })
+  @IsNotEmpty()
+  @IsArray()
+  translations: CreateCategoryTranslationDto[];
 
-     @ApiProperty({
-        description: `Deprecated: the category always goes to your own organization; another id is 404`,
-        example: '',
-        required: false,
-    })
-    @IsOptional()
-    @IsString()
-    readonly organization_id?: string
+  @ApiProperty({
+    description: `Deprecated: the category always goes to your own organization; another id is 404`,
+    example: '',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  readonly organization_id?: string;
 }
 
 export class CreateCategoryTranslationDto {
-    id?:string
+  id?: string;
 
-    @ApiProperty({
-        description: `title`,
-        example: '',
-        required: false,
-    })
-    @IsNotEmpty()
-    @IsString()
-    readonly title: string
+  @ApiProperty({
+    description: `title`,
+    example: '',
+    required: false,
+  })
+  @IsNotEmpty()
+  @IsString()
+  readonly title: string;
 
-    @ApiProperty({
-        description: `key`,
-        example: '',
-        required: false,
-    })
-    @IsNotEmpty()
-    @IsString()
-    readonly lang: string;
+  @ApiProperty({
+    description: `key`,
+    example: '',
+    required: false,
+  })
+  @IsNotEmpty()
+  @IsString()
+  readonly lang: string;
 }
 
-export default CreateCategoryDto
+export default CreateCategoryDto;

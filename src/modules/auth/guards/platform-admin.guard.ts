@@ -1,7 +1,14 @@
-import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+  Injectable,
+} from '@nestjs/common';
 
 /** User ids from PLATFORM_ADMIN_USER_IDS (comma separated). Empty or unset means nobody. */
-export function platformAdminIds(env: NodeJS.ProcessEnv = process.env): Set<string> {
+export function platformAdminIds(
+  env: NodeJS.ProcessEnv = process.env,
+): Set<string> {
   return new Set(
     (env.PLATFORM_ADMIN_USER_IDS ?? '')
       .split(',')

@@ -1,4 +1,11 @@
-import { BadRequestException, Body, Controller, Get, Put, Req } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Put,
+  Req,
+} from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { requireStaffOrganizationId } from 'src/infra/http/request-helpers';
 import { Prisma } from '@prisma/client';
@@ -19,25 +26,34 @@ export class OrderSettingsController {
   ) {}
 
   @Get()
-  @ApiOperation({ summary: 'Current ordering settings (the row is created at signup)' })
+  @ApiOperation({
+    summary: 'Current ordering settings (the row is created at signup)',
+  })
   get(@Req() req) {
     return this.settings.get(requireStaffOrganizationId(req));
   }
 
   @Put()
-  @ApiOperation({ summary: "Sozlamalarni saqlash (faqat yuborilgan maydonlar o'zgaradi)" })
+  @ApiOperation({
+    summary: "Sozlamalarni saqlash (faqat yuborilgan maydonlar o'zgaradi)",
+  })
   async update(@Req() req, @Body() dto: UpdateOrderSettingsDto) {
     const organizationId = requireStaffOrganizationId(req);
 
     if (dto.deliveryZone != null && parseZone(dto.deliveryZone) === null) {
-      throw new BadRequestException('deliveryZone must be [[lat, lng], ...] with at least 3 points');
+      throw new BadRequestException(
+        'deliveryZone must be [[lat, lng], ...] with at least 3 points',
+      );
     }
     if (dto.etaMin != null && dto.etaMax != null && dto.etaMax < dto.etaMin) {
       throw new BadRequestException('etaMax must be >= etaMin');
     }
 
     // deliveryZone: undefined — o'zgartirmaslik; null — zonani o'chirish (SQL NULL); massiv — saqlash
-    const zone = dto.deliveryZone === null ? Prisma.DbNull : (dto.deliveryZone ?? undefined);
+    const zone =
+      dto.deliveryZone === null
+        ? Prisma.DbNull
+        : (dto.deliveryZone ?? undefined);
     const data = {
       delivery_service_fee: dto.deliveryServiceFee,
       min_order_delivery: dto.minOrderDelivery,
@@ -56,7 +72,10 @@ export class OrderSettingsController {
     });
     this.settings.invalidate(organizationId);
     // Fees, minimums, ETA and the zone are part of the delivery site's config
-    await this.revalidate.addRevalidationJob({ tenantId: organizationId, route: 'settings' });
+    await this.revalidate.addRevalidationJob({
+      tenantId: organizationId,
+      route: 'settings',
+    });
     return this.settings.get(organizationId);
   }
 }

@@ -34,19 +34,19 @@ import { Public } from '../decorators/public.decorator';
 import { StaffLogoutDto, StaffRefreshDto } from '../dto/staff-session.dto';
 import { requestCtx } from 'src/infra/http/request-helpers';
 
-
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
   constructor(
     private readonly staffAuth: StaffAuthService,
     private readonly sessions: StaffSessionService,
-  ) { }
+  ) {}
 
   @Public()
   @Post('/login')
   @ApiOperation({
-    summary: 'Owner login by phone and password (per-phone escalating lockout, per-IP limit)',
+    summary:
+      'Owner login by phone and password (per-phone escalating lockout, per-IP limit)',
   })
   @ApiOkResponse({ type: StaffLoginResponseDto })
   @HttpCode(200)
@@ -54,11 +54,11 @@ export class AuthController {
     return this.staffAuth.login(dto, requestCtx(req));
   }
 
-
   @Public()
   @Post('/register')
   @ApiOperation({
-    summary: 'Start owner signup: nothing is stored in the DB until the SMS code is confirmed',
+    summary:
+      'Start owner signup: nothing is stored in the DB until the SMS code is confirmed',
   })
   @ApiCreatedResponse({ type: StaffRegisterResponseDto })
   @HttpCode(HttpStatus.CREATED)
@@ -68,7 +68,10 @@ export class AuthController {
 
   @Public()
   @Post('/check-code')
-  @ApiOperation({ summary: 'Confirm the signup code; creates the owner and the venue and signs in' })
+  @ApiOperation({
+    summary:
+      'Confirm the signup code; creates the owner and the venue and signs in',
+  })
   @ApiOkResponse({ type: StaffCheckCodeResponseDto })
   @HttpCode(200)
   checkCode(@Body() dto: StaffCheckCodeDto, @Req() req: express.Request) {
@@ -77,17 +80,23 @@ export class AuthController {
 
   @Public()
   @Post('/resend-code')
-  @ApiOperation({ summary: 'Send a new signup code (respects the resend cooldown)' })
+  @ApiOperation({
+    summary: 'Send a new signup code (respects the resend cooldown)',
+  })
   @ApiOkResponse({ type: StaffResendCodeResponseDto })
   @HttpCode(200)
-  resendCode(@Body() dto: StaffRegistrationRefDto, @Req() req: express.Request) {
+  resendCode(
+    @Body() dto: StaffRegistrationRefDto,
+    @Req() req: express.Request,
+  ) {
     return this.staffAuth.resendCode(dto.registrationId, requestCtx(req));
   }
 
   @Public()
   @Post('/refresh')
   @ApiOperation({
-    summary: 'New token pair for a refresh token; the old refresh token is spent (rotation). 401 invalid_refresh_token',
+    summary:
+      'New token pair for a refresh token; the old refresh token is spent (rotation). 401 invalid_refresh_token',
   })
   @ApiOkResponse({ type: StaffTokenPairDto })
   @HttpCode(200)
@@ -97,10 +106,15 @@ export class AuthController {
 
   @Public()
   @Post('/logout')
-  @ApiOperation({ summary: 'Revoke the login behind a refresh token (idempotent, always 204)' })
+  @ApiOperation({
+    summary: 'Revoke the login behind a refresh token (idempotent, always 204)',
+  })
   @ApiNoContentResponse()
   @HttpCode(HttpStatus.NO_CONTENT)
-  async logout(@Body() dto: StaffLogoutDto, @Req() req: express.Request): Promise<void> {
+  async logout(
+    @Body() dto: StaffLogoutDto,
+    @Req() req: express.Request,
+  ): Promise<void> {
     await this.sessions.logout(dto.refreshToken, requestCtx(req));
   }
 }

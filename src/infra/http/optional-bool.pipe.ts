@@ -2,7 +2,9 @@ import { BadRequestException, Injectable, PipeTransform } from '@nestjs/common';
 
 /** Optional boolean query parameter: absent/empty -> undefined, 'true'/'false' -> boolean, anything else -> 400. */
 @Injectable()
-export class OptionalBoolPipe implements PipeTransform<string | undefined, boolean | undefined> {
+export class OptionalBoolPipe
+  implements PipeTransform<string | undefined, boolean | undefined>
+{
   constructor(private readonly name = 'value') {}
 
   transform(value: string | undefined): boolean | undefined {

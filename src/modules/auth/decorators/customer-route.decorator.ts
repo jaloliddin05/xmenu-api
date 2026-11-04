@@ -1,4 +1,10 @@
-import { applyDecorators, createParamDecorator, ExecutionContext, UseFilters, UseGuards } from '@nestjs/common';
+import {
+  applyDecorators,
+  createParamDecorator,
+  ExecutionContext,
+  UseFilters,
+  UseGuards,
+} from '@nestjs/common';
 import { Public } from './public.decorator';
 import { TenantGuard } from '../../tenant/tenant.guard';
 import { CustomerAccessTokenGuard } from '../passport-strategies/customer-access-token/customer-access-token.guard';
@@ -10,7 +16,11 @@ import { CustomerExceptionFilter } from '../errors/customer-exception.filter';
  * Token talab qilinmaydi (OTP, register, refresh, logout uchun).
  */
 export const CustomerPublicRoute = () =>
-  applyDecorators(Public(), UseGuards(TenantGuard), UseFilters(CustomerExceptionFilter));
+  applyDecorators(
+    Public(),
+    UseGuards(TenantGuard),
+    UseFilters(CustomerExceptionFilter),
+  );
 
 /** Mijoz access-tokeni (aud=xmenu:customer) talab qilinadi. */
 export const CustomerProtectedRoute = () =>
@@ -27,5 +37,6 @@ export interface CustomerPrincipal {
 }
 
 export const CurrentCustomer = createParamDecorator(
-  (_d: unknown, ctx: ExecutionContext): CustomerPrincipal => ctx.switchToHttp().getRequest().user,
+  (_d: unknown, ctx: ExecutionContext): CustomerPrincipal =>
+    ctx.switchToHttp().getRequest().user,
 );

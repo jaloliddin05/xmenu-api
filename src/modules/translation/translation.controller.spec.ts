@@ -1,4 +1,8 @@
-import { BadGatewayException, INestApplication, ValidationPipe } from '@nestjs/common';
+import {
+  BadGatewayException,
+  INestApplication,
+  ValidationPipe,
+} from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { FakeRedis } from 'src/infra/redis/redis.fake';
@@ -21,12 +25,22 @@ describe('TranslationController', () => {
       controllers: [TranslationController],
       providers: [
         { provide: TranslationService, useValue: { translate } },
-        { provide: RateLimitService, useValue: new RateLimitService(redis as never) },
+        {
+          provide: RateLimitService,
+          useValue: new RateLimitService(redis as never),
+        },
       ],
     }).compile();
     app = mod.createNestApplication();
     app.useGlobalFilters(new ErrorFilter());
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, forbidUnknownValues: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        forbidUnknownValues: true,
+        transform: true,
+      }),
+    );
     // Stand-in for the global access-token guard: x-user header = authenticated owner.
     app.use((req, _res, next) => {
       if (req.headers['x-user']) req.user = { id: req.headers['x-user'] };
@@ -47,7 +61,9 @@ describe('TranslationController', () => {
   const ok = { text: 'Плов', promptName: 'dish' };
 
   it('is not marked public, so the global guard demands an owner token', () => {
-    expect(Reflect.getMetadata(PUBLIC_KEY, TranslationController.prototype.create)).toBeUndefined();
+    expect(
+      Reflect.getMetadata(PUBLIC_KEY, TranslationController.prototype.create),
+    ).toBeUndefined();
   });
 
   it('refuses a request without an authenticated user and never calls the model', async () => {
@@ -84,16 +100,26 @@ describe('TranslationController', () => {
   });
 
   it('does not let invalid requests dodge or spend validation: oversize and wrong types are 400', async () => {
-    expect((await post('u1', { ...ok, text: 'a'.repeat(2001) })).status).toBe(400);
-    expect((await post('u1', { ...ok, promptName: 'p'.repeat(101) })).status).toBe(400);
-    expect((await post('u1', { text: ['a'], promptName: 'dish' })).status).toBe(400);
-    expect((await post('u1', { text: { a: 1 }, promptName: 'dish' })).status).toBe(400);
+    expect((await post('u1', { ...ok, text: 'a'.repeat(2001) })).status).toBe(
+      400,
+    );
+    expect(
+      (await post('u1', { ...ok, promptName: 'p'.repeat(101) })).status,
+    ).toBe(400);
+    expect((await post('u1', { text: ['a'], promptName: 'dish' })).status).toBe(
+      400,
+    );
+    expect(
+      (await post('u1', { text: { a: 1 }, promptName: 'dish' })).status,
+    ).toBe(400);
     expect((await post('u1', { ...ok, extra: 1 })).status).toBe(400);
     expect(translate).not.toHaveBeenCalled();
   });
 
   it('maps model failures to 502 without leaking the raw response', async () => {
-    translate.mockRejectedValue(new BadGatewayException('Invalid translation response'));
+    translate.mockRejectedValue(
+      new BadGatewayException('Invalid translation response'),
+    );
     const res = await post('u1', ok);
     expect(res.status).toBe(502);
     expect(JSON.stringify(res.body)).not.toMatch(/sk-|gpt/i);

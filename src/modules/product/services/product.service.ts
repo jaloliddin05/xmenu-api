@@ -1,21 +1,25 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 
-
 import { PrismaService } from '../../_prisma/prisma.service';
 import { FileService } from 'src/modules/file/file.service';
 import { CreateProductDto } from '../dto/create-product.dto';
 import MoveProductDto from '../dto/move-product.dto';
 import { UpdateProductDto } from '../dto/update-product.dto';
 import { RevalidateService } from 'src/modules/revalidate-queue/revalidate.service';
-import { assertOwnTranslations, ownCategory, ownGroup, ownProduct } from './menu-ownership';
+import {
+  assertOwnTranslations,
+  ownCategory,
+  ownGroup,
+  ownProduct,
+} from './menu-ownership';
 
 @Injectable()
 export class ProductService {
   constructor(
     private readonly prismaService: PrismaService,
     private readonly fileService: FileService,
-    private readonly revalidateService: RevalidateService
-  ) { }
+    private readonly revalidateService: RevalidateService,
+  ) {}
 
   // Every id from the URL or the body must belong to the caller's organization; anything else is 404.
 
@@ -36,19 +40,29 @@ export class ProductService {
     if (!category) throw new NotFoundException('Category not found');
   }
 
-  private async assertOwnGroups(ids: string[] | undefined, organizationId: string) {
+  private async assertOwnGroups(
+    ids: string[] | undefined,
+    organizationId: string,
+  ) {
     if (!ids?.length) return;
     const unique = [...new Set(ids)];
     const found = await this.prismaService.additional_product_group.findMany({
       where: { id: { in: unique }, ...ownGroup(organizationId) },
       select: { id: true },
     });
-    if (found.length !== unique.length) throw new NotFoundException('Additional product group not found');
+    if (found.length !== unique.length)
+      throw new NotFoundException('Additional product group not found');
   }
 
-  async findAll(organization_id: string, category_id: string, lang: string, isActive?: boolean, title?: string) {
-    const where: any = {}
-    category_id ? where['category_id'] = category_id : null;
+  async findAll(
+    organization_id: string,
+    category_id: string,
+    lang: string,
+    isActive?: boolean,
+    title?: string,
+  ) {
+    const where: any = {};
+    category_id ? (where['category_id'] = category_id) : null;
     if (isActive !== undefined) where.is_active = isActive;
     if (title) {
       where.translations = {
@@ -56,41 +70,37 @@ export class ProductService {
           lang,
           title: {
             contains: title,
-            mode: 'insensitive'
-          }
-        }
-      }
+            mode: 'insensitive',
+          },
+        },
+      };
     }
     // Always scoped: without an organization this used to list every venue's dishes
-    where.category = ownCategory(organization_id)
-
+    where.category = ownCategory(organization_id);
 
     const products = await this.prismaService.product.findMany({
       where,
       include: {
         translations: {
           where: { lang },
-          select: { title: true }
+          select: { title: true },
         },
         category: {
           select: {
             id: true,
             translations: {
               where: { lang },
-              select: { title: true }
-            }
-          }
+              select: { title: true },
+            },
+          },
         },
         images: true,
       },
-      orderBy: [
-        { index: 'asc' },
-        { created_at: 'asc' }
-      ]
+      orderBy: [{ index: 'asc' }, { created_at: 'asc' }],
     });
 
     // Formatlash
-    return products.map(p => ({
+    return products.map((p) => ({
       id: p.id,
       index: p.index,
       is_active: p.is_active,
@@ -98,7 +108,7 @@ export class ProductService {
       product_title: p.translations[0]?.title || null,
       category_id: p.category.id,
       category_title: p.category.translations[0]?.title || null,
-      images: p.images.map(img => img.url) // agar image modelida `url` maydoni bo‘lsa
+      images: p.images.map((img) => img.url), // agar image modelida `url` maydoni bo‘lsa
     }));
   }
 
@@ -113,24 +123,31 @@ export class ProductService {
           include: {
             translations: true,
             additional_products: {
-              include: { translations: true }
-            }
-          }
-        }
+              include: { translations: true },
+            },
+          },
+        },
       },
     });
     if (!product) throw new NotFoundException('Product not found');
     return product;
   }
 
-  async createProduct(dto: CreateProductDto, organizationId: string, slug: string) {
+  async createProduct(
+    dto: CreateProductDto,
+    organizationId: string,
+    slug: string,
+  ) {
     await this.assertOwnCategory(dto.category_id, organizationId);
-    await this.assertOwnGroups(dto.additional_product_group_ids, organizationId);
+    await this.assertOwnGroups(
+      dto.additional_product_group_ids,
+      organizationId,
+    );
 
     const product = await this.prismaService.$transaction(async (prisma) => {
       const lastProduct = await prisma.product.findFirst({
         where: { category_id: dto.category_id },
-        orderBy: { index: "desc" },
+        orderBy: { index: 'desc' },
         select: { index: true },
       });
 
@@ -148,7 +165,7 @@ export class ProductService {
           index: nextIndex,
           category: { connect: { id: dto.category_id } },
           translations: {
-            create: dto.translations.map(t => ({
+            create: dto.translations.map((t) => ({
               lang: t.lang,
               title: t.title,
               description: t.description,
@@ -156,8 +173,8 @@ export class ProductService {
           },
           additional_product_groups: dto.additional_product_group_ids
             ? {
-              connect: dto.additional_product_group_ids.map(id => ({ id })),
-            }
+                connect: dto.additional_product_group_ids.map((id) => ({ id })),
+              }
             : undefined,
         },
         include: {
@@ -173,14 +190,24 @@ export class ProductService {
       });
     });
 
-    await this.revalidateService.addRevalidationJob({ tenantId: organizationId, route: 'menu', slug })
-    return product
+    await this.revalidateService.addRevalidationJob({
+      tenantId: organizationId,
+      route: 'menu',
+      slug,
+    });
+    return product;
   }
 
-  async updateProduct(id: string, dto: UpdateProductDto, organizationId: string, slug: string) {
+  async updateProduct(
+    id: string,
+    dto: UpdateProductDto,
+    organizationId: string,
+    slug: string,
+  ) {
     const existingProduct = await this.findOwnProduct(id, organizationId);
     assertOwnTranslations(existingProduct.translations, dto.translations);
-    if (dto.category_id) await this.assertOwnCategory(dto.category_id, organizationId);
+    if (dto.category_id)
+      await this.assertOwnCategory(dto.category_id, organizationId);
 
     const product = await this.prismaService.$transaction(async (prisma) => {
       // Translationlar yangilanishi
@@ -196,7 +223,7 @@ export class ProductService {
           });
         }
       }
-      
+
       // Product asosiy ma’lumotlarini yangilash
       return await prisma.product.update({
         where: { id },
@@ -208,7 +235,9 @@ export class ProductService {
           protein: dto.protein,
           fat: dto.fat,
           carbohydrate: dto.carbohydrate,
-          category: dto.category_id ? { connect: { id: dto.category_id } } : undefined,
+          category: dto.category_id
+            ? { connect: { id: dto.category_id } }
+            : undefined,
         },
         include: {
           translations: true,
@@ -221,13 +250,15 @@ export class ProductService {
           },
         },
       });
-      
     });
-    
-    await this.revalidateService.addRevalidationJob({ tenantId: organizationId, route: 'menu', slug })
-    return product
-  }
 
+    await this.revalidateService.addRevalidationJob({
+      tenantId: organizationId,
+      route: 'menu',
+      slug,
+    });
+    return product;
+  }
 
   async moveProduct(dto: MoveProductDto, organizationId: string, slug: string) {
     const { categoryId, productId, newIndex } = dto;
@@ -235,7 +266,8 @@ export class ProductService {
     // 1. Avval eski indexni topamiz
     const product = await this.findOwnProduct(productId, organizationId);
     // The reindex below runs over categoryId, so it must be the product's own category
-    if (product.category_id !== categoryId) throw new NotFoundException('Category not found');
+    if (product.category_id !== categoryId)
+      throw new NotFoundException('Category not found');
 
     const oldIndex = product.index || 0;
 
@@ -269,26 +301,50 @@ export class ProductService {
       data: { index: newIndex },
     });
 
-    await this.revalidateService.addRevalidationJob({ tenantId: organizationId, route: 'menu', slug })
+    await this.revalidateService.addRevalidationJob({
+      tenantId: organizationId,
+      route: 'menu',
+      slug,
+    });
 
     return updated;
   }
 
-  async updateIsActive(id: string, is_active: boolean, organizationId: string, slug: string) {
+  async updateIsActive(
+    id: string,
+    is_active: boolean,
+    organizationId: string,
+    slug: string,
+  ) {
     await this.findOwnProduct(id, organizationId);
-    const product = await this.prismaService.product.update({ where: { id }, data: { is_active } })
-    await this.revalidateService.addRevalidationJob({ tenantId: organizationId, route: 'menu', slug })
+    const product = await this.prismaService.product.update({
+      where: { id },
+      data: { is_active },
+    });
+    await this.revalidateService.addRevalidationJob({
+      tenantId: organizationId,
+      route: 'menu',
+      slug,
+    });
     return product;
   }
 
   async delete(id: string, organizationId: string, slug: string) {
     await this.findOwnProduct(id, organizationId);
-    const product = await this.prismaService.product.delete({ where: { id } })
-    await this.revalidateService.addRevalidationJob({ tenantId: organizationId, route: 'menu', slug })
-    return product
+    const product = await this.prismaService.product.delete({ where: { id } });
+    await this.revalidateService.addRevalidationJob({
+      tenantId: organizationId,
+      route: 'menu',
+      slug,
+    });
+    return product;
   }
 
-  async addProductImages(productId: string, images: Express.Multer.File[], organizationId: string) {
+  async addProductImages(
+    productId: string,
+    images: Express.Multer.File[],
+    organizationId: string,
+  ) {
     // 🔸 1. Productni tekshirish
     await this.findOwnProduct(productId, organizationId);
 

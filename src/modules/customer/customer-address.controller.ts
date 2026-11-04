@@ -35,7 +35,8 @@ import {
 @ApiBearerAuth('access-token')
 @ApiHeader({
   name: 'X-Tenant-Id',
-  description: 'Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug',
+  description:
+    'Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug',
   required: true,
 })
 @CustomerProtectedRoute()

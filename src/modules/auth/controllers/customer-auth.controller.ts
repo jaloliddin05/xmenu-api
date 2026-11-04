@@ -55,10 +55,15 @@ import { CurrentTenant } from '../../tenant/current-tenant.decorator';
 import type { Tenant } from '../../tenant/tenant.service';
 
 @ApiTags('Auth-Customer')
-@ApiExtraModels(CustomerSignedInDto, CustomerRegistrationRequiredDto, CustomerPhoneRequiredDto)
+@ApiExtraModels(
+  CustomerSignedInDto,
+  CustomerRegistrationRequiredDto,
+  CustomerPhoneRequiredDto,
+)
 @ApiHeader({
   name: 'X-Tenant-Id',
-  description: 'Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug',
+  description:
+    'Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug',
   required: true,
 })
 // '/auth/*' endi band: AuthController (xodimlar) shu yerda /auth/login,
@@ -89,8 +94,18 @@ export class AuthCustomerController {
   @CustomerPublicRoute()
   @Post('otp/verify')
   @HttpCode(200)
-  @ApiOperation({ summary: 'Check the code: known phone signs in (isNewUser false), new phone gets a registrationToken' })
-  @ApiOkResponse({ schema: { oneOf: [{ $ref: getSchemaPath(CustomerSignedInDto) }, { $ref: getSchemaPath(CustomerRegistrationRequiredDto) }] } })
+  @ApiOperation({
+    summary:
+      'Check the code: known phone signs in (isNewUser false), new phone gets a registrationToken',
+  })
+  @ApiOkResponse({
+    schema: {
+      oneOf: [
+        { $ref: getSchemaPath(CustomerSignedInDto) },
+        { $ref: getSchemaPath(CustomerRegistrationRequiredDto) },
+      ],
+    },
+  })
   verifyOtp(
     @CurrentTenant() tenant: Tenant,
     @Body() dto: CustomerOtpVerifyDto,
@@ -124,7 +139,8 @@ export class AuthCustomerController {
   @Post('telegram/status')
   @HttpCode(200)
   @ApiOperation({
-    summary: 'Poll the Telegram verification session every 2 s (the login result is returned once)',
+    summary:
+      'Poll the Telegram verification session every 2 s (the login result is returned once)',
   })
   @ApiOkResponse({ type: CustomerTelegramStatusResponseDto })
   telegramStatus(
@@ -162,7 +178,10 @@ export class AuthCustomerController {
   @CustomerPublicRoute()
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiNoContentResponse({ description: 'Always 204 (idempotent); the login and its access tokens are revoked' })
+  @ApiNoContentResponse({
+    description:
+      'Always 204 (idempotent); the login and its access tokens are revoked',
+  })
   async logout(
     @CurrentTenant() tenant: Tenant,
     @Body() dto: CustomerLogoutDto,
@@ -183,7 +202,15 @@ export class AuthCustomerController {
   @CustomerPublicRoute()
   @Post('login')
   @HttpCode(200)
-  @ApiOkResponse({ schema: { oneOf: [{ $ref: getSchemaPath(CustomerSignedInDto) }, { $ref: getSchemaPath(CustomerRegistrationRequiredDto) }, { $ref: getSchemaPath(CustomerPhoneRequiredDto) }] } })
+  @ApiOkResponse({
+    schema: {
+      oneOf: [
+        { $ref: getSchemaPath(CustomerSignedInDto) },
+        { $ref: getSchemaPath(CustomerRegistrationRequiredDto) },
+        { $ref: getSchemaPath(CustomerPhoneRequiredDto) },
+      ],
+    },
+  })
   telegramLogin(
     @CurrentTenant() tenant: Tenant,
     @Body() dto: CustomerTelegramDto,

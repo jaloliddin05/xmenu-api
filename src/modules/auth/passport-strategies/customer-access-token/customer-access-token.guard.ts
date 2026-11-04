@@ -10,8 +10,10 @@ export class CustomerAccessTokenGuard extends AuthGuard(CUSTOMER_ACCESS_TOKEN) {
     if (user) return user;
 
     const msg = String(info?.message ?? '');
-    if (info?.name === 'TokenExpiredError') throw new CustomerAuthException('token_expired');
-    if (/no auth token/i.test(msg)) throw new CustomerAuthException('missing_token');
+    if (info?.name === 'TokenExpiredError')
+      throw new CustomerAuthException('token_expired');
+    if (/no auth token/i.test(msg))
+      throw new CustomerAuthException('missing_token');
     throw new CustomerAuthException('invalid_token');
   }
 }

@@ -10,7 +10,10 @@ class CustomerOtpVerifyDto {
   @IsString()
   code: string;
 
-  @ApiPropertyOptional({ description: 'Telegram WebApp initData — mavjud mijozga Telegram ulash uchun' })
+  @ApiPropertyOptional({
+    description:
+      'Telegram WebApp initData — mavjud mijozga Telegram ulash uchun',
+  })
   @IsOptional()
   @IsString()
   initData?: string;
