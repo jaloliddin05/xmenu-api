@@ -173,7 +173,7 @@ export class OrganizationService {
       assertOwnTranslations(own, data.translations);
     }
 
-    const files: any = {};
+    const files: { logo_id?: string; banner_id?: string } = {};
 
     // 1️⃣ logo va banner
     if (logo) {
@@ -222,7 +222,8 @@ export class OrganizationService {
     try {
       await this.prismaService.organization.update({
         where: { id },
-        data: { ...data, ...files },
+        // `data` is the update DTO (it also types relations the owner API never sets here)
+        data: { ...data, ...files } as Prisma.organizationUncheckedUpdateInput,
         include: { logo: true, banner: true },
       });
     } catch (e) {
@@ -281,7 +282,7 @@ export class OrganizationService {
     return avatar;
   }
 
-  async deleteImage(id: string, type) {
+  async deleteImage(id: string, type: 'logo' | 'banner') {
     const data = await this.findById(id);
     if (data?.[type]?.url) {
       await this.fileService.removeFile(data?.[type].id);

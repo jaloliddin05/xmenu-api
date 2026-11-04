@@ -19,7 +19,9 @@ class CreateOrganizationDto {
     required: false,
   })
   @IsString()
-  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.trim() : (value as unknown),
+  )
   @Length(2, 100)
   readonly name: string;
 }

@@ -16,7 +16,7 @@ export class FileService {
   async removeFile(id: string) {
     const file = await this.prismaService.file.findUnique({ where: { id } });
     if (file?.path) {
-      await this.deleteFileWithFs(file.path);
+      this.deleteFileWithFs(file.path);
     }
     await this.prismaService.file.delete({ where: { id } });
   }
@@ -27,7 +27,7 @@ export class FileService {
       : null;
 
     if (changedFile?.path) {
-      await this.deleteFileWithFs(changedFile.path);
+      this.deleteFileWithFs(changedFile.path);
     }
 
     const url = file.path.split('uploads')[1];
@@ -45,7 +45,7 @@ export class FileService {
     }
   }
 
-  async deleteFileWithFs(path) {
+  deleteFileWithFs(path: string) {
     try {
       return fs.unlink(path, (err) => {
         if (err) console.log(err);
