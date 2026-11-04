@@ -27,13 +27,13 @@ export class TranslationService {
     return this.openai;
   }
 
-  async translate(text: string, promptName: string) {
+  async translate(text: string, promptName: string): Promise<unknown> {
     const openai = this.client();
     const prompt = await this.prismaService.translation_prompt.findFirst({
       where: { title: promptName },
     });
 
-    let response;
+    let response: OpenAI.Chat.Completions.ChatCompletion;
     try {
       response = await openai.chat.completions.create({
         model: 'gpt-4o-mini',
@@ -58,7 +58,7 @@ export class TranslationService {
 
     try {
       return JSON.parse(this.clearJson(content));
-    } catch (e) {
+    } catch {
       this.logger.error('Invalid GPT response (not JSON)');
       throw new BadGatewayException({
         code: 'translation_failed',
@@ -67,7 +67,7 @@ export class TranslationService {
     }
   }
 
-  clearJson = (str) => {
+  clearJson = (str: string): string => {
     return str
       .replace(/```json/gi, '')
       .replace(/```/g, '')

@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { organization as Organization, Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../_prisma/prisma.service';
 import { CreateOrganizationDto } from '../dto';
@@ -115,7 +115,7 @@ export class OrganizationService {
 
   async findOne(id: string) {
     const isNumber = !isNaN(Number(id));
-    let organization;
+    let organization: Organization | null;
 
     if (isNumber) {
       organization = await this.prismaService.organization.findUnique({
