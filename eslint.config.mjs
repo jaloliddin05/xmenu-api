@@ -27,8 +27,8 @@ export default tseslint.config(
   {
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
-      '@typescript-eslint/no-floating-promises': 'warn',
-      '@typescript-eslint/no-unsafe-argument': 'warn',
+      '@typescript-eslint/no-floating-promises': 'error',
+      '@typescript-eslint/no-unsafe-argument': 'error',
       // `_name` marks a parameter that a signature or an Express error handler requires but the body ignores
       '@typescript-eslint/no-unused-vars': [
         'error',
@@ -40,6 +40,7 @@ export default tseslint.config(
     // Tests and in-memory fakes mimic async, loosely typed APIs (Prisma, Redis, Jest mocks)
     files: ['**/*.spec.ts', '**/*.fake.ts', 'test/**/*.ts'],
     rules: {
+      '@typescript-eslint/no-unsafe-argument': 'off',
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-unsafe-call': 'off',
       '@typescript-eslint/no-unsafe-member-access': 'off',
