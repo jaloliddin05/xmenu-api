@@ -56,6 +56,7 @@ describe('GET /tenant/config', () => {
   beforeAll(async () => {
     jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
     process.env.PUBLIC_FILES_URL = 'https://files.example';
+    process.env.SMS_PROVIDER = 'console';
     const prisma = {
       organization: {
         findUnique: jest.fn(async ({ where }) => orgs[where.id] ?? null),
@@ -101,6 +102,7 @@ describe('GET /tenant/config', () => {
         delivery_enabled: true,
         delivery_mode: 'both',
         published_at: new Date('2026-10-31T10:00:00Z'),
+        telegram_bot: { is_enabled: true },
         logo: { url: '/image/organization/logo.png' },
         banner: null,
         // PRIMARY_DOMAIN_SELECT result: the earliest verified domain
@@ -139,6 +141,7 @@ describe('GET /tenant/config', () => {
         delivery_enabled: false,
         delivery_mode: 'site',
         published_at: null,
+        telegram_bot: null,
         logo: null,
         banner: null,
         domains: [],
@@ -196,6 +199,7 @@ describe('GET /tenant/config', () => {
       },
       channels: {
         qr: true,
+        auth: { sms: true, telegram: true },
         delivery: { enabled: true, mode: 'both', published: true },
       },
       fulfillment: {
@@ -254,6 +258,7 @@ describe('GET /tenant/config', () => {
       },
       channels: {
         qr: true,
+        auth: { sms: true, telegram: false },
         delivery: { enabled: false, mode: 'site', published: false },
       },
       fulfillment: {
@@ -401,6 +406,14 @@ describe('GET /tenant/config', () => {
       const { map } = (await config(FULL).expect(200)).body;
       expect(map.center).toBeNull();
       expect(map.centerSource).toBeNull();
+    });
+  });
+
+  it('reports which ways of confirming a phone work', async () => {
+    orgs[FULL].telegram_bot = { is_enabled: false };
+    expect((await config(FULL).expect(200)).body.channels.auth).toEqual({
+      sms: true,
+      telegram: false,
     });
   });
 

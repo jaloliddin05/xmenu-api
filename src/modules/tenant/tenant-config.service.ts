@@ -9,10 +9,12 @@ import {
 } from 'src/modules/organization/domain/organization-settings';
 import { orderingProblem } from 'src/modules/organization/domain/publication';
 import type { OrderingProblem } from 'src/modules/organization/domain/publication';
+import { isSmsConfigured } from 'src/modules/sms/sms.module';
 import { PrismaService } from '../_prisma/prisma.service';
 import {
   DeliveryUnavailableReason,
   FulfillmentMode,
+  TenantAuthChannelsDto,
   TenantConfigDto,
   TenantFulfillmentDto,
 } from './dto/tenant-config.dto';
@@ -76,6 +78,17 @@ export function deliveryStatus(
   };
 }
 
+/**
+ * How a customer can confirm a phone. telegram mirrors TelegramBotService.forTenant (an enabled
+ * bot row), so the hint and POST /auth/customer/telegram/start agree.
+ */
+export function authChannels(
+  bot: { is_enabled: boolean } | null,
+  smsConfigured: boolean,
+): TenantAuthChannelsDto {
+  return { sms: smsConfigured, telegram: bot?.is_enabled === true };
+}
+
 /** Branch coordinates for the map; (0, 0) is what an empty map pin gives, not a real place. */
 export function branchPoints(
   branches: { latitude?: number | null; longitude?: number | null }[],
@@ -115,6 +128,7 @@ export class TenantConfigService {
           delivery_enabled: true,
           delivery_mode: true,
           published_at: true,
+          telegram_bot: { select: { is_enabled: true } },
           domains: PRIMARY_DOMAIN_SELECT,
         },
       }),
@@ -180,6 +194,7 @@ export class TenantConfigService {
       },
       channels: {
         qr: org.qr_enabled,
+        auth: authChannels(org.telegram_bot, isSmsConfigured()),
         delivery: {
           enabled: org.delivery_enabled,
           mode: org.delivery_mode,
