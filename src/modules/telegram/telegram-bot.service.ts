@@ -15,6 +15,7 @@ import {
 import { errorMessage } from 'src/infra/helper/error-text';
 import { RevalidateService } from 'src/modules/revalidate-queue/revalidate.service';
 import { hashWebhookSecret } from './domain/webhook-secret';
+import type { BotSettingLeft } from './dto/telegram-bot-status.dto';
 import { TelegramClient, telegramErrorText } from './telegram-client';
 
 /** A venue's own bot, ready to use (token decrypted). `botKey` is the row id and never changes. */
@@ -34,6 +35,19 @@ export interface BotStatus {
   webhookUrl: string | null;
   isEnabled: boolean;
 }
+
+export interface BotDisconnected {
+  connected: false;
+  leftOnBot: BotSettingLeft[];
+}
+
+/** Set by autoconfiguration (TelegramBotProfileService) and kept on the bot after disconnecting. */
+const BOT_SETTINGS_LEFT: readonly BotSettingLeft[] = [
+  'name',
+  'description',
+  'shortDescription',
+  'commands',
+];
 
 interface BotRow {
   id: string;
@@ -228,17 +242,22 @@ export class TelegramBotService {
     return this.status(organizationId);
   }
 
-  async disconnect(organizationId: string): Promise<void> {
+  /**
+   * Drops the webhook and the row, gives the menu button back to Telegram's default. The bot's
+   * name, descriptions and commands are the owner's settings on their own bot and stay as they are.
+   */
+  async disconnect(organizationId: string): Promise<BotDisconnected> {
     const row = await this.prisma.organization_telegram_bot.findUnique({
       where: { organization_id: organizationId },
     });
-    if (!row) return;
+    if (!row) return { connected: false, leftOnBot: [] };
     await this.resetMenuButton(row);
     await this.dropWebhook(row);
     await this.prisma.organization_telegram_bot.delete({
       where: { organization_id: organizationId },
     });
     await this.authChannelsChanged(organizationId);
+    return { connected: false, leftOnBot: [...BOT_SETTINGS_LEFT] };
   }
 
   /** GET /tenant/config channels.auth.telegram follows the bot row; front-ends cache that config. */

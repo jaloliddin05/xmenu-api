@@ -210,6 +210,25 @@ describe('TelegramBotService', () => {
     expect(rows.size).toBe(1);
   });
 
+  it('disconnect says what stays on the bot, and nothing when no bot was connected', async () => {
+    const { svc, client } = setup();
+    await expect(svc.disconnect(ORG)).resolves.toEqual({
+      connected: false,
+      leftOnBot: [],
+    });
+    await svc.connect(ORG, TOKEN);
+    client.call.mockClear();
+    await expect(svc.disconnect(ORG)).resolves.toEqual({
+      connected: false,
+      leftOnBot: ['name', 'description', 'shortDescription', 'commands'],
+    });
+    // The owner's bot settings are not reset
+    const methods = client.call.mock.calls.map((c: any[]) => c[1]);
+    expect(methods.filter((m: string) => /^(setMy|deleteMy)/.test(m))).toEqual(
+      [],
+    );
+  });
+
   it('disconnect removes the webhook and the row', async () => {
     const { svc, client, rows } = setup();
     await svc.connect(ORG, TOKEN);
