@@ -80,7 +80,7 @@ export class TelegramInitDataService {
     const userString = params.get('user');
     if (!userString) throw bad();
     try {
-      const user = JSON.parse(userString);
+      const user = JSON.parse(userString) as TelegramUser | null;
       if (!user?.id) throw bad();
       return user;
     } catch {

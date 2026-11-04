@@ -53,16 +53,16 @@ export class CustomerTokenService {
   }
 
   verifyRegistration(token: string, tenantId: string): RegistrationClaims {
-    let payload: any;
+    let payload: Partial<RegistrationClaims>;
     try {
-      payload = this.jwt.verify(token, {
+      payload = this.jwt.verify<Partial<RegistrationClaims>>(token, {
         secret: this.cfg.registrationSecret,
         algorithms: ['HS256'],
         issuer: ISSUER,
         audience: AUD_REGISTRATION,
       });
-    } catch (err: any) {
-      if (err?.name === 'TokenExpiredError')
+    } catch (err) {
+      if ((err as { name?: string } | null)?.name === 'TokenExpiredError')
         throw new CustomerAuthException('registration_expired');
       throw new CustomerAuthException('invalid_registration_token');
     }

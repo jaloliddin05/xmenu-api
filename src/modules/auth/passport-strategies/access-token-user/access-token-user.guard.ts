@@ -12,7 +12,7 @@ export class AccessTokenUserGuard extends AuthGuard(ACCESS_TOKEN_USER) {
   }
 
   canActivate(context: ExecutionContext) {
-    const isPublic = this.reflector.getAllAndOverride(PUBLIC_KEY, [
+    const isPublic = this.reflector.getAllAndOverride<boolean>(PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),
     ]);

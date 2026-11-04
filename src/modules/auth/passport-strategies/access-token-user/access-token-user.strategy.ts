@@ -1,3 +1,4 @@
+import type { IConfig } from 'src/config/config.interface';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
@@ -17,7 +18,7 @@ export class AccessTokenUserStrategy extends PassportStrategy(
     private readonly authService: AuthService,
     configService: ConfigService,
   ) {
-    const jwtConfig = configService.getOrThrow('jwt');
+    const jwtConfig = configService.getOrThrow<IConfig['jwt']>('jwt');
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,

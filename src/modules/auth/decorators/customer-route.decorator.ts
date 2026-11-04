@@ -38,5 +38,5 @@ export interface CustomerPrincipal {
 
 export const CurrentCustomer = createParamDecorator(
   (_d: unknown, ctx: ExecutionContext): CustomerPrincipal =>
-    ctx.switchToHttp().getRequest().user,
+    ctx.switchToHttp().getRequest<{ user: CustomerPrincipal }>().user,
 );

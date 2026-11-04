@@ -42,7 +42,9 @@ export class CustomerExceptionFilter implements ExceptionFilter {
     } else if (exception instanceof BadRequestException) {
       status = 400;
       code = 'validation_error';
-      const r: any = exception.getResponse();
+      const r = exception.getResponse() as
+        | { message?: string | string[] }
+        | undefined;
       message = Array.isArray(r?.message)
         ? r.message.join('; ')
         : (r?.message ?? 'Validation failed');
@@ -51,7 +53,7 @@ export class CustomerExceptionFilter implements ExceptionFilter {
       if (Array.isArray(errors)) details = { errors };
     } else if (exception instanceof HttpException) {
       status = exception.getStatus();
-      const r: any = exception.getResponse();
+      const r = exception.getResponse() as string | { message?: string };
       message = typeof r === 'string' ? r : (r?.message ?? exception.message);
       code =
         status === 401

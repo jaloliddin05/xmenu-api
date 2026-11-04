@@ -21,7 +21,8 @@ export function platformAdminIds(
 @Injectable()
 export class PlatformAdminGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
-    const id = context.switchToHttp().getRequest().user?.id;
+    const id = context.switchToHttp().getRequest<{ user?: { id?: unknown } }>()
+      .user?.id;
     if (typeof id === 'string' && platformAdminIds().has(id)) return true;
     throw new ForbiddenException('Forbidden');
   }
