@@ -16,7 +16,7 @@ Telegram доступен, когда заведение подключило б
 |---|---|---|
 | `GET` | `/telegram-bot` | Статус: `{ connected, username, link, webhookUrl, isEnabled }`. Токен не возвращается никогда |
 | `PUT` | `/telegram-bot` | Тело `{ "token": "123456:AA..." }`. Проверяет токен через `getMe`, регистрирует webhook с секретом, сохраняет токен зашифрованным (AES-256-GCM, `PAYMENT_CONFIG_KEY`) |
-| `DELETE` | `/telegram-bot` | Снимает webhook и удаляет бота, 204 |
+| `DELETE` | `/telegram-bot` | Снимает webhook, возвращает стандартную кнопку меню и удаляет бота. 200 `{ connected: false, leftOnBot: ["name", "description", "shortDescription", "commands"] }`: это остаётся у бота в Telegram (бот принадлежит владельцу, его настройки не сбрасываем; меняются в @BotFather). Бота не было: `leftOnBot: []` |
 
 Ошибки `PUT` (формат ошибок админки, поле `code`): `invalid_bot_token` (400), `webhook_url_not_https` (400, на
 сервере `PUBLIC_API_URL` не https), `webhook_setup_failed` (400, ничего не сохранено), `bot_already_connected` (409,
@@ -24,6 +24,17 @@ Telegram доступен, когда заведение подключило б
 
 Webhook: `POST /telegram/bot/{id строки бота}/webhook` (в OpenAPI скрыт). Адрес не зависит от slug и не меняется
 при повторном подключении того же заведения; секрет каждый раз новый. Смена бота снимает webhook со старого.
+В БД хранится только sha256 секрета (`organization_telegram_bot.webhook_secret_hash`), сам секрет знает только
+Telegram; заголовок хешируется и сравнивается с хешем за константное время.
+
+Обработка асинхронная: вебхук проверяет секрет, отмечает `update_id` (Redis `tgv:upd:*`, 1 час) и кладёт
+`{ botKey, update }` в очередь BullMQ `telegram-update`, после чего сразу отвечает `200 {"ok":true}`. Повтор того же
+`update_id` получает 200 и в очередь не попадает. Ответы бота (`sendMessage`), выдача кода и смена статуса сессии
+происходят в обработчике очереди (`telegram-update.processor.ts`), поэтому медленный Telegram ответ вебхука не держит.
+Обработчик заново читает бота по `botKey` (отключён → апдейт пропускается), 3 попытки с паузой от 5 с; в логах только
+id бота и апдейта и текст ошибки. Ошибки Telegram внутри обработки не повторяются (гасятся и пишутся в лог), повтор
+бывает только при сбое Redis или БД. Не удалось поставить в очередь → отметка снимается, ответ 503, Telegram повторит.
+Токена в задаче нет; задача с ошибкой хранится сутки (в апдейте может быть телефон).
 
 Что должна показывать админка: инструкция «создайте бота в @BotFather, вставьте токен», затем статус и ссылку на бота.
 Webhook и секрет ставятся автоматически, руками настраивать ничего не нужно.
@@ -81,11 +92,36 @@ Webhook и секрет ставятся автоматически, рукам�
   с SMS (нельзя обойти, чередуя каналы). Лимит по IP у кода из бота не применяется (вебхук IP клиента не знает).
 - Лимиты `start`: 20 в час на IP, 5 в час на телефон, 10 в час на Telegram-пользователя. `status`: 200 опросов на
   сессию за 5 минут, 600 на IP за 15 минут.
-- Webhook проверяет `X-Telegram-Bot-Api-Secret-Token` (сравнение за константное время), каждое `update_id`
-  обрабатывается один раз, принимаются только личные сообщения не от ботов. Адрес содержит id бота, а не slug.
+- Webhook проверяет `X-Telegram-Bot-Api-Secret-Token` (sha256 заголовка против хеша в БД, за константное время),
+  каждое `update_id` ставится в очередь один раз, принимаются только личные сообщения не от ботов. Адрес содержит id бота, а не slug.
 - Максимум 3 попытки отправки контакта на сессию; сессия живёт `TELEGRAM_VERIFY_TTL_SECONDS` (300 с).
 - Поддерживаются только номера Узбекистана (`+998`).
 - Токен бота не логируется: ошибки Telegram пишутся только их описанием.
+
+## Фейковый Telegram (тесты и e2e)
+
+Все вызовы Bot API (боты заведений, уведомления о заказах, тестовая группа OTP) идут на `TELEGRAM_API_BASE_URL`
+(по умолчанию `https://api.telegram.org`): `{base}/bot{token}/{method}`, тело JSON. В production API не стартует с
+другим значением; вне production значение должно быть http(s)-адресом, при старте пишется предупреждение.
+
+Как e2e подставляют фейк:
+1. Поднять HTTP-сервер (например, сток `xmenu-e2e/scripts/sink.mjs`) и дать бэкенду
+   `TELEGRAM_API_BASE_URL=http://127.0.0.1:<порт>`. Запросы идут обычным HTTP, без `CONNECT`, поэтому их тело видно.
+2. Отвечать на `POST /bot<token>/<method>` как Telegram, `{ "ok": true, "result": … }`: `getMe` →
+   `{ "id": 123456789, "is_bot": true, "username": "e2e_bot" }`; `setWebhook`, `deleteWebhook`, `setMyName`,
+   `setMyDescription`, `setMyShortDescription`, `setMyCommands`, `setChatMenuButton` → `true`; `sendMessage` →
+   `{ "message_id": 1, "chat": { "id": <chat_id из тела> } }`. Ошибку изображать `{ "ok": false, "error_code": 400,
+   "description": "…" }`, медленный Telegram — задержкой ответа. Каждый запрос записывать (метод и тело).
+3. `PUT /telegram-bot` требует https `PUBLIC_API_URL`; адрес вебхука уходит только фейку в `setWebhook`, сам Telegram
+   его не вызывает, поэтому достаточно любого `https://…` в `PUBLIC_API_URL` стека.
+4. Секрет вебхука тест берёт из тела `setWebhook` (`secret_token`): в БД только хеш. `botKey` — из `url` того же тела
+   (`…/telegram/bot/<botKey>/webhook`) или из `webhookUrl` ответа `GET /telegram-bot`.
+5. Апдейты тест шлёт сам: `POST /telegram/bot/<botKey>/webhook` с заголовком `X-Telegram-Bot-Api-Secret-Token` и
+   телом `{ update_id, message: { chat: { id, type: "private" }, from: { id }, text: "/start <sessionId>" } }`, затем
+   `{ …, message: { …, contact: { phone_number, user_id: <from.id> } } }`.
+6. Обработка асинхронная: ответ вебхука ничего не говорит о результате. Ждать нужного `sendMessage` в журнале фейка
+   (код — в его `text`) или `code_sent` в `telegram/status`.
+Токены в e2e фиктивные: они видны в пути запросов к фейку и в его журнале.
 
 ## Не проверено на реальном Telegram
 
