@@ -98,7 +98,7 @@ class UpdateOrganizationDto {
         const parsed = JSON.parse(value);
         // ⚙️ 2️⃣ parsed ni class-transformer instance ga aylantiramiz
         return plainToInstance(UpdateOrganizationTranslationDto, parsed);
-      } catch (error) {
+      } catch {
         console.error('❌ Invalid JSON in translations:', value);
         return [];
       }

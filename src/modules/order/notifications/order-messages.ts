@@ -144,7 +144,7 @@ export function buildRestaurantKeyboard(
       inline_keyboard: [
         [
           {
-            text: NEXT_LABEL[status]!,
+            text: NEXT_LABEL[status],
             callback_data: CALLBACK.next + order.id,
           },
         ],

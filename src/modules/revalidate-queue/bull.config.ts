@@ -1,4 +1,4 @@
-import { Queue, Worker, QueueEvents } from 'bullmq';
+import { Worker } from 'bullmq';
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { RedisOptions } from 'ioredis';
 import { bullConnection } from 'src/infra/redis/bull-connection';

@@ -165,7 +165,7 @@ export class CustomerOtpService {
             ).unref(),
           ),
         ]);
-      } catch (err) {
+      } catch {
         await this.redis.del(key);
         await this.rateLimit.rollback(rules);
         throw new CustomerAuthException(

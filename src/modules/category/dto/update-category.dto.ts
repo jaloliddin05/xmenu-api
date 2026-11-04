@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsArray, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsOptional } from 'class-validator';
 import { CreateCategoryTranslationDto } from './create-category.dto';
 
 export class UpdateCategoryDto {

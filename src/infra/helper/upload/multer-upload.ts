@@ -106,9 +106,7 @@ class ImageStorage implements StorageEngine {
     file: Express.Multer.File,
     cb: (error: Error | null) => void,
   ) {
-    unlink(file.path, (err) =>
-      cb(err && (err as NodeJS.ErrnoException).code !== 'ENOENT' ? err : null),
-    );
+    unlink(file.path, (err) => cb(err && err.code !== 'ENOENT' ? err : null));
   }
 }
 

@@ -133,7 +133,7 @@ export class OrderService {
     if (
       online &&
       !(await this.payments.enabledProviders(organizationId)).has(
-        dto.paymentMethod as 'click' | 'payme',
+        dto.paymentMethod,
       )
     ) {
       throw new CustomerAuthException(
@@ -302,7 +302,7 @@ export class OrderService {
   async list(
     principal: CustomerPrincipal,
     opts: { activeOnly?: boolean },
-    lang: Lang,
+    _lang: Lang,
   ) {
     const rows = await this.prisma.customer_order.findMany({
       where: {
@@ -388,7 +388,7 @@ export class OrderService {
     }
     if (
       !(await this.payments.enabledProviders(order.organization_id)).has(
-        order.payment_method as 'click' | 'payme',
+        order.payment_method,
       )
     ) {
       throw new CustomerAuthException(

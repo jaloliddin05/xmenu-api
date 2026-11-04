@@ -112,7 +112,7 @@ export class BranchService {
       return {
         branch,
         scheduled: hasSchedule(schedule),
-        state: evaluateOpenState(schedule, now) as OpenState,
+        state: evaluateOpenState(schedule, now),
       };
     });
   }

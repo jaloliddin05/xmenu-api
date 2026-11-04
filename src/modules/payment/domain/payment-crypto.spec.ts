@@ -1,4 +1,4 @@
-import { randomBytes } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 import {
   decryptConfig,
   encryptConfig,
@@ -54,10 +54,7 @@ describe('clickAuthHeader', () => {
     expect(user).toBe('77');
     expect(ts).toBe('1700000000');
     expect(digest).toBe(
-      require('crypto')
-        .createHash('sha1')
-        .update('1700000000sec')
-        .digest('hex'),
+      createHash('sha1').update('1700000000sec').digest('hex'),
     );
   });
 });

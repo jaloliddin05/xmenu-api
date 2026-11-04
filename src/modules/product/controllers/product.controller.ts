@@ -13,23 +13,17 @@ import {
   Req,
   UploadedFiles,
   UseInterceptors,
-  UsePipes,
-  ValidationPipe,
 } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
-  ApiResponse,
   ApiConsumes,
   ApiQuery,
   ApiBody,
 } from '@nestjs/swagger';
 import { ProductService } from '../services/product.service';
 import { CreateProductDto } from '../dto/create-product.dto';
-import {
-  FileFieldsInterceptor,
-  FilesInterceptor,
-} from '@nestjs/platform-express';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { OptionalBoolPipe } from 'src/infra/http/optional-bool.pipe';
 import { MulterStorage } from 'src/infra/helper/upload/multer-upload';
 import MoveProductDto from '../dto/move-product.dto';

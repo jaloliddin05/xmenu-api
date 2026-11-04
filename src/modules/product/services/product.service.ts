@@ -62,7 +62,7 @@ export class ProductService {
     title?: string,
   ) {
     const where: any = {};
-    category_id ? (where['category_id'] = category_id) : null;
+    if (category_id) where['category_id'] = category_id;
     if (isActive !== undefined) where.is_active = isActive;
     if (title) {
       where.translations = {

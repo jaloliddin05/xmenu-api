@@ -57,7 +57,7 @@ describe('MulterStorage (image upload)', () => {
         .post('/up')
         .attach('file', buf, 'whatever.bin');
       expect(res.status).toBe(200);
-      expect(res.body.filename).toMatch(new RegExp(`^[0-9a-f-]{36}\.${ext}$`));
+      expect(res.body.filename).toMatch(new RegExp(`^[0-9a-f-]{36}\\.${ext}$`));
       expect(readFileSync(res.body.path).equals(buf)).toBe(true);
     },
   );

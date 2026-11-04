@@ -4,7 +4,7 @@ const validatePhoneNumber = (phoneNumber: string): boolean => {
   try {
     const parsedPhoneNumber = parsePhoneNumberFromString(phoneNumber);
     return parsedPhoneNumber?.isValid() || false;
-  } catch (error) {
+  } catch {
     return false;
   }
 };

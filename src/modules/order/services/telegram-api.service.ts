@@ -75,7 +75,7 @@ export class TelegramApiService {
     chatId: string | number,
     messageId: number,
     text: string,
-    replyMarkup: unknown | null,
+    replyMarkup: unknown,
   ) {
     return this.call('editMessageText', {
       chat_id: chatId,
