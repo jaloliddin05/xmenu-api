@@ -20,7 +20,8 @@ Env: см. `.env.example` (полный). Ключевые: `JWT_*`, `OTP_*`, `S
 `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ORDERS_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `TELEGRAM_VERIFY_TTL_SECONDS`, `OPS_CHAT_ID`, `ORDER_QUEUES`,
 `MINIAPP_URL`, `UPLOAD_MAX_BYTES`, `PLATFORM_ADMIN_USER_IDS`, `TRANSLATION_*`, `OPENAI_API_KEY` (необязателен: без него
 `/translation` → 503 `translation_unavailable`), `NEXT_PUBLIC_URL` + `REVALIDATE_SECRET` (QR),
-`CLIENT_REVALIDATE_URL` + `CLIENT_REVALIDATE_SECRET` (сайт доставки), `DELIVERY_URL_TEMPLATE` (адрес Mini App для кнопки бота), `STAFF_REFRESH_TTL_DAYS`,
+`CLIENT_REVALIDATE_URL` + `CLIENT_REVALIDATE_SECRET` (сайт доставки), `DELIVERY_URL_TEMPLATE` (адрес Mini App для кнопки бота),
+`PLATFORM_DOMAIN` (`xmenu.uz`; в dev `localhost`), `DOMAIN_VERIFY_SKIP` (только dev), `STAFF_REFRESH_TTL_DAYS`,
 `STAFF_SESSION_ABSOLUTE_DAYS`, `PUBLIC_POST_RATE_*`, `APPLICATION_RATE_*`, `TRANSLATION_IP_RATE_*` (лимиты по IP). Окончания строк LF (`.gitattributes`, `.editorconfig`).
 
 ## Схема Prisma
@@ -33,7 +34,7 @@ Env: см. `.env.example` (полный). Ключевые: `JWT_*`, `OTP_*`, `S
 используется), `branch`, `category`, `product` (+ группы допов), `menu` (публичный), `customer` (+ адреса),
 `order` (state machine, очереди, уведомления), `payment` (Click, Payme, ключи тенанта, возвраты),
 `sms` (провайдеры eskiz, telegram, console), `telegram` (боты заведений: `TelegramBotService`, `TelegramClient`,
-`/telegram-bot`), `file`, `translation`, `application`,
+`/telegram-bot`), `tenant-domain` (свои домены заведения, `/organization/:id/domains`), `file`, `translation`, `application`,
 `revalidate-queue` (`RevalidateModule`: ревалидация QR-меню и сайта доставки, `docs/REVALIDATE.md`).
 
 ## Контракт API
@@ -49,6 +50,21 @@ test, `npm run openapi` + `git diff --exit-code docs/`, `format:check` и `lint`
   Запасного пути по slug нет. Вебхуки оплаты по id: `payments/click/:tenantId`, `payments/payme/:tenantId`.
 - `GET /tenant/by-slug/:slug` → `{ id, slug }` (только активные). `GET /tenant/config` → публичный конфиг
   (`tenant-config.service.ts`): незаполненное `null`, `delivery` в режимах только при заданной зоне.
+- `GET /tenant/by-host/:host` → `{ id, slug, name, primaryDomain }` (`TenantService.findActiveByHost`): хост
+  нормализуется (`tenant/host.ts`: регистр, порт, точка в конце, IDN → punycode); `{slug}.{PLATFORM_DOMAIN}` ровно с
+  одной меткой разбирается по slug без таблицы, любой другой хост только через подтверждённый `tenant_domain`
+  (`verified_host`). Заголовки `Host`/`X-Forwarded-Host` запроса тенантом не считаются нигде.
+- Свои домены (`modules/tenant-domain`, контракт `docs/API.md`, «Домены заведения»): таблица `tenant_domain`
+  (`host` канонический, `status` `pending`/`verified`, `verified_host` уникален и задан только у подтверждённого,
+  `@@unique([organization_id, host])`; неподтверждённый хост может быть у нескольких заведений, каждое со своим
+  токеном). Добавление в транзакции с `FOR UPDATE` строки организации (лимит 5). Проверка владения за интерфейсом
+  `DomainOwnershipVerifier` (`DOMAIN_VERIFIER`): `DnsTxtVerifier` (TXT `_xmenu-verify.<host>` =
+  `xmenu-verify=<token>`), `SkipDomainVerifier` при `DOMAIN_VERIFY_SKIP=true`, в тестах `FakeDomainVerifier`.
+  `assertDomainConfig` (фабрика модуля): production не стартует с флагом и без годного `PLATFORM_DOMAIN`.
+  `primaryDomain` = самый ранний подтверждённый (`tenant/primary-domain.ts`, один select для всех ответов).
+  Подтверждение и удаление подтверждённого: `TenantService.invalidate` + ревалидация `route: 'domains'` с `host`.
+  Новый платформенный поддомен по-прежнему надо добавить в `RESERVED_SLUGS`; свои домены под `PLATFORM_DOMAIN`
+  запрещены целиком.
 - Кэш тенанта (30 с, в памяти процесса) сбрасывают `PUT /organization/:id/settings`, `PUT` и `DELETE
   /organization/:id`; кэш настроек заказа сбрасывает `PUT /order-settings`. Другие процессы pm2 видят старое до 30 с.
 - Публичные ответы только через маппер или DTO со списком полей, не строкой БД: `GET /tenant/config`, `GET /menu`
@@ -173,7 +189,8 @@ Payme вручную через ops-чат.
 ## Что не проверено (проверять на стенде перед опорой)
 Запросы Prisma end-to-end (`POST /orders`), боевые вызовы Click/Payme (особенно reversal Click и параметры ссылки
 Payme), Telegram webhook и кнопки, боты заведений (`PUT /telegram-bot`, вебхук, `requestContact()` в Mini App,
-цепочка `deepLink` → контакт → код → `otp/verify`), нагрузка. Стендов Click/Payme нет.
+цепочка `deepLink` → контакт → код → `otp/verify`), нагрузка. Стендов Click/Payme нет. Свои домены: проверка TXT на
+реальном DNS (только фейк резолвера), nginx и TLS для них, повторная проверка подтверждённых доменов (не делается).
 
 ## Известные долги
 - Ветки `feat/staff-auth-hardening`, `fix/pilot-hardening`, `feat/tenant-config`, `feat/reserved-slugs` влиты в `main`
@@ -216,7 +233,8 @@ Payme), Telegram webhook и кнопки, боты заведений (`PUT /tel
   коммита (без `git stash` и `git pull` поверх правок) → `npm ci` (не `npm i`) → `npm run build` →
   `npx prisma migrate deploy` → `pm2 reload xmenu-backend` → проверка живости и откат на предыдущий коммит и дамп,
   если проверка не прошла. Миграции только после бэкапа и только `migrate deploy`.
-- Прод не стартует с `SMS_PROVIDER=console`, `OTP_DEV_MODE`, пустым `REVALIDATE_SECRET` (проверки уже в коде); перед
+- Прод не стартует с `SMS_PROVIDER=console`, `OTP_DEV_MODE`, пустым `REVALIDATE_SECRET`, `DOMAIN_VERIFY_SKIP=true`, без
+  `PLATFORM_DOMAIN` (проверки уже в коде); перед
   первым запуском: staging, бэкапы по расписанию, чек-лист безопасности (корневой `CLAUDE.md`, очередь, п. 5).
 
 ## Лимиты публичных POST

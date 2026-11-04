@@ -22,6 +22,7 @@ import { OrderModule } from './modules/order/order.module';
 import { PaymentModule } from './modules/payment/payment.module';
 import { TenantConfigModule } from './modules/tenant/tenant-config.module';
 import { TelegramModule } from './modules/telegram/telegram.module';
+import { TenantDomainModule } from './modules/tenant-domain/tenant-domain.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -45,6 +46,7 @@ import { TelegramModule } from './modules/telegram/telegram.module';
     SmsModule,
     TelegramModule,
     TenantConfigModule,
+    TenantDomainModule,
     TranslationModule,
     UserModule,
   ],

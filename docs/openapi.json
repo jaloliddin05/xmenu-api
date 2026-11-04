@@ -1325,6 +1325,40 @@
         ]
       }
     },
+    "/tenant/by-host/{host}": {
+      "get": {
+        "operationId": "TenantController_byHost",
+        "parameters": [
+          {
+            "name": "host",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantHostRefDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "tenant_not_found: unknown or unverified host, another platform host, inactive venue, not a host name"
+          }
+        },
+        "summary": "Resolve the host of the delivery site to the tenant id: {slug}.PLATFORM_DOMAIN or a verified venue domain",
+        "tags": [
+          "Tenant"
+        ]
+      }
+    },
     "/telegram-bot": {
       "get": {
         "operationId": "TelegramBotController_status",
@@ -3334,6 +3368,337 @@
         ]
       }
     },
+    "/organization/{id}/domains": {
+      "get": {
+        "operationId": "TenantDomainController_list",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantDomainListDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No or invalid owner token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The user has no organization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not your organization (any other id looks missing); domain_not_found: no such domain of this venue",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Own domains of the venue, its platform address and the primary domain",
+        "tags": [
+          "Organization domains"
+        ]
+      },
+      "post": {
+        "operationId": "TenantDomainController_add",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddDomainDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantDomainDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid_host (not a bare domain name), platform_host (the platform domain or under it), reserved_host (localhost, .local, .internal, IP); field in errors[]",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No or invalid owner token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The user has no organization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not your organization (any other id looks missing); domain_not_found: no such domain of this venue",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "domain_already_added (this venue has it), domain_taken (verified by another venue)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "domain_limit_reached (details.limit)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Add a domain. It stays pending (resolves to nobody) until the TXT record check passes; with DOMAIN_VERIFY_SKIP=true (development) it is verified at once",
+        "tags": [
+          "Organization domains"
+        ]
+      }
+    },
+    "/organization/{id}/domains/{domainId}/verify": {
+      "post": {
+        "operationId": "TenantDomainController_verify",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "domainId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantDomainDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No or invalid owner token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The user has no organization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not your organization (any other id looks missing); domain_not_found: no such domain of this venue",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "domain_taken: another venue verified this host first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "domain_verification_failed: details.reason record_not_found | token_mismatch | dns_error, details.record the expected record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Check the TXT record _xmenu-verify.<host> = xmenu-verify=<token>. A verified domain answers as is",
+        "tags": [
+          "Organization domains"
+        ]
+      }
+    },
+    "/organization/{id}/domains/{domainId}": {
+      "delete": {
+        "operationId": "TenantDomainController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "domainId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed"
+          },
+          "401": {
+            "description": "No or invalid owner token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The user has no organization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not your organization (any other id looks missing); domain_not_found: no such domain of this venue",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Remove a domain",
+        "tags": [
+          "Organization domains"
+        ]
+      }
+    },
     "/translation": {
       "post": {
         "operationId": "TranslationController_create",
@@ -4803,6 +5168,37 @@
         "required": [
           "id",
           "slug"
+        ]
+      },
+      "TenantHostRefDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Tenant id: send it as X-Tenant-Id"
+          },
+          "slug": {
+            "type": "string",
+            "nullable": true,
+            "example": "cafe-example"
+          },
+          "name": {
+            "type": "string",
+            "example": "Demo Cafe"
+          },
+          "primaryDomain": {
+            "type": "string",
+            "nullable": true,
+            "example": "order.restaurant.uz",
+            "description": "The venue's earliest verified own domain (bare host), or null"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "primaryDomain"
         ]
       },
       "SyncItemDto": {
@@ -6913,6 +7309,12 @@
             "type": "string",
             "example": "Demo Cafe"
           },
+          "primaryDomain": {
+            "type": "string",
+            "nullable": true,
+            "example": "order.restaurant.uz",
+            "description": "The venue's earliest verified own domain (bare host, no scheme), or null; the platform address {slug}.PLATFORM_DOMAIN always works"
+          },
           "type": {
             "type": "string",
             "enum": [
@@ -6971,6 +7373,7 @@
           "id",
           "slug",
           "name",
+          "primaryDomain",
           "type",
           "logoUrl",
           "bannerUrl",
@@ -6982,6 +7385,154 @@
           "channels",
           "fulfillment",
           "map"
+        ]
+      },
+      "DomainVerificationRecordDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "TXT"
+            ],
+            "example": "TXT"
+          },
+          "name": {
+            "type": "string",
+            "example": "_xmenu-verify.order.restaurant.uz"
+          },
+          "value": {
+            "type": "string",
+            "example": "xmenu-verify=Qm9vb..."
+          }
+        },
+        "required": [
+          "type",
+          "name",
+          "value"
+        ]
+      },
+      "TenantDomainDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "host": {
+            "type": "string",
+            "example": "xn--80ajzcicfi.uz",
+            "description": "Canonical host: ASCII (IDN as punycode), lower case"
+          },
+          "hostUnicode": {
+            "type": "string",
+            "example": "ресторан.uz",
+            "description": "The host for display"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "verified"
+            ],
+            "example": "pending"
+          },
+          "isPrimary": {
+            "type": "boolean",
+            "description": "This is primaryDomain: the earliest verified domain of the venue"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "verifiedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastCheckAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastCheckError": {
+            "type": "string",
+            "enum": [
+              "record_not_found",
+              "token_mismatch",
+              "dns_error",
+              "domain_taken"
+            ],
+            "nullable": true,
+            "description": "Why the last check failed; null after a successful one"
+          },
+          "verification": {
+            "description": "DNS record that proves ownership; keep it after verification",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DomainVerificationRecordDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "host",
+          "hostUnicode",
+          "status",
+          "isPrimary",
+          "createdAt",
+          "verifiedAt",
+          "lastCheckAt",
+          "lastCheckError",
+          "verification"
+        ]
+      },
+      "TenantDomainListDto": {
+        "type": "object",
+        "properties": {
+          "platformHost": {
+            "type": "string",
+            "nullable": true,
+            "example": "mant.xmenu.uz",
+            "description": "The platform address {slug}.PLATFORM_DOMAIN (always works, needs no row); null without a slug or PLATFORM_DOMAIN"
+          },
+          "primaryDomain": {
+            "type": "string",
+            "nullable": true,
+            "example": "order.restaurant.uz",
+            "description": "Earliest verified own domain, or null"
+          },
+          "limit": {
+            "type": "number",
+            "example": 5,
+            "description": "Domains a venue may have, pending ones included"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TenantDomainDto"
+            }
+          }
+        },
+        "required": [
+          "platformHost",
+          "primaryDomain",
+          "limit",
+          "items"
+        ]
+      },
+      "AddDomainDto": {
+        "type": "object",
+        "properties": {
+          "host": {
+            "type": "string",
+            "example": "order.restaurant.uz",
+            "description": "Bare host name: no scheme, path or port. Case, a trailing dot and IDN (ресторан.uz) are normalised. Not the platform domain or anything under it, not localhost, .local, .internal or an IP"
+          }
+        },
+        "required": [
+          "host"
         ]
       },
       "TranslationDto": {
