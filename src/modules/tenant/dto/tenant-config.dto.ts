@@ -205,6 +205,15 @@ export class TenantConfigDto {
   name: string;
 
   @ApiProperty({
+    type: String,
+    nullable: true,
+    example: 'order.restaurant.uz',
+    description:
+      "The venue's earliest verified own domain (bare host, no scheme), or null; the platform address {slug}.PLATFORM_DOMAIN always works",
+  })
+  primaryDomain: string | null;
+
+  @ApiProperty({
     enum: ['restaurant', 'cafe', 'fast_food', 'coffee_shop', 'other'],
   })
   type: string;

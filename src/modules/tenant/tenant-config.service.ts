@@ -17,6 +17,7 @@ import {
   TenantFulfillmentDto,
 } from './dto/tenant-config.dto';
 import { resolveMapView } from './map-view';
+import { PRIMARY_DOMAIN_SELECT, primaryDomainOf } from './primary-domain';
 import type { LatLng } from 'src/modules/organization/domain/organization-settings';
 import type { Tenant } from './tenant.service';
 
@@ -114,6 +115,7 @@ export class TenantConfigService {
           delivery_enabled: true,
           delivery_mode: true,
           published_at: true,
+          domains: PRIMARY_DOMAIN_SELECT,
         },
       }),
       this.orderSettings.get(tenant.id),
@@ -158,6 +160,7 @@ export class TenantConfigService {
       id: org.id,
       slug: org.slug ?? '',
       name: org.name,
+      primaryDomain: primaryDomainOf(org.domains),
       type: org.type,
       logoUrl: publicFileUrl(org.logo?.url),
       bannerUrl: publicFileUrl(org.banner?.url),

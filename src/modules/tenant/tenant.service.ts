@@ -3,7 +3,30 @@ import { isLang, Lang } from 'src/infra/http/request-helpers';
 import { PrismaService } from '../_prisma/prisma.service';
 import { CustomerAuthException } from '../auth/errors/customer-auth.exception';
 import { isValidSlug } from '../organization/domain/slug';
+import {
+  isPlatformHost,
+  normalizeHost,
+  platformDomainFrom,
+  platformSlug,
+} from './host';
+import { PRIMARY_DOMAIN_SELECT, primaryDomainOf } from './primary-domain';
 import { parseTenantId } from './tenant-key';
+
+/** GET /tenant/by-host answer. */
+export interface TenantHostRef {
+  id: string;
+  slug: string | null;
+  name: string;
+  primaryDomain: string | null;
+}
+
+const HOST_ORG_SELECT = {
+  id: true,
+  slug: true,
+  name: true,
+  is_active: true,
+  domains: PRIMARY_DOMAIN_SELECT,
+} as const;
 
 export interface Tenant {
   id: string;
@@ -93,6 +116,47 @@ export class TenantService {
     });
     if (!org?.is_active) return null;
     return { id: org.id, slug: org.slug ?? slug };
+  }
+
+  /**
+   * Public lookup for the delivery site: the host it was requested on → the venue. A host is a tenant
+   * only as {slug}.PLATFORM_DOMAIN (by slug, no table row) or as a verified tenant_domain; a pending,
+   * unknown or other platform host (api.xmenu.uz, a.b.xmenu.uz) and an inactive venue give null.
+   */
+  async findActiveByHost(raw: string): Promise<TenantHostRef | null> {
+    const host = normalizeHost(raw);
+    if (!host) return null;
+    const platformDomain = platformDomainFrom();
+
+    let org: {
+      id: string;
+      slug: string | null;
+      name: string;
+      is_active: boolean;
+      domains: { host: string }[];
+    } | null = null;
+    if (isPlatformHost(host, platformDomain)) {
+      const slug = platformSlug(host, platformDomain);
+      if (!slug || !isValidSlug(slug)) return null;
+      org = await this.prisma.organization.findUnique({
+        where: { slug },
+        select: HOST_ORG_SELECT,
+      });
+    } else {
+      // verified_host is set only while the domain is verified
+      const domain = await this.prisma.tenant_domain.findUnique({
+        where: { verified_host: host },
+        select: { organization: { select: HOST_ORG_SELECT } },
+      });
+      org = domain?.organization ?? null;
+    }
+    if (!org?.is_active) return null;
+    return {
+      id: org.id,
+      slug: org.slug,
+      name: org.name,
+      primaryDomain: primaryDomainOf(org.domains),
+    };
   }
 
   /** Drops the cached entry after the owner changes something the tenant carries. */

@@ -103,6 +103,8 @@ describe('GET /tenant/config', () => {
         published_at: new Date('2026-10-31T10:00:00Z'),
         logo: { url: '/image/organization/logo.png' },
         banner: null,
+        // PRIMARY_DOMAIN_SELECT result: the earliest verified domain
+        domains: [{ host: 'order.cafe-example.uz' }],
         translations: [
           { lang: 'ru', description: 'Описание' },
           { lang: 'uz', description: 'Tavsif' },
@@ -139,6 +141,7 @@ describe('GET /tenant/config', () => {
         published_at: null,
         logo: null,
         banner: null,
+        domains: [],
         translations: [
           { lang: 'ru', description: '' },
           { lang: 'uz', description: '' },
@@ -173,6 +176,7 @@ describe('GET /tenant/config', () => {
       id: FULL,
       slug: 'cafe-example',
       name: 'Demo Cafe',
+      primaryDomain: 'order.cafe-example.uz',
       type: 'cafe',
       logoUrl: 'https://files.example/image/organization/logo.png',
       bannerUrl: null,
@@ -230,6 +234,7 @@ describe('GET /tenant/config', () => {
       id: BARE,
       slug: 'bare-cafe',
       name: 'Bare',
+      primaryDomain: null,
       type: 'other',
       logoUrl: null,
       bannerUrl: null,

@@ -21,6 +21,19 @@ describe('TenantGuard', () => {
     ).rejects.toBeInstanceOf(CustomerAuthException);
   });
 
+  it('never takes the tenant from Host or X-Forwarded-Host', async () => {
+    const resolve = jest.fn();
+    const guard = new TenantGuard({ resolve } as any);
+    const { context } = ctx({
+      host: 'restaurant.uz',
+      'x-forwarded-host': 'mant.xmenu.uz',
+    });
+    await expect(guard.canActivate(context)).rejects.toMatchObject({
+      code: 'tenant_required',
+    });
+    expect(resolve).not.toHaveBeenCalled();
+  });
+
   it('puts the resolved tenant on the request', async () => {
     const tenant = { id: 't', slug: 's', brandName: 'B' };
     const resolve = jest.fn(async () => tenant);
