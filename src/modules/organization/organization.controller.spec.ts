@@ -36,7 +36,13 @@ describe('Organization endpoints: own organization only (IDOR)', () => {
     revalidate = { addRevalidationJob: jest.fn() };
     tenants = { invalidate: jest.fn() };
     controller = new OrganizationController(
-      new OrganizationService(db as any, files as any, revalidate as any, tenants as any, { refreshMenuButton: jest.fn() } as any),
+      new OrganizationService(
+        db as any,
+        files as any,
+        revalidate as any,
+        tenants as any,
+        { refreshMenuButton: jest.fn() } as any,
+      ),
     );
     req = { user: { organization: { id: t.mine.org.id, slug: 'mine' } } };
   });
@@ -102,7 +108,12 @@ describe('Organization endpoints: own organization only (IDOR)', () => {
   });
 
   it('drops the cached tenant after an update, so the new name and slug apply at once', async () => {
-    await controller.update(t.mine.org.id, { name: 'Mine 2', slug: 'mine-2' } as any, {}, req);
+    await controller.update(
+      t.mine.org.id,
+      { name: 'Mine 2', slug: 'mine-2' } as any,
+      {},
+      req,
+    );
     expect(tenants.invalidate).toHaveBeenCalledWith(t.mine.org.id);
   });
 });

@@ -24,7 +24,13 @@ describe('order/payment/branch/menu modules wiring', () => {
 
   it('resolves the whole dependency graph', async () => {
     const moduleRef = await Test.createTestingModule({
-      imports: [ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: true }), BranchModule, MenuModule, PaymentModule, OrderModule],
+      imports: [
+        ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: true }),
+        BranchModule,
+        MenuModule,
+        PaymentModule,
+        OrderModule,
+      ],
     })
       .overrideProvider(PrismaService)
       .useValue({})

@@ -1,5 +1,9 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { organization as Organization, Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../_prisma/prisma.service';
 import { CreateOrganizationDto } from '../dto';
@@ -11,10 +15,18 @@ import { TenantService } from 'src/modules/tenant/tenant.service';
 import { assertOwnTranslations } from 'src/modules/product/services/menu-ownership';
 import { TelegramBotProfileService } from 'src/modules/telegram/telegram-bot-profile.service';
 import { randomSlug, SLUG_MAX, slugify } from '../domain/slug';
-import { PLATFORM_CHANNELS, PLATFORM_ORDER_SETTINGS, PLATFORM_SETTINGS } from '../domain/platform-defaults';
+import {
+  PLATFORM_CHANNELS,
+  PLATFORM_ORDER_SETTINGS,
+  PLATFORM_SETTINGS,
+} from '../domain/platform-defaults';
 import { parseTenantId } from 'src/modules/tenant/tenant-key';
 
-const slugTaken = () => new ConflictException({ message: 'Slug is already taken', code: 'slug_taken' });
+const slugTaken = () =>
+  new ConflictException({
+    message: 'Slug is already taken',
+    code: 'slug_taken',
+  });
 
 @Injectable()
 export class OrganizationService {
@@ -24,15 +36,19 @@ export class OrganizationService {
     private readonly revalidateService: RevalidateService,
     private readonly tenants: TenantService,
     private readonly botProfile: TelegramBotProfileService,
-  ) { }
+  ) {}
 
-  async create(data: CreateOrganizationDto, owner_id: string, tx?: Prisma.TransactionClient) {
+  async create(
+    data: CreateOrganizationDto,
+    owner_id: string,
+    tx?: Prisma.TransactionClient,
+  ) {
     const db = tx ?? this.prismaService;
     const existingOrg = await db.organization.findUnique({
       where: { owner_id },
     });
 
-    const type = parseOrganizationType(data.type);
+    const type = parseOrganizationType(data.type as string);
     const slug = await this.generateUniqueSlug(data.name, existingOrg?.id, tx);
 
     // 🔁 agar organization allaqachon bor bo‘lsa — update qilamiz
@@ -93,12 +109,13 @@ export class OrganizationService {
 
   /** An owner may only act on their own organization; any other id looks like it does not exist. */
   assertOwn(id: string, organizationId: string) {
-    if (id !== organizationId) throw new NotFoundException('Organization not found');
+    if (id !== organizationId)
+      throw new NotFoundException('Organization not found');
   }
 
   async findOne(id: string) {
     const isNumber = !isNaN(Number(id));
-    let organization
+    let organization: Organization | null;
 
     if (isNumber) {
       organization = await this.prismaService.organization.findUnique({
@@ -128,15 +145,15 @@ export class OrganizationService {
     return organization?.slug ?? null;
   }
 
-
   async findById(id: string) {
     const organization = await this.prismaService.organization.findUnique({
-      where: { id }, include: {
+      where: { id },
+      include: {
         logo: true,
-        banner: true
-      }
-    })
-    return organization
+        banner: true,
+      },
+    });
+    return organization;
   }
 
   async update(
@@ -156,7 +173,7 @@ export class OrganizationService {
       assertOwnTranslations(own, data.translations);
     }
 
-    const files: any = {};
+    const files: { logo_id?: string; banner_id?: string } = {};
 
     // 1️⃣ logo va banner
     if (logo) {
@@ -170,16 +187,21 @@ export class OrganizationService {
     }
 
     // 2️⃣ mavjud organization ni topamiz
-    const existing = await this.prismaService.organization.findUnique({ where: { id } });
+    const existing = await this.prismaService.organization.findUnique({
+      where: { id },
+    });
     if (!existing) throw new NotFoundException('Organization not found');
 
     // 3️⃣ type ni moslashtirish
     if (data.type) data.type = parseOrganizationType(data.type);
 
-    if (data.slug !== undefined && data.slug !== existing.slug && (await this.isSlugExists(data.slug, id))) {
+    if (
+      data.slug !== undefined &&
+      data.slug !== existing.slug &&
+      (await this.isSlugExists(data.slug, id))
+    ) {
       throw slugTaken();
     }
-
 
     // 6️⃣ translations ni yangilash
     if (data.translations?.length) {
@@ -196,16 +218,21 @@ export class OrganizationService {
 
     delete data.translations;
 
-        // 5️⃣ asosiy organization yangilash
+    // 5️⃣ asosiy organization yangilash
     try {
       await this.prismaService.organization.update({
         where: { id },
-        data: { ...data, ...files },
+        // `data` is the update DTO (it also types relations the owner API never sets here)
+        data: { ...data, ...files } as Prisma.organizationUncheckedUpdateInput,
         include: { logo: true, banner: true },
       });
     } catch (e) {
       // Two owners claiming the same slug at once: the unique index decides
-      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') throw slugTaken();
+      if (
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        e.code === 'P2002'
+      )
+        throw slugTaken();
       throw e;
     }
     // Name and slug feed the cached tenant (brand name in SMS, slug in /tenant/by-slug)
@@ -233,21 +260,29 @@ export class OrganizationService {
     });
   }
 
-
   async delete(id: string, organizationId: string) {
     this.assertOwn(id, organizationId);
-    const deleted = await this.prismaService.organization.delete({ where: { id } });
+    const deleted = await this.prismaService.organization.delete({
+      where: { id },
+    });
     this.tenants.invalidate(id);
     return deleted;
   }
 
-  async updateImage(file: Express.Multer.File, id: string, type: 'logo' | 'banner') {
+  async updateImage(
+    file: Express.Multer.File,
+    id: string,
+    type: 'logo' | 'banner',
+  ) {
     const data = await this.findById(id);
-    const avatar = await this.fileService.updateFile(data?.[type]?.id || '', file);
+    const avatar = await this.fileService.updateFile(
+      data?.[type]?.id || '',
+      file,
+    );
     return avatar;
   }
 
-  async deleteImage(id: string, type) {
+  async deleteImage(id: string, type: 'logo' | 'banner') {
     const data = await this.findById(id);
     if (data?.[type]?.url) {
       await this.fileService.removeFile(data?.[type].id);

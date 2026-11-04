@@ -17,11 +17,18 @@ export class CustomerNotifierService {
     private readonly telegram: TelegramApiService,
   ) {}
 
-  async notifyStatus(orderId: string, from: OrderStatusName | null): Promise<void> {
+  async notifyStatus(
+    orderId: string,
+    from: OrderStatusName | null,
+  ): Promise<void> {
     const order = await this.prisma.customer_order.findUnique({
       where: { id: orderId },
       select: {
-        number: true, status: true, payment_method: true, payment_status: true, cancelled_by: true,
+        number: true,
+        status: true,
+        payment_method: true,
+        payment_status: true,
+        cancelled_by: true,
         customer: { select: { telegram_id: true } },
       },
     });

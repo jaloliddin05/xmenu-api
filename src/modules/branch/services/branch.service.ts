@@ -1,10 +1,22 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
 import { Lang } from 'src/infra/http/request-helpers';
-import { BranchStatus, branchStatus, evaluateOpenState, formatHours, hasSchedule, OpenState } from '../domain/branch-hours';
+import {
+  BranchStatus,
+  branchStatus,
+  evaluateOpenState,
+  formatHours,
+  hasSchedule,
+  OpenState,
+} from '../domain/branch-hours';
 import { BranchWithSchedule, toSchedule } from './branch-schedule.mapper';
 import { RevalidateService } from 'src/modules/revalidate-queue/revalidate.service';
-import { CreateBranchDto, SetWorkingHoursDto, UpdateBranchDto, CreateHoursExceptionDto } from '../dto/branch.dto';
+import {
+  CreateBranchDto,
+  SetWorkingHoursDto,
+  UpdateBranchDto,
+  CreateHoursExceptionDto,
+} from '../dto/branch.dto';
 
 const withSchedule = {
   working_hours: { orderBy: { weekday: 'asc' } },
@@ -28,7 +40,11 @@ export interface BranchView {
   status: BranchStatus;
 }
 
-export function toBranchView(b: BranchWithSchedule, lang: Lang, now = new Date()): BranchView {
+export function toBranchView(
+  b: BranchWithSchedule,
+  lang: Lang,
+  now = new Date(),
+): BranchView {
   const schedule = toSchedule(b);
   const state = evaluateOpenState(schedule, now);
   return {
@@ -54,7 +70,10 @@ export class BranchService {
 
   /** Branch list, hours and open state are shown by the delivery site. */
   private async changed<T>(organizationId: string, result: T): Promise<T> {
-    await this.revalidate.addRevalidationJob({ tenantId: organizationId, route: 'branches' });
+    await this.revalidate.addRevalidationJob({
+      tenantId: organizationId,
+      route: 'branches',
+    });
     return result;
   }
 
@@ -90,7 +109,11 @@ export class BranchService {
     const now = new Date();
     return rows.map((branch) => {
       const schedule = toSchedule(branch);
-      return { branch, scheduled: hasSchedule(schedule), state: evaluateOpenState(schedule, now) as OpenState };
+      return {
+        branch,
+        scheduled: hasSchedule(schedule),
+        state: evaluateOpenState(schedule, now),
+      };
     });
   }
 
@@ -99,7 +122,10 @@ export class BranchService {
   async listAdmin(organizationId: string) {
     const rows = await this.prisma.branch.findMany({
       where: { organization_id: organizationId },
-      include: { working_hours: { orderBy: { weekday: 'asc' } }, hours_exceptions: { orderBy: { date: 'asc' } } },
+      include: {
+        working_hours: { orderBy: { weekday: 'asc' } },
+        hours_exceptions: { orderBy: { date: 'asc' } },
+      },
       orderBy: [{ sort_order: 'asc' }, { created_at: 'asc' }],
     });
     return rows;
@@ -146,7 +172,11 @@ export class BranchService {
   }
 
   /** Haftalik jadvalni to'liq almashtiradi (PUT semantikasi). */
-  async setWorkingHours(organizationId: string, id: string, dto: SetWorkingHoursDto) {
+  async setWorkingHours(
+    organizationId: string,
+    id: string,
+    dto: SetWorkingHoursDto,
+  ) {
     await this.requireOwn(organizationId, id);
     await this.prisma.$transaction([
       this.prisma.branch_working_hours.deleteMany({ where: { branch_id: id } }),
@@ -163,24 +193,51 @@ export class BranchService {
     ]);
     return this.changed(
       organizationId,
-      await this.prisma.branch_working_hours.findMany({ where: { branch_id: id }, orderBy: { weekday: 'asc' } }),
+      await this.prisma.branch_working_hours.findMany({
+        where: { branch_id: id },
+        orderBy: { weekday: 'asc' },
+      }),
     );
   }
 
-  async addException(organizationId: string, id: string, dto: CreateHoursExceptionDto) {
+  async addException(
+    organizationId: string,
+    id: string,
+    dto: CreateHoursExceptionDto,
+  ) {
     await this.requireOwn(organizationId, id);
     const date = new Date(`${dto.date}T00:00:00Z`);
     const exception = await this.prisma.branch_hours_exception.upsert({
       where: { branch_id_date: { branch_id: id, date } },
-      create: { branch_id: id, date, opens_at: dto.opensAt, closes_at: dto.closesAt, is_24h: dto.is24h ?? false, is_closed: dto.isClosed ?? false, note: dto.note },
-      update: { opens_at: dto.opensAt, closes_at: dto.closesAt, is_24h: dto.is24h ?? false, is_closed: dto.isClosed ?? false, note: dto.note },
+      create: {
+        branch_id: id,
+        date,
+        opens_at: dto.opensAt,
+        closes_at: dto.closesAt,
+        is_24h: dto.is24h ?? false,
+        is_closed: dto.isClosed ?? false,
+        note: dto.note,
+      },
+      update: {
+        opens_at: dto.opensAt,
+        closes_at: dto.closesAt,
+        is_24h: dto.is24h ?? false,
+        is_closed: dto.isClosed ?? false,
+        note: dto.note,
+      },
     });
     return this.changed(organizationId, exception);
   }
 
-  async removeException(organizationId: string, id: string, exceptionId: string) {
+  async removeException(
+    organizationId: string,
+    id: string,
+    exceptionId: string,
+  ) {
     await this.requireOwn(organizationId, id);
-    await this.prisma.branch_hours_exception.deleteMany({ where: { id: exceptionId, branch_id: id } });
+    await this.prisma.branch_hours_exception.deleteMany({
+      where: { id: exceptionId, branch_id: id },
+    });
     await this.changed(organizationId, undefined);
   }
 
@@ -188,11 +245,19 @@ export class BranchService {
    * Buyurtmasi bor filial o'chirilmaydi (buyurtmalar unga ishora qiladi) — faqat
    * yashiriladi (is_active=false). Buyurtmasiz filial to'liq o'chadi.
    */
-  async remove(organizationId: string, id: string): Promise<{ deleted: boolean }> {
+  async remove(
+    organizationId: string,
+    id: string,
+  ): Promise<{ deleted: boolean }> {
     await this.requireOwn(organizationId, id);
-    const orders = await this.prisma.customer_order.count({ where: { branch_id: id } });
+    const orders = await this.prisma.customer_order.count({
+      where: { branch_id: id },
+    });
     if (orders > 0) {
-      await this.prisma.branch.update({ where: { id }, data: { is_active: false } });
+      await this.prisma.branch.update({
+        where: { id },
+        data: { is_active: false },
+      });
       return this.changed(organizationId, { deleted: false });
     }
     await this.prisma.branch.delete({ where: { id } });
@@ -200,7 +265,10 @@ export class BranchService {
   }
 
   private async requireOwn(organizationId: string, id: string) {
-    const b = await this.prisma.branch.findFirst({ where: { id, organization_id: organizationId }, select: { id: true } });
+    const b = await this.prisma.branch.findFirst({
+      where: { id, organization_id: organizationId },
+      select: { id: true },
+    });
     if (!b) throw new NotFoundException('Branch not found');
   }
 }

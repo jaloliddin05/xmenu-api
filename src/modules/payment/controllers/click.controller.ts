@@ -1,4 +1,12 @@
-import { Body, Controller, HttpCode, Logger, Param, Post } from '@nestjs/common';
+import { errorStack } from 'src/infra/helper/error-text';
+import {
+  Body,
+  Controller,
+  HttpCode,
+  Logger,
+  Param,
+  Post,
+} from '@nestjs/common';
 import { SkipPublicRateLimit } from 'src/infra/http/public-rate-limit';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
@@ -43,7 +51,11 @@ export class ClickController {
     return this.handle('complete', tenantId, body);
   }
 
-  private async handle(action: 'prepare' | 'complete', tenantId: string, body: ClickRequest) {
+  private async handle(
+    action: 'prepare' | 'complete',
+    tenantId: string,
+    body: ClickRequest,
+  ) {
     const fail = (error: number, note: string) => ({
       click_trans_id: String(body?.click_trans_id ?? ''),
       merchant_trans_id: String(body?.merchant_trans_id ?? ''),
@@ -53,14 +65,23 @@ export class ClickController {
 
     try {
       const id = parseTenantId(tenantId);
-      const org = id ? await this.prisma.organization.findUnique({ where: { id }, select: { id: true, is_active: true } }) : null;
+      const org = id
+        ? await this.prisma.organization.findUnique({
+            where: { id },
+            select: { id: true, is_active: true },
+          })
+        : null;
       const cfg = org?.is_active ? await this.configs.getClick(org.id) : null;
-      if (!org || !cfg) return fail(CLICK_ERROR.BAD_REQUEST, 'Merchant is not configured');
+      if (!org || !cfg)
+        return fail(CLICK_ERROR.BAD_REQUEST, 'Merchant is not configured');
 
-      const protocol = new ClickProtocol(new PrismaClickStore(this.prisma, this.transitions, org.id), cfg);
+      const protocol = new ClickProtocol(
+        new PrismaClickStore(this.prisma, this.transitions, org.id),
+        cfg,
+      );
       return await protocol.handle(action, body ?? {});
-    } catch (e: any) {
-      this.logger.error(`${action} failed: ${e?.stack ?? e}`);
+    } catch (e) {
+      this.logger.error(`${action} failed: ${errorStack(e)}`);
       return fail(CLICK_ERROR.FAILED_TO_UPDATE, 'Failed to update user');
     }
   }

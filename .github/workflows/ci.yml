@@ -69,6 +69,12 @@ jobs:
           psql --dbname="$PG_ADMIN_URL/postgres" -c 'create database xmenu_upgrade'
           DATABASE_URL="$PG_ADMIN_URL/xmenu_upgrade" scripts/check-migration-upgrade.sh
 
+      - name: Format (prettier)
+        run: npm run format:check
+
+      - name: Lint
+        run: npm run lint
+
       - name: Build
         run: npm run build
 
@@ -80,8 +86,3 @@ jobs:
         run: |
           npm run openapi
           git diff --exit-code docs/
-
-      # Report only: the old code base still has many lint errors (see CLAUDE.md)
-      - name: Lint (report, does not block)
-        run: npm run lint
-        continue-on-error: true

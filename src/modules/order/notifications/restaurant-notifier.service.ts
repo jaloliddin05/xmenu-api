@@ -6,7 +6,15 @@ import type { OrderWithItems } from '../services/order-view';
 
 const include = {
   items: { include: { options: true } },
-  branch: { select: { id: true, title: true, address: true, telegram_chat_id: true, phone: true } },
+  branch: {
+    select: {
+      id: true,
+      title: true,
+      address: true,
+      telegram_chat_id: true,
+      phone: true,
+    },
+  },
 } as const;
 
 /**
@@ -24,7 +32,10 @@ export class RestaurantNotifierService {
   ) {}
 
   private load(orderId: string) {
-    return this.prisma.customer_order.findUnique({ where: { id: orderId }, include });
+    return this.prisma.customer_order.findUnique({
+      where: { id: orderId },
+      include,
+    });
   }
 
   /** Yangi buyurtma: guruhga xabar. chat sozlanmagan bo'lsa false (eskalatsiya SMS'ga o'tadi). */
@@ -32,18 +43,28 @@ export class RestaurantNotifierService {
     const order = await this.load(orderId);
     const chatId = order?.branch.telegram_chat_id;
     if (!order || !chatId) {
-      if (order) this.logger.warn(`Filial ${order.branch.id} uchun telegram_chat_id yo'q — buyurtma ${order.number} xabarsiz qoldi`);
+      if (order)
+        this.logger.warn(
+          `Filial ${order.branch.id} uchun telegram_chat_id yo'q — buyurtma ${order.number} xabarsiz qoldi`,
+        );
       return false;
     }
 
-    const sent = await this.telegram.sendMessage(chatId, buildRestaurantText(order as OrderWithItems), {
-      reply_markup: buildRestaurantKeyboard(order),
-    });
+    const sent = await this.telegram.sendMessage(
+      chatId,
+      buildRestaurantText(order as OrderWithItems),
+      {
+        reply_markup: buildRestaurantKeyboard(order),
+      },
+    );
     if (!sent) return false;
 
     await this.prisma.customer_order.update({
       where: { id: orderId },
-      data: { tg_chat_id: String(sent.chat.id), tg_message_id: sent.message_id },
+      data: {
+        tg_chat_id: String(sent.chat.id),
+        tg_message_id: sent.message_id,
+      },
     });
     return true;
   }
@@ -72,7 +93,9 @@ export class RestaurantNotifierService {
   }
 
   /** Filial telefoni (SMS eskalatsiyasi uchun). */
-  async branchPhone(orderId: string): Promise<{ phone: string | null; number: number } | null> {
+  async branchPhone(
+    orderId: string,
+  ): Promise<{ phone: string | null; number: number } | null> {
     const order = await this.load(orderId);
     return order ? { phone: order.branch.phone, number: order.number } : null;
   }

@@ -17,7 +17,8 @@ export class BranchViewDto implements BranchView {
   @ApiProperty({ type: String, nullable: true, example: '+998711234567' })
   phone: string | null;
   @ApiProperty({
-    description: 'Open right now; false also when the branch has no working hours (see status)',
+    description:
+      'Open right now; false also when the branch has no working hours (see status)',
   })
   isOpen: boolean;
   @ApiProperty({

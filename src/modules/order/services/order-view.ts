@@ -19,7 +19,10 @@ export interface OrderViewOptions {
  * Buyurtma → JSON (docs/ORDERS_API.md "Объект заказа"). Barcha pozitsiyalar,
  * manzil va filial — buyurtma vaqtidagi snapshot.
  */
-export function toOrderView(order: OrderWithItems, opts: OrderViewOptions = {}) {
+export function toOrderView(
+  order: OrderWithItems,
+  opts: OrderViewOptions = {},
+) {
   const online = order.payment_method !== 'cash';
 
   return {
@@ -29,7 +32,11 @@ export function toOrderView(order: OrderWithItems, opts: OrderViewOptions = {}) 
     fulfillmentMode: order.fulfillment,
     createdAt: order.created_at.toISOString(),
     branchId: order.branch_id,
-    branch: { id: order.branch.id, title: order.branch.title, address: order.branch.address },
+    branch: {
+      id: order.branch.id,
+      title: order.branch.title,
+      address: order.branch.address,
+    },
     address: order.address_snapshot ?? null,
     phone: order.phone,
     comment: order.comment ?? '',
@@ -37,9 +44,17 @@ export function toOrderView(order: OrderWithItems, opts: OrderViewOptions = {}) 
     paymentStatus: order.payment_status,
     payment: online
       ? {
-          url: order.status === 'awaiting_payment' ? (opts.paymentUrl ?? null) : null,
-          expiresAt: order.payment_expires_at ? order.payment_expires_at.toISOString() : null,
-          failReason: order.status === 'payment_failed' ? (opts.failReason ?? 'declined') : null,
+          url:
+            order.status === 'awaiting_payment'
+              ? (opts.paymentUrl ?? null)
+              : null,
+          expiresAt: order.payment_expires_at
+            ? order.payment_expires_at.toISOString()
+            : null,
+          failReason:
+            order.status === 'payment_failed'
+              ? (opts.failReason ?? 'declined')
+              : null,
         }
       : null,
     items: [...order.items]
@@ -60,7 +75,10 @@ export function toOrderView(order: OrderWithItems, opts: OrderViewOptions = {}) 
     discount: order.discount,
     total: order.total,
     etaMinutes: [order.eta_min, order.eta_max],
-    cancelledBy: order.cancelled_by && order.cancelled_by !== 'payment' ? order.cancelled_by : null,
+    cancelledBy:
+      order.cancelled_by && order.cancelled_by !== 'payment'
+        ? order.cancelled_by
+        : null,
     cancelReason: order.cancel_reason,
   };
 }
@@ -68,7 +86,14 @@ export function toOrderView(order: OrderWithItems, opts: OrderViewOptions = {}) 
 export type OrderView = ReturnType<typeof toOrderView>;
 
 function groupModifiers(options: customer_order_item_option[]) {
-  const groups = new Map<string, { groupId: string; groupTitle: string; options: { id: string; name: string; price: number }[] }>();
+  const groups = new Map<
+    string,
+    {
+      groupId: string;
+      groupTitle: string;
+      options: { id: string; name: string; price: number }[];
+    }
+  >();
   for (const o of [...options].sort((a, b) => a.position - b.position)) {
     const key = o.group_id ?? o.group_title;
     let g = groups.get(key);

@@ -4,10 +4,7 @@ import { PrismaService } from '../_prisma/prisma.service';
 
 @Injectable()
 export class FileService {
-  constructor(
-    private readonly prismaService:PrismaService
-    
-  ) {}
+  constructor(private readonly prismaService: PrismaService) {}
 
   async uploadFile(file: Express.Multer.File) {
     const url = file.path.split('uploads')[1];
@@ -19,7 +16,7 @@ export class FileService {
   async removeFile(id: string) {
     const file = await this.prismaService.file.findUnique({ where: { id } });
     if (file?.path) {
-      await this.deleteFileWithFs(file.path);
+      this.deleteFileWithFs(file.path);
     }
     await this.prismaService.file.delete({ where: { id } });
   }
@@ -30,7 +27,7 @@ export class FileService {
       : null;
 
     if (changedFile?.path) {
-      await this.deleteFileWithFs(changedFile.path);
+      this.deleteFileWithFs(changedFile.path);
     }
 
     const url = file.path.split('uploads')[1];
@@ -39,13 +36,16 @@ export class FileService {
     if (changedFile) {
       changedFile.url = url;
       changedFile.path = path;
-      return await this.prismaService.file.update({ where: { id }, data: changedFile });
+      return await this.prismaService.file.update({
+        where: { id },
+        data: changedFile,
+      });
     } else {
       return await this.prismaService.file.create({ data: { url, path } });
     }
   }
 
-  async deleteFileWithFs(path) {
+  deleteFileWithFs(path: string) {
     try {
       return fs.unlink(path, (err) => {
         if (err) console.log(err);

@@ -1,7 +1,10 @@
-export {default as LoginDto} from './login.dto'
-export {default as CustomerTelegramDto} from './customer-login.dto'
-export {default as CustomerOtpRequestDto} from './customer-otp-request.dto'
-export {default as CustomerOtpVerifyDto} from './customer-otp-verify.dto'
-export {default as CustomerRegisterDto} from './customer-register.dto'
-export { CustomerRefreshDto, CustomerLogoutDto } from './customer-refresh.dto'
-export { CustomerTelegramStartDto, CustomerTelegramStatusDto } from './customer-telegram-verify.dto'
+export { default as LoginDto } from './login.dto';
+export { default as CustomerTelegramDto } from './customer-login.dto';
+export { default as CustomerOtpRequestDto } from './customer-otp-request.dto';
+export { default as CustomerOtpVerifyDto } from './customer-otp-verify.dto';
+export { default as CustomerRegisterDto } from './customer-register.dto';
+export { CustomerRefreshDto, CustomerLogoutDto } from './customer-refresh.dto';
+export {
+  CustomerTelegramStartDto,
+  CustomerTelegramStatusDto,
+} from './customer-telegram-verify.dto';

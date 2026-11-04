@@ -23,7 +23,10 @@ export class TelegramInitDataService {
    * initData is signed with the token of the bot that opened the Mini App: the venue's own bot,
    * or the platform bot (TELEGRAM_BOT_TOKEN) while the venue has not connected one.
    */
-  async verifyForTenant(tenantId: string, initData: string): Promise<TelegramUser> {
+  async verifyForTenant(
+    tenantId: string,
+    initData: string,
+  ): Promise<TelegramUser> {
     const token = await this.bots.initDataToken(tenantId);
     if (!token) throw new Error('TELEGRAM_BOT_TOKEN is not configured');
     return this.verifyWithToken(initData, token);
@@ -31,7 +34,11 @@ export class TelegramInitDataService {
 
   /** Verifies the WebApp initData signature against `botToken` and returns the user. */
   verifyWithToken(initData: string, botToken: string): TelegramUser {
-    const bad = () => new CustomerAuthException('invalid_telegram_data', 'Invalid Telegram initData');
+    const bad = () =>
+      new CustomerAuthException(
+        'invalid_telegram_data',
+        'Invalid Telegram initData',
+      );
 
     const params = new URLSearchParams(initData);
     const hash = params.get('hash');
@@ -43,8 +50,12 @@ export class TelegramInitDataService {
       .map(([k, v]) => `${k}=${v}`)
       .join('\n');
 
-    const secretKey = createHmac('sha256', 'WebAppData').update(botToken).digest();
-    const calculated = createHmac('sha256', secretKey).update(dataCheckString).digest();
+    const secretKey = createHmac('sha256', 'WebAppData')
+      .update(botToken)
+      .digest();
+    const calculated = createHmac('sha256', secretKey)
+      .update(dataCheckString)
+      .digest();
 
     let given: Buffer;
     try {
@@ -52,16 +63,24 @@ export class TelegramInitDataService {
     } catch {
       throw bad();
     }
-    if (given.length !== calculated.length || !timingSafeEqual(given, calculated)) throw bad();
+    if (
+      given.length !== calculated.length ||
+      !timingSafeEqual(given, calculated)
+    )
+      throw bad();
 
     // Eski initData qayta ishlatilishiga yo'l qo'ymaymiz
     const authDate = Number(params.get('auth_date'));
-    if (!authDate || Date.now() / 1000 - authDate > this.cfg.telegramInitDataMaxAgeSeconds) throw bad();
+    if (
+      !authDate ||
+      Date.now() / 1000 - authDate > this.cfg.telegramInitDataMaxAgeSeconds
+    )
+      throw bad();
 
     const userString = params.get('user');
     if (!userString) throw bad();
     try {
-      const user = JSON.parse(userString);
+      const user = JSON.parse(userString) as TelegramUser | null;
       if (!user?.id) throw bad();
       return user;
     } catch {

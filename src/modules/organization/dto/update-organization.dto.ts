@@ -95,10 +95,10 @@ class UpdateOrganizationDto {
     // ⚙️ 1️⃣ Agar form-data dan string kelsa → JSON.parse
     if (typeof value === 'string') {
       try {
-        const parsed = JSON.parse(value);
+        const parsed = JSON.parse(value) as unknown[];
         // ⚙️ 2️⃣ parsed ni class-transformer instance ga aylantiramiz
         return plainToInstance(UpdateOrganizationTranslationDto, parsed);
-      } catch (error) {
+      } catch {
         console.error('❌ Invalid JSON in translations:', value);
         return [];
       }

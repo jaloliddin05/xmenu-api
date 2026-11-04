@@ -5,9 +5,9 @@ import { FileController } from './file.controller';
 
 @Global()
 @Module({
-  imports:[PrismaModule],
-  controllers:[FileController],
+  imports: [PrismaModule],
+  controllers: [FileController],
   providers: [FileService],
-  exports:[FileService]
+  exports: [FileService],
 })
 export class FileModule {}

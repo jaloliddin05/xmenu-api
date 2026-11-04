@@ -39,7 +39,8 @@ class ErrorFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
     const status = exception.getStatus();
     // Client errors (401, 404, validation) are expected traffic: no log, no stack trace
-    if (status >= 500) ErrorFilter.logger.error(exception.message, exception.stack);
+    if (status >= 500)
+      ErrorFilter.logger.error(exception.message, exception.stack);
 
     const extra: Record<string, unknown> = {};
     let code = defaultErrorCode(status);

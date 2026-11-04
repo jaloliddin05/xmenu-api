@@ -5,9 +5,9 @@ import { TranslationController } from './translation.controller';
 import { TranslationService } from './translation.service';
 
 @Module({
-  imports:[PrismaModule, AuthModule],
+  imports: [PrismaModule, AuthModule],
   controllers: [TranslationController],
   providers: [TranslationService],
-  exports:[TranslationService]
+  exports: [TranslationService],
 })
 export class TranslationModule {}

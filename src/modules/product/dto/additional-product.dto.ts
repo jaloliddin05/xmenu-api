@@ -1,26 +1,25 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty } from '@nestjs/swagger';
 import {
   IsArray,
   IsBoolean,
-  IsEnum,
   IsInt,
   IsNumber,
   Min,
   IsOptional,
   IsString,
   ValidateNested,
-} from "class-validator";
-import { Type } from "class-transformer";
+} from 'class-validator';
+import { Type } from 'class-transformer';
 
 //
 // 🔹 1. Additional product translation DTO
 //
 export class CreateAdditionalProductTranslationDto {
-  @ApiProperty({ example: "en" })
+  @ApiProperty({ example: 'en' })
   @IsString()
   readonly lang: string;
 
-  @ApiProperty({ example: "Ketchup" })
+  @ApiProperty({ example: 'Ketchup' })
   @IsString()
   readonly title: string;
 }
@@ -29,7 +28,7 @@ export class CreateAdditionalProductTranslationDto {
 // 🔹 2. Additional product create DTO
 //
 export class CreateAdditionalProductDto {
-  @ApiProperty({ example: "uuid-of-group" })
+  @ApiProperty({ example: 'uuid-of-group' })
   @IsString()
   readonly additional_product_group_id: string;
 
@@ -48,11 +47,11 @@ export class CreateAdditionalProductDto {
 // 🔹 3. Additional product group translation DTO
 //
 export class CreateAdditionalProductGroupTranslationDto {
-  @ApiProperty({ example: "en" })
+  @ApiProperty({ example: 'en' })
   @IsString()
   readonly lang: string;
 
-  @ApiProperty({ example: "Sauce type" })
+  @ApiProperty({ example: 'Sauce type' })
   @IsString()
   readonly title: string;
 }
@@ -70,13 +69,22 @@ export class CreateAdditionalProductGroupDto {
   @IsBoolean()
   readonly is_required?: boolean;
 
-  @ApiProperty({ example: 2, required: false, description: "Kamida nechta variant tanlanishi kerak (bo'sh — is_required bo'yicha)" })
+  @ApiProperty({
+    example: 2,
+    required: false,
+    description:
+      "Kamida nechta variant tanlanishi kerak (bo'sh — is_required bo'yicha)",
+  })
   @IsOptional()
   @IsInt()
   @Min(0)
   readonly min_selected?: number;
 
-  @ApiProperty({ example: 4, required: false, description: "Ko'pi bilan nechta variant (bo'sh — is_multiple bo'yicha)" })
+  @ApiProperty({
+    example: 4,
+    required: false,
+    description: "Ko'pi bilan nechta variant (bo'sh — is_multiple bo'yicha)",
+  })
   @IsOptional()
   @IsInt()
   @Min(1)
@@ -85,7 +93,8 @@ export class CreateAdditionalProductGroupDto {
   @ApiProperty({
     example: 'uuid',
     required: false,
-    description: 'Your own dish; omit when the dish does not exist yet and pass the group id in POST /product',
+    description:
+      'Your own dish; omit when the dish does not exist yet and pass the group id in POST /product',
   })
   @IsOptional()
   @IsString()

@@ -113,6 +113,9 @@ export class CustomerAuthException extends HttpException {
     /** Ekran amal qila oladigan tuzilgan ma'lumot (qaysi pozitsiyalar yo'q, yangi narxlar...). */
     public readonly details?: Record<string, unknown>,
   ) {
-    super({ code, message: message ?? code, retryAfter, details }, STATUS[code]);
+    super(
+      { code, message: message ?? code, retryAfter, details },
+      STATUS[code],
+    );
   }
 }

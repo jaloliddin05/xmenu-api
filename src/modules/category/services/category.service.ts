@@ -9,8 +9,8 @@ import { ownCategory } from 'src/modules/product/services/menu-ownership';
 export class CategoryService {
   constructor(
     private readonly prismaService: PrismaService,
-    private readonly revalidateService: RevalidateService
-  ) { }
+    private readonly revalidateService: RevalidateService,
+  ) {}
 
   // Every id from the URL or the body must belong to the caller's organization; anything else is 404.
 
@@ -23,15 +23,22 @@ export class CategoryService {
   }
 
   /** Legacy body/URL field: tolerated only when it names the caller's own organization. */
-  private assertSameOrganization(sent: string | undefined, organizationId: string) {
-    if (sent !== undefined && sent !== organizationId) throw new NotFoundException('Organization not found');
+  private assertSameOrganization(
+    sent: string | undefined,
+    organizationId: string,
+  ) {
+    if (sent !== undefined && sent !== organizationId)
+      throw new NotFoundException('Organization not found');
   }
 
-  async createCategory(dto: CreateCategoryDto, organizationId: string, slug:string) {
+  async createCategory(
+    dto: CreateCategoryDto,
+    organizationId: string,
+    slug: string,
+  ) {
     this.assertSameOrganization(dto.organization_id, organizationId);
 
     const category = await this.prismaService.$transaction(async (prisma) => {
-
       const lastCategory = await prisma.category.findFirst({
         where: { organization_id: organizationId },
         orderBy: { index: 'desc' },
@@ -62,47 +69,55 @@ export class CategoryService {
       return newCategory;
     });
 
-    await this.revalidateService.addRevalidationJob({ tenantId: organizationId, route: 'menu', slug })
+    await this.revalidateService.addRevalidationJob({
+      tenantId: organizationId,
+      route: 'menu',
+      slug,
+    });
 
     return category;
   }
 
-  async findAll(lang: string,organizationId: string) {
+  async findAll(lang: string, organizationId: string) {
     const categories = await this.prismaService.category.findMany({
       where: {
-        organization_id: organizationId
+        organization_id: organizationId,
       },
       include: {
         translations: {
           where: { lang }, // faqat berilgan til bo‘yicha translation
-          select: { id: true, lang: true, title: true }
-        }
+          select: { id: true, lang: true, title: true },
+        },
       },
-      orderBy: { index: 'asc' }
-    })
+      orderBy: { index: 'asc' },
+    });
 
-    return categories.map(c => ({
+    return categories.map((c) => ({
       id: c.id,
       is_active: c.is_active,
       index: c.index,
-      translation: c.translations[0] || null
+      translation: c.translations[0] || null,
     }));
   }
 
-  async getForSelect(requestedOrganizationId: string, organizationId: string, lang:string) {
+  async getForSelect(
+    requestedOrganizationId: string,
+    organizationId: string,
+    lang: string,
+  ) {
     this.assertSameOrganization(requestedOrganizationId, organizationId);
     const categories = await this.prismaService.category.findMany({
       where: { organization_id: organizationId, is_active: true },
       include: {
         translations: {
           where: { lang },
-          select: { id: true, lang: true, title: true }
-        }
+          select: { id: true, lang: true, title: true },
+        },
       },
-      orderBy: { index: 'asc' }
+      orderBy: { index: 'asc' },
     });
 
-    return categories.map(c => ({
+    return categories.map((c) => ({
       id: c.id,
       title: c.translations[0]?.title || 'No title',
     }));
@@ -117,7 +132,12 @@ export class CategoryService {
     return category;
   }
 
-  async update(id: string, data: UpdateCategoryDto, organizationId: string, slug:string) {
+  async update(
+    id: string,
+    data: UpdateCategoryDto,
+    organizationId: string,
+    slug: string,
+  ) {
     await this.findOwnCategory(id, organizationId);
     const { translations } = data;
 
@@ -130,13 +150,14 @@ export class CategoryService {
 
     // Promise.all bilan parallel ishlov berish
     await Promise.all(
-      translations.map(async tr => {
-        const existing = await this.prismaService.category_translation.findFirst({
-          where: {
-            category_id: id,
-            lang: tr.lang,
-          },
-        });
+      translations.map(async (tr) => {
+        const existing =
+          await this.prismaService.category_translation.findFirst({
+            where: {
+              category_id: id,
+              lang: tr.lang,
+            },
+          });
 
         if (existing) {
           await this.prismaService.category_translation.update({
@@ -152,10 +173,14 @@ export class CategoryService {
             },
           });
         }
-      })
+      }),
     );
 
-    await this.revalidateService.addRevalidationJob({ tenantId: organizationId, route: 'menu', slug })
+    await this.revalidateService.addRevalidationJob({
+      tenantId: organizationId,
+      route: 'menu',
+      slug,
+    });
 
     return this.prismaService.category.findUnique({
       where: { id },
@@ -163,7 +188,11 @@ export class CategoryService {
     });
   }
 
-  async moveCategory(dto: MoveCategoryDto, organizationId: string, slug:string) {
+  async moveCategory(
+    dto: MoveCategoryDto,
+    organizationId: string,
+    slug: string,
+  ) {
     const { categoryId, newIndex } = dto;
     // The reindex below runs over the whole organization, so it must be the caller's own
     this.assertSameOrganization(dto.organizationId, organizationId);
@@ -203,22 +232,44 @@ export class CategoryService {
       data: { index: newIndex },
     });
 
-    await this.revalidateService.addRevalidationJob({ tenantId: organizationId, route: 'menu', slug })
+    await this.revalidateService.addRevalidationJob({
+      tenantId: organizationId,
+      route: 'menu',
+      slug,
+    });
 
     return updated;
   }
 
-  async updateIsActive(id: string, is_active: boolean, organizationId: string, slug:string) {
+  async updateIsActive(
+    id: string,
+    is_active: boolean,
+    organizationId: string,
+    slug: string,
+  ) {
     await this.findOwnCategory(id, organizationId);
-    const category = await this.prismaService.category.update({ where: { id }, data: { is_active } })
-    await this.revalidateService.addRevalidationJob({ tenantId: organizationId, route: 'menu', slug })
-    return category
+    const category = await this.prismaService.category.update({
+      where: { id },
+      data: { is_active },
+    });
+    await this.revalidateService.addRevalidationJob({
+      tenantId: organizationId,
+      route: 'menu',
+      slug,
+    });
+    return category;
   }
 
-  async delete(id: string, organizationId: string, slug:string) {
+  async delete(id: string, organizationId: string, slug: string) {
     await this.findOwnCategory(id, organizationId);
-    const category =  await this.prismaService.category.delete({ where: { id } })
-    await this.revalidateService.addRevalidationJob({ tenantId: organizationId, route: 'menu', slug })
-    return category
+    const category = await this.prismaService.category.delete({
+      where: { id },
+    });
+    await this.revalidateService.addRevalidationJob({
+      tenantId: organizationId,
+      route: 'menu',
+      slug,
+    });
+    return category;
   }
 }

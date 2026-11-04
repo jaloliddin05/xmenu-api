@@ -37,7 +37,9 @@ function run(exception: any) {
 
 describe('ErrorFilter', () => {
   const log = jest.spyOn(console, 'log');
-  const loggerError = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+  const loggerError = jest
+    .spyOn(Logger.prototype, 'error')
+    .mockImplementation(() => undefined);
   beforeEach(() => {
     log.mockClear();
     loggerError.mockClear();
@@ -52,7 +54,10 @@ describe('ErrorFilter', () => {
 
   it('logs server errors with their stack', () => {
     run(new ServiceUnavailableException('down'));
-    expect(loggerError).toHaveBeenCalledWith('down', expect.stringContaining('ServiceUnavailableException'));
+    expect(loggerError).toHaveBeenCalledWith(
+      'down',
+      expect.stringContaining('ServiceUnavailableException'),
+    );
   });
 
   it('adds code, retryAfter and Retry-After when the exception has them', () => {
@@ -82,12 +87,23 @@ describe('ErrorFilter', () => {
       message: 'Invalid phone number',
     });
     expect(res.headers).toEqual({});
-    expect(run(new NotFoundException()).body).toMatchObject({ code: 'not_found', message: 'Not Found' });
-    expect(run(new UnauthorizedException()).body).toMatchObject({ code: 'unauthorized' });
+    expect(run(new NotFoundException()).body).toMatchObject({
+      code: 'not_found',
+      message: 'Not Found',
+    });
+    expect(run(new UnauthorizedException()).body).toMatchObject({
+      code: 'unauthorized',
+    });
   });
 
   it('passes field errors and details through', () => {
-    const errors = [{ field: 'theme.brand', reason: 'matches', message: 'brand must be a hex color' }];
+    const errors = [
+      {
+        field: 'theme.brand',
+        reason: 'matches',
+        message: 'brand must be a hex color',
+      },
+    ];
     const res = run(fieldErrorsException('validation_error', errors));
     expect(res.body).toMatchObject({
       status: 400,
@@ -95,7 +111,14 @@ describe('ErrorFilter', () => {
       message: 'theme.brand: brand must be a hex color',
       errors,
     });
-    const withDetails = run(new CustomerAuthException('branch_closed', 'closed', undefined, { opensAt: '09:00' }));
-    expect(withDetails.body).toMatchObject({ code: 'branch_closed', details: { opensAt: '09:00' } });
+    const withDetails = run(
+      new CustomerAuthException('branch_closed', 'closed', undefined, {
+        opensAt: '09:00',
+      }),
+    );
+    expect(withDetails.body).toMatchObject({
+      code: 'branch_closed',
+      details: { opensAt: '09:00' },
+    });
   });
 });

@@ -1,4 +1,4 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty } from '@nestjs/swagger';
 import {
   IsArray,
   IsBoolean,
@@ -9,22 +9,22 @@ import {
   IsString,
   ValidateNested,
   IsUUID,
-} from "class-validator";
-import { Type } from "class-transformer";
+} from 'class-validator';
+import { Type } from 'class-transformer';
 
 //
 // 🔹 1. Additional product translation update DTO
 //
 export class UpdateAdditionalProductTranslationDto {
-  @ApiProperty({ example: "uuid-of-translation" })
+  @ApiProperty({ example: 'uuid-of-translation' })
   @IsUUID()
   readonly id: string;
 
-  @ApiProperty({ example: "en" })
+  @ApiProperty({ example: 'en' })
   @IsString()
   readonly lang: string;
 
-  @ApiProperty({ example: "Ketchup" })
+  @ApiProperty({ example: 'Ketchup' })
   @IsString()
   readonly title: string;
 }
@@ -38,7 +38,7 @@ export class UpdateAdditionalProductDto {
   @IsNumber()
   readonly price?: number;
 
-  @ApiProperty({ example: "uuid-of-group", required: false })
+  @ApiProperty({ example: 'uuid-of-group', required: false })
   @IsOptional()
   @IsString()
   readonly additional_product_group_id?: string;
@@ -58,15 +58,15 @@ export class UpdateAdditionalProductDto {
 // 🔹 3. Additional product group translation update DTO
 //
 export class UpdateAdditionalProductGroupTranslationDto {
-  @ApiProperty({ example: "uuid-of-translation" })
+  @ApiProperty({ example: 'uuid-of-translation' })
   @IsUUID()
   readonly id: string;
 
-  @ApiProperty({ example: "en" })
+  @ApiProperty({ example: 'en' })
   @IsString()
   readonly lang: string;
 
-  @ApiProperty({ example: "Sauce type" })
+  @ApiProperty({ example: 'Sauce type' })
   @IsString()
   readonly title: string;
 }
@@ -85,19 +85,28 @@ export class UpdateAdditionalProductGroupDto {
   @IsBoolean()
   readonly is_required?: boolean;
 
-  @ApiProperty({ example: 2, required: false, description: "Kamida nechta variant tanlanishi kerak (bo'sh — is_required bo'yicha)" })
+  @ApiProperty({
+    example: 2,
+    required: false,
+    description:
+      "Kamida nechta variant tanlanishi kerak (bo'sh — is_required bo'yicha)",
+  })
   @IsOptional()
   @IsInt()
   @Min(0)
   readonly min_selected?: number;
 
-  @ApiProperty({ example: 4, required: false, description: "Ko'pi bilan nechta variant (bo'sh — is_multiple bo'yicha)" })
+  @ApiProperty({
+    example: 4,
+    required: false,
+    description: "Ko'pi bilan nechta variant (bo'sh — is_multiple bo'yicha)",
+  })
   @IsOptional()
   @IsInt()
   @Min(1)
   readonly max_selected?: number;
 
-  @ApiProperty({ example: "uuid-of-product", required: false })
+  @ApiProperty({ example: 'uuid-of-product', required: false })
   @IsOptional()
   @IsString()
   readonly product_id?: string;

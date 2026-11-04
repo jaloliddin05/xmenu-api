@@ -36,8 +36,14 @@ type StaffRequest = Parameters<typeof requireStaffOrganizationId>[0];
 /** Owner (dashboard): channels (QR menu, ordering) and publication of the venue. */
 @ApiTags('Organization')
 @ApiBearerAuth('access-token')
-@ApiUnauthorizedResponse({ type: ErrorResponseDto, description: 'No or invalid owner token' })
-@ApiForbiddenResponse({ type: ErrorResponseDto, description: 'The user has no organization' })
+@ApiUnauthorizedResponse({
+  type: ErrorResponseDto,
+  description: 'No or invalid owner token',
+})
+@ApiForbiddenResponse({
+  type: ErrorResponseDto,
+  description: 'The user has no organization',
+})
 @ApiNotFoundResponse({
   type: ErrorResponseDto,
   description: 'Not your organization (any other id looks missing)',

@@ -90,7 +90,10 @@ describe('GET/PUT /organization/:id/settings', () => {
           { provide: RevalidateService, useValue: {} },
           { provide: TenantService, useValue: { invalidate } },
           { provide: RevalidateService, useValue: { addRevalidationJob } },
-          { provide: TelegramBotProfileService, useValue: { refreshMenuButton: jest.fn() } },
+          {
+            provide: TelegramBotProfileService,
+            useValue: { refreshMenuButton: jest.fn() },
+          },
         ],
       },
       [
@@ -150,7 +153,10 @@ describe('GET/PUT /organization/:id/settings', () => {
       platformTheme: PLATFORM_THEME,
     });
     expect(invalidate).toHaveBeenCalledWith(ORG_A);
-    expect(addRevalidationJob).toHaveBeenCalledWith({ tenantId: ORG_A, route: 'settings' });
+    expect(addRevalidationJob).toHaveBeenCalledWith({
+      tenantId: ORG_A,
+      route: 'settings',
+    });
 
     const again = await get().expect(200);
     expect(again.body).toEqual(res.body);
@@ -173,7 +179,10 @@ describe('GET/PUT /organization/:id/settings', () => {
   it('accepts a GET answer sent back unchanged: effectiveTheme is ignored, not stored', async () => {
     await put(VALID).expect(200);
     const answer = (await get().expect(200)).body;
-    const res = await put({ ...answer, effectiveTheme: { brand: '#000000' } }).expect(200);
+    const res = await put({
+      ...answer,
+      effectiveTheme: { brand: '#000000' },
+    }).expect(200);
     expect(res.body.theme).toEqual(VALID.theme);
     expect(res.body.effectiveTheme.brand).toBe(VALID.theme.brand);
     expect(rows[ORG_A].theme).toEqual(VALID.theme);
@@ -185,7 +194,10 @@ describe('GET/PUT /organization/:id/settings', () => {
     expect(answer.platformTheme).toEqual(PLATFORM_THEME);
     expect(answer.effectiveTheme.brand).toBe(VALID.theme.brand);
     expect(answer.platformTheme.brand).not.toBe(VALID.theme.brand);
-    const res = await put({ ...answer, platformTheme: { brand: '#000000' } }).expect(200);
+    const res = await put({
+      ...answer,
+      platformTheme: { brand: '#000000' },
+    }).expect(200);
     expect(res.body.platformTheme).toEqual(PLATFORM_THEME);
     expect(rows[ORG_A].theme).toEqual(VALID.theme);
   });
@@ -245,18 +257,56 @@ describe('GET/PUT /organization/:id/settings', () => {
   });
 
   it.each([
-    ['theme color', { theme: { brand: 'red' } }, 'validation_error', 'theme.brand', 'matches'],
-    ['language', { languages: ['uz', 'kk'] }, 'validation_error', 'languages', 'isIn'],
-    ['latitude', { mapCenter: { lat: 91, lng: 69 } }, 'validation_error', 'mapCenter.lat', 'max'],
+    [
+      'theme color',
+      { theme: { brand: 'red' } },
+      'validation_error',
+      'theme.brand',
+      'matches',
+    ],
+    [
+      'language',
+      { languages: ['uz', 'kk'] },
+      'validation_error',
+      'languages',
+      'isIn',
+    ],
+    [
+      'latitude',
+      { mapCenter: { lat: 91, lng: 69 } },
+      'validation_error',
+      'mapCenter.lat',
+      'max',
+    ],
     ['zoom', { mapZoom: 22 }, 'validation_error', 'mapZoom', 'max'],
     ['zoom integer', { mapZoom: 1.5 }, 'validation_error', 'mapZoom', 'isInt'],
-    ['unknown field', { extra: 1 }, 'validation_error', 'extra', 'whitelistValidation'],
-    ['default language', { defaultLanguage: 'en' }, 'invalid_settings', 'defaultLanguage', 'notInLanguages'],
-    ['center outside bounds', { mapCenter: { lat: 40, lng: 69.24 } }, 'invalid_settings', 'mapCenter', 'outsideBounds'],
+    [
+      'unknown field',
+      { extra: 1 },
+      'validation_error',
+      'extra',
+      'whitelistValidation',
+    ],
+    [
+      'default language',
+      { defaultLanguage: 'en' },
+      'invalid_settings',
+      'defaultLanguage',
+      'notInLanguages',
+    ],
+    [
+      'center outside bounds',
+      { mapCenter: { lat: 40, lng: 69.24 } },
+      'invalid_settings',
+      'mapCenter',
+      'outsideBounds',
+    ],
   ])('400 names the field: %s', async (_name, patch, code, field, reason) => {
     const res = await put({ ...VALID, ...patch }).expect(400);
     expect(res.body.code).toBe(code);
-    expect(res.body.errors).toContainEqual(expect.objectContaining({ field, reason }));
+    expect(res.body.errors).toContainEqual(
+      expect.objectContaining({ field, reason }),
+    );
     expect(res.body.message).toContain(`${field}: `);
   });
 

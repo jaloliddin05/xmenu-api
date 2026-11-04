@@ -1,5 +1,10 @@
 import { Controller, Get, Header } from '@nestjs/common';
-import { ApiHeader, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiHeader,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { CustomerPublicRoute } from 'src/modules/auth/decorators/customer-route.decorator';
 import { PaymentConfigService } from 'src/modules/payment/services/payment-config.service';
 import { CurrentTenant } from 'src/modules/tenant/current-tenant.decorator';
@@ -15,7 +20,12 @@ import { OrderSettingsService } from '../services/order-settings.service';
  * Maxfiy narsa yo'q: ommaviy.
  */
 @ApiTags('Checkout config (customer)')
-@ApiHeader({ name: 'X-Tenant-Id', description: 'Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug', required: true })
+@ApiHeader({
+  name: 'X-Tenant-Id',
+  description:
+    'Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug',
+  required: true,
+})
 @CustomerPublicRoute()
 @Controller('checkout-config')
 export class CheckoutConfigController {
@@ -27,16 +37,25 @@ export class CheckoutConfigController {
   @Get()
   @Header('Cache-Control', 'public, max-age=30')
   @Header('Vary', 'X-Tenant-Id')
-  @ApiOperation({ summary: "Savat sozlamalari: yetkazib berish narxi, minimal summa, ETA, to'lov usullari" })
+  @ApiOperation({
+    summary:
+      "Savat sozlamalari: yetkazib berish narxi, minimal summa, ETA, to'lov usullari",
+  })
   @ApiOkResponse({ type: CheckoutConfigDto })
   async get(@CurrentTenant() tenant: Tenant): Promise<CheckoutConfigDto> {
-    const [s, online] = await Promise.all([this.settings.get(tenant.id), this.payments.enabledProviders(tenant.id)]);
+    const [s, online] = await Promise.all([
+      this.settings.get(tenant.id),
+      this.payments.enabledProviders(tenant.id),
+    ]);
     return {
       currency: tenant.currency,
       deliveryServiceFee: s.deliveryServiceFee,
       minOrder: { delivery: s.minOrderDelivery, pickup: s.minOrderPickup },
       etaMinutes: [s.etaMin, s.etaMax],
-      paymentMethods: ['cash', ...(['click', 'payme'] as const).filter((p) => online.has(p))],
+      paymentMethods: [
+        'cash',
+        ...(['click', 'payme'] as const).filter((p) => online.has(p)),
+      ],
     };
   }
 }

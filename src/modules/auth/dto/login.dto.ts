@@ -1,5 +1,5 @@
-import { ApiProperty } from "@nestjs/swagger";
-import { IsString, IsNotEmpty } from "class-validator";
+import { ApiProperty } from '@nestjs/swagger';
+import { IsString, IsNotEmpty } from 'class-validator';
 
 class LoginDto {
   @ApiProperty({
@@ -19,4 +19,4 @@ class LoginDto {
   password: string;
 }
 
-export default LoginDto
+export default LoginDto;

@@ -5,7 +5,9 @@ import type { RedisOptions } from 'ioredis';
  * REDIS_HOST/PORT/PASSWORD — RedisModule bilan bir xil manbalar. Avval
  * bull.config.ts faqat host/port o'qirdi: parolli Redis'da navbatlar ishlamas edi.
  */
-export function bullConnection(env: NodeJS.ProcessEnv = process.env): RedisOptions {
+export function bullConnection(
+  env: NodeJS.ProcessEnv = process.env,
+): RedisOptions {
   if (env.REDIS_URL) {
     const u = new URL(env.REDIS_URL);
     return {
@@ -13,7 +15,10 @@ export function bullConnection(env: NodeJS.ProcessEnv = process.env): RedisOptio
       port: Number(u.port || 6379),
       username: u.username ? decodeURIComponent(u.username) : undefined,
       password: u.password ? decodeURIComponent(u.password) : undefined,
-      db: u.pathname && u.pathname !== '/' ? Number(u.pathname.slice(1)) : undefined,
+      db:
+        u.pathname && u.pathname !== '/'
+          ? Number(u.pathname.slice(1))
+          : undefined,
       tls: u.protocol === 'rediss:' ? {} : undefined,
     };
   }

@@ -57,7 +57,12 @@ export class RevalidateProcessor implements OnModuleDestroy {
     );
 
     this.worker.on('completed', (job) => {
-      this.logger.log(`Done: ${describeRevalidate(job.data ?? {}, job.id)}`);
+      this.logger.log(
+        `Done: ${describeRevalidate(
+          (job.data ?? {}) as Partial<RevalidateJob>,
+          job.id,
+        )}`,
+      );
     });
   }
 

@@ -1,4 +1,10 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { errorMessage } from 'src/infra/helper/error-text';
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { Job, Worker } from 'bullmq';
 import { bullConnection } from 'src/infra/redis/bull-connection';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
@@ -33,12 +39,27 @@ export class RefundProcessor implements OnModuleInit, OnModuleDestroy {
 
   onModuleInit() {
     if (process.env.ORDER_QUEUES === 'off') return;
-    this.worker = new Worker(REFUND_QUEUE, (job) => this.process(job), { connection: bullConnection(), concurrency: 2 });
-    this.worker.on('failed', (job, err) => {
-      const exhausted = job && job.attemptsMade >= (job.opts.attempts ?? 1);
-      this.logger.error(`Refund job ${job?.data?.orderId} failed (${job?.attemptsMade}): ${err.message}`);
-      if (exhausted) void this.ops.alert(`Не удалось вернуть деньги по заказу ${job?.data?.orderId}: ${err.message}. Нужен ручной возврат.`);
-    });
+    this.worker = new Worker<{ orderId: string }>(
+      REFUND_QUEUE,
+      (job) => this.process(job),
+      {
+        connection: bullConnection(),
+        concurrency: 2,
+      },
+    );
+    this.worker.on(
+      'failed',
+      (job: Job<{ orderId: string }> | undefined, err: Error) => {
+        const exhausted = job && job.attemptsMade >= (job.opts.attempts ?? 1);
+        this.logger.error(
+          `Refund job ${job?.data?.orderId} failed (${job?.attemptsMade}): ${errorMessage(err)}`,
+        );
+        if (exhausted)
+          void this.ops.alert(
+            `Не удалось вернуть деньги по заказу ${job?.data?.orderId}: ${errorMessage(err)}. Нужен ручной возврат.`,
+          );
+      },
+    );
   }
 
   async onModuleDestroy() {
@@ -48,7 +69,10 @@ export class RefundProcessor implements OnModuleInit, OnModuleDestroy {
   async process(job: Job<{ orderId: string }>): Promise<void> {
     const order = await this.prisma.customer_order.findUnique({
       where: { id: job.data.orderId },
-      include: { payments: { where: { status: 'paid' } }, customer: { select: { telegram_id: true } } },
+      include: {
+        payments: { where: { status: 'paid' } },
+        customer: { select: { telegram_id: true } },
+      },
     });
     if (!order || order.payment_status !== 'refund_pending') return; // allaqachon hal bo'lgan
 
@@ -56,22 +80,34 @@ export class RefundProcessor implements OnModuleInit, OnModuleDestroy {
     for (const payment of order.payments) {
       if (payment.provider === 'click') {
         const cfg = await this.configs.getClick(order.organization_id);
-        if (!cfg || !payment.provider_payment_id) throw new Error('Click sozlamasi yoki click_paydoc_id yo\'q');
+        if (!cfg || !payment.provider_payment_id)
+          throw new Error("Click sozlamasi yoki click_paydoc_id yo'q");
         await clickReversePayment(cfg, payment.provider_payment_id);
-        await this.prisma.order_payment.update({ where: { id: payment.id }, data: { status: 'refunded', refunded_at: new Date() } });
+        await this.prisma.order_payment.update({
+          where: { id: payment.id },
+          data: { status: 'refunded', refunded_at: new Date() },
+        });
       } else {
         manual = true;
       }
     }
 
     if (manual) {
-      await this.ops.alert(`Заказ №${order.number} (${order.total} сум) отменён после оплаты через Payme — верните деньги вручную в кабинете Payme.`);
+      await this.ops.alert(
+        `Заказ №${order.number} (${order.total} сум) отменён после оплаты через Payme — верните деньги вручную в кабинете Payme.`,
+      );
       return;
     }
 
-    await this.prisma.customer_order.update({ where: { id: order.id }, data: { payment_status: 'refunded' } });
+    await this.prisma.customer_order.update({
+      where: { id: order.id },
+      data: { payment_status: 'refunded' },
+    });
     if (order.customer.telegram_id) {
-      await this.telegram.sendMessage(order.customer.telegram_id, `💸 Деньги за заказ №${order.number} возвращены`);
+      await this.telegram.sendMessage(
+        order.customer.telegram_id,
+        `💸 Деньги за заказ №${order.number} возвращены`,
+      );
     }
   }
 }

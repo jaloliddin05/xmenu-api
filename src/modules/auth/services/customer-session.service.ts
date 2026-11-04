@@ -8,7 +8,10 @@ import { CUSTOMER_AUTH_CONFIG } from '../customer-auth.config';
 import type { CustomerAuthConfig } from '../customer-auth.config';
 import { CustomerTokenService } from './customer-token.service';
 import { CustomerAuthException } from '../errors/customer-auth.exception';
-import { CustomerAuthEventService, RequestCtx } from './customer-auth-event.service';
+import {
+  CustomerAuthEventService,
+  RequestCtx,
+} from './customer-auth-event.service';
 
 type Db = Prisma.TransactionClient | PrismaService;
 
@@ -19,7 +22,8 @@ export interface TokenPair {
 
 const DAY_MS = 86_400_000;
 
-export const sha256 = (value: string) => createHash('sha256').update(value).digest();
+export const sha256 = (value: string) =>
+  createHash('sha256').update(value).digest();
 
 @Injectable()
 export class CustomerSessionService {
@@ -34,7 +38,12 @@ export class CustomerSessionService {
   // ---------- denylist (access'ni darhol bekor qilish) ----------
 
   async denySid(sid: string): Promise<void> {
-    await this.redis.set(`sid:revoked:${sid}`, '1', 'EX', this.cfg.accessTtlSeconds);
+    await this.redis.set(
+      `sid:revoked:${sid}`,
+      '1',
+      'EX',
+      this.cfg.accessTtlSeconds,
+    );
   }
 
   async isSidDenied(sid: string): Promise<boolean> {
@@ -50,7 +59,8 @@ export class CustomerSessionService {
 
   private expiryFor(familyStartedAt: Date): Date {
     const sliding = Date.now() + this.cfg.refreshTtlDays * DAY_MS;
-    const absolute = familyStartedAt.getTime() + this.cfg.sessionAbsoluteDays * DAY_MS;
+    const absolute =
+      familyStartedAt.getTime() + this.cfg.sessionAbsoluteDays * DAY_MS;
     return new Date(Math.min(sliding, absolute));
   }
 
@@ -89,7 +99,12 @@ export class CustomerSessionService {
   private async evictOldFamilies(db: Db, customerId: string) {
     // Faol oila = hali ishlatilmagan, bekor qilinmagan, muddati o'tmagan "barg" qator
     const leaves = await db.customer_session.findMany({
-      where: { customer_id: customerId, used_at: null, revoked_at: null, expires_at: { gt: new Date() } },
+      where: {
+        customer_id: customerId,
+        used_at: null,
+        revoked_at: null,
+        expires_at: { gt: new Date() },
+      },
       orderBy: { family_started_at: 'asc' },
       select: { family_id: true },
     });
@@ -117,7 +132,11 @@ export class CustomerSessionService {
 
   // ---------- refresh ----------
 
-  async refresh(refreshToken: string, tenantId: string, ctx: RequestCtx): Promise<TokenPair> {
+  async refresh(
+    refreshToken: string,
+    tenantId: string,
+    ctx: RequestCtx,
+  ): Promise<TokenPair> {
     const invalid = () => new CustomerAuthException('invalid_refresh_token');
     const now = new Date();
 
@@ -126,10 +145,15 @@ export class CustomerSessionService {
       include: { customer: true },
     });
 
-    if (!session || session.revoked_at || session.expires_at <= now) throw invalid();
+    if (!session || session.revoked_at || session.expires_at <= now)
+      throw invalid();
     // Boshqa tenant tokeni: oilaga tegmaymiz, shunchaki rad etamiz
     if (session.organization_id !== tenantId) throw invalid();
-    if (session.family_started_at.getTime() + this.cfg.sessionAbsoluteDays * DAY_MS <= now.getTime()) {
+    if (
+      session.family_started_at.getTime() +
+        this.cfg.sessionAbsoluteDays * DAY_MS <=
+      now.getTime()
+    ) {
       throw invalid();
     }
 
@@ -154,7 +178,9 @@ export class CustomerSessionService {
         data: { used_at: now },
       });
       if (claimed.count === 0) {
-        const fresh = await this.prisma.customer_session.findUnique({ where: { id: session.id } });
+        const fresh = await this.prisma.customer_session.findUnique({
+          where: { id: session.id },
+        });
         if (!fresh || fresh.revoked_at) throw invalid();
         await this.assertWithinLeeway(fresh, ctx, tenantId);
       }
@@ -175,22 +201,37 @@ export class CustomerSessionService {
       },
     });
 
-    await this.events.log('refresh', ctx, { tenantId, customerId: customer.id, phone: customer.phone });
+    await this.events.log('refresh', ctx, {
+      tenantId,
+      customerId: customer.id,
+      phone: customer.phone,
+    });
 
     return {
-      accessToken: this.tokens.signAccess(customer.id, tenantId, session.family_id),
+      accessToken: this.tokens.signAccess(
+        customer.id,
+        tenantId,
+        session.family_id,
+      ),
       refreshToken: token,
     };
   }
 
   /** Ishlatilgan token: leeway ichida bo'lsa (javob yo'qolgan holat) ruxsat, aks holda o'g'irlik. */
   private async assertWithinLeeway(
-    session: { id: string; family_id: string; used_at: Date | null; revoked_at: Date | null; customer_id: string },
+    session: {
+      id: string;
+      family_id: string;
+      used_at: Date | null;
+      revoked_at: Date | null;
+      customer_id: string;
+    },
     ctx: RequestCtx,
     tenantId: string,
   ) {
     const usedAt = session.used_at?.getTime() ?? 0;
-    const withinLeeway = Date.now() - usedAt <= this.cfg.refreshReuseLeewaySeconds * 1000;
+    const withinLeeway =
+      Date.now() - usedAt <= this.cfg.refreshReuseLeewaySeconds * 1000;
     if (withinLeeway && !session.revoked_at) return;
 
     await this.revokeFamily(session.family_id);
@@ -205,7 +246,11 @@ export class CustomerSessionService {
   // ---------- logout ----------
 
   /** Har doim muvaffaqiyatli (idempotent). Noma'lum / boshqa tenant tokeni e'tiborsiz qoldiriladi. */
-  async logout(refreshToken: string | undefined, tenantId: string, ctx: RequestCtx): Promise<void> {
+  async logout(
+    refreshToken: string | undefined,
+    tenantId: string,
+    ctx: RequestCtx,
+  ): Promise<void> {
     if (!refreshToken) return;
     const session = await this.prisma.customer_session.findUnique({
       where: { token_hash: sha256(refreshToken) },
@@ -213,7 +258,10 @@ export class CustomerSessionService {
     if (!session || session.organization_id !== tenantId) return;
 
     await this.revokeFamily(session.family_id);
-    await this.events.log('logout', ctx, { tenantId, customerId: session.customer_id });
+    await this.events.log('logout', ctx, {
+      tenantId,
+      customerId: session.customer_id,
+    });
   }
 
   // ---------- fon tozalash ----------

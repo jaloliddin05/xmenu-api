@@ -1,3 +1,4 @@
+import type { IConfig } from 'src/config/config.interface';
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { PassportModule } from '@nestjs/passport';
 import { JwtModule } from '@nestjs/jwt';
@@ -47,7 +48,7 @@ import { NoStoreMiddleware } from './middleware/no-store.middleware';
     PrismaModule,
     JwtModule.registerAsync({
       useFactory: (configService: ConfigService) => {
-        const jwtConfig = configService.getOrThrow('jwt');
+        const jwtConfig = configService.getOrThrow<IConfig['jwt']>('jwt');
         return {
           secret: jwtConfig.accessTokenSecret,
           signOptions: { expiresIn: jwtConfig.accessTokenExpiration },

@@ -34,7 +34,9 @@ export class RevalidateService implements OnModuleDestroy {
       const jobId = buildRevalidateJobId(job);
       try {
         await this.queue.remove(jobId);
-      } catch {}
+      } catch {
+        // no queued job with this id: nothing to replace
+      }
       await this.queue.add('revalidate', job, { jobId, delay: 20 * 1000 });
       this.logger.log(`Job added: ${describeRevalidate(job, jobId)}`);
     }

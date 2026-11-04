@@ -50,12 +50,20 @@ export class RateLimitService {
     )) as [number, number];
 
     if (idx > 0) {
-      throw new CustomerAuthException('rate_limited', 'Too many requests', Math.max(1, ttl));
+      throw new CustomerAuthException(
+        'rate_limited',
+        'Too many requests',
+        Math.max(1, ttl),
+      );
     }
   }
 
   /** SMS yuborilmay qolsa hisoblagichlarni qaytarish. */
   async rollback(rules: RateRule[]): Promise<void> {
-    await this.redis.eval(ROLLBACK_LUA, rules.length, ...rules.map((r) => r.key));
+    await this.redis.eval(
+      ROLLBACK_LUA,
+      rules.length,
+      ...rules.map((r) => r.key),
+    );
   }
 }

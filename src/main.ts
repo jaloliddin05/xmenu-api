@@ -40,8 +40,11 @@ async function bootstrap() {
   SwaggerModule.setup('docs', app, document, {
     swaggerOptions: {
       tagsSorter: 'alpha',
-      operationsSorter: function (a, b) {
-        const order = {
+      operationsSorter: function (
+        a: { get(key: string): string },
+        b: { get(key: string): string },
+      ) {
+        const order: Record<string, string> = {
           get: '0',
           post: '1',
           put: '2',
@@ -55,4 +58,4 @@ async function bootstrap() {
 
   await app.listen(process.env.PORT || 4000);
 }
-bootstrap();
+void bootstrap();

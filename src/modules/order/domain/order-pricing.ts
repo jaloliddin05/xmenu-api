@@ -1,13 +1,20 @@
 import { Lang, pickTranslation } from 'src/infra/http/request-helpers';
 import { CustomerAuthException } from 'src/modules/auth/errors/customer-auth.exception';
-import { formatWeight, groupLimits, MenuProductRow, publicFileUrl } from 'src/modules/menu/menu.mapper';
+import {
+  formatWeight,
+  groupLimits,
+  MenuProductRow,
+  publicFileUrl,
+} from 'src/modules/menu/menu.mapper';
 import { toSum } from './order-money';
 
 export const MAX_LINE_QUANTITY = 50;
 /** Cap on one dish across all lines of an order (lines differ by modifiers, so a dish can repeat). */
 export const MAX_ITEM_QUANTITY = 50;
 
-export type PricingProduct = MenuProductRow & { category: { is_active: boolean | null } };
+export type PricingProduct = MenuProductRow & {
+  category: { is_active: boolean | null };
+};
 
 export interface RequestItem {
   itemId: string;
@@ -36,7 +43,12 @@ export interface PricedLine {
   options: PricedOption[];
 }
 
-type Problem = { index: number; itemId: string; reason: string; groupId?: string };
+type Problem = {
+  index: number;
+  itemId: string;
+  reason: string;
+  groupId?: string;
+};
 
 /**
  * So'rov pozitsiyalarini BAZADAGI narxlar bilan hisoblaydi. Mijozdan faqat
@@ -61,31 +73,65 @@ export function priceLines(
 
   items.forEach((item, index) => {
     const p = products.get(item.itemId);
-    const available = p && p.is_active !== false && p.category.is_active !== false;
-    if (!available) unavailable.push({ index, itemId: item.itemId, reason: 'not_available' });
+    const available =
+      p && p.is_active !== false && p.category.is_active !== false;
+    if (!available)
+      unavailable.push({ index, itemId: item.itemId, reason: 'not_available' });
   });
   if (unavailable.length) {
-    throw new CustomerAuthException('item_unavailable', 'Some items are unavailable', undefined, { items: unavailable });
+    throw new CustomerAuthException(
+      'item_unavailable',
+      'Some items are unavailable',
+      undefined,
+      { items: unavailable },
+    );
   }
 
   items.forEach((item, index) => {
-    if (!Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > MAX_LINE_QUANTITY) {
-      throw new CustomerAuthException('invalid_order', `quantity must be 1..${MAX_LINE_QUANTITY}`);
+    if (
+      !Number.isInteger(item.quantity) ||
+      item.quantity < 1 ||
+      item.quantity > MAX_LINE_QUANTITY
+    ) {
+      throw new CustomerAuthException(
+        'invalid_order',
+        `quantity must be 1..${MAX_LINE_QUANTITY}`,
+      );
     }
-    const reason = modifierProblem(products.get(item.itemId)!, item.modifiers ?? []);
+    const reason = modifierProblem(
+      products.get(item.itemId)!,
+      item.modifiers ?? [],
+    );
     if (reason) invalid.push({ index, itemId: item.itemId, ...reason });
   });
   if (invalid.length) {
-    throw new CustomerAuthException('invalid_modifiers', 'Invalid modifiers', undefined, { items: invalid });
+    throw new CustomerAuthException(
+      'invalid_modifiers',
+      'Invalid modifiers',
+      undefined,
+      { items: invalid },
+    );
   }
 
   const perItem = new Map<string, number>();
-  for (const item of items) perItem.set(item.itemId, (perItem.get(item.itemId) ?? 0) + item.quantity);
-  const tooMany = [...perItem].filter(([, quantity]) => quantity > MAX_ITEM_QUANTITY);
+  for (const item of items)
+    perItem.set(item.itemId, (perItem.get(item.itemId) ?? 0) + item.quantity);
+  const tooMany = [...perItem].filter(
+    ([, quantity]) => quantity > MAX_ITEM_QUANTITY,
+  );
   if (tooMany.length) {
-    throw new CustomerAuthException('invalid_order', `at most ${MAX_ITEM_QUANTITY} of one item per order`, undefined, {
-      items: tooMany.map(([itemId, quantity]) => ({ itemId, quantity, max: MAX_ITEM_QUANTITY })),
-    });
+    throw new CustomerAuthException(
+      'invalid_order',
+      `at most ${MAX_ITEM_QUANTITY} of one item per order`,
+      undefined,
+      {
+        items: tooMany.map(([itemId, quantity]) => ({
+          itemId,
+          quantity,
+          max: MAX_ITEM_QUANTITY,
+        })),
+      },
+    );
   }
 
   const lines: PricedLine[] = items.map((item, position) => {
@@ -95,16 +141,20 @@ export function priceLines(
 
     // Guruhlar va variantlar BAZADAGI tartibda yoziladi (so'rov tartibida emas).
     for (const group of p.additional_product_groups) {
-      const chosen = new Set(item.modifiers?.find((m) => m.groupId === group.id)?.optionIds ?? []);
+      const chosen = new Set(
+        item.modifiers?.find((m) => m.groupId === group.id)?.optionIds ?? [],
+      );
       for (const option of group.additional_products) {
         if (!chosen.has(option.id)) continue;
         const price = toSum(option.price);
         addons += price;
         options.push({
           groupId: group.id,
-          groupTitle: pickTranslation(group.translations, lang, fallback)?.title ?? '',
+          groupTitle:
+            pickTranslation(group.translations, lang, fallback)?.title ?? '',
           optionId: option.id,
-          name: pickTranslation(option.translations, lang, fallback)?.title ?? '',
+          name:
+            pickTranslation(option.translations, lang, fallback)?.title ?? '',
           price,
           position: options.length,
         });
@@ -125,35 +175,51 @@ export function priceLines(
     };
   });
 
-  return { lines, subtotal: lines.reduce((sum, l) => sum + l.unitPrice * l.quantity, 0) };
+  return {
+    lines,
+    subtotal: lines.reduce((sum, l) => sum + l.unitPrice * l.quantity, 0),
+  };
 }
 
 function modifierProblem(
   product: PricingProduct,
   modifiers: { groupId: string; optionIds: string[] }[],
 ): { reason: string; groupId?: string } | null {
-  const groups = new Map(product.additional_product_groups.filter((g) => g.additional_products.length > 0).map((g) => [g.id, g]));
+  const groups = new Map(
+    product.additional_product_groups
+      .filter((g) => g.additional_products.length > 0)
+      .map((g) => [g.id, g]),
+  );
   const seen = new Set<string>();
 
   for (const m of modifiers) {
     const group = groups.get(m.groupId);
     if (!group) return { reason: 'unknown_group', groupId: m.groupId };
-    if (seen.has(m.groupId)) return { reason: 'duplicate_group', groupId: m.groupId };
+    if (seen.has(m.groupId))
+      return { reason: 'duplicate_group', groupId: m.groupId };
     seen.add(m.groupId);
 
     const ids = new Set<string>();
     for (const id of m.optionIds) {
-      if (!group.additional_products.some((o) => o.id === id)) return { reason: 'unknown_option', groupId: m.groupId };
-      if (ids.has(id)) return { reason: 'duplicate_option', groupId: m.groupId };
+      if (!group.additional_products.some((o) => o.id === id))
+        return { reason: 'unknown_option', groupId: m.groupId };
+      if (ids.has(id))
+        return { reason: 'duplicate_option', groupId: m.groupId };
       ids.add(id);
     }
   }
 
   for (const group of groups.values()) {
-    const count = modifiers.find((m) => m.groupId === group.id)?.optionIds.length ?? 0;
-    const { required, min, max } = groupLimits(group, group.additional_products.length);
-    if (required && count === 0) return { reason: 'missing_required', groupId: group.id };
-    if (count > 0 && count < min) return { reason: 'below_min', groupId: group.id };
+    const count =
+      modifiers.find((m) => m.groupId === group.id)?.optionIds.length ?? 0;
+    const { required, min, max } = groupLimits(
+      group,
+      group.additional_products.length,
+    );
+    if (required && count === 0)
+      return { reason: 'missing_required', groupId: group.id };
+    if (count > 0 && count < min)
+      return { reason: 'below_min', groupId: group.id };
     if (count > max) return { reason: 'above_max', groupId: group.id };
   }
   return null;

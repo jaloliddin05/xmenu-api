@@ -20,13 +20,21 @@ export class CustomerService {
   }
 
   async getMe(tenantId: string, customerId: string): Promise<CustomerUser> {
-    const customer = await this.customerRepository.findById(tenantId, customerId);
+    const customer = await this.customerRepository.findById(
+      tenantId,
+      customerId,
+    );
     if (!customer) throw new NotFoundException('Customer not found');
-    if (customer.status === 'blocked') throw new CustomerAuthException('customer_blocked');
+    if (customer.status === 'blocked')
+      throw new CustomerAuthException('customer_blocked');
     return this.toUser(customer);
   }
 
-  async updateMe(tenantId: string, customerId: string, dto: UpdateCustomerDto): Promise<CustomerUser> {
+  async updateMe(
+    tenantId: string,
+    customerId: string,
+    dto: UpdateCustomerDto,
+  ): Promise<CustomerUser> {
     const name = normalizeCustomerName(dto.name);
     if (!name) throw new CustomerAuthException('invalid_name');
 

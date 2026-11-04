@@ -98,7 +98,9 @@ describe('sendCustomerOtpSms', () => {
   it('rejects without leaking the bot token when Telegram is unreachable', async () => {
     const { otpBot, sendMessage } = loadWithMockedBot();
     sendMessage.post.mockRejectedValueOnce(
-      new Error(`connect ETIMEDOUT https://api.telegram.org/bot${OTP_BOT}/sendMessage`),
+      new Error(
+        `connect ETIMEDOUT https://api.telegram.org/bot${OTP_BOT}/sendMessage`,
+      ),
     );
 
     const result = otpBot.sendCustomerOtpSms('+998901234567', 'any text');
@@ -129,23 +131,32 @@ describe('sendApplicationToTelegram', () => {
 
   it('makes no external call when the bot is not configured', async () => {
     const { otpBot, post } = load({});
-    await expect(otpBot.sendApplicationToTelegram({ fullName: 'A' })).resolves.toBe(false);
+    await expect(
+      otpBot.sendApplicationToTelegram({ fullName: 'A' }),
+    ).resolves.toBe(false);
     expect(post).not.toHaveBeenCalled();
   });
 
   it('makes no external call when only the token or only the chat is set', async () => {
     const a = load({ OTP_BOT });
-    await expect(a.otpBot.sendApplicationToTelegram({ fullName: 'A' })).resolves.toBe(false);
+    await expect(
+      a.otpBot.sendApplicationToTelegram({ fullName: 'A' }),
+    ).resolves.toBe(false);
     expect(a.post).not.toHaveBeenCalled();
     const b = load({ XMENU_CHAT_ID: '-1001' });
-    await expect(b.otpBot.sendApplicationToTelegram({ fullName: 'A' })).resolves.toBe(false);
+    await expect(
+      b.otpBot.sendApplicationToTelegram({ fullName: 'A' }),
+    ).resolves.toBe(false);
     expect(b.post).not.toHaveBeenCalled();
   });
 
   it('sends plain text: _ * [ in the name go through unescaped and without parse_mode', async () => {
     const { otpBot, post } = load({ OTP_BOT, XMENU_CHAT_ID: '-1001' });
     await expect(
-      otpBot.sendApplicationToTelegram({ fullName: 'Ali_Baba *Cafe* [x](y)', phone: '+998901234567' }),
+      otpBot.sendApplicationToTelegram({
+        fullName: 'Ali_Baba *Cafe* [x](y)',
+        phone: '+998901234567',
+      }),
     ).resolves.toBe(true);
     const body = post.mock.calls[0][1];
     expect(body.text).toContain('Ali_Baba *Cafe* [x](y)');
@@ -155,7 +166,11 @@ describe('sendApplicationToTelegram', () => {
 
   it('rejects without the bot token when Telegram is unreachable', async () => {
     const { otpBot, post } = load({ OTP_BOT, XMENU_CHAT_ID: '-1001' });
-    post.mockRejectedValueOnce(new Error(`connect ETIMEDOUT https://api.telegram.org/bot${OTP_BOT}/sendMessage`));
+    post.mockRejectedValueOnce(
+      new Error(
+        `connect ETIMEDOUT https://api.telegram.org/bot${OTP_BOT}/sendMessage`,
+      ),
+    );
     const result = otpBot.sendApplicationToTelegram({ fullName: 'A' });
     await expect(result).rejects.toThrow('Telegram sendMessage failed');
     await expect(result).rejects.not.toThrow(OTP_BOT);

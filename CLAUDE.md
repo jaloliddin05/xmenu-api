@@ -9,7 +9,7 @@ Swagger (`/docs`), Jest. Prettier: одинарные кавычки, trailing c
 Комментарии частично на узбекском, документация на русском; новые комментарии на английском.
 
 ## Команды
-`npm run start:dev` · `npm run build` · `npm run lint` (только отчёт) · `npm run lint:fix` · `npm test` ·
+`npm run start:dev` · `npm run build` · `npm run lint` · `npm run format:check` · `npm run format` · `npm run lint:fix` · `npm test` ·
 `npm run test:e2e` · `npm run openapi`
 (`openapi` собирает проект и пишет `docs/openapi.json` из сборки, без БД и Redis; `docs/API.md` правится руками).
 Миграции: `npm run migrate` (собирает схему и запускает `prisma migrate dev`), на сервере `npx prisma migrate deploy`.
@@ -40,7 +40,7 @@ Env: см. `.env.example` (полный). Ключевые: `JWT_*`, `OTP_*`, `S
 Единое место: `docs/API.md` и `docs/openapi.json`. Подробности: `docs/ORDERS_API.md`, `docs/BRANCHES_API.md`,
 `docs/BACKEND_ORDERS.md`, `docs/TELEGRAM_VERIFICATION.md`. Меняешь контроллер или DTO: добавь `@ApiProperty` и
 `@ApiOperation`, запусти `npm run openapi`, закоммить результат вместе с кодом. `.github/workflows/ci.yml` (build,
-test, `npm run openapi` + `git diff --exit-code docs/`, lint без блокировки) проверяет это на PR; на GitHub запускался: на `main` 2026-10-31 `41178755985`, `41181531000` (упали на `npm ci`, lock-файл не совпадал с `package.json`), `41185810185` и 2026-11-03 `41597505450` (упал тест `organization-publication.controller.http.spec.ts`, `ECONNRESET`; исправлено в PR #1 (`fix/wave4-followups`, влит в `main`, `ci.yml` зелёный: `41667043527`), тестовое приложение слушает один порт вместо сервера на запрос). Шаги: чистая БД `migrate deploy`, `migrate diff` без расхождений, `scripts/check-migration-upgrade.sh`, build, test, openapi); `deploy.yml` отдельный и без проверок, запускается только вручную (`workflow_dispatch`), см. «Деплой».
+test, `npm run openapi` + `git diff --exit-code docs/`, `format:check` и `lint` блокирующие) проверяет это на PR; на GitHub запускался: на `main` 2026-10-31 `41178755985`, `41181531000` (упали на `npm ci`, lock-файл не совпадал с `package.json`), `41185810185` и 2026-11-03 `41597505450` (упал тест `organization-publication.controller.http.spec.ts`, `ECONNRESET`; исправлено в PR #1 (`fix/wave4-followups`, влит в `main`, `ci.yml` зелёный: `41667043527`), тестовое приложение слушает один порт вместо сервера на запрос). Шаги: чистая БД `migrate deploy`, `migrate diff` без расхождений, `scripts/check-migration-upgrade.sh`, build, test, openapi); `deploy.yml` отдельный и без проверок, запускается только вручную (`workflow_dispatch`), см. «Деплой».
 Локально те же шаги: временные БД (`createdb xmenu_ci`, `xmenu_ci_shadow`, `xmenu_upgrade`), `DATABASE_URL=… npx prisma migrate deploy`, `npx prisma migrate diff --from-url $DATABASE_URL --to-schema-datamodel prisma/schema.prisma --exit-code`, `DATABASE_URL=<пустая БД> scripts/check-migration-upgrade.sh`, затем `npm run build`, `npm test`, `npm run openapi && git diff --exit-code docs/`. В Windows psql принимает URL только через `--dbname=`.
 
 ## Тенантность
@@ -193,14 +193,17 @@ Payme), Telegram webhook и кнопки, боты заведений (`PUT /tel
   (недоступны никому); можно удалить вручную.
 - Кэш тенанта и настроек заказа в памяти процесса (30 с): после `PUT` другие процессы pm2 видят старые имя, slug,
   язык, валюту и зону до 30 с. `is_active` через API не меняется (только в БД), сброса для него нет.
-- `npm run lint` (без `--fix`) не проходит (замер 2026-11-03: 196 ошибок правил `recommendedTypeChecked` (нетипизированный
-  `@Req() req`, `any` из конфигов и passport, код заказов и платежей) и 535 `prettier/prettier` в старом коде; в клоне с
-  `core.autocrlf=true` prettier добавляет ещё ~12 тыс. `␍`), в CI lint запускается без блокировки (отчёт).
-  Файлы, добавленные волной 3, отформатированы; в них остаются 3 ошибки правил (`no-unsafe-*`, `no-unused-vars`)
-  в `create-organization.dto.ts` и `update-organization.dto.ts`. Для `*.spec.ts` и `*.fake.ts` правила `no-unsafe-*` и
-  `require-await` выключены.
-  `.gitattributes` (`eol=lf`) добавлен; рабочая копия, выгруженная раньше с `core.autocrlf=true`, остаётся в CRLF,
-  пока файлы не перевыгрузить (`git rm --cached -r . && git reset --hard` на чистом дереве).
+- Форматирование и линт блокируют CI (`npm run format:check`, `npm run lint`; ноль ошибок и предупреждений).
+  Prettier по `.prettierrc`, `npm run format` перед коммитом; `lint:fix` только для автоисправляемого. `eslint-disable` на
+  весь файл не используем; строчные исключения только с причиной в комментарии. Послабления правил лежат в
+  `eslint.config.mjs` с обоснованием (`no-explicit-any` выключен для старого кода; в `*.spec.ts`, `*.fake.ts` и `test/` выключены
+  `no-unsafe-*`, `require-await`, `unbound-method`; аргументы с `_` в начале разрешены неиспользуемыми). Типы на границах
+  (`@Req()` на маршрутах владельца: `StaffRequest` из `infra/http/request-helpers.ts`; `catch`: `errorMessage`/`errorStack` из
+  `infra/helper/error-text.ts`) вместо `any`.
+- Массовый коммит форматирования (`style: format with prettier`) записан в `.git-blame-ignore-revs`; чтобы `git blame`
+  его пропускал: `git config blame.ignoreRevsFile .git-blame-ignore-revs` (GitHub читает файл сам).
+- `.gitattributes` (`eol=lf`): рабочая копия, выгруженная раньше с `core.autocrlf=true`, остаётся в CRLF, пока файлы не
+  перевыгрузить (`git rm --cached -r . && git reset --hard` на чистом дереве); иначе prettier видит `␍`.
 
 ## Деплой (когда появится прод)
 `.github/workflows/deploy.yml` запускается только вручную (`workflow_dispatch`): сервера и прода нет, а прежний триггер

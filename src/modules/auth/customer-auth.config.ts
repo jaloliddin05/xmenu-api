@@ -31,7 +31,9 @@ function int(name: string, def: number): number {
   if (raw === undefined || raw === '') return def;
   const n = Number(raw);
   if (!Number.isInteger(n) || n <= 0) {
-    throw new Error(`${name} musbat butun son bo'lishi kerak (hozir: "${raw}")`);
+    throw new Error(
+      `${name} musbat butun son bo'lishi kerak (hozir: "${raw}")`,
+    );
   }
   return n;
 }
@@ -39,7 +41,9 @@ function int(name: string, def: number): number {
 function secret(name: string, isProd: boolean): string {
   const v = process.env[name];
   if (!v) {
-    throw new Error(`${name} env o'zgaruvchisi majburiy (mijoz autentifikatsiyasi uchun)`);
+    throw new Error(
+      `${name} env o'zgaruvchisi majburiy (mijoz autentifikatsiyasi uchun)`,
+    );
   }
   if (isProd && v.length < 32) {
     throw new Error(`${name} production'da kamida 32 belgi bo'lishi kerak`);
@@ -52,11 +56,13 @@ export function loadCustomerAuthConfig(): CustomerAuthConfig {
   const otpDevMode = process.env.OTP_DEV_MODE === 'true';
 
   if (otpDevMode && isProd) {
-    throw new Error('OTP_DEV_MODE=true bilan NODE_ENV=production da ishga tushmaydi');
+    throw new Error(
+      'OTP_DEV_MODE=true bilan NODE_ENV=production da ishga tushmaydi',
+    );
   }
   if (otpDevMode) {
     new Logger('CustomerAuthConfig').warn(
-      'OTP_DEV_MODE yoqilgan: SMS yuborilmaydi, kod har doim 123456... bo\'ladi',
+      "OTP_DEV_MODE yoqilgan: SMS yuborilmaydi, kod har doim 123456... bo'ladi",
     );
   }
 
@@ -65,11 +71,18 @@ export function loadCustomerAuthConfig(): CustomerAuthConfig {
   const otpHmacSecret = secret('OTP_HMAC_SECRET', isProd);
 
   if (accessSecret === registrationSecret) {
-    throw new Error('JWT_CUSTOMER_ACCESS_SECRET va JWT_CUSTOMER_REGISTRATION_SECRET har xil bo\'lishi kerak');
+    throw new Error(
+      "JWT_CUSTOMER_ACCESS_SECRET va JWT_CUSTOMER_REGISTRATION_SECRET har xil bo'lishi kerak",
+    );
   }
   const staffSecrets = [process.env.JWT_ACCESS_TOKEN_SECRET].filter(Boolean);
-  if (staffSecrets.includes(accessSecret) || staffSecrets.includes(registrationSecret)) {
-    throw new Error('Mijoz JWT secretlari xodimlar (user) secretlaridan farq qilishi kerak');
+  if (
+    staffSecrets.includes(accessSecret) ||
+    staffSecrets.includes(registrationSecret)
+  ) {
+    throw new Error(
+      'Mijoz JWT secretlari xodimlar (user) secretlaridan farq qilishi kerak',
+    );
   }
 
   const locale = process.env.SMS_LOCALE === 'ru' ? 'ru' : 'uz';
@@ -90,7 +103,10 @@ export function loadCustomerAuthConfig(): CustomerAuthConfig {
     refreshReuseLeewaySeconds: int('REFRESH_REUSE_LEEWAY_SECONDS', 10),
     maxActiveFamilies: 10,
     smsLocale: locale,
-    telegramInitDataMaxAgeSeconds: int('TELEGRAM_INITDATA_MAX_AGE_SECONDS', 86400),
+    telegramInitDataMaxAgeSeconds: int(
+      'TELEGRAM_INITDATA_MAX_AGE_SECONDS',
+      86400,
+    ),
     telegramVerifyTtlSeconds: int('TELEGRAM_VERIFY_TTL_SECONDS', 300),
   };
 }

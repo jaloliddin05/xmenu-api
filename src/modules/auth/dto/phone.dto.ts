@@ -10,7 +10,7 @@ class PhoneDto {
   })
   @IsNotEmpty()
   @IsString()
-  @Transform(({ value }) => formatPhoneNumber(value))
+  @Transform(({ value }) => formatPhoneNumber(value as string))
   phone: string;
 }
 

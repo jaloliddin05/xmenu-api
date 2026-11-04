@@ -7,7 +7,10 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Response } from 'express';
-import { CustomerAuthException, CustomerErrorCode } from './customer-auth.exception';
+import {
+  CustomerAuthException,
+  CustomerErrorCode,
+} from './customer-auth.exception';
 
 /**
  * Faqat mijoz endpointlarida ishlaydi (controller darajasida ulangan).
@@ -30,22 +33,34 @@ export class CustomerExceptionFilter implements ExceptionFilter {
     if (exception instanceof CustomerAuthException) {
       status = exception.getStatus();
       code = exception.code;
-      message = exception.message === exception.code ? exception.code : exception.message;
+      message =
+        exception.message === exception.code
+          ? exception.code
+          : exception.message;
       retryAfter = exception.retryAfter;
       details = exception.details;
     } else if (exception instanceof BadRequestException) {
       status = 400;
       code = 'validation_error';
-      const r: any = exception.getResponse();
-      message = Array.isArray(r?.message) ? r.message.join('; ') : (r?.message ?? 'Validation failed');
+      const r = exception.getResponse() as
+        | { message?: string | string[] }
+        | undefined;
+      message = Array.isArray(r?.message)
+        ? r.message.join('; ')
+        : (r?.message ?? 'Validation failed');
       // Same per-field list as the owner API ({ field, reason, message }), see createValidationPipe
       const errors: unknown = (r as { errors?: unknown } | undefined)?.errors;
       if (Array.isArray(errors)) details = { errors };
     } else if (exception instanceof HttpException) {
       status = exception.getStatus();
-      const r: any = exception.getResponse();
+      const r = exception.getResponse() as string | { message?: string };
       message = typeof r === 'string' ? r : (r?.message ?? exception.message);
-      code = status === 401 ? 'invalid_token' : status === 429 ? 'rate_limited' : 'validation_error';
+      code =
+        status === 401
+          ? 'invalid_token'
+          : status === 429
+            ? 'rate_limited'
+            : 'validation_error';
     } else {
       this.logger.error(
         exception instanceof Error ? exception.message : String(exception),
@@ -54,7 +69,8 @@ export class CustomerExceptionFilter implements ExceptionFilter {
     }
 
     res.setHeader('Cache-Control', 'no-store');
-    if (retryAfter !== undefined) res.setHeader('Retry-After', String(retryAfter));
+    if (retryAfter !== undefined)
+      res.setHeader('Retry-After', String(retryAfter));
 
     const error: Record<string, unknown> = { code, message };
     if (retryAfter !== undefined) error.retryAfter = retryAfter;

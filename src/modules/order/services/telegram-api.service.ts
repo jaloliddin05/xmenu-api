@@ -22,33 +22,65 @@ export class TelegramApiService {
   private warned = false;
 
   private get token(): string | undefined {
-    return process.env.TELEGRAM_ORDERS_BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN;
+    return (
+      process.env.TELEGRAM_ORDERS_BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN
+    );
   }
 
-  private async call<T>(method: string, payload: Record<string, unknown>): Promise<T | null> {
+  private async call<T>(
+    method: string,
+    payload: Record<string, unknown>,
+  ): Promise<T | null> {
     const token = this.token;
     if (!token) {
       if (!this.warned) {
-        this.logger.warn('TELEGRAM_BOT_TOKEN sozlanmagan — Telegram xabarnomalari o\'chirilgan');
+        this.logger.warn(
+          "TELEGRAM_BOT_TOKEN sozlanmagan — Telegram xabarnomalari o'chirilgan",
+        );
         this.warned = true;
       }
       return null;
     }
     try {
-      const { data } = await axios.post(`https://api.telegram.org/bot${token}/${method}`, payload, { timeout: 8000 });
+      const { data } = await axios.post<{ result?: T }>(
+        `https://api.telegram.org/bot${token}/${method}`,
+        payload,
+        { timeout: 8000 },
+      );
       return (data?.result ?? null) as T | null;
-    } catch (e: any) {
+    } catch (e) {
+      const err = e as {
+        response?: { data?: { description?: string } };
+        code?: string;
+      };
       // Token URL'da — xato matniga tushib qolmasligi uchun faqat Telegram javobini loglaymiz.
-      this.logger.warn(`${method} failed: ${e?.response?.data?.description ?? e?.code ?? 'unknown error'}`);
+      this.logger.warn(
+        `${method} failed: ${err?.response?.data?.description ?? err?.code ?? 'unknown error'}`,
+      );
       return null;
     }
   }
 
-  sendMessage(chatId: string | number, text: string, extra: Record<string, unknown> = {}) {
-    return this.call<TelegramMessageResult>('sendMessage', { chat_id: chatId, text, parse_mode: 'HTML', disable_web_page_preview: true, ...extra });
+  sendMessage(
+    chatId: string | number,
+    text: string,
+    extra: Record<string, unknown> = {},
+  ) {
+    return this.call<TelegramMessageResult>('sendMessage', {
+      chat_id: chatId,
+      text,
+      parse_mode: 'HTML',
+      disable_web_page_preview: true,
+      ...extra,
+    });
   }
 
-  editMessageText(chatId: string | number, messageId: number, text: string, replyMarkup: unknown | null) {
+  editMessageText(
+    chatId: string | number,
+    messageId: number,
+    text: string,
+    replyMarkup: unknown,
+  ) {
     return this.call('editMessageText', {
       chat_id: chatId,
       message_id: messageId,
@@ -61,6 +93,10 @@ export class TelegramApiService {
   }
 
   answerCallbackQuery(callbackQueryId: string, text?: string) {
-    return this.call('answerCallbackQuery', { callback_query_id: callbackQueryId, text, show_alert: false });
+    return this.call('answerCallbackQuery', {
+      callback_query_id: callbackQueryId,
+      text,
+      show_alert: false,
+    });
   }
 }

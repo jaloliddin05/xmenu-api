@@ -1,3 +1,5 @@
+import { Prisma } from '@prisma/client';
+import { errorMessage } from 'src/infra/helper/error-text';
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
 import { maskPhone } from 'src/infra/helper/auth/customer-validators';
@@ -32,7 +34,12 @@ export class CustomerAuthEventService {
   async log(
     type: AuthEventType,
     ctx: RequestCtx,
-    data: { tenantId?: string; customerId?: string; phone?: string; meta?: Record<string, unknown> } = {},
+    data: {
+      tenantId?: string;
+      customerId?: string;
+      phone?: string;
+      meta?: Record<string, unknown>;
+    } = {},
   ): Promise<void> {
     const phone_masked = maskPhone(data.phone);
     this.logger.log(
@@ -53,12 +60,12 @@ export class CustomerAuthEventService {
           phone_masked,
           ip: ctx.ip || null,
           user_agent: ctx.userAgent || null,
-          meta: (data.meta as any) ?? undefined,
+          meta: data.meta as Prisma.InputJsonObject | undefined,
         },
       });
-    } catch (err: any) {
+    } catch (err) {
       // Audit yozuvi xatosi autentifikatsiyani buzmasligi kerak
-      this.logger.warn(`audit yozilmadi: ${err?.message}`);
+      this.logger.warn(`audit yozilmadi: ${errorMessage(err)}`);
     }
   }
 }
