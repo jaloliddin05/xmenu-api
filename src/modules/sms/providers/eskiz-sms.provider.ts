@@ -17,9 +17,13 @@ export class EskizSmsProvider implements SmsProvider {
       throw new Error('ESKIZ_EMAIL / ESKIZ_PASSWORD sozlanmagan');
 
     const form = new URLSearchParams({ email, password });
-    const res = await axios.post(`${BASE}/auth/login`, form, {
-      timeout: TIMEOUT_MS,
-    });
+    const res = await axios.post<{ data?: { token?: string } }>(
+      `${BASE}/auth/login`,
+      form,
+      {
+        timeout: TIMEOUT_MS,
+      },
+    );
     const token = res.data?.data?.token;
     if (!token) throw new Error('Eskiz login: token qaytmadi');
     this.token = token;
@@ -42,16 +46,20 @@ export class EskizSmsProvider implements SmsProvider {
     const token = this.token ?? (await this.login());
     try {
       await this.post(phone, text, token);
-    } catch (err: any) {
+    } catch (err) {
+      const e = err as {
+        response?: { status?: number };
+        message?: string;
+      } | null;
       // Token eskirgan bo'lsa — bir marta qayta login, so'ng yana yuboriladi
       // (birinchi so'rov 401 bilan rad etilgani uchun SMS ketmagan).
-      if (err?.response?.status === 401) {
+      if (e?.response?.status === 401) {
         const fresh = await this.login();
         await this.post(phone, text, fresh);
         return;
       }
       this.logger.error(
-        `Eskiz xatosi: status=${err?.response?.status ?? 'n/a'} ${err?.message}`,
+        `Eskiz xatosi: status=${e?.response?.status ?? 'n/a'} ${e?.message}`,
       );
       throw err;
     }

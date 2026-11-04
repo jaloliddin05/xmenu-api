@@ -30,7 +30,7 @@ export function resolveSmsProviderName(
   imports: [
     HttpModule.registerAsync({
       imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
+      useFactory: (configService: ConfigService) => ({
         timeout: configService.get('HTTP_TIMEOUT'),
         maxRedirects: configService.get('HTTP_MAX_REDIRECTS'),
       }),

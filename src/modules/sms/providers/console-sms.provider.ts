@@ -6,10 +6,13 @@ import { SmsProvider } from './sms-provider.interface';
 export class ConsoleSmsProvider implements SmsProvider {
   private readonly logger = new Logger('ConsoleSms');
 
-  async send(phone: string, text: string): Promise<void> {
+  send(phone: string, text: string): Promise<void> {
     if (process.env.NODE_ENV === 'production') {
-      throw new Error("ConsoleSmsProvider production'da ishlatilmaydi");
+      return Promise.reject(
+        new Error("ConsoleSmsProvider production'da ishlatilmaydi"),
+      );
     }
     this.logger.log(`[DEV SMS] ${phone}: ${text}`);
+    return Promise.resolve();
   }
 }

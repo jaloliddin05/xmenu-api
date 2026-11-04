@@ -7,7 +7,7 @@ export const redisConfig: RedisOptions = bullConnection();
 
 @Injectable()
 export class BullConfigService implements OnModuleDestroy {
-  async onModuleDestroy() {
+  onModuleDestroy() {
     console.log('🧹 Gracefully shutting down BullMQ...');
   }
 }

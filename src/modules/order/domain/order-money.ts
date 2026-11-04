@@ -29,7 +29,7 @@ export function parseZone(value: unknown): [number, number][] | null {
     ) {
       return null;
     }
-    points.push([p[0], p[1]]);
+    points.push([p[0] as number, p[1] as number]);
   }
   return points;
 }

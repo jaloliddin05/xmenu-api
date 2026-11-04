@@ -15,7 +15,7 @@ export function parsePaginationQuery({ key, value }: TransformFnParams) {
 }
 
 export function parseNumberQuery({ key, value }: TransformFnParams) {
-  const float = parseFloat(value);
+  const float = parseFloat(value as string);
   if (isNaN(float)) {
     throw new BadRequestException(`${key} should be a number.`);
   }

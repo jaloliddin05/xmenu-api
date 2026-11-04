@@ -270,8 +270,8 @@ export class PaymeProtocol {
     const tx = await this.store.createTx(
       order.id,
       p.id,
-      p.amount,
-      p.time ?? this.now(),
+      p.amount as number,
+      (p.time as number | undefined) ?? this.now(),
     );
     return {
       create_time: tx.createTime,
@@ -350,7 +350,7 @@ export class PaymeProtocol {
   private async statement(p: Record<string, any>) {
     if (!Number.isFinite(p.from) || !Number.isFinite(p.to))
       throw new PaymeRpcError(PAYME_ERROR.INVALID_REQUEST);
-    const list = await this.store.statement(p.from, p.to);
+    const list = await this.store.statement(p.from as number, p.to as number);
     return {
       transactions: list.map((tx) => ({
         id: tx.id,

@@ -48,7 +48,7 @@ export class OrganizationService {
       where: { owner_id },
     });
 
-    const type = parseOrganizationType(data.type);
+    const type = parseOrganizationType(data.type as string);
     const slug = await this.generateUniqueSlug(data.name, existingOrg?.id, tx);
 
     // 🔁 agar organization allaqachon bor bo‘lsa — update qilamiz
