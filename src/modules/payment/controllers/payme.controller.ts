@@ -1,3 +1,4 @@
+import { errorStack } from 'src/infra/helper/error-text';
 import { SkipPublicRateLimit } from 'src/infra/http/public-rate-limit';
 import {
   Body,
@@ -72,8 +73,8 @@ export class PaymeController {
       return await new PaymeProtocol(
         new PrismaPaymeStore(this.prisma, this.transitions, org.id),
       ).handle(body);
-    } catch (e: any) {
-      this.logger.error(`${body?.method} failed: ${e?.stack ?? e}`);
+    } catch (e) {
+      this.logger.error(`${body?.method} failed: ${errorStack(e)}`);
       return err(PAYME_ERROR.SYSTEM_ERROR);
     }
   }

@@ -1,3 +1,4 @@
+import { errorMessage } from 'src/infra/helper/error-text';
 import {
   Inject,
   Injectable,
@@ -43,13 +44,17 @@ export class EscalationProcessor implements OnModuleInit, OnModuleDestroy {
       );
       return;
     }
-    this.worker = new Worker(ESCALATION_QUEUE, (job) => this.process(job), {
-      connection: bullConnection(),
-      concurrency: 5,
-    });
+    this.worker = new Worker<{ orderId: string }>(
+      ESCALATION_QUEUE,
+      (job) => this.process(job),
+      {
+        connection: bullConnection(),
+        concurrency: 5,
+      },
+    );
     this.worker.on('failed', (job, err) =>
       this.logger.error(
-        `Job ${job?.name} (${job?.data?.orderId}) failed: ${err.message}`,
+        `Job ${job?.name} (${job?.data?.orderId}) failed: ${errorMessage(err)}`,
       ),
     );
   }

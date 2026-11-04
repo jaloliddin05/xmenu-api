@@ -1,3 +1,4 @@
+import { errorStack } from 'src/infra/helper/error-text';
 import { SkipPublicRateLimit } from 'src/infra/http/public-rate-limit';
 import {
   Body,
@@ -76,8 +77,8 @@ export class TelegramOrdersController {
     if (cq) {
       try {
         await this.handleCallback(cq);
-      } catch (e: any) {
-        this.logger.error(`callback failed: ${e?.stack ?? e}`);
+      } catch (e) {
+        this.logger.error(`callback failed: ${errorStack(e)}`);
         await this.telegram.answerCallbackQuery(
           cq.id,
           'Ошибка, попробуйте ещё раз',

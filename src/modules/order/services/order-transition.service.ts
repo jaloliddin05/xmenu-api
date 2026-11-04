@@ -1,3 +1,4 @@
+import { errorMessage } from 'src/infra/helper/error-text';
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma, customer_order } from '@prisma/client';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
@@ -254,9 +255,9 @@ export class OrderTransitionService {
             await this.queues.enqueueRefund(order.id);
             break;
         }
-      } catch (e: any) {
+      } catch (e) {
         this.logger.error(
-          `Effect ${effect.type} (order ${order.number}) failed: ${e?.message ?? e}`,
+          `Effect ${effect.type} (order ${order.number}) failed: ${errorMessage(e)}`,
         );
       }
     }

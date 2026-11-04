@@ -1,3 +1,4 @@
+import { errorStack } from 'src/infra/helper/error-text';
 import {
   Body,
   Controller,
@@ -79,8 +80,8 @@ export class ClickController {
         cfg,
       );
       return await protocol.handle(action, body ?? {});
-    } catch (e: any) {
-      this.logger.error(`${action} failed: ${e?.stack ?? e}`);
+    } catch (e) {
+      this.logger.error(`${action} failed: ${errorStack(e)}`);
       return fail(CLICK_ERROR.FAILED_TO_UPDATE, 'Failed to update user');
     }
   }

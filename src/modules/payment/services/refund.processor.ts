@@ -1,3 +1,4 @@
+import { errorMessage } from 'src/infra/helper/error-text';
 import {
   Injectable,
   Logger,
@@ -38,18 +39,22 @@ export class RefundProcessor implements OnModuleInit, OnModuleDestroy {
 
   onModuleInit() {
     if (process.env.ORDER_QUEUES === 'off') return;
-    this.worker = new Worker(REFUND_QUEUE, (job) => this.process(job), {
-      connection: bullConnection(),
-      concurrency: 2,
-    });
+    this.worker = new Worker<{ orderId: string }>(
+      REFUND_QUEUE,
+      (job) => this.process(job),
+      {
+        connection: bullConnection(),
+        concurrency: 2,
+      },
+    );
     this.worker.on('failed', (job, err) => {
       const exhausted = job && job.attemptsMade >= (job.opts.attempts ?? 1);
       this.logger.error(
-        `Refund job ${job?.data?.orderId} failed (${job?.attemptsMade}): ${err.message}`,
+        `Refund job ${job?.data?.orderId} failed (${job?.attemptsMade}): ${errorMessage(err)}`,
       );
       if (exhausted)
         void this.ops.alert(
-          `Не удалось вернуть деньги по заказу ${job?.data?.orderId}: ${err.message}. Нужен ручной возврат.`,
+          `Не удалось вернуть деньги по заказу ${job?.data?.orderId}: ${errorMessage(err)}. Нужен ручной возврат.`,
         );
     });
   }

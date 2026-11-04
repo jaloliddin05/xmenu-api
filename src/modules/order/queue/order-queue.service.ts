@@ -1,3 +1,4 @@
+import { errorMessage } from 'src/infra/helper/error-text';
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { Queue } from 'bullmq';
 import { bullConnection } from 'src/infra/redis/bull-connection';
@@ -64,9 +65,9 @@ export class OrderQueueService implements OnModuleDestroy {
     if (!this.enabled) return;
     try {
       await fn();
-    } catch (e: any) {
+    } catch (e) {
       // Navbat ishlamasa buyurtma baribir saqlangan bo'lishi kerak.
-      this.logger.error(`${label}: ${e?.message ?? e}`);
+      this.logger.error(`${label}: ${errorMessage(e)}`);
     }
   }
 

@@ -1,3 +1,4 @@
+import { errorMessage } from 'src/infra/helper/error-text';
 import {
   Injectable,
   Logger,
@@ -31,8 +32,8 @@ export class CustomerCleanupService implements OnModuleInit, OnModuleDestroy {
     try {
       const r = await this.sessions.cleanup();
       this.logger.log(`tozalandi: sessions=${r.sessions} events=${r.events}`);
-    } catch (err: any) {
-      this.logger.warn(`tozalash xatosi: ${err?.message}`);
+    } catch (err) {
+      this.logger.warn(`tozalash xatosi: ${errorMessage(err)}`);
     }
   }
 }
