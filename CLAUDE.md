@@ -32,7 +32,7 @@ Env: см. `.env.example` (полный). Ключевые: `JWT_*`, `OTP_*`, `S
 
 ## Модули
 `auth` (два контура: staff и customer), `tenant` (`TenantGuard`, `TenantService`: тенант по id; `GET /tenant/by-slug`,
-`GET /tenant/config` в `TenantConfigModule`), `organization` (+ настройки заведения), `user`, `employee` (пока не
+`GET /tenant/config` в `TenantConfigModule`), `organization` (+ настройки заведения), `user`, `employee` (не
 используется), `branch`, `category`, `product` (+ группы допов), `menu` (публичный), `customer` (+ адреса),
 `order` (state machine, очереди, уведомления), `payment` (Click, Payme, ключи тенанта, возвраты),
 `sms` (провайдеры eskiz, telegram, console), `telegram` (боты заведений: `TelegramBotService`, `TelegramClient`,
@@ -43,7 +43,7 @@ Env: см. `.env.example` (полный). Ключевые: `JWT_*`, `OTP_*`, `S
 Единое место: `docs/API.md` и `docs/openapi.json`. Подробности: `docs/ORDERS_API.md`, `docs/BRANCHES_API.md`,
 `docs/BACKEND_ORDERS.md`, `docs/TELEGRAM_VERIFICATION.md`. Меняешь контроллер или DTO: добавь `@ApiProperty` и
 `@ApiOperation`, запусти `npm run openapi`, закоммить результат вместе с кодом. `.github/workflows/ci.yml` (build,
-test, `npm run openapi` + `git diff --exit-code docs/`, `format:check` и `lint` блокирующие) проверяет это на PR; на GitHub запускался: на `main` 2026-10-31 `41178755985`, `41181531000` (упали на `npm ci`, lock-файл не совпадал с `package.json`), `41185810185` и 2026-11-03 `41597505450` (упал тест `organization-publication.controller.http.spec.ts`, `ECONNRESET`; исправлено в PR #1 (`fix/wave4-followups`, влит в `main`, `ci.yml` зелёный: `41667043527`), тестовое приложение слушает один порт вместо сервера на запрос). Шаги: чистая БД `migrate deploy`, `migrate diff` без расхождений, `scripts/check-migration-upgrade.sh`, build, test, openapi); `deploy.yml` отдельный и без проверок, запускается только вручную (`workflow_dispatch`), см. «Деплой».
+test, `npm run openapi` + `git diff --exit-code docs/`, `format:check` и `lint` блокирующие) проверяет это на PR. Шаги: чистая БД `migrate deploy`, `migrate diff` без расхождений, `scripts/check-migration-upgrade.sh`, build, test, openapi); `deploy.yml` отдельный и без проверок, запускается только вручную (`workflow_dispatch`), см. «Деплой».
 Локально те же шаги: временные БД (`createdb xmenu_ci`, `xmenu_ci_shadow`, `xmenu_upgrade`), `DATABASE_URL=… npx prisma migrate deploy`, `npx prisma migrate diff --from-url $DATABASE_URL --to-schema-datamodel prisma/schema.prisma --exit-code`, `DATABASE_URL=<пустая БД> scripts/check-migration-upgrade.sh`, затем `npm run build`, `npm test`, `npm run openapi && git diff --exit-code docs/`. В Windows psql принимает URL только через `--dbname=`.
 
 ## Тенантность
@@ -132,13 +132,13 @@ Payme вручную через ops-чат.
 ## Авторизация клиентов
 Телефон + OTP (HMAC-хеш кода, TTL, лимит попыток, cooldown) через `SmsProvider`; refresh-токены с ротацией и
 сессиями. `CustomerOtpService.issue()` не зависит от канала доставки (SMS или Telegram), лимиты по телефону общие.
-Целевые параметры: `OTP_LENGTH=6`, `OTP_TTL_SECONDS=300`, `OTP_MAX_ATTEMPTS=5`, `OTP_COOLDOWN_SECONDS=60`
-По умолчанию 6, длина приходит в `codeLength`; дашборд и клиент доставки читают её из ответа (вход с 6 цифрами прошёл в браузере, WAVE4).
+Параметры и значения по умолчанию: `OTP_LENGTH`, `OTP_TTL_SECONDS`, `OTP_MAX_ATTEMPTS`, `OTP_COOLDOWN_SECONDS` (см. `.env.example`).
+Длина кода приходит в `codeLength`; фронты читают её из ответа, своих констант у них нет.
 `TelegramInitDataService.verifyForTenant` проверяет `initData` токеном бота заведения (иначе платформенным
 `TELEGRAM_BOT_TOKEN`) и входом не является.
 
 ## Боты заведений и подтверждение номера через Telegram
-Контракт и сценарии: `docs/TELEGRAM_VERIFICATION.md`. На реальном Telegram не проверено (чек-лист там же).
+Контракт и сценарии: `docs/TELEGRAM_VERIFICATION.md`.
 - `TelegramBotService` (`modules/telegram`): `GET/PUT/DELETE /telegram-bot` из админки. Таблица
   `organization_telegram_bot` (одна строка на заведение, `telegram_bot_id` уникален), токен зашифрован
   `PAYMENT_CONFIG_KEY`, `PUT` требует https `PUBLIC_API_URL`. Webhook `POST /telegram/bot/:botKey/webhook`
@@ -151,7 +151,7 @@ Payme вручную через ops-чат.
 - `TelegramBotProfileService` (`modules/telegram`): автонастройка бота заведения (имя, описания, `/start`, кнопка меню Mini App) по
   профилю из `organization_telegram_bot.profile` или дефолтам из данных заведения (`domain/bot-profile.ts`); `PUT
   /telegram-bot` применяет её после подключения, `PUT /telegram-bot/profile` и `POST /telegram-bot/sync` вручную, смена slug
-  перенастраивает кнопку. Пункты независимы, итог в `sync_result`. Аватар не меняется (нет метода). На реальном Telegram не проверено.
+  перенастраивает кнопку. Пункты независимы, итог в `sync_result`. Аватар не меняется (нет метода в Bot API).
 - `TelegramVerificationService` + `TelegramBotWebhookController` (в `auth`), клиентские `POST
   /auth/customer/telegram/start` и `/status`. Режимы: Mini App (`instant`, сессия привязана к Telegram-пользователю
   из `initData`, вход выдаётся в `status` один раз) и сайт (`code`, код приходит в чат только при совпадении номера,
@@ -186,9 +186,9 @@ Payme вручную через ops-чат.
 ## Что нужно построить
 - Интерфейс провайдера доставки (создать, отменить, статус, вебхук) и адаптер собственных курьеров; внешние сервисы
   (Noor, Yandex, Millennium) по мере доступа к API.
-- Уведомления о заказах через бота ресторана (сейчас платформенный бот из env).
+- Уведомления о заказах через бота ресторана (пока идут через платформенного бота из env).
 - История старых slug с редиректом.
-- Возврат после оплаты на сайт заведения: сейчас `MINIAPP_RETURN_URL`/`MINIAPP_URL` один на платформу
+- Возврат после оплаты на сайт заведения: `MINIAPP_RETURN_URL`/`MINIAPP_URL` один на платформу
   (`payment/domain/payment-url.ts`), а не `https://{slug}.xmenu.uz`. Бэкенд адресов `{slug}.xmenu.uz` нигде не строит:
   slug только валидируется как поддомен (`organization/domain/slug.ts`).
 - Отзыв всех сессий владельца при смене пароля, восстановление пароля, выход «везде».
@@ -197,31 +197,19 @@ Payme вручную через ops-чат.
   времени, меню по филиалам, язык уведомлений клиенту (только русский), ротация `PAYMENT_CONFIG_KEY`, rate limit на
   `POST /orders`.
 
-## Что не проверено (проверять на стенде перед опорой)
-Запросы Prisma end-to-end (`POST /orders`), боевые вызовы Click/Payme (особенно reversal Click и параметры ссылки
-Payme), Telegram webhook и кнопки, боты заведений (`PUT /telegram-bot`, вебхук, `requestContact()` в Mini App,
-цепочка `deepLink` → контакт → код → `otp/verify`), нагрузка. Стендов Click/Payme нет. Свои домены: проверка TXT на
-реальном DNS (только фейк резолвера), nginx и TLS для них, повторная проверка подтверждённых доменов (не делается).
-
 ## Известные долги
-- Ветки `feat/staff-auth-hardening`, `fix/pilot-hardening`, `feat/tenant-config`, `feat/reserved-slugs` влиты в `main`
-  (2026-10-29, fast-forward, без PR); `npm test` и `npm run build` проходили, миграции на реальной БД не применялись.
 - Сессии владельцев: ротация и выход есть, но смена пароля сессии не отзывает, access-токен после выхода живёт до
-  часа (denylist нет), восстановления пароля нет. Дашборд должен перейти на `POST /auth/refresh` с телом и
-  сохранять новый refresh-токен, иначе после первого обновления токена его выкинет на вход.
+  часа (denylist нет), восстановления пароля нет.
 - Загрузки (`MulterStorage`) принимают только изображения (JPEG, PNG, GIF, WebP по содержимому, до `UPLOAD_MAX_BYTES`) и
   пишут на диск после проверки. Но при 404 владельца в `PUT /organization`, `POST/PATCH /product…` файл, уже записанный
-  валидатором, остаётся на диске без записи в БД. Файлы, загруженные до этой защиты, не проверялись: отдача делает
-  любой не-образ `attachment` + `sandbox`, сами файлы не чистились.
+  валидатором, остаётся на диске без записи в БД.  Отдача делает любой не-образ `attachment` + `sandbox`.
 - Ревалидация: ключ задания `revalidate-{target}-{route}-{tenantId}`, цели QR и сайт доставки (`docs/REVALIDATE.md`);
   в очередь идут tenantId, route, oldSlug, актуальный slug читается при выполнении; при заданном адресе цели и пустом
   секрете production не стартует (`revalidate-config.ts`); без `CLIENT_REVALIDATE_URL` задания клиенту не ставятся. В
   `GET /application` читать могут только id из `PLATFORM_ADMIN_USER_IDS`.
-- Группы допов, созданные до миграции `additional_product_group_organization` и не привязанные к блюду, без владельца
-  (недоступны никому); можно удалить вручную.
 - Кэш тенанта и настроек заказа в памяти процесса (30 с): после `PUT` другие процессы pm2 видят старые имя, slug,
   язык, валюту и зону до 30 с. `is_active` через API не меняется (только в БД), сброса для него нет.
-- Форматирование и линт блокируют CI (`npm run format:check`, `npm run lint`; ноль ошибок и предупреждений).
+- Форматирование и линт блокируют CI (`npm run format:check`, `npm run lint`; должны проходить без ошибок и предупреждений).
   Prettier по `.prettierrc`, `npm run format` перед коммитом; `lint:fix` только для автоисправляемого. `eslint-disable` на
   весь файл не используем; строчные исключения только с причиной в комментарии. Послабления правил лежат в
   `eslint.config.mjs` с обоснованием (`no-explicit-any` выключен для старого кода; в `*.spec.ts`, `*.fake.ts` и `test/` выключены
@@ -233,9 +221,8 @@ Payme), Telegram webhook и кнопки, боты заведений (`PUT /tel
 - `.gitattributes` (`eol=lf`): рабочая копия, выгруженная раньше с `core.autocrlf=true`, остаётся в CRLF, пока файлы не
   перевыгрузить (`git rm --cached -r . && git reset --hard` на чистом дереве); иначе prettier видит `␍`.
 
-## Деплой (когда появится прод)
-`.github/workflows/deploy.yml` запускается только вручную (`workflow_dispatch`): сервера и прода нет, а прежний триггер
-на `push` и `pull_request` падал при каждом пуше. Для настоящего деплоя нужно:
+## Деплой
+`.github/workflows/deploy.yml` запускается только вручную (`workflow_dispatch`), не на `push` и не на `pull_request`. Для деплоя нужно:
 - Ключ вместо SSH-пароля: `SSH_PRIVATE_KEY` в секретах, `key:` в `appleboy/ssh-action`, отдельный пользователь без
   `sudo -s`, пароль входа отключён.
 - Окружения GitHub (`staging`, `production`): свои секреты (`SSH_HOST`, `SSH_USER`, ключ), у `production` ручное
@@ -246,7 +233,7 @@ Payme), Telegram webhook и кнопки, боты заведений (`PUT /tel
   если проверка не прошла. Миграции только после бэкапа и только `migrate deploy`.
 - Прод не стартует с `SMS_PROVIDER=console`, `OTP_DEV_MODE`, пустым `REVALIDATE_SECRET`, `DOMAIN_VERIFY_SKIP=true`, без
   `PLATFORM_DOMAIN`, с `TELEGRAM_API_BASE_URL` не на `https://api.telegram.org` (проверки уже в коде); перед
-  первым запуском: staging, бэкапы по расписанию, чек-лист безопасности (корневой `CLAUDE.md`, очередь, п. 5).
+  первым запуском: staging, бэкапы по расписанию, чек-лист безопасности (корневой `CLAUDE.md`, очередь, п. 6).
 
 ## Лимиты публичных POST
 `PublicRateLimitGuard` (`infra/http/public-rate-limit.ts`, глобальный `APP_GUARD`): POST к `@Public()` маршрутам по IP через
