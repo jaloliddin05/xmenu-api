@@ -700,8 +700,9 @@ model organization_telegram_bot {
   telegram_bot_id String       @unique
   username        String
   token_encrypted String
-  // secret_token given to setWebhook: webhook calls must carry it in a header
-  webhook_secret  String
+  // sha256 (hex) of the secret_token given to setWebhook: webhook calls carry the secret in a
+  // header; only Telegram keeps it in the clear (domain/webhook-secret.ts)
+  webhook_secret_hash String
   is_enabled      Boolean      @default(true)
 
   // Bot profile the owner edited: { ru|uz|en: { name, description, shortDescription, menuButtonText } }.

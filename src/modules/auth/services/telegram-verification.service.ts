@@ -75,6 +75,8 @@ const REMOVE_KEYBOARD = { remove_keyboard: true };
 const sKey = (sid: string) => `tgv:s:${sid}`;
 const uKey = (botKey: string, tgUserId: string) =>
   `tgv:u:${botKey}:${tgUserId}`;
+const updKey = (botKey: string, updateId: number) =>
+  `tgv:upd:${botKey}:${updateId}`;
 
 /**
  * Phone verification through the venue's own Telegram bot.
@@ -232,19 +234,30 @@ export class TelegramVerificationService {
 
   // ================= Bot webhook =================
 
-  async handleUpdate(bot: TenantBot, update: TelegramUpdate): Promise<void> {
-    if (typeof update?.update_id === 'number') {
-      // Telegram retries deliveries: process every update once
-      const fresh = await this.redis.set(
-        `tgv:upd:${bot.botKey}:${update.update_id}`,
-        '1',
-        'EX',
-        3600,
-        'NX',
-      );
-      if (fresh !== 'OK') return;
-    }
+  /**
+   * Telegram retries deliveries: true only for the first delivery of an update_id (remembered 1 h),
+   * so each update is queued once. An update without an id cannot be deduplicated and is let through.
+   */
+  async claimUpdate(botKey: string, updateId: unknown): Promise<boolean> {
+    if (typeof updateId !== 'number') return true;
+    const fresh = await this.redis.set(
+      updKey(botKey, updateId),
+      '1',
+      'EX',
+      3600,
+      'NX',
+    );
+    return fresh === 'OK';
+  }
 
+  /** Forget a claimed update that could not be queued, so Telegram's retry is accepted. */
+  async releaseUpdate(botKey: string, updateId: unknown): Promise<void> {
+    if (typeof updateId === 'number')
+      await this.redis.del(updKey(botKey, updateId));
+  }
+
+  /** Runs in the telegram-update queue worker, after the webhook has answered Telegram. */
+  async handleUpdate(bot: TenantBot, update: TelegramUpdate): Promise<void> {
     const msg = update?.message;
     if (
       !msg?.chat ||

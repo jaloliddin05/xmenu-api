@@ -14,7 +14,6 @@ import {
   ApiBearerAuth,
   ApiConflictResponse,
   ApiForbiddenResponse,
-  ApiNoContentResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
@@ -23,6 +22,7 @@ import {
 } from '@nestjs/swagger';
 import { requireStaffOrganizationId } from 'src/infra/http/request-helpers';
 import { ConnectTelegramBotDto } from './dto/connect-telegram-bot.dto';
+import { TelegramBotDisconnectedDto } from './dto/telegram-bot-status.dto';
 import {
   SaveBotProfileDto,
   TelegramBotFullStatusDto,
@@ -108,10 +108,14 @@ export class TelegramBotController {
   }
 
   @Delete()
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Disconnect the bot and remove its webhook' })
-  @ApiNoContentResponse()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Disconnect the bot and remove its webhook',
+    description:
+      'The menu button returns to Telegram default. Name, descriptions and commands set by autoconfiguration stay on the bot (listed in leftOnBot): it is the owner bot, they change them in @BotFather.',
+  })
+  @ApiOkResponse({ type: TelegramBotDisconnectedDto })
   async disconnect(@Req() req: StaffRequest) {
-    await this.bots.disconnect(requireStaffOrganizationId(req));
+    return this.bots.disconnect(requireStaffOrganizationId(req));
   }
 }

@@ -108,6 +108,19 @@ describe('sendCustomerOtpSms', () => {
     await expect(result).rejects.toThrow('Telegram sendMessage failed');
     await expect(result).rejects.not.toThrow(OTP_BOT);
   });
+
+  it('goes to TELEGRAM_API_BASE_URL when it is set (fake Telegram in e2e)', async () => {
+    process.env.TELEGRAM_API_BASE_URL = 'http://127.0.0.1:4604';
+    try {
+      const { otpBot, sendMessage } = loadWithMockedBot();
+      await otpBot.sendCustomerOtpSms('+998901234567', 'any text');
+      expect(sendMessage.post.mock.calls[0][0]).toBe(
+        `http://127.0.0.1:4604/bot${OTP_BOT}/sendMessage`,
+      );
+    } finally {
+      delete process.env.TELEGRAM_API_BASE_URL;
+    }
+  });
 });
 
 describe('sendApplicationToTelegram', () => {

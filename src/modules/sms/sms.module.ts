@@ -27,12 +27,22 @@ export function resolveSmsProviderName(
 }
 
 /**
- * Whether the chosen provider has what it needs to send. A static configuration check, not a probe
- * of the provider: a provider that is down still answers 503 sms_unavailable per request.
+ * Whether the chosen provider has what it needs to send: eskiz its credentials, telegram the OTP
+ * group bot and chat (OTP_BOT, XMENU_CHAT_ID), console a non-production run (production refuses it
+ * at boot). A static configuration check, not a probe of the provider: a provider that is down
+ * still answers 503 sms_unavailable per request.
  */
 export function isSmsConfigured(env: NodeJS.ProcessEnv = process.env): boolean {
-  if (resolveSmsProviderName(env) !== 'eskiz') return true;
-  return Boolean(env.ESKIZ_EMAIL && env.ESKIZ_PASSWORD);
+  if (env.NODE_ENV === 'production' && env.SMS_PROVIDER === 'console')
+    return false;
+  switch (resolveSmsProviderName(env)) {
+    case 'eskiz':
+      return Boolean(env.ESKIZ_EMAIL && env.ESKIZ_PASSWORD);
+    case 'telegram':
+      return Boolean(env.OTP_BOT && env.XMENU_CHAT_ID);
+    case 'console':
+      return true;
+  }
 }
 
 @Module({

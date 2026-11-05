@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { FactoryProvider, Module } from '@nestjs/common';
 import { PrismaModule } from '../_prisma/prisma.module';
 import { RevalidateModule } from '../revalidate-queue/revalidate.module';
 import { TenantModule } from '../tenant/tenant.module';
@@ -11,19 +11,24 @@ import {
 import { TenantDomainController } from './tenant-domain.controller';
 import { TenantDomainService } from './tenant-domain.service';
 
+type Env = Record<string, string | undefined>;
+
+/** DnsTxtVerifier, or SkipDomainVerifier with DOMAIN_VERIFY_SKIP=true outside production. */
+export function createDomainVerifier(env: Env = process.env) {
+  // Startup check: production refuses DOMAIN_VERIFY_SKIP and a missing PLATFORM_DOMAIN
+  return assertDomainConfig(env).skipVerification
+    ? new SkipDomainVerifier()
+    : new DnsTxtVerifier();
+}
+
+export const domainVerifierProvider: FactoryProvider = {
+  provide: DOMAIN_VERIFIER,
+  useFactory: () => createDomainVerifier(),
+};
+
 @Module({
   imports: [PrismaModule, TenantModule, RevalidateModule],
   controllers: [TenantDomainController],
-  providers: [
-    TenantDomainService,
-    {
-      provide: DOMAIN_VERIFIER,
-      // Startup check: production refuses DOMAIN_VERIFY_SKIP and a missing PLATFORM_DOMAIN
-      useFactory: () =>
-        assertDomainConfig().skipVerification
-          ? new SkipDomainVerifier()
-          : new DnsTxtVerifier(),
-    },
-  ],
+  providers: [TenantDomainService, domainVerifierProvider],
 })
 export class TenantDomainModule {}

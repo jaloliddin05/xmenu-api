@@ -1,5 +1,9 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
 import { randomBytes } from 'crypto';
+import {
+  hashWebhookSecret,
+  webhookSecretMatches,
+} from './domain/webhook-secret';
 import { TelegramApiError } from './telegram-client';
 import { TelegramBotService } from './telegram-bot.service';
 
@@ -107,11 +111,16 @@ describe('TelegramBotService', () => {
       (c: any[]) => c[1] === 'setWebhook',
     )!;
     const row = rows.get(ORG);
+    const secret = (webhookCall[2] as { secret_token: string }).secret_token;
     expect(webhookCall[2]).toMatchObject({
       url: `https://api.xmenu.uz/telegram/bot/${row.id}/webhook`,
-      secret_token: row.webhook_secret,
       allowed_updates: ['message'],
     });
+    // Only the hash is stored; the secret itself is known to Telegram alone
+    expect(secret).toMatch(/^[0-9a-f]{64}$/);
+    expect(row.webhook_secret_hash).toBe(hashWebhookSecret(secret));
+    expect(JSON.stringify(row)).not.toContain(secret);
+    expect(webhookSecretMatches(secret, row.webhook_secret_hash)).toBe(true);
     expect(row.token_encrypted).not.toContain(TOKEN);
     expect(JSON.stringify(status)).not.toContain(TOKEN);
     expect(status).toMatchObject({
@@ -135,7 +144,9 @@ describe('TelegramBotService', () => {
     const first = { ...rows.get(ORG) };
     await svc.connect(ORG, TOKEN);
     expect(rows.get(ORG).id).toBe(first.id);
-    expect(rows.get(ORG).webhook_secret).not.toBe(first.webhook_secret);
+    expect(rows.get(ORG).webhook_secret_hash).not.toBe(
+      first.webhook_secret_hash,
+    );
   });
 
   it('drops the old webhook when the venue switches to another bot', async () => {
@@ -197,6 +208,25 @@ describe('TelegramBotService', () => {
       connected: true,
     });
     expect(rows.size).toBe(1);
+  });
+
+  it('disconnect says what stays on the bot, and nothing when no bot was connected', async () => {
+    const { svc, client } = setup();
+    await expect(svc.disconnect(ORG)).resolves.toEqual({
+      connected: false,
+      leftOnBot: [],
+    });
+    await svc.connect(ORG, TOKEN);
+    client.call.mockClear();
+    await expect(svc.disconnect(ORG)).resolves.toEqual({
+      connected: false,
+      leftOnBot: ['name', 'description', 'shortDescription', 'commands'],
+    });
+    // The owner's bot settings are not reset
+    const methods = client.call.mock.calls.map((c: any[]) => c[1]);
+    expect(methods.filter((m: string) => /^(setMy|deleteMy)/.test(m))).toEqual(
+      [],
+    );
   });
 
   it('disconnect removes the webhook and the row', async () => {

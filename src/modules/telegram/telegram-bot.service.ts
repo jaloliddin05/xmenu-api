@@ -14,6 +14,8 @@ import {
 } from 'src/modules/payment/domain/payment-crypto';
 import { errorMessage } from 'src/infra/helper/error-text';
 import { RevalidateService } from 'src/modules/revalidate-queue/revalidate.service';
+import { hashWebhookSecret } from './domain/webhook-secret';
+import type { BotSettingLeft } from './dto/telegram-bot-status.dto';
 import { TelegramClient, telegramErrorText } from './telegram-client';
 
 /** A venue's own bot, ready to use (token decrypted). `botKey` is the row id and never changes. */
@@ -22,7 +24,8 @@ export interface TenantBot {
   organizationId: string;
   username: string;
   token: string;
-  webhookSecret: string;
+  /** sha256 hex of the webhook secret_token (domain/webhook-secret.ts) */
+  webhookSecretHash: string;
 }
 
 export interface BotStatus {
@@ -33,13 +36,26 @@ export interface BotStatus {
   isEnabled: boolean;
 }
 
+export interface BotDisconnected {
+  connected: false;
+  leftOnBot: BotSettingLeft[];
+}
+
+/** Set by autoconfiguration (TelegramBotProfileService) and kept on the bot after disconnecting. */
+const BOT_SETTINGS_LEFT: readonly BotSettingLeft[] = [
+  'name',
+  'description',
+  'shortDescription',
+  'commands',
+];
+
 interface BotRow {
   id: string;
   organization_id: string;
   telegram_bot_id: string;
   username: string;
   token_encrypted: string;
-  webhook_secret: string;
+  webhook_secret_hash: string;
   is_enabled: boolean;
 }
 
@@ -97,7 +113,7 @@ export class TelegramBotService {
       organizationId: row.organization_id,
       username: row.username,
       token,
-      webhookSecret: row.webhook_secret,
+      webhookSecretHash: row.webhook_secret_hash,
     };
   }
 
@@ -209,7 +225,7 @@ export class TelegramBotService {
       telegram_bot_id: telegramBotId,
       username: me.username,
       token_encrypted: encryptConfig({ token }, key),
-      webhook_secret: webhookSecret,
+      webhook_secret_hash: hashWebhookSecret(webhookSecret),
       is_enabled: true,
     };
     await this.prisma.organization_telegram_bot.upsert({
@@ -226,17 +242,22 @@ export class TelegramBotService {
     return this.status(organizationId);
   }
 
-  async disconnect(organizationId: string): Promise<void> {
+  /**
+   * Drops the webhook and the row, gives the menu button back to Telegram's default. The bot's
+   * name, descriptions and commands are the owner's settings on their own bot and stay as they are.
+   */
+  async disconnect(organizationId: string): Promise<BotDisconnected> {
     const row = await this.prisma.organization_telegram_bot.findUnique({
       where: { organization_id: organizationId },
     });
-    if (!row) return;
+    if (!row) return { connected: false, leftOnBot: [] };
     await this.resetMenuButton(row);
     await this.dropWebhook(row);
     await this.prisma.organization_telegram_bot.delete({
       where: { organization_id: organizationId },
     });
     await this.authChannelsChanged(organizationId);
+    return { connected: false, leftOnBot: [...BOT_SETTINGS_LEFT] };
   }
 
   /** GET /tenant/config channels.auth.telegram follows the bot row; front-ends cache that config. */

@@ -7,6 +7,7 @@
 # 2. inserts a venue with settings, as it would exist before that migration,
 # 3. applies the remaining migrations (`prisma migrate deploy`),
 # 4. checks the existing row kept its data and got the column defaults,
+#    and the venue bot's webhook secret was replaced by its sha256 hash,
 # 5. checks the tenant_domain rules on that venue (one verified host per venue, pending claims by
 #    several venues, cascade on delete).
 #
@@ -56,6 +57,9 @@ values ('00000000-0000-4000-8000-000000000001', '{"brand":"#EE2E17"}', 'UZS', 'r
 insert into organization_order_settings (organization_id, delivery_service_fee, min_order_delivery, min_order_pickup,
   eta_min, eta_max, acceptance_timeout_seconds, payment_timeout_seconds, max_active_orders, updated_at)
 values ('00000000-0000-4000-8000-000000000001', 10000, 50000, 0, 25, 40, 300, 900, 5, now());
+insert into organization_telegram_bot (id, organization_id, telegram_bot_id, username, token_encrypted, webhook_secret, updated_at)
+values ('00000000-0000-4000-8000-0000000000b1', '00000000-0000-4000-8000-000000000001', '123456789', 'mant_bot',
+  'encrypted', 'plain-webhook-secret', now());
 SQL
 
 echo "== applying the remaining migrations"
@@ -77,6 +81,13 @@ fi
 orders="$("${PSQL[@]}" -F '|' -c "select delivery_service_fee, min_order_delivery, eta_min, eta_max from organization_order_settings where organization_id = '00000000-0000-4000-8000-000000000001'")"
 if [ "$orders" != '10000|50000|25|40' ]; then
   echo "FAIL: order settings row changed: '$orders'" >&2
+  exit 1
+fi
+
+# The webhook secret is hashed in place: the connected bot keeps working without reconnecting
+bot="$("${PSQL[@]}" -c "select webhook_secret_hash = encode(sha256(convert_to('plain-webhook-secret', 'UTF8')), 'hex') from organization_telegram_bot where id = '00000000-0000-4000-8000-0000000000b1'")"
+if [ "$bot" != 't' ]; then
+  echo "FAIL: webhook secret of the existing bot is not its sha256 hash ('$bot')" >&2
   exit 1
 fi
 

@@ -17,7 +17,9 @@ Swagger (`/docs`), Jest. Prettier: одинарные кавычки, trailing c
 `prisma/schema.prisma` пустым. Собирай схему из Git Bash (`cat ./src/modules/*/*/*.prisma > prisma/schema.prisma`);
 порядок файлов в glob там другой, поэтому лишние перестановки моделей в диффе лучше не коммитить.
 Env: см. `.env.example` (полный). Ключевые: `JWT_*`, `OTP_*`, `SMS_PROVIDER`, `PAYMENT_CONFIG_KEY`, `REDIS_URL`, `PUBLIC_API_URL`, `PUBLIC_FILES_URL`,
-`TELEGRAM_BOT_TOKEN`, `TELEGRAM_ORDERS_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `TELEGRAM_VERIFY_TTL_SECONDS`, `OPS_CHAT_ID`, `ORDER_QUEUES`,
+`TELEGRAM_BOT_TOKEN`, `TELEGRAM_ORDERS_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `TELEGRAM_VERIFY_TTL_SECONDS`,
+`TELEGRAM_API_BASE_URL` (база всех вызовов Bot API, `infra/telegram/telegram-api-url.ts`; фейк в тестах и e2e, в production только
+`https://api.telegram.org`), `OPS_CHAT_ID`, `ORDER_QUEUES`,
 `MINIAPP_URL`, `UPLOAD_MAX_BYTES`, `PLATFORM_ADMIN_USER_IDS`, `TRANSLATION_*`, `OPENAI_API_KEY` (необязателен: без него
 `/translation` → 503 `translation_unavailable`), `NEXT_PUBLIC_URL` + `REVALIDATE_SECRET` (QR),
 `CLIENT_REVALIDATE_URL` + `CLIENT_REVALIDATE_SECRET` (сайт доставки), `DELIVERY_URL_TEMPLATE` (адрес Mini App для кнопки бота),
@@ -110,7 +112,8 @@ test, `npm run openapi` + `git diff --exit-code docs/`, `format:check` и `lint`
   (меню отдаётся), его читает QR-фронт.
 - Изменения ставят ревалидацию с `route: 'channels'` (QR и клиент); её ставит и `TelegramBotService` при подключении и
   отключении бота. `channels.auth` `{ sms, telegram }` в `GET /tenant/config`: подсказка, как подтвердить номер
-  (`telegram` = включённый бот заведения, `sms` = `isSmsConfigured()` в `sms.module.ts`, проверка настроек, не пинг);
+  (`telegram` = включённый бот заведения, `sms` = `isSmsConfigured()` в `sms.module.ts`: учётные данные Eskiz, `OTP_BOT` и `XMENU_CHAT_ID` для `telegram`,
+  `console` вне production; проверка настроек, не пинг);
   источник истины остаются `otp/request` и `telegram/start`.
 - Бот удалён (`DELETE /telegram-bot`) при режиме `miniapp`/`both`: режим остаётся, пункт `telegram_bot` в чеклисте
   становится `todo`, публикация не снимается.
@@ -139,7 +142,11 @@ Payme вручную через ops-чат.
 - `TelegramBotService` (`modules/telegram`): `GET/PUT/DELETE /telegram-bot` из админки. Таблица
   `organization_telegram_bot` (одна строка на заведение, `telegram_bot_id` уникален), токен зашифрован
   `PAYMENT_CONFIG_KEY`, `PUT` требует https `PUBLIC_API_URL`. Webhook `POST /telegram/bot/:botKey/webhook`
-  (`botKey` = id строки, не slug), секрет в заголовке сравнивается за константное время. `TelegramClient` не
+  (`botKey` = id строки, не slug): в БД sha256 секрета (`webhook_secret_hash`, `domain/webhook-secret.ts`), заголовок
+  хешируется и сравнивается за константное время. Вебхук после секрета и отметки `update_id` (`claimUpdate`) кладёт апдейт
+  в очередь BullMQ `telegram-update` и сразу отвечает 200; обработка (`TelegramUpdateProcessor`, 3 попытки) идёт в фоне,
+  сбой постановки в очередь → 503. `DELETE /telegram-bot` → 200 `{ connected: false, leftOnBot }`: имя, описания и
+  команды остаются у бота (не сбрасываем), кнопка меню возвращается к стандартной. `TelegramClient` не
   кладёт токен в ошибки: логируй через `telegramErrorText(e)`.
 - `TelegramBotProfileService` (`modules/telegram`): автонастройка бота заведения (имя, описания, `/start`, кнопка меню Mini App) по
   профилю из `organization_telegram_bot.profile` или дефолтам из данных заведения (`domain/bot-profile.ts`); `PUT
@@ -238,7 +245,7 @@ Payme), Telegram webhook и кнопки, боты заведений (`PUT /tel
   `npx prisma migrate deploy` → `pm2 reload xmenu-backend` → проверка живости и откат на предыдущий коммит и дамп,
   если проверка не прошла. Миграции только после бэкапа и только `migrate deploy`.
 - Прод не стартует с `SMS_PROVIDER=console`, `OTP_DEV_MODE`, пустым `REVALIDATE_SECRET`, `DOMAIN_VERIFY_SKIP=true`, без
-  `PLATFORM_DOMAIN` (проверки уже в коде); перед
+  `PLATFORM_DOMAIN`, с `TELEGRAM_API_BASE_URL` не на `https://api.telegram.org` (проверки уже в коде); перед
   первым запуском: staging, бэкапы по расписанию, чек-лист безопасности (корневой `CLAUDE.md`, очередь, п. 5).
 
 ## Лимиты публичных POST

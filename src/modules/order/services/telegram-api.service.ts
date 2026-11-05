@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
+import { telegramMethodUrl } from 'src/infra/telegram/telegram-api-url';
 
 export interface TelegramMessageResult {
   message_id: number;
@@ -43,7 +44,7 @@ export class TelegramApiService {
     }
     try {
       const { data } = await axios.post<{ result?: T }>(
-        `https://api.telegram.org/bot${token}/${method}`,
+        telegramMethodUrl(token, method),
         payload,
         { timeout: 8000 },
       );
