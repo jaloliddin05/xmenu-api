@@ -18,9 +18,9 @@ Telegram доступен, когда заведение подключило б
 | `PUT` | `/telegram-bot` | Тело `{ "token": "123456:AA..." }`. Проверяет токен через `getMe`, регистрирует webhook с секретом, сохраняет токен зашифрованным (AES-256-GCM, `PAYMENT_CONFIG_KEY`) |
 | `DELETE` | `/telegram-bot` | Снимает webhook, возвращает стандартную кнопку меню и удаляет бота. 200 `{ connected: false, leftOnBot: ["name", "description", "shortDescription", "commands"] }`: это остаётся у бота в Telegram (бот принадлежит владельцу, его настройки не сбрасываем; меняются в @BotFather). Бота не было: `leftOnBot: []` |
 
-Ошибки `PUT` (формат ошибок админки, поле `code`): `invalid_bot_token` (400), `webhook_url_not_https` (400, на
-сервере `PUBLIC_API_URL` не https), `webhook_setup_failed` (400, ничего не сохранено), `bot_already_connected` (409,
-бот уже у другого заведения). Нужны `PUBLIC_API_URL` с `https://` и `PAYMENT_CONFIG_KEY`.
+Ошибки `PUT` (общий формат, `docs/API.md`, «Ошибки»): `invalid_bot_token` (400), `webhook_setup_failed` (400, ничего
+не сохранено), `bot_already_connected` (409, бот уже у другого заведения), `platform_misconfigured` (503,
+`details.feature: telegram_bot`: на сервере `PUBLIC_API_URL` не https или нет годного `PAYMENT_CONFIG_KEY`).
 
 Webhook: `POST /telegram/bot/{id строки бота}/webhook` (в OpenAPI скрыт). Адрес не зависит от slug и не меняется
 при повторном подключении того же заведения; секрет каждый раз новый. Смена бота снимает webhook со старого.
