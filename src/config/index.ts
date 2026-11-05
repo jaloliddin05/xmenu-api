@@ -1,25 +1,26 @@
 import * as dotenv from 'dotenv';
 
 import { IConfig } from './config.interface';
+import { Env, EnvIssues, isProduction } from './env/env-issues';
 
 dotenv.config();
 
 const DEFAULT_ACCESS_TOKEN_SECRET = 'defaultAccessTokenSecret';
 
-// customer-auth.config.ts requires JWT_CUSTOMER_* in production and refuses
-// to boot without them. This (staff/org) config never got the same guard —
-// it silently falls back to a hardcoded secret, so a misconfigured deploy
-// would start up fine and sign every restaurant owner's session with a
-// secret that's sitting in this repo. Only production is affected: local
-// and staging keep working with no env vars set, exactly as before.
-function staffTokenSecret(envVar: string, fallback: string): string {
-  const value = process.env[envVar] || fallback;
-  if (process.env.NODE_ENV === 'production' && value === fallback) {
-    throw new Error(
-      `${envVar} env o'zgaruvchisi production'da majburiy (standart qiymat ishlatib bo'lmaydi)`,
-    );
-  }
-  return value;
+/**
+ * Startup check (validateEnv): the staff JWT secret falls back to a built-in default for local runs,
+ * which production refuses (every owner session would be signed with a secret from this repository).
+ */
+export function staffAuthEnvIssues(env: Env = process.env): EnvIssues {
+  const v = env.JWT_ACCESS_TOKEN_SECRET;
+  const missing = !v || v === DEFAULT_ACCESS_TOKEN_SECRET;
+  return {
+    errors:
+      missing && isProduction(env)
+        ? ['JWT_ACCESS_TOKEN_SECRET is required when NODE_ENV=production']
+        : [],
+    warnings: [],
+  };
 }
 
 export default (): IConfig => ({
@@ -27,10 +28,8 @@ export default (): IConfig => ({
 
   jwt: {
     accessTokenExpiration: process.env.JWT_ACCESS_TOKEN_EXPIRATION_TIME || '1h',
-    accessTokenSecret: staffTokenSecret(
-      'JWT_ACCESS_TOKEN_SECRET',
-      DEFAULT_ACCESS_TOKEN_SECRET,
-    ),
+    accessTokenSecret:
+      process.env.JWT_ACCESS_TOKEN_SECRET || DEFAULT_ACCESS_TOKEN_SECRET,
   },
 
   newPasswordBytes: 4,

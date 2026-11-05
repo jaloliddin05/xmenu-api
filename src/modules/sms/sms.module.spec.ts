@@ -1,4 +1,8 @@
-import { isSmsConfigured, resolveSmsProviderName } from './sms.module';
+import {
+  isSmsConfigured,
+  resolveSmsProviderName,
+  smsEnvIssues,
+} from './sms.module';
 
 describe('resolveSmsProviderName', () => {
   it('defaults to console outside production and eskiz in production', () => {
@@ -80,5 +84,38 @@ describe('isSmsConfigured', () => {
         ESKIZ_PASSWORD: 'x',
       }),
     ).toBe(true);
+  });
+});
+
+describe('smsEnvIssues', () => {
+  it('rejects an unknown provider and console in production', () => {
+    expect(smsEnvIssues({ SMS_PROVIDER: 'pigeon' }).errors).toEqual([
+      expect.stringContaining('SMS_PROVIDER'),
+    ]);
+    expect(
+      smsEnvIssues({ NODE_ENV: 'production', SMS_PROVIDER: 'console' }).errors,
+    ).toEqual([expect.stringContaining('not allowed')]);
+  });
+
+  it('production needs the credentials of the chosen provider', () => {
+    expect(smsEnvIssues({ NODE_ENV: 'production' }).errors).toEqual([
+      expect.stringContaining('ESKIZ_EMAIL'),
+    ]);
+    expect(
+      smsEnvIssues({ NODE_ENV: 'production', SMS_PROVIDER: 'telegram' }).errors,
+    ).toEqual([expect.stringContaining('OTP_BOT')]);
+    expect(
+      smsEnvIssues({
+        NODE_ENV: 'production',
+        ESKIZ_EMAIL: 'a@b.uz',
+        ESKIZ_PASSWORD: 'p',
+      }).errors,
+    ).toEqual([]);
+  });
+
+  it('development without credentials is not an error (the feature is off)', () => {
+    expect(
+      smsEnvIssues({ NODE_ENV: 'development', SMS_PROVIDER: 'eskiz' }).errors,
+    ).toEqual([]);
   });
 });

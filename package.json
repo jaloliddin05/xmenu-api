@@ -21,6 +21,7 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "openapi": "nest build && node dist/openapi",
+    "check:env": "ts-node -r tsconfig-paths/register --transpile-only src/config/env/check-env.cli.ts",
     "generate-schema": "cat ./src/modules/*/*/*.prisma > prisma/schema.prisma",
     "migrate": "npm run generate-schema && npx prisma migrate dev && npx prisma generate"
   },

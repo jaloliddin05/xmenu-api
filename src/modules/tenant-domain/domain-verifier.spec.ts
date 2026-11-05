@@ -1,4 +1,4 @@
-import { assertDomainConfig } from './domain-config';
+import { domainConfigFrom, domainEnvIssues } from './domain-config';
 import {
   DnsTxtVerifier,
   SkipDomainVerifier,
@@ -60,62 +60,54 @@ describe('DnsTxtVerifier', () => {
   });
 });
 
-describe('assertDomainConfig', () => {
-  const logger = () => ({ warn: jest.fn() });
-
+describe('domainEnvIssues', () => {
   it('refuses DOMAIN_VERIFY_SKIP in production', () => {
-    expect(() =>
-      assertDomainConfig(
-        {
-          NODE_ENV: 'production',
-          DOMAIN_VERIFY_SKIP: 'true',
-          PLATFORM_DOMAIN: 'xmenu.uz',
-        },
-        logger(),
-      ),
-    ).toThrow('DOMAIN_VERIFY_SKIP');
+    expect(
+      domainEnvIssues({
+        NODE_ENV: 'production',
+        DOMAIN_VERIFY_SKIP: 'true',
+        PLATFORM_DOMAIN: 'xmenu.uz',
+      }).errors,
+    ).toEqual([expect.stringContaining('DOMAIN_VERIFY_SKIP')]);
   });
 
   it('refuses production without a usable platform domain', () => {
-    expect(() =>
-      assertDomainConfig({ NODE_ENV: 'production' }, logger()),
-    ).toThrow('PLATFORM_DOMAIN');
-    expect(() =>
-      assertDomainConfig(
-        { NODE_ENV: 'production', PLATFORM_DOMAIN: 'https://xmenu.uz' },
-        logger(),
-      ),
-    ).toThrow('PLATFORM_DOMAIN');
+    expect(domainEnvIssues({ NODE_ENV: 'production' }).errors).toEqual([
+      expect.stringContaining('PLATFORM_DOMAIN'),
+    ]);
+    expect(
+      domainEnvIssues({
+        NODE_ENV: 'production',
+        PLATFORM_DOMAIN: 'https://xmenu.uz',
+      }).errors,
+    ).toEqual([expect.stringContaining('PLATFORM_DOMAIN')]);
   });
 
-  it('starts in production with DNS checks and a platform domain', () => {
-    const log = logger();
+  it('has no issues in production with DNS checks and a platform domain', () => {
     expect(
-      assertDomainConfig(
-        { NODE_ENV: 'production', PLATFORM_DOMAIN: 'XMenu.uz' },
-        log,
-      ),
-    ).toEqual({ platformDomain: 'xmenu.uz', skipVerification: false });
-    expect(log.warn).not.toHaveBeenCalled();
+      domainEnvIssues({ NODE_ENV: 'production', PLATFORM_DOMAIN: 'XMenu.uz' }),
+    ).toEqual({ errors: [], warnings: [] });
+    expect(domainConfigFrom({ PLATFORM_DOMAIN: 'XMenu.uz' })).toEqual({
+      platformDomain: 'xmenu.uz',
+      skipVerification: false,
+    });
   });
 
   it('only warns in development', () => {
-    const log = logger();
-    expect(
-      assertDomainConfig(
-        { NODE_ENV: 'development', DOMAIN_VERIFY_SKIP: 'true' },
-        log,
-      ),
-    ).toEqual({ platformDomain: null, skipVerification: true });
-    expect(log.warn).toHaveBeenCalledTimes(2);
+    const issues = domainEnvIssues({
+      NODE_ENV: 'development',
+      DOMAIN_VERIFY_SKIP: 'true',
+    });
+    expect(issues.errors).toEqual([]);
+    expect(issues.warnings).toHaveLength(2);
   });
 
   it('takes only the exact value true as the flag', () => {
     expect(
-      assertDomainConfig(
-        { DOMAIN_VERIFY_SKIP: '1', PLATFORM_DOMAIN: 'localhost' },
-        logger(),
-      ).skipVerification,
+      domainConfigFrom({
+        DOMAIN_VERIFY_SKIP: '1',
+        PLATFORM_DOMAIN: 'localhost',
+      }).skipVerification,
     ).toBe(false);
   });
 });

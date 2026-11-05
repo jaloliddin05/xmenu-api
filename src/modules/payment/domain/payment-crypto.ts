@@ -14,14 +14,14 @@ const VERSION = 'v1';
 export function parsePaymentConfigKey(raw: string | undefined): Buffer {
   if (!raw)
     throw new Error(
-      "PAYMENT_CONFIG_KEY env o'zgaruvchisi majburiy (to'lov kalitlarini shifrlash uchun)",
+      'PAYMENT_CONFIG_KEY is not set (it encrypts payment keys and bot tokens)',
     );
   const key = /^[0-9a-fA-F]{64}$/.test(raw)
     ? Buffer.from(raw, 'hex')
     : Buffer.from(raw, 'base64');
   if (key.length !== 32)
     throw new Error(
-      "PAYMENT_CONFIG_KEY 32 bayt bo'lishi kerak (64 hex yoki base64)",
+      'PAYMENT_CONFIG_KEY must be 32 bytes (64 hex characters or base64)',
     );
   return key;
 }

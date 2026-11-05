@@ -7,8 +7,12 @@ import { AppModule } from './app.module';
 import { configureStatic } from './infra/http/static-assets';
 import { ErrorFilter } from './infra/validators';
 import { AccessTokenUserGuard } from './modules/auth/passport-strategies/access-token-user/access-token-user.guard';
+import { checkEnvAtStartup } from './config/env/startup-check';
 
 async function bootstrap() {
+  // Production refuses to start with a bad configuration; development prints what is switched off
+  checkEnvAtStartup();
+
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: ['log', 'warn', 'error'],
   });

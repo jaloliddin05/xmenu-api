@@ -1,17 +1,13 @@
-import { Module, OnModuleInit } from '@nestjs/common';
-import { assertRevalidateConfig } from './revalidate-config';
+import { Module } from '@nestjs/common';
 import { PrismaModule } from '../_prisma/prisma.module';
 import { BullConfigService } from './bull.config';
 import { RevalidateService } from './revalidate.service';
 import { RevalidateProcessor } from './revalidate.processor';
 
+// Configuration is checked once at startup (validateEnv, revalidateEnvIssues)
 @Module({
   imports: [PrismaModule],
   providers: [BullConfigService, RevalidateService, RevalidateProcessor],
   exports: [RevalidateService],
 })
-export class RevalidateModule implements OnModuleInit {
-  onModuleInit() {
-    assertRevalidateConfig();
-  }
-}
+export class RevalidateModule {}
