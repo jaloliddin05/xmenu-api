@@ -27,12 +27,12 @@ describe('venue name: trimmed, 2-100 characters', () => {
     ['one character', 'A'],
     ['101 characters', 'x'.repeat(101)],
   ])(
-    'PUT /organization/:id rejects %s with errors[] on `name`',
+    'PUT /organization/:id rejects %s with fields[] on `name`',
     async (_t, name) => {
       await expect(run(UpdateOrganizationDto, { name })).rejects.toMatchObject({
         response: {
           code: 'validation_error',
-          errors: [expect.objectContaining({ field: 'name' })],
+          fields: [expect.objectContaining({ field: 'name' })],
         },
       });
     },

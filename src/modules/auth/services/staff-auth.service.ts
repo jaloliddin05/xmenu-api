@@ -12,7 +12,6 @@ import { toStaffUser } from 'src/infra/helper/auth/staff-user';
 import { OrganizationService } from 'src/modules/organization/services/organization.service';
 import { CUSTOMER_AUTH_CONFIG } from '../customer-auth.config';
 import type { CustomerAuthConfig } from '../customer-auth.config';
-import { CustomerAuthException } from '../errors/customer-auth.exception';
 import type { StaffRegisterDto } from '../dto/staff-register.dto';
 import { CustomerOtpService } from './customer-otp.service';
 import type { RequestCtx } from './customer-auth-event.service';
@@ -20,6 +19,7 @@ import { RateLimitService } from './rate-limit.service';
 import { StaffAuthEventService } from './staff-auth-event.service';
 import { StaffLoginThrottleService } from './staff-login-throttle.service';
 import { StaffSessionService } from './staff-session.service';
+import { AppException } from 'src/infra/errors/app-exception';
 
 /** How long a signup waits for its phone code; every resend extends it. */
 export const PENDING_REGISTRATION_TTL_SECONDS = 1800;
@@ -67,8 +67,7 @@ export class StaffAuthService {
   // ================= POST /auth/register =================
 
   async register(dto: StaffRegisterDto, ctx: RequestCtx) {
-    if (!isValidPhone(dto.phone))
-      throw new CustomerAuthException('invalid_phone');
+    if (!isValidPhone(dto.phone)) throw new AppException('invalid_phone');
     await this.rateLimit.hit([
       { key: `staff:reg:rl:ip:${ctx.ip}`, limit: 10, ttlSeconds: 3600 },
     ]);
@@ -77,7 +76,7 @@ export class StaffAuthService {
       where: { phone: dto.phone },
       select: { isActive: true },
     });
-    if (existing?.isActive) throw new CustomerAuthException('phone_taken');
+    if (existing?.isActive) throw new AppException('phone_taken');
 
     const registrationId = randomUUID();
     const pending: PendingRegistration = {
@@ -131,7 +130,7 @@ export class StaffAuthService {
   ) {
     // A malformed code does not spend an attempt
     if (!this.otp.isValidCodeFormat(dto.code))
-      throw new CustomerAuthException('invalid_code');
+      throw new AppException('invalid_code');
     const pending = await this.readPending(dto.registrationId);
     const { phone } = pending;
 
@@ -153,7 +152,7 @@ export class StaffAuthService {
 
     // Only the request that removes the pending signup may create the account
     if ((await this.redis.del(this.pendingKey(dto.registrationId))) !== 1) {
-      throw new CustomerAuthException('registration_expired');
+      throw new AppException('registration_expired');
     }
 
     const user = await this.createAccount(pending);
@@ -211,10 +210,9 @@ export class StaffAuthService {
           meta: { seconds: lockedFor },
         });
       }
-      throw new CustomerAuthException(
-        'invalid_credentials',
-        'Invalid phone or password',
-      );
+      throw new AppException('invalid_credentials', {
+        message: 'Invalid phone or password',
+      });
     }
 
     await this.throttle.reset(phone);
@@ -239,7 +237,7 @@ export class StaffAuthService {
     registrationId: string,
   ): Promise<PendingRegistration> {
     const raw = await this.redis.get(this.pendingKey(registrationId));
-    if (!raw) throw new CustomerAuthException('registration_expired');
+    if (!raw) throw new AppException('registration_expired');
     return JSON.parse(raw) as PendingRegistration;
   }
 
@@ -258,10 +256,7 @@ export class StaffAuthService {
       await this.events.log('staff_otp_requested', ctx, { phone });
       return resendAfter;
     } catch (err) {
-      if (
-        err instanceof CustomerAuthException &&
-        err.code === 'sms_unavailable'
-      ) {
+      if (err instanceof AppException && err.code === 'sms_unavailable') {
         await this.events.log('staff_otp_send_failed', ctx, { phone });
       }
       throw err;
@@ -276,8 +271,7 @@ export class StaffAuthService {
           const existing = await tx.user.findUnique({
             where: { phone: p.phone },
           });
-          if (existing?.isActive)
-            throw new CustomerAuthException('phone_taken');
+          if (existing?.isActive) throw new AppException('phone_taken');
 
           const data = {
             first_name: p.first_name,
@@ -316,8 +310,7 @@ export class StaffAuthService {
           : typeof raw === 'string'
             ? raw
             : '';
-        if (target.includes('phone'))
-          throw new CustomerAuthException('phone_taken');
+        if (target.includes('phone')) throw new AppException('phone_taken');
         // Two venues with the same name signing up at once collide on the slug: try a fresh one
         if (target.includes('slug') && attempt < SLUG_RETRIES) continue;
         throw err;

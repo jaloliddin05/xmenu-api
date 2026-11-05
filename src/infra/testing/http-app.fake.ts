@@ -1,14 +1,10 @@
-import {
-  INestApplication,
-  ModuleMetadata,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { INestApplication, ModuleMetadata } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import { sign } from 'jsonwebtoken';
-import { ErrorFilter } from 'src/infra/validators';
-import { createValidationPipe } from 'src/infra/validators/validation-errors';
+import { AppException } from 'src/infra/errors/app-exception';
+import { configureErrorHandling } from 'src/infra/errors/configure';
 import { AccessTokenUserGuard } from 'src/modules/auth/passport-strategies/access-token-user/access-token-user.guard';
 import { AccessTokenUserStrategy } from 'src/modules/auth/passport-strategies/access-token-user/access-token-user.strategy';
 import { AuthService } from 'src/modules/auth/services/auth.service';
@@ -27,7 +23,7 @@ export function staffToken(userId: string, secret = SECRET): string {
 }
 
 /**
- * The app as main.ts wires it (ValidationPipe, ErrorFilter, global staff AccessTokenUserGuard with the
+ * The app as main.ts wires it (request ids, AppErrorFilter, ValidationPipe, global staff AccessTokenUserGuard with the
  * real passport strategy), around the given controllers and providers. Staff users come from
  * `staffUsers` instead of the database, with the same rule as AuthService: missing or inactive is 401.
  */
@@ -39,9 +35,9 @@ export async function createHttpApp(
     validateUserById: async (id: string) => {
       const user = staffUsers.find((u) => u.id === id);
       if (!user || user.isActive === false)
-        throw new UnauthorizedException(
-          'Valid token with non-existent or inactive user.',
-        );
+        throw new AppException('unauthorized', {
+          message: 'Valid token with non-existent or inactive user.',
+        });
       return user;
     },
   };
@@ -59,8 +55,7 @@ export async function createHttpApp(
   }).compile();
 
   const app = moduleRef.createNestApplication({ logger: false });
-  app.useGlobalFilters(new ErrorFilter());
-  app.useGlobalPipes(createValidationPipe());
+  configureErrorHandling(app);
   app.useGlobalGuards(new AccessTokenUserGuard(app.get(Reflector)));
   await app.init();
   // One listening server per app: otherwise supertest opens a new ephemeral server for every request, and

@@ -6,11 +6,8 @@ import {
   HttpCode,
   Inject,
   Logger,
-  NotFoundException,
   Param,
   Post,
-  ServiceUnavailableException,
-  UnauthorizedException,
 } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { errorMessage } from 'src/infra/helper/error-text';
@@ -21,6 +18,7 @@ import { TELEGRAM_UPDATE_QUEUE } from '../services/telegram-update.queue';
 import type { TelegramUpdateQueue } from '../services/telegram-update.queue';
 import { TelegramVerificationService } from '../services/telegram-verification.service';
 import type { TelegramUpdate } from '../services/telegram-verification.service';
+import { AppException } from 'src/infra/errors/app-exception';
 
 const UUID_RE = /^[0-9a-fA-F-]{36}$/;
 
@@ -53,12 +51,12 @@ export class TelegramBotWebhookController {
     @Headers('x-telegram-bot-api-secret-token') secret: string | undefined,
     @Body() update: TelegramUpdate,
   ) {
-    if (!UUID_RE.test(botKey)) throw new NotFoundException();
+    if (!UUID_RE.test(botKey)) throw new AppException('not_found');
     const bot = await this.bots.byKey(botKey);
-    if (!bot) throw new NotFoundException();
+    if (!bot) throw new AppException('not_found');
 
     if (!webhookSecretMatches(secret, bot.webhookSecretHash)) {
-      throw new UnauthorizedException();
+      throw new AppException('unauthorized');
     }
 
     const updateId = update?.update_id;
@@ -74,7 +72,7 @@ export class TelegramBotWebhookController {
       await this.verification
         .releaseUpdate(bot.botKey, updateId)
         .catch(() => undefined);
-      throw new ServiceUnavailableException();
+      throw new AppException('unavailable');
     }
     return { ok: true };
   }

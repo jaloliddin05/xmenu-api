@@ -5,7 +5,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import request from 'supertest';
-import { ErrorFilter } from '../validators';
+import { configureErrorHandling } from '../errors/configure';
 import { configureStatic } from './static-assets';
 
 @Controller()
@@ -35,7 +35,7 @@ describe('configureStatic', () => {
       controllers: [Dummy],
     }).compile();
     app = mod.createNestApplication<NestExpressApplication>();
-    app.useGlobalFilters(new ErrorFilter());
+    configureErrorHandling(app);
     configureStatic(app, root);
     await app.init();
   });

@@ -1,9 +1,4 @@
-import {
-  ConflictException,
-  Injectable,
-  NotFoundException,
-  UnprocessableEntityException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { ACTIVE } from 'src/modules/menu/menu.service';
 import { RevalidateService } from 'src/modules/revalidate-queue/revalidate.service';
@@ -17,6 +12,7 @@ import {
   PublicationFacts,
 } from '../domain/publication';
 import { PublicationViewDto } from '../dto/publication.dto';
+import { AppException } from 'src/infra/errors/app-exception';
 
 type Db = Prisma.TransactionClient;
 
@@ -62,8 +58,7 @@ export class PublicationService {
           modeNeedsBot(mode) &&
           !(await this.botConnected(tx, organizationId))
         ) {
-          throw new UnprocessableEntityException({
-            code: 'telegram_bot_required',
+          throw new AppException('telegram_bot_required', {
             message:
               'Connect the venue Telegram bot before choosing the Mini App',
           });
@@ -106,8 +101,7 @@ export class PublicationService {
           await this.facts(tx, organizationId),
         );
         if (!isReady(checklist)) {
-          throw new ConflictException({
-            code: 'publication_incomplete',
+          throw new AppException('publication_incomplete', {
             message: 'Publication checklist is not complete',
             details: { missing: checklist.filter((i) => i.status === 'todo') },
           });
@@ -168,7 +162,10 @@ export class PublicationService {
       where: { id: organizationId },
       select: CHANNEL_FIELDS,
     });
-    if (!row) throw new NotFoundException('Organization not found');
+    if (!row)
+      throw new AppException('not_found', {
+        message: 'Organization not found',
+      });
     return row;
   }
 
@@ -236,7 +233,10 @@ export class PublicationService {
         }),
         this.botConnected(db, organizationId),
       ]);
-    if (!org) throw new NotFoundException('Organization not found');
+    if (!org)
+      throw new AppException('not_found', {
+        message: 'Organization not found',
+      });
     return {
       name: org.name,
       slug: org.slug,

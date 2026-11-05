@@ -114,7 +114,7 @@ describe('/organization/:id/domains (owner)', () => {
       .expect(400);
     expect(res.body).toMatchObject({
       code: 'platform_host',
-      errors: [{ field: 'host', reason: 'platform_host' }],
+      fields: [{ field: 'host', code: 'platform_host' }],
     });
     const missing = await request(app.getHttpServer())
       .post(`/organization/${ORG_A}/domains`)
@@ -123,7 +123,7 @@ describe('/organization/:id/domains (owner)', () => {
       .expect(400);
     expect(missing.body.code).toBe('validation_error');
     expect(
-      new Set(missing.body.errors.map((e: { field: string }) => e.field)),
+      new Set(missing.body.fields.map((e: { field: string }) => e.field)),
     ).toEqual(new Set(['host']));
   });
 

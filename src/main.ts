@@ -1,11 +1,10 @@
-import { createValidationPipe } from './infra/validators/validation-errors';
 import { NestFactory, Reflector } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { SwaggerModule } from '@nestjs/swagger';
 import { createOpenApiDocument } from './swagger';
 import { AppModule } from './app.module';
 import { configureStatic } from './infra/http/static-assets';
-import { ErrorFilter } from './infra/validators';
+import { configureErrorHandling } from './infra/errors/configure';
 import { AccessTokenUserGuard } from './modules/auth/passport-strategies/access-token-user/access-token-user.guard';
 import { checkEnvAtStartup } from './config/env/startup-check';
 
@@ -33,9 +32,8 @@ async function bootstrap() {
 
   configureStatic(app);
 
-  app.useGlobalFilters(new ErrorFilter());
-
-  app.useGlobalPipes(createValidationPipe());
+  // X-Request-Id, one error shape for both APIs (AppErrorFilter), the validation pipe
+  configureErrorHandling(app);
 
   const reflector = app.get(Reflector);
   app.useGlobalGuards(new AccessTokenUserGuard(reflector));

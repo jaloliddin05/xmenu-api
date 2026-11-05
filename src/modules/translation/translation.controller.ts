@@ -5,7 +5,6 @@ import {
   HttpCode,
   HttpStatus,
   Req,
-  UnauthorizedException,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
@@ -14,6 +13,7 @@ import { TranslationDto } from './dto';
 import { RateLimitService } from '../auth/services/rate-limit.service';
 import { translationIpRate, translationRate } from './translation.limits';
 import { requestCtx, type StaffRequest } from 'src/infra/http/request-helpers';
+import { AppException } from 'src/infra/errors/app-exception';
 
 @ApiTags('Translation')
 @Controller('translation')
@@ -34,7 +34,7 @@ export class TranslationController {
     @Req() req: StaffRequest & Request,
   ) {
     const userId = req?.user?.id;
-    if (!userId) throw new UnauthorizedException();
+    if (!userId) throw new AppException('unauthorized');
     const { limit, ttlSeconds } = translationRate();
     const ipRate = translationIpRate();
     await this.rateLimit.hit([

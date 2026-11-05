@@ -1,11 +1,4 @@
-import {
-  BadRequestException,
-  Body,
-  Controller,
-  Get,
-  Put,
-  Req,
-} from '@nestjs/common';
+import { Body, Controller, Get, Put, Req } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   requireStaffOrganizationId,
@@ -17,6 +10,7 @@ import { parseZone } from '../domain/order-money';
 import { UpdateOrderSettingsDto } from '../dto/order-settings.dto';
 import { OrderSettingsService } from '../services/order-settings.service';
 import { RevalidateService } from 'src/modules/revalidate-queue/revalidate.service';
+import { fieldError } from 'src/infra/validators/validation-errors';
 
 /** Restoran paneli: yetkazib berish narxi, minimal summa, zona, taymautlar. */
 @ApiTags('Order settings')
@@ -44,12 +38,14 @@ export class OrderSettingsController {
     const organizationId = requireStaffOrganizationId(req);
 
     if (dto.deliveryZone != null && parseZone(dto.deliveryZone) === null) {
-      throw new BadRequestException(
+      throw fieldError(
+        'deliveryZone',
+        'polygon',
         'deliveryZone must be [[lat, lng], ...] with at least 3 points',
       );
     }
     if (dto.etaMin != null && dto.etaMax != null && dto.etaMax < dto.etaMin) {
-      throw new BadRequestException('etaMax must be >= etaMin');
+      throw fieldError('etaMax', 'min', 'etaMax must be >= etaMin');
     }
 
     // deliveryZone: undefined — o'zgartirmaslik; null — zonani o'chirish (SQL NULL); massiv — saqlash

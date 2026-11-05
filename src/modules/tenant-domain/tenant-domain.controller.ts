@@ -5,7 +5,6 @@ import {
   Get,
   HttpCode,
   HttpStatus,
-  NotFoundException,
   Param,
   Post,
   Req,
@@ -26,27 +25,28 @@ import {
 } from '@nestjs/swagger';
 import { requireStaffOrganizationId } from 'src/infra/http/request-helpers';
 import type { StaffRequest } from 'src/infra/http/request-helpers';
-import { ErrorResponseDto } from 'src/infra/validators/error-response.dto';
+import { ErrorResponse } from 'src/infra/errors/error-response.dto';
 import {
   AddDomainDto,
   TenantDomainDto,
   TenantDomainListDto,
 } from './dto/tenant-domain.dto';
 import { TenantDomainService } from './tenant-domain.service';
+import { AppException } from 'src/infra/errors/app-exception';
 
 /** Owner (dashboard): the venue's own domains for the delivery site. */
 @ApiTags('Organization domains')
 @ApiBearerAuth('access-token')
 @ApiUnauthorizedResponse({
-  type: ErrorResponseDto,
+  type: ErrorResponse,
   description: 'No or invalid owner token',
 })
 @ApiForbiddenResponse({
-  type: ErrorResponseDto,
+  type: ErrorResponse,
   description: 'The user has no organization',
 })
 @ApiNotFoundResponse({
-  type: ErrorResponseDto,
+  type: ErrorResponse,
   description:
     'Not your organization (any other id looks missing); domain_not_found: no such domain of this venue',
 })
@@ -58,7 +58,9 @@ export class TenantDomainController {
   private own(id: string, req: StaffRequest): string {
     const organizationId = requireStaffOrganizationId(req);
     if (id !== organizationId)
-      throw new NotFoundException('Organization not found');
+      throw new AppException('not_found', {
+        message: 'Organization not found',
+      });
     return organizationId;
   }
 
@@ -79,17 +81,17 @@ export class TenantDomainController {
   })
   @ApiCreatedResponse({ type: TenantDomainDto })
   @ApiBadRequestResponse({
-    type: ErrorResponseDto,
+    type: ErrorResponse,
     description:
-      'invalid_host (not a bare domain name), platform_host (the platform domain or under it), reserved_host (localhost, .local, .internal, IP); field in errors[]',
+      'invalid_host (not a bare domain name), platform_host (the platform domain or under it), reserved_host (localhost, .local, .internal, IP); field in fields[]',
   })
   @ApiConflictResponse({
-    type: ErrorResponseDto,
+    type: ErrorResponse,
     description:
       'domain_already_added (this venue has it), domain_taken (verified by another venue)',
   })
   @ApiUnprocessableEntityResponse({
-    type: ErrorResponseDto,
+    type: ErrorResponse,
     description: 'domain_limit_reached (details.limit)',
   })
   add(
@@ -108,11 +110,11 @@ export class TenantDomainController {
   })
   @ApiOkResponse({ type: TenantDomainDto })
   @ApiConflictResponse({
-    type: ErrorResponseDto,
+    type: ErrorResponse,
     description: 'domain_taken: another venue verified this host first',
   })
   @ApiUnprocessableEntityResponse({
-    type: ErrorResponseDto,
+    type: ErrorResponse,
     description:
       'domain_verification_failed: details.reason record_not_found | token_mismatch | dns_error, details.record the expected record',
   })

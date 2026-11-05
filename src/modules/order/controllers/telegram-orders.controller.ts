@@ -7,8 +7,6 @@ import {
   HttpCode,
   Logger,
   Post,
-  ServiceUnavailableException,
-  UnauthorizedException,
 } from '@nestjs/common';
 import { timingSafeEqual } from 'crypto';
 import { ApiExcludeController } from '@nestjs/swagger';
@@ -21,6 +19,10 @@ import {
   OrderStaffService,
   RestaurantAction,
 } from '../services/order-staff.service';
+import {
+  AppException,
+  platformMisconfigured,
+} from 'src/infra/errors/app-exception';
 
 interface CallbackQuery {
   id: string;
@@ -64,13 +66,16 @@ export class TelegramOrdersController {
   ) {
     const expected = process.env.TELEGRAM_WEBHOOK_SECRET;
     if (!expected)
-      throw new ServiceUnavailableException('Webhook is not configured');
+      throw platformMisconfigured(
+        'order_notifications',
+        'TELEGRAM_WEBHOOK_SECRET is not set',
+      );
     if (
       !secret ||
       secret.length !== expected.length ||
       !timingSafeEqual(Buffer.from(secret), Buffer.from(expected))
     ) {
-      throw new UnauthorizedException();
+      throw new AppException('unauthorized');
     }
 
     const cq = update?.callback_query;

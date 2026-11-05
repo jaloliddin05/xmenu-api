@@ -7,9 +7,10 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { BadRequestException } from '@nestjs/common';
+import { AppException } from 'src/infra/errors/app-exception';
 import {
   createValidationPipe,
+  fieldCode,
   flattenValidationErrors,
 } from './validation-errors';
 
@@ -41,29 +42,33 @@ describe('validation errors', () => {
       zoom: 1.5,
       extra: true,
     }).catch((e: unknown) => e);
-    expect(err).toBeInstanceOf(BadRequestException);
-    const body = (err as BadRequestException).getResponse() as Record<
-      string,
-      any
-    >;
+    expect(err).toBeInstanceOf(AppException);
+    const body = (err as AppException).getResponse() as Record<string, any>;
     expect(body.code).toBe('validation_error');
-    expect(body.errors).toEqual(
+    expect(body.fields).toEqual(
       expect.arrayContaining([
         {
           field: 'theme.brand',
-          reason: 'matches',
+          code: 'matches',
           message: 'brand must be a hex color',
         },
-        expect.objectContaining({ field: 'languages', reason: 'isIn' }),
-        expect.objectContaining({ field: 'points[1].lat', reason: 'max' }),
-        expect.objectContaining({ field: 'zoom', reason: 'isInt' }),
+        expect.objectContaining({ field: 'languages', code: 'is_in' }),
+        expect.objectContaining({ field: 'points[1].lat', code: 'max' }),
+        expect.objectContaining({ field: 'zoom', code: 'is_int' }),
         expect.objectContaining({
           field: 'extra',
-          reason: 'whitelistValidation',
+          code: 'unknown_field',
         }),
       ]),
     );
     expect(body.message).toContain('theme.brand: brand must be a hex color');
+  });
+
+  it('turns constraint names into snake_case field codes', () => {
+    expect(fieldCode('isIn')).toBe('is_in');
+    expect(fieldCode('maxLength')).toBe('max_length');
+    expect(fieldCode('max')).toBe('max');
+    expect(fieldCode('whitelistValidation')).toBe('unknown_field');
   });
 
   it('flattens an empty list to nothing', () => {

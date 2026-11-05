@@ -269,7 +269,7 @@ describe('GET/PUT /organization/:id/settings', () => {
       { languages: ['uz', 'kk'] },
       'validation_error',
       'languages',
-      'isIn',
+      'is_in',
     ],
     [
       'latitude',
@@ -279,33 +279,33 @@ describe('GET/PUT /organization/:id/settings', () => {
       'max',
     ],
     ['zoom', { mapZoom: 22 }, 'validation_error', 'mapZoom', 'max'],
-    ['zoom integer', { mapZoom: 1.5 }, 'validation_error', 'mapZoom', 'isInt'],
+    ['zoom integer', { mapZoom: 1.5 }, 'validation_error', 'mapZoom', 'is_int'],
     [
       'unknown field',
       { extra: 1 },
       'validation_error',
       'extra',
-      'whitelistValidation',
+      'unknown_field',
     ],
     [
       'default language',
       { defaultLanguage: 'en' },
       'invalid_settings',
       'defaultLanguage',
-      'notInLanguages',
+      'not_in_languages',
     ],
     [
       'center outside bounds',
       { mapCenter: { lat: 40, lng: 69.24 } },
       'invalid_settings',
       'mapCenter',
-      'outsideBounds',
+      'outside_bounds',
     ],
-  ])('400 names the field: %s', async (_name, patch, code, field, reason) => {
+  ])('400 names the field: %s', async (_name, patch, code, field, rule) => {
     const res = await put({ ...VALID, ...patch }).expect(400);
     expect(res.body.code).toBe(code);
-    expect(res.body.errors).toContainEqual(
-      expect.objectContaining({ field, reason }),
+    expect(res.body.fields).toContainEqual(
+      expect.objectContaining({ field, code: rule }),
     );
     expect(res.body.message).toContain(`${field}: `);
   });

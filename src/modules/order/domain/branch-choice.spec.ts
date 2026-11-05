@@ -1,4 +1,4 @@
-import { CustomerAuthException } from 'src/modules/auth/errors/customer-auth.exception';
+import { AppException } from 'src/infra/errors/app-exception';
 import { BranchCandidate, chooseBranch } from './branch-choice';
 
 type B = { title: string };
@@ -27,7 +27,7 @@ const errorOf = (fn: () => unknown) => {
   try {
     fn();
   } catch (e) {
-    return e as CustomerAuthException;
+    return e as AppException;
   }
   throw new Error('expected an error');
 };

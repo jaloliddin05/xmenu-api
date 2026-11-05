@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { normalizeAddressInput } from 'src/infra/helper/customer/address-validators';
-import { CustomerAuthException } from 'src/modules/auth/errors/customer-auth.exception';
 import { CreateAddressDto } from '../dto';
 import {
   AddressRecord,
   CustomerAddressRepository,
 } from '../repositories/customer-address.repository';
+import { AppException } from 'src/infra/errors/app-exception';
 
 /** Bir mijoz saqlay oladigan manzillar soni. Spam va nazoratsiz o'sishdan himoya. */
 export const MAX_ADDRESSES_PER_CUSTOMER = 20;
@@ -58,7 +58,7 @@ export class CustomerAddressService {
   ): Promise<AddressView> {
     const input = normalizeAddressInput(dto);
     if (!input.ok)
-      throw new CustomerAuthException('invalid_address', input.message);
+      throw new AppException('invalid_address', { message: input.message });
 
     return this.addresses.withCustomerLock(
       tenantId,
@@ -66,10 +66,9 @@ export class CustomerAddressService {
       async (store) => {
         const existing = await store.count();
         if (existing >= MAX_ADDRESSES_PER_CUSTOMER) {
-          throw new CustomerAuthException(
-            'address_limit_reached',
-            `Manzillar soni ${MAX_ADDRESSES_PER_CUSTOMER} tadan oshmasligi kerak`,
-          );
+          throw new AppException('address_limit_reached', {
+            message: `A customer can save at most ${MAX_ADDRESSES_PER_CUSTOMER} addresses`,
+          });
         }
 
         // Birinchi manzil har doim asosiy: savatda tanlash uchun doim bitta
@@ -96,7 +95,7 @@ export class CustomerAddressService {
       customerId,
       async (store) => {
         const row = await store.findById(id);
-        if (!row) throw new CustomerAuthException('address_not_found');
+        if (!row) throw new AppException('address_not_found');
 
         await store.delete(id);
 
@@ -120,7 +119,7 @@ export class CustomerAddressService {
       customerId,
       async (store) => {
         const row = await store.findById(id);
-        if (!row) throw new CustomerAuthException('address_not_found');
+        if (!row) throw new AppException('address_not_found');
         if (row.is_default) return toAddressView(row); // idempotent
 
         await store.clearDefault();

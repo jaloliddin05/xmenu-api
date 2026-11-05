@@ -95,15 +95,13 @@ describe('validateProfileInput', () => {
       ['ru', 'uz'],
     );
     if (!('errors' in r)) throw new Error('expected errors');
-    const byField = Object.fromEntries(
-      r.errors.map((e) => [e.field, e.reason]),
-    );
+    const byField = Object.fromEntries(r.errors.map((e) => [e.field, e.code]));
     expect(byField).toMatchObject({
-      'ru.name': 'maxLength',
-      'ru.shortDescription': 'isNotEmpty',
-      'ru.menuButtonText': 'isString',
-      'ru.extra': 'whitelistValidation',
-      de: 'notInLanguages',
+      'ru.name': 'max_length',
+      'ru.shortDescription': 'is_not_empty',
+      'ru.menuButtonText': 'is_string',
+      'ru.extra': 'unknown_field',
+      de: 'not_in_languages',
     });
     expect(byField['uz.name']).toBeUndefined();
   });

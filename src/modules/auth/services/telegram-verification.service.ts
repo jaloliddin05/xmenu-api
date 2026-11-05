@@ -13,7 +13,6 @@ import {
 } from 'src/modules/telegram/telegram-client';
 import { CUSTOMER_AUTH_CONFIG } from '../customer-auth.config';
 import type { CustomerAuthConfig } from '../customer-auth.config';
-import { CustomerAuthException } from '../errors/customer-auth.exception';
 import { CustomerAuthService } from './customer-auth.service';
 import type { VerifyResult } from './customer-auth.service';
 import { CustomerAuthEventService } from './customer-auth-event.service';
@@ -27,6 +26,7 @@ import {
   normalizeTelegramPhone,
   pickBotLang,
 } from './telegram-verification.util';
+import { AppException } from 'src/infra/errors/app-exception';
 
 export type TelegramVerifyMode = 'instant' | 'code';
 
@@ -118,13 +118,12 @@ export class TelegramVerificationService {
   ): Promise<TelegramStartResult> {
     const bot = await this.bots.forTenant(tenant.id);
     if (!bot) {
-      throw new CustomerAuthException(
-        'telegram_unavailable',
-        'Telegram bot is not connected for this tenant',
-      );
+      throw new AppException('telegram_unavailable', {
+        message: 'Telegram bot is not connected for this tenant',
+      });
     }
     if (dto.phone !== undefined && !isValidPhone(dto.phone)) {
-      throw new CustomerAuthException('invalid_phone');
+      throw new AppException('invalid_phone');
     }
 
     // Only the venue's own bot can have opened the Mini App that starts this flow
@@ -133,8 +132,7 @@ export class TelegramVerificationService {
       : undefined;
     const mode: TelegramVerifyMode = tgUserId ? 'instant' : 'code';
     // Without initData nothing identifies the Telegram user: the contact is checked against the phone
-    if (mode === 'code' && !dto.phone)
-      throw new CustomerAuthException('invalid_phone');
+    if (mode === 'code' && !dto.phone) throw new AppException('invalid_phone');
 
     const rules: RateRule[] = [
       { key: `tgv:rl:ip:${ctx.ip}`, limit: 20, ttlSeconds: 3600 },
@@ -379,7 +377,7 @@ export class TelegramVerificationService {
       );
     } catch (err) {
       const rateLimited =
-        err instanceof CustomerAuthException && err.code === 'rate_limited';
+        err instanceof AppException && err.code === 'rate_limited';
       return this.say(bot, chatId, rateLimited ? t.tooMany : t.failed);
     }
     await this.redis.hset(sKey(sid), { status: 'code_sent', phone });

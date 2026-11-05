@@ -1,4 +1,5 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
+import { AppException } from 'src/infra/errors/app-exception';
 import { TelegramApiError } from './telegram-client';
 import { TelegramBotProfileService } from './telegram-bot-profile.service';
 
@@ -123,7 +124,7 @@ describe('TelegramBotProfileService', () => {
     expect(row().synced_at).toBeInstanceOf(Date);
   });
 
-  it('a failing item does not stop the others and is reported with Telegram text', async () => {
+  it('a failing item does not stop the others and is reported with a code, Telegram text only in the log', async () => {
     const { svc, client, row } = setup();
     client.call.mockImplementation(async (_t, method, payload) => {
       if (method === 'setMyName' && payload?.language_code === 'uz') {
@@ -135,12 +136,17 @@ describe('TelegramBotProfileService', () => {
       }
       return true;
     });
+    const warn = jest
+      .spyOn(Logger.prototype, 'warn')
+      .mockImplementation(() => undefined);
     const result = await svc.apply(ORG);
 
-    expect(result.name).toEqual({
-      status: 'failed',
-      reason: 'uz: Too Many Requests: retry after 3600',
-    });
+    expect(result.name).toEqual({ status: 'failed', code: 'telegram_error' });
+    expect(JSON.stringify(row().sync_result)).not.toContain('Too Many');
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('Too Many Requests'),
+    );
+    warn.mockRestore();
     expect(result.description.status).toBe('ok');
     expect(result.menuButton.status).toBe('ok');
     expect(JSON.stringify(row().sync_result)).not.toContain(TOKEN);
@@ -150,14 +156,20 @@ describe('TelegramBotProfileService', () => {
     delete process.env.DELIVERY_URL_TEMPLATE;
     const { svc, calls } = setup();
     const result = await svc.apply(ORG);
-    expect(result.menuButton).toEqual({ status: 'skipped_no_url' });
+    expect(result.menuButton).toEqual({
+      status: 'skipped',
+      code: 'platform_misconfigured',
+      feature: 'delivery_link',
+    });
     expect(result.name.status).toBe('ok');
     expect(calls('setChatMenuButton')).toHaveLength(0);
   });
 
   it('apply without a connected bot: bot_not_connected', async () => {
     const { svc } = setup({ connected: false });
-    await expect(svc.apply(ORG)).rejects.toBeInstanceOf(NotFoundException);
+    await expect(svc.apply(ORG)).rejects.toMatchObject({
+      code: 'bot_not_connected',
+    });
   });
 
   it('view: defaults until saved, then the saved profile with isDefault false', async () => {
@@ -185,7 +197,7 @@ describe('TelegramBotProfileService', () => {
 
   it('save rejects bad input with field errors and stores nothing', async () => {
     const { svc, prisma, client } = setup();
-    const err: BadRequestException = await svc
+    const err: AppException = await svc
       .save(ORG, {
         ru: {
           name: '',
@@ -195,10 +207,10 @@ describe('TelegramBotProfileService', () => {
         },
       })
       .catch((e) => e);
-    expect(err).toBeInstanceOf(BadRequestException);
-    expect((err.getResponse() as any).errors[0]).toMatchObject({
+    expect(err).toBeInstanceOf(AppException);
+    expect(err.fields?.[0]).toMatchObject({
       field: 'ru.name',
-      reason: 'isNotEmpty',
+      code: 'is_not_empty',
     });
     expect(prisma.organization_telegram_bot.update).not.toHaveBeenCalled();
     expect(client.call).not.toHaveBeenCalled();
@@ -216,9 +228,9 @@ describe('TelegramBotProfileService', () => {
         },
       })
       .catch((e) => e);
-    expect(err.getResponse().errors[0]).toMatchObject({
+    expect(err.getResponse().fields[0]).toMatchObject({
       field: 'uz',
-      reason: 'notInLanguages',
+      code: 'not_in_languages',
     });
   });
 

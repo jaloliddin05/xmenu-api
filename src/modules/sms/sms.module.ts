@@ -6,7 +6,6 @@ import { ConsoleSmsProvider } from './providers/console-sms.provider';
 import { EskizSmsProvider } from './providers/eskiz-sms.provider';
 import { TelegramSmsProvider } from './providers/telegram-sms.provider';
 import { Env, EnvIssues, isProduction } from 'src/config/env/env-issues';
-import { errorMessage } from 'src/infra/helper/error-text';
 
 export type SmsProviderName = 'eskiz' | 'telegram' | 'console';
 
@@ -53,13 +52,18 @@ export function isSmsConfigured(env: NodeJS.ProcessEnv = process.env): boolean {
  */
 export function smsEnvIssues(env: Env = process.env): EnvIssues {
   const issues: EnvIssues = { errors: [], warnings: [] };
-  let name: SmsProviderName;
-  try {
-    name = resolveSmsProviderName(env);
-  } catch (e) {
-    issues.errors.push(errorMessage(e));
+  const raw = env.SMS_PROVIDER;
+  if (raw && raw !== 'eskiz' && raw !== 'telegram' && raw !== 'console') {
+    issues.errors.push('SMS_PROVIDER must be eskiz, telegram or console');
     return issues;
   }
+  if (isProduction(env) && raw === 'console') {
+    issues.errors.push(
+      'SMS_PROVIDER=console is not allowed when NODE_ENV=production',
+    );
+    return issues;
+  }
+  const name = resolveSmsProviderName(env);
   if (isProduction(env) && !isSmsConfigured(env)) {
     issues.errors.push(
       name === 'eskiz'

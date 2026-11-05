@@ -1,6 +1,6 @@
 import type Redis from 'ioredis';
 import { FakeRedis } from 'src/infra/redis/redis.fake';
-import { CustomerAuthException } from '../errors/customer-auth.exception';
+import { AppException } from 'src/infra/errors/app-exception';
 import {
   LOGIN_FAILS_BEFORE_LOCK,
   StaffLoginThrottleService,
@@ -32,7 +32,7 @@ describe('StaffLoginThrottleService', () => {
       () => null,
       (e) => e,
     );
-    expect(err).toBeInstanceOf(CustomerAuthException);
+    expect(err).toBeInstanceOf(AppException);
     expect(err.code).toBe('too_many_attempts');
     expect(err.getStatus()).toBe(429);
     return err.retryAfter;

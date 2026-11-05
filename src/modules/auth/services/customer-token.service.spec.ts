@@ -7,7 +7,7 @@ import {
   AUD_REGISTRATION,
 } from './customer-token.service';
 import type { CustomerAuthConfig } from '../customer-auth.config';
-import { CustomerAuthException } from '../errors/customer-auth.exception';
+import { AppException } from 'src/infra/errors/app-exception';
 
 const TENANT_A = 'a1111111-1111-1111-1111-111111111111';
 const TENANT_B = 'b2222222-2222-2222-2222-222222222222';
@@ -131,16 +131,14 @@ describe('CustomerTokenService', () => {
       const token = service.signRegistration('+998901234567', TENANT_A);
 
       expect(() => service.verifyRegistration(token, TENANT_B)).toThrow(
-        CustomerAuthException,
+        AppException,
       );
       try {
         service.verifyRegistration(token, TENANT_B);
         fail('expected verifyRegistration to throw');
       } catch (err) {
-        expect(err).toBeInstanceOf(CustomerAuthException);
-        expect((err as CustomerAuthException).code).toBe(
-          'invalid_registration_token',
-        );
+        expect(err).toBeInstanceOf(AppException);
+        expect((err as AppException).code).toBe('invalid_registration_token');
       }
     });
 
@@ -157,10 +155,8 @@ describe('CustomerTokenService', () => {
         service.verifyRegistration(token, TENANT_A);
         fail('expected verifyRegistration to throw');
       } catch (err) {
-        expect(err).toBeInstanceOf(CustomerAuthException);
-        expect((err as CustomerAuthException).code).toBe(
-          'registration_expired',
-        );
+        expect(err).toBeInstanceOf(AppException);
+        expect((err as AppException).code).toBe('registration_expired');
       }
     });
 
@@ -171,10 +167,8 @@ describe('CustomerTokenService', () => {
         service.verifyRegistration('not-a-real-jwt', TENANT_A);
         fail('expected verifyRegistration to throw');
       } catch (err) {
-        expect(err).toBeInstanceOf(CustomerAuthException);
-        expect((err as CustomerAuthException).code).toBe(
-          'invalid_registration_token',
-        );
+        expect(err).toBeInstanceOf(AppException);
+        expect((err as AppException).code).toBe('invalid_registration_token');
       }
     });
 
@@ -199,10 +193,8 @@ describe('CustomerTokenService', () => {
         service.verifyRegistration(forged, TENANT_A);
         fail('expected verifyRegistration to throw');
       } catch (err) {
-        expect(err).toBeInstanceOf(CustomerAuthException);
-        expect((err as CustomerAuthException).code).toBe(
-          'invalid_registration_token',
-        );
+        expect(err).toBeInstanceOf(AppException);
+        expect((err as AppException).code).toBe('invalid_registration_token');
       }
     });
 
@@ -228,10 +220,8 @@ describe('CustomerTokenService', () => {
         service.verifyRegistration(none, TENANT_A);
         fail('expected verifyRegistration to throw');
       } catch (err) {
-        expect(err).toBeInstanceOf(CustomerAuthException);
-        expect((err as CustomerAuthException).code).toBe(
-          'invalid_registration_token',
-        );
+        expect(err).toBeInstanceOf(AppException);
+        expect((err as AppException).code).toBe('invalid_registration_token');
       }
     });
 
@@ -250,10 +240,8 @@ describe('CustomerTokenService', () => {
         service.verifyRegistration(incomplete, TENANT_A);
         fail('expected verifyRegistration to throw');
       } catch (err) {
-        expect(err).toBeInstanceOf(CustomerAuthException);
-        expect((err as CustomerAuthException).code).toBe(
-          'invalid_registration_token',
-        );
+        expect(err).toBeInstanceOf(AppException);
+        expect((err as AppException).code).toBe('invalid_registration_token');
       }
     });
   });

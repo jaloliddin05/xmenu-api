@@ -5,12 +5,12 @@ import {
   HttpCode,
   HttpStatus,
   Post,
-  BadRequestException,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { MulterStorage } from 'src/infra/helper/upload/multer-upload';
+import { fieldError } from 'src/infra/validators/validation-errors';
 
 @ApiTags('File')
 @Controller('file')
@@ -26,7 +26,7 @@ export class FileController {
   )
   @HttpCode(HttpStatus.OK)
   async uploadFile(@UploadedFile() file: Express.Multer.File) {
-    if (!file) throw new BadRequestException('file is required');
+    if (!file) throw fieldError('file', 'required', 'file is required');
     return await this.fileService.uploadFile(file);
   }
 }

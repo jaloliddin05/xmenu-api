@@ -1,3 +1,4 @@
+import { ErrorResponse } from 'src/infra/errors/error-response.dto';
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsBoolean, IsDefined, IsIn, ValidateNested } from 'class-validator';
@@ -115,37 +116,17 @@ export class PublicationMissingDto {
   missing: ChecklistItemDto[];
 }
 
-/** 409 publication_incomplete (owner error shape, ErrorFilter). */
-export class PublicationIncompleteErrorDto {
-  @ApiProperty({ example: 409 })
-  status: number;
-
-  @ApiProperty({ format: 'date-time' })
-  timestamp: string;
-
+/** 409 publication_incomplete (the common error shape, ErrorResponse). */
+export class PublicationIncompleteErrorDto extends ErrorResponse {
   @ApiProperty({ enum: ['publication_incomplete'] })
-  code: string;
-
-  @ApiProperty({ example: 'Publication checklist is not complete' })
-  message: string;
+  declare code: string;
 
   @ApiProperty({ type: PublicationMissingDto })
-  details: PublicationMissingDto;
+  declare details: PublicationMissingDto;
 }
 
-/** 422 telegram_bot_required (owner error shape, ErrorFilter). */
-export class TelegramBotRequiredErrorDto {
-  @ApiProperty({ example: 422 })
-  status: number;
-
-  @ApiProperty({ format: 'date-time' })
-  timestamp: string;
-
+/** 422 telegram_bot_required (the common error shape, ErrorResponse). */
+export class TelegramBotRequiredErrorDto extends ErrorResponse {
   @ApiProperty({ enum: ['telegram_bot_required'] })
-  code: string;
-
-  @ApiProperty({
-    example: 'Connect the venue Telegram bot before choosing the Mini App',
-  })
-  message: string;
+  declare code: string;
 }

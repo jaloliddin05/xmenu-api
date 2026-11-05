@@ -42,7 +42,7 @@ describe('settingsProblems', () => {
     expect(settingsProblems({ ...VALID, defaultLanguage: 'en' }, NOW)).toEqual([
       {
         field: 'defaultLanguage',
-        reason: 'notInLanguages',
+        code: 'not_in_languages',
         message: 'defaultLanguage must be one of languages',
       },
     ]);
@@ -50,7 +50,7 @@ describe('settingsProblems', () => {
 
   it('refuses a founding year in the future', () => {
     expect(settingsProblems({ ...VALID, foundedYear: 2027 }, NOW)).toEqual([
-      expect.objectContaining({ field: 'foundedYear', reason: 'inFuture' }),
+      expect.objectContaining({ field: 'foundedYear', code: 'in_future' }),
     ]);
     expect(settingsProblems({ ...VALID, foundedYear: 2026 }, NOW)).toEqual([]);
   });
@@ -107,7 +107,7 @@ describe('settingsProblems', () => {
     expect(problems).toHaveLength(1);
     expect(problems[0]).toMatchObject({
       field: 'mapBounds',
-      reason: 'invalidBounds',
+      code: 'invalid_bounds',
     });
   });
 
@@ -115,7 +115,7 @@ describe('settingsProblems', () => {
     expect(
       settingsProblems({ ...VALID, mapCenter: { lat: 40, lng: 69.24 } }, NOW),
     ).toEqual([
-      expect.objectContaining({ field: 'mapCenter', reason: 'outsideBounds' }),
+      expect.objectContaining({ field: 'mapCenter', code: 'outside_bounds' }),
     ]);
     expect(
       settingsProblems(

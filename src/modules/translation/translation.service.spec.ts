@@ -13,7 +13,7 @@ describe('TranslationService without OPENAI_API_KEY', () => {
     expect(() => new TranslationService({} as never)).not.toThrow();
   });
 
-  it('answers 503 translation_unavailable and never touches the database', async () => {
+  it('answers 503 platform_misconfigured translation and never touches the database', async () => {
     const findFirst = jest.fn();
     const service = new TranslationService({
       translation_prompt: { findFirst },
@@ -23,8 +23,9 @@ describe('TranslationService without OPENAI_API_KEY', () => {
       .catch((e: unknown) => e);
     expect(err).toBeInstanceOf(HttpException);
     expect((err as HttpException).getStatus()).toBe(503);
-    expect((err as HttpException).getResponse()).toMatchObject({
-      code: 'translation_unavailable',
+    expect(err).toMatchObject({
+      code: 'platform_misconfigured',
+      details: { feature: 'translation' },
     });
     expect(findFirst).not.toHaveBeenCalled();
   });

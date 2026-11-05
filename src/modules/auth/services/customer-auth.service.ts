@@ -15,7 +15,6 @@ import {
 } from 'src/infra/helper/auth/customer-validators';
 import { CUSTOMER_AUTH_CONFIG } from '../customer-auth.config';
 import type { CustomerAuthConfig } from '../customer-auth.config';
-import { CustomerAuthException } from '../errors/customer-auth.exception';
 import { CustomerOtpService } from './customer-otp.service';
 import { CustomerSessionService, TokenPair } from './customer-session.service';
 import { CustomerTokenService } from './customer-token.service';
@@ -25,6 +24,7 @@ import {
 } from './customer-auth-event.service';
 import { RateLimitService } from './rate-limit.service';
 import { TelegramInitDataService } from './telegram-init-data.service';
+import { AppException } from 'src/infra/errors/app-exception';
 
 type Customer = NonNullable<
   Awaited<ReturnType<CustomerRepository['findById']>>
@@ -57,7 +57,7 @@ export class CustomerAuthService {
     phone: string,
     ctx: RequestCtx,
   ): Promise<{ resendAfter: number; codeLength: number }> {
-    if (!isValidPhone(phone)) throw new CustomerAuthException('invalid_phone');
+    if (!isValidPhone(phone)) throw new AppException('invalid_phone');
 
     try {
       const resendAfter = await this.otp.request(tenant, phone, ctx.ip);
@@ -67,10 +67,7 @@ export class CustomerAuthService {
       });
       return { resendAfter, codeLength: this.cfg.otpLength };
     } catch (err) {
-      if (
-        err instanceof CustomerAuthException &&
-        err.code === 'sms_unavailable'
-      ) {
+      if (err instanceof AppException && err.code === 'sms_unavailable') {
         await this.events.log('otp_send_failed', ctx, {
           tenantId: tenant.id,
           phone,
@@ -88,10 +85,10 @@ export class CustomerAuthService {
     ctx: RequestCtx,
   ): Promise<VerifyResult> {
     const { phone, code } = dto;
-    if (!isValidPhone(phone)) throw new CustomerAuthException('invalid_phone');
+    if (!isValidPhone(phone)) throw new AppException('invalid_phone');
     // Format xato bo'lsa urinish sarflanmaydi
     if (!this.otp.isValidCodeFormat(code))
-      throw new CustomerAuthException('invalid_code');
+      throw new AppException('invalid_code');
 
     await this.rateLimit.hit([
       { key: `verify:rl:${phone}:${ctx.ip}`, limit: 10, ttlSeconds: 900 },
@@ -163,7 +160,7 @@ export class CustomerAuthService {
     );
 
     const name = normalizeCustomerName(dto.name);
-    if (!name) throw new CustomerAuthException('invalid_name');
+    if (!name) throw new AppException('invalid_name');
 
     // Bir martalik: token "yoqiladi"
     const burned = await this.redis.set(
@@ -173,8 +170,7 @@ export class CustomerAuthService {
       600,
       'NX',
     );
-    if (burned !== 'OK')
-      throw new CustomerAuthException('registration_expired');
+    if (burned !== 'OK') throw new AppException('registration_expired');
 
     const telegramId = dto.initData
       ? await this.safeTelegramId(tenant.id, dto.initData)
@@ -254,9 +250,9 @@ export class CustomerAuthService {
 
   async me(tenantId: string, customerId: string): Promise<CustomerUser> {
     const customer = await this.customers.findById(tenantId, customerId);
-    if (!customer) throw new CustomerAuthException('invalid_token');
+    if (!customer) throw new AppException('invalid_token');
     if (customer.status === 'blocked')
-      throw new CustomerAuthException('customer_blocked');
+      throw new AppException('customer_blocked');
     return this.customerService.toUser(customer);
   }
 
@@ -302,7 +298,7 @@ export class CustomerAuthService {
         phone: customer.phone,
         meta: { via },
       });
-      throw new CustomerAuthException('customer_blocked');
+      throw new AppException('customer_blocked');
     }
   }
 

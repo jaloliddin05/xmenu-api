@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../_prisma/prisma.service';
 import {
@@ -17,6 +17,7 @@ import {
   ownOption,
   ownProduct,
 } from './menu-ownership';
+import { AppException } from 'src/infra/errors/app-exception';
 
 @Injectable()
 export class AdditionalProductService {
@@ -33,7 +34,9 @@ export class AdditionalProductService {
       include: { translations: true, product: true },
     });
     if (!group)
-      throw new NotFoundException('Additional product group not found');
+      throw new AppException('not_found', {
+        message: 'Additional product group not found',
+      });
     return group;
   }
 
@@ -45,7 +48,10 @@ export class AdditionalProductService {
         additional_product_group: { include: { product: true } },
       },
     });
-    if (!option) throw new NotFoundException('Additional product not found');
+    if (!option)
+      throw new AppException('not_found', {
+        message: 'Additional product not found',
+      });
     return option;
   }
 
@@ -54,7 +60,8 @@ export class AdditionalProductService {
       where: { id, ...ownProduct(organizationId) },
       select: { id: true },
     });
-    if (!product) throw new NotFoundException('Product not found');
+    if (!product)
+      throw new AppException('not_found', { message: 'Product not found' });
   }
 
   async createGroup(

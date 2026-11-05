@@ -1,7 +1,7 @@
 import { Prisma } from '@prisma/client';
 import type { organization_settings } from '@prisma/client';
 import { isLang, Lang } from 'src/infra/http/request-helpers';
-import type { FieldError } from 'src/infra/validators/validation-errors';
+import type { FieldError } from 'src/infra/errors/app-exception';
 import { PLATFORM_THEME } from './platform-defaults';
 
 /** Brand colors a front-end can override; any key may be missing (the front-end keeps its neutral value). */
@@ -98,21 +98,21 @@ export function settingsProblems(
   if (!s.languages.includes(s.defaultLanguage)) {
     problems.push({
       field: 'defaultLanguage',
-      reason: 'notInLanguages',
+      code: 'not_in_languages',
       message: 'defaultLanguage must be one of languages',
     });
   }
   if (s.foundedYear !== null && s.foundedYear > now.getFullYear()) {
     problems.push({
       field: 'foundedYear',
-      reason: 'inFuture',
+      code: 'in_future',
       message: 'foundedYear must not be in the future',
     });
   }
   if (s.mapBounds !== null && parseBounds(s.mapBounds) === null) {
     problems.push({
       field: 'mapBounds',
-      reason: 'invalidBounds',
+      code: 'invalid_bounds',
       message:
         'mapBounds must be [[southWestLat, southWestLng], [northEastLat, northEastLng]] with valid coordinates, south-west below and left of north-east',
     });
@@ -124,7 +124,7 @@ export function settingsProblems(
     if (lat < s0 || lat > n0 || lng < w0 || lng > e0) {
       problems.push({
         field: 'mapCenter',
-        reason: 'outsideBounds',
+        code: 'outside_bounds',
         message: 'mapCenter must lie within mapBounds',
       });
     }

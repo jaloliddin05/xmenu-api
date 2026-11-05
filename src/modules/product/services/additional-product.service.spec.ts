@@ -1,4 +1,3 @@
-import { NotFoundException } from '@nestjs/common';
 import {
   FakeMenuPrisma,
   seedTwoTenants,
@@ -23,7 +22,7 @@ describe('AdditionalProductService: organization ownership (IDOR)', () => {
   });
 
   async function refused(p: Promise<unknown>) {
-    await expect(p).rejects.toBeInstanceOf(NotFoundException);
+    await expect(p).rejects.toMatchObject({ code: 'not_found' });
     expect(db.log).toEqual([]);
     expect(revalidate.addRevalidationJob).not.toHaveBeenCalled();
   }
@@ -130,7 +129,7 @@ describe('AdditionalProductService: organization ownership (IDOR)', () => {
       // ...and is invisible to the other tenant
       await expect(
         service.deleteGroup(g.id, t.theirs.org.id, 'theirs'),
-      ).rejects.toBeInstanceOf(NotFoundException);
+      ).rejects.toMatchObject({ code: 'not_found' });
     });
 
     it('updates and deletes my own group', async () => {

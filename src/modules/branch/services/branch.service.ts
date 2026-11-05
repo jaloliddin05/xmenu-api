@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
 import { Lang } from 'src/infra/http/request-helpers';
 import {
@@ -17,6 +17,7 @@ import {
   UpdateBranchDto,
   CreateHoursExceptionDto,
 } from '../dto/branch.dto';
+import { AppException } from 'src/infra/errors/app-exception';
 
 const withSchedule = {
   working_hours: { orderBy: { weekday: 'asc' } },
@@ -269,6 +270,7 @@ export class BranchService {
       where: { id, organization_id: organizationId },
       select: { id: true },
     });
-    if (!b) throw new NotFoundException('Branch not found');
+    if (!b)
+      throw new AppException('not_found', { message: 'Branch not found' });
   }
 }

@@ -1,4 +1,3 @@
-import { CustomerAuthException } from 'src/modules/auth/errors/customer-auth.exception';
 import {
   AddressRecord,
   AddressStore,
@@ -9,6 +8,7 @@ import {
   CustomerAddressService,
   MAX_ADDRESSES_PER_CUSTOMER,
 } from './customer-address.service';
+import { AppException } from 'src/infra/errors/app-exception';
 
 const TENANT = 'tenant-a';
 const OTHER_TENANT = 'tenant-b';
@@ -61,9 +61,9 @@ class FakeAddressRepository {
     const run = previous.then(async () => {
       const customer = this.customers.get(customerId);
       if (!customer || customer.tenantId !== tenantId)
-        throw new CustomerAuthException('invalid_token');
+        throw new AppException('invalid_token');
       if (customer.status === 'blocked')
-        throw new CustomerAuthException('customer_blocked');
+        throw new AppException('customer_blocked');
       return fn(this.storeFor(customerId));
     });
     this.locks.set(
@@ -155,7 +155,7 @@ async function codeOf(promise: Promise<unknown>): Promise<string> {
   try {
     await promise;
   } catch (err) {
-    if (err instanceof CustomerAuthException) return err.code;
+    if (err instanceof AppException) return err.code;
     throw err;
   }
   throw new Error('expected the promise to reject');
@@ -286,9 +286,7 @@ describe('CustomerAddressService', () => {
       expect(rejected).toHaveLength(5);
       expect(
         rejected.every(
-          (r) =>
-            (r.reason as CustomerAuthException).code ===
-            'address_limit_reached',
+          (r) => (r.reason as AppException).code === 'address_limit_reached',
         ),
       ).toBe(true);
       expect(repo.all(ALICE).filter((r) => r.is_default)).toHaveLength(1);

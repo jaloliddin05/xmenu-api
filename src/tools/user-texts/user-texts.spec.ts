@@ -37,7 +37,7 @@ describe('scanSource', () => {
   it('checks every string of an exception, including object messages and templates', () => {
     const src = [
       "throw new BadRequestException({ code: 'x', message: 'PUBLIC_API_URL is not https' });",
-      "throw new CustomerAuthException('x', `Kod ${n} xato: заказ`);",
+      "throw new AppException('x', `Kod ${n} xato: заказ`);",
       "throw new ServiceUnavailableException('Provider is down');",
     ].join('\n');
     expect(problems('src/a.ts', src)).toEqual([
@@ -72,6 +72,15 @@ describe('scanSource', () => {
         'void ops.send(`Refund failed: ${errorMessage(err)}`);',
       ),
     ).toEqual([]);
+  });
+
+  it('leaves causes alone: they only reach the log', () => {
+    const src = [
+      "throw platformMisconfigured('sms', 'SMS_PROVIDER lacks ESKIZ_EMAIL');",
+      "throw platformMisconfigured('payments', errorMessage(e));",
+      "throw new AppException('internal_error', { cause: `DATABASE_URL: ${e.message}` });",
+    ].join('\n');
+    expect(problems('src/a.ts', src)).toEqual([]);
   });
 
   it('checks field errors', () => {

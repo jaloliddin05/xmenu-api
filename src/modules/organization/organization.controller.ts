@@ -1,6 +1,4 @@
 import {
-  BadRequestException,
-  NotFoundException,
   Controller,
   Get,
   Post,
@@ -31,6 +29,7 @@ import {
   type StaffRequest,
 } from 'src/infra/http/request-helpers';
 import { isValidSlug, SLUG_RULE } from './domain/slug';
+import { AppException } from 'src/infra/errors/app-exception';
 
 @ApiTags('Organization')
 @Controller('organization')
@@ -59,7 +58,10 @@ export class OrganizationController {
   @HttpCode(HttpStatus.OK)
   async getSlugById(@Param('id') id: string) {
     const slug = await this.organizationService.findActiveSlug(id);
-    if (!slug) throw new NotFoundException('Organization not found');
+    if (!slug)
+      throw new AppException('not_found', {
+        message: 'Organization not found',
+      });
     return slug;
   }
 
@@ -80,10 +82,7 @@ export class OrganizationController {
   })
   async checkSlug(@Body('slug') slug: string) {
     if (!isValidSlug(slug))
-      throw new BadRequestException({
-        message: `slug: ${SLUG_RULE}`,
-        code: 'invalid_slug',
-      });
+      throw new AppException('invalid_slug', { message: `slug: ${SLUG_RULE}` });
     const exists = await this.organizationService.isSlugExists(slug);
     return { exists };
   }

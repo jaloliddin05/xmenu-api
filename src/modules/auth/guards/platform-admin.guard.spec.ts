@@ -1,4 +1,5 @@
-import { ExecutionContext, ForbiddenException } from '@nestjs/common';
+import { AppException } from 'src/infra/errors/app-exception';
+import { ExecutionContext } from '@nestjs/common';
 import { PlatformAdminGuard } from './platform-admin.guard';
 
 const ctx = (user: unknown) =>
@@ -11,22 +12,16 @@ describe('PlatformAdminGuard', () => {
   afterEach(() => delete process.env.PLATFORM_ADMIN_USER_IDS);
 
   it('denies everyone when the list is unset or empty', () => {
-    expect(() => guard.canActivate(ctx({ id: 'u1' }))).toThrow(
-      ForbiddenException,
-    );
+    expect(() => guard.canActivate(ctx({ id: 'u1' }))).toThrow(AppException);
     process.env.PLATFORM_ADMIN_USER_IDS = ' , ';
-    expect(() => guard.canActivate(ctx({ id: '' }))).toThrow(
-      ForbiddenException,
-    );
-    expect(() => guard.canActivate(ctx({ id: 'u1' }))).toThrow(
-      ForbiddenException,
-    );
+    expect(() => guard.canActivate(ctx({ id: '' }))).toThrow(AppException);
+    expect(() => guard.canActivate(ctx({ id: 'u1' }))).toThrow(AppException);
   });
 
   it('denies an ordinary owner', () => {
     process.env.PLATFORM_ADMIN_USER_IDS = 'admin-1';
     expect(() => guard.canActivate(ctx({ id: 'owner-9' }))).toThrow(
-      ForbiddenException,
+      AppException,
     );
   });
 
@@ -45,7 +40,7 @@ describe('PlatformAdminGuard', () => {
       undefined,
       { id: ['admin-1'] },
     ]) {
-      expect(() => guard.canActivate(ctx(user))).toThrow(ForbiddenException);
+      expect(() => guard.canActivate(ctx(user))).toThrow(AppException);
     }
   });
 });

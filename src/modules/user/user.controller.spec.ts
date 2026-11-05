@@ -1,4 +1,3 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { UserController } from './user.controller';
 import { UserService } from './user.service';
 
@@ -29,9 +28,9 @@ describe('UserController: only your own account', () => {
   ])(
     '%s on someone else is 404 and never reaches the service',
     async (_name, call) => {
-      await expect(Promise.resolve().then(call)).rejects.toBeInstanceOf(
-        NotFoundException,
-      );
+      await expect(Promise.resolve().then(call)).rejects.toMatchObject({
+        code: 'not_found',
+      });
       expect(service.update).not.toHaveBeenCalled();
       expect(service.changePassword).not.toHaveBeenCalled();
       expect(service.delete).not.toHaveBeenCalled();
@@ -70,7 +69,7 @@ describe('UserService.changePassword', () => {
         { oldPassword: 'x', newPassword: 'new-password' },
         'u',
       ),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    ).rejects.toMatchObject({ code: 'wrong_password' });
   });
 
   it('never returns the new hash', async () => {

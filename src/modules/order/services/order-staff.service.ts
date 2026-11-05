@@ -1,8 +1,4 @@
-import {
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
 import {
@@ -15,6 +11,7 @@ import {
   OrderTransitionService,
 } from './order-transition.service';
 import { OrderWithItems, toOrderView } from './order-view';
+import { AppException } from 'src/infra/errors/app-exception';
 
 const INCLUDE = {
   items: { include: { options: true } },
@@ -101,7 +98,8 @@ export class OrderStaffService {
       where: { id, organization_id: organizationId },
       include: INCLUDE,
     });
-    if (!order) throw new NotFoundException('Order not found');
+    if (!order)
+      throw new AppException('not_found', { message: 'Order not found' });
     return this.toStaffView(order);
   }
 
@@ -114,9 +112,9 @@ export class OrderStaffService {
   ) {
     const result = await this.perform(organizationId, id, action, actorId);
     if (!result.changed && result.conflict) {
-      throw new ConflictException(
-        `Order is "${result.status}" — this action is not available`,
-      );
+      throw new AppException('order_status_conflict', {
+        details: { status: result.status },
+      });
     }
     return this.get(organizationId, id);
   }
@@ -138,7 +136,8 @@ export class OrderStaffService {
       },
       select: { status: true, fulfillment: true },
     });
-    if (!order) throw new NotFoundException('Order not found');
+    if (!order)
+      throw new AppException('not_found', { message: 'Order not found' });
 
     const from = order.status as OrderStatusName;
     const to = this.target(action, from, order.fulfillment);
@@ -157,7 +156,7 @@ export class OrderStaffService {
       return { changed: true, status: to, conflict: false };
     } catch (e) {
       if (e instanceof OrderNotFoundError)
-        throw new NotFoundException('Order not found');
+        throw new AppException('not_found', { message: 'Order not found' });
       if (e instanceof InvalidTransitionError) {
         // Allaqachon shu holatda — takror bosish; boshqa holatda — haqiqiy konflikt.
         return { changed: false, status: e.from, conflict: e.from !== to };

@@ -1,6 +1,6 @@
 import * as bcrypt from 'bcrypt';
 import { Logger } from '@nestjs/common';
-import { CustomerAuthException } from '../errors/customer-auth.exception';
+import { AppException } from 'src/infra/errors/app-exception';
 import { OrganizationTypeEnum } from 'src/modules/organization/models/organization.model';
 import { makeStaffAuthDeps, staffTestConfig } from './staff-auth.fake';
 import {
@@ -33,9 +33,9 @@ async function expectCode(p: Promise<unknown>, code: string) {
     () => null,
     (e) => e,
   );
-  expect(err).toBeInstanceOf(CustomerAuthException);
+  expect(err).toBeInstanceOf(AppException);
   expect(err.code).toBe(code);
-  return err as CustomerAuthException;
+  return err as AppException;
 }
 
 function wrong(code: string) {
@@ -372,8 +372,8 @@ describe('StaffAuthService (signup)', () => {
         () => null,
         (e) => e,
       );
-      expect(err).toBeInstanceOf(CustomerAuthException);
-      return err as CustomerAuthException;
+      expect(err).toBeInstanceOf(AppException);
+      return err as AppException;
     }
 
     it('signs in with the right password and hides the hash', async () => {

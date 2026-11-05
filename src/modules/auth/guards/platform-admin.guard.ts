@@ -1,9 +1,5 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  ForbiddenException,
-  Injectable,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
+import { AppException } from 'src/infra/errors/app-exception';
 
 /** User ids from PLATFORM_ADMIN_USER_IDS (comma separated). Empty or unset means nobody. */
 export function platformAdminIds(
@@ -24,6 +20,6 @@ export class PlatformAdminGuard implements CanActivate {
     const id = context.switchToHttp().getRequest<{ user?: { id?: unknown } }>()
       .user?.id;
     if (typeof id === 'string' && platformAdminIds().has(id)) return true;
-    throw new ForbiddenException('Forbidden');
+    throw new AppException('forbidden', { message: 'Forbidden' });
   }
 }

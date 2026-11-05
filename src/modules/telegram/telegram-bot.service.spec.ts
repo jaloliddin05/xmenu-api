@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import { AppException } from 'src/infra/errors/app-exception';
 import { randomBytes } from 'crypto';
 import {
   hashWebhookSecret,
@@ -78,18 +78,31 @@ describe('TelegramBotService', () => {
 
   it('rejects malformed tokens without calling Telegram', async () => {
     const { svc, client } = setup();
-    await expect(svc.connect(ORG, 'nope')).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
+    await expect(svc.connect(ORG, 'nope')).rejects.toMatchObject({
+      code: 'invalid_bot_token',
+    });
     expect(client.call).not.toHaveBeenCalled();
   });
 
-  it('requires an https PUBLIC_API_URL', async () => {
+  it('requires an https PUBLIC_API_URL: platform_misconfigured telegram_bot', async () => {
     process.env.PUBLIC_API_URL = 'http://localhost:3000';
     const { svc, client } = setup();
-    await expect(svc.connect(ORG, TOKEN)).rejects.toMatchObject(
-      withCode('webhook_url_not_https'),
-    );
+    const err = await svc.connect(ORG, TOKEN).catch((e: AppException) => e);
+    expect(err).toMatchObject({
+      code: 'platform_misconfigured',
+      details: { feature: 'telegram_bot' },
+    });
+    expect(err.message).not.toMatch(/PUBLIC_API_URL/);
+    expect(client.call).not.toHaveBeenCalled();
+  });
+
+  it('without a usable PAYMENT_CONFIG_KEY: platform_misconfigured telegram_bot', async () => {
+    process.env.PAYMENT_CONFIG_KEY = 'short';
+    const { svc, client } = setup();
+    await expect(svc.connect(ORG, TOKEN)).rejects.toMatchObject({
+      code: 'platform_misconfigured',
+      details: { feature: 'telegram_bot' },
+    });
     expect(client.call).not.toHaveBeenCalled();
   });
 
@@ -171,7 +184,6 @@ describe('TelegramBotService', () => {
     const { svc } = setup();
     await svc.connect('org-2', TOKEN);
     const p = svc.connect(ORG, TOKEN);
-    await expect(p).rejects.toBeInstanceOf(ConflictException);
     await expect(p).rejects.toMatchObject(withCode('bot_already_connected'));
   });
 

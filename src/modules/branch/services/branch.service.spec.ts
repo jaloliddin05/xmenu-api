@@ -1,4 +1,3 @@
-import { NotFoundException } from '@nestjs/common';
 import { BranchService, toBranchView } from './branch.service';
 
 describe('BranchService: delivery site revalidation', () => {
@@ -36,9 +35,9 @@ describe('BranchService: delivery site revalidation', () => {
 
   it('schedules nothing for a branch of another venue', async () => {
     const { service, revalidate } = make(false);
-    await expect(service.update(ORG, 'b-2', {} as any)).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(service.update(ORG, 'b-2', {} as any)).rejects.toMatchObject({
+      code: 'not_found',
+    });
     expect(revalidate.addRevalidationJob).not.toHaveBeenCalled();
   });
 });

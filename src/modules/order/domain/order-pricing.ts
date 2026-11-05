@@ -1,5 +1,4 @@
 import { Lang, pickTranslation } from 'src/infra/http/request-helpers';
-import { CustomerAuthException } from 'src/modules/auth/errors/customer-auth.exception';
 import {
   formatWeight,
   groupLimits,
@@ -7,6 +6,7 @@ import {
   publicFileUrl,
 } from 'src/modules/menu/menu.mapper';
 import { toSum } from './order-money';
+import { AppException } from 'src/infra/errors/app-exception';
 
 export const MAX_LINE_QUANTITY = 50;
 /** Cap on one dish across all lines of an order (lines differ by modifiers, so a dish can repeat). */
@@ -53,7 +53,7 @@ type Problem = {
 /**
  * So'rov pozitsiyalarini BAZADAGI narxlar bilan hisoblaydi. Mijozdan faqat
  * id va miqdor keladi — narx, nom, modifikator qoidalari bazadan. Hech narsa
- * yozmaydi, faqat tekshiradi va xato bo'lsa CustomerAuthException tashlaydi
+ * yozmaydi, faqat tekshiradi va xato bo'lsa AppException tashlaydi
  * (details.items[].index — so'rovdagi pozitsiya indeksi, frontend shu bo'yicha
  * qatorlarni belgilaydi).
  *
@@ -79,12 +79,10 @@ export function priceLines(
       unavailable.push({ index, itemId: item.itemId, reason: 'not_available' });
   });
   if (unavailable.length) {
-    throw new CustomerAuthException(
-      'item_unavailable',
-      'Some items are unavailable',
-      undefined,
-      { items: unavailable },
-    );
+    throw new AppException('item_unavailable', {
+      message: 'Some items are unavailable',
+      details: { items: unavailable },
+    });
   }
 
   items.forEach((item, index) => {
@@ -93,10 +91,9 @@ export function priceLines(
       item.quantity < 1 ||
       item.quantity > MAX_LINE_QUANTITY
     ) {
-      throw new CustomerAuthException(
-        'invalid_order',
-        `quantity must be 1..${MAX_LINE_QUANTITY}`,
-      );
+      throw new AppException('invalid_order', {
+        message: `quantity must be 1..${MAX_LINE_QUANTITY}`,
+      });
     }
     const reason = modifierProblem(
       products.get(item.itemId)!,
@@ -105,12 +102,10 @@ export function priceLines(
     if (reason) invalid.push({ index, itemId: item.itemId, ...reason });
   });
   if (invalid.length) {
-    throw new CustomerAuthException(
-      'invalid_modifiers',
-      'Invalid modifiers',
-      undefined,
-      { items: invalid },
-    );
+    throw new AppException('invalid_modifiers', {
+      message: 'Invalid modifiers',
+      details: { items: invalid },
+    });
   }
 
   const perItem = new Map<string, number>();
@@ -120,18 +115,16 @@ export function priceLines(
     ([, quantity]) => quantity > MAX_ITEM_QUANTITY,
   );
   if (tooMany.length) {
-    throw new CustomerAuthException(
-      'invalid_order',
-      `at most ${MAX_ITEM_QUANTITY} of one item per order`,
-      undefined,
-      {
+    throw new AppException('invalid_order', {
+      message: `at most ${MAX_ITEM_QUANTITY} of one item per order`,
+      details: {
         items: tooMany.map(([itemId, quantity]) => ({
           itemId,
           quantity,
           max: MAX_ITEM_QUANTITY,
         })),
       },
-    );
+    });
   }
 
   const lines: PricedLine[] = items.map((item, position) => {

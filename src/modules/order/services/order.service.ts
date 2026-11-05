@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { Lang } from 'src/infra/http/request-helpers';
-import { CustomerAuthException } from 'src/modules/auth/errors/customer-auth.exception';
 import type { CustomerPrincipal } from 'src/modules/auth/decorators/customer-route.decorator';
 import { BranchService } from 'src/modules/branch/services/branch.service';
 import { toAddressView } from 'src/modules/customer/services/customer-address.service';
@@ -30,6 +29,7 @@ import {
   OrderTransitionService,
 } from './order-transition.service';
 import { OrderWithItems, toOrderView } from './order-view';
+import { AppException } from 'src/infra/errors/app-exception';
 
 export const ORDER_INCLUDE = {
   items: { include: { options: true } },
@@ -64,10 +64,10 @@ export class OrderService {
     tenant: Pick<Tenant, 'currency' | 'defaultLanguage'>,
   ) {
     if (!idempotencyKey || !IDEMPOTENCY_KEY.test(idempotencyKey)) {
-      throw new CustomerAuthException(
-        'idempotency_key_required',
-        'Idempotency-Key header (8-128 chars: A-Z a-z 0-9 _ -) is required',
-      );
+      throw new AppException('idempotency_key_required', {
+        message:
+          'Idempotency-Key header (8-128 chars: A-Z a-z 0-9 _ -) is required',
+      });
     }
     const { tenantId: organizationId, customerId } = principal;
     const requestHash = hashOrderRequest(dto);
@@ -85,9 +85,9 @@ export class OrderService {
       },
       select: { id: true, status: true },
     });
-    if (!customer) throw new CustomerAuthException('invalid_token');
+    if (!customer) throw new AppException('invalid_token');
     if (customer.status === 'blocked')
-      throw new CustomerAuthException('customer_blocked');
+      throw new AppException('customer_blocked');
 
     // Ordering channel and publication, read fresh (not from the tenant cache): a pause applies at once
     await this.assertOrderingOpen(organizationId);
@@ -102,27 +102,24 @@ export class OrderService {
     let addressSnapshot: Prisma.InputJsonValue | undefined;
     if (mode === 'delivery') {
       if (!dto.addressId)
-        throw new CustomerAuthException(
-          'validation_error',
-          'addressId is required for delivery',
-        );
+        throw new AppException('validation_error', {
+          message: 'addressId is required for delivery',
+        });
       const address = await this.prisma.customer_address.findFirst({
         where: { id: dto.addressId, customer_id: customerId },
       });
-      if (!address) throw new CustomerAuthException('address_not_found');
+      if (!address) throw new AppException('address_not_found');
 
       const zoneProblem = deliveryZoneProblem(settings.deliveryZone, address);
       if (zoneProblem === 'delivery_unavailable_no_zone') {
-        throw new CustomerAuthException(
-          zoneProblem,
-          'Delivery is unavailable: the venue has no delivery zone',
-        );
+        throw new AppException(zoneProblem, {
+          message: 'Delivery is unavailable: the venue has no delivery zone',
+        });
       }
       if (zoneProblem)
-        throw new CustomerAuthException(
-          zoneProblem,
-          'Address is outside the delivery zone',
-        );
+        throw new AppException(zoneProblem, {
+          message: 'Address is outside the delivery zone',
+        });
       addressSnapshot = toAddressView(
         address,
       ) as unknown as Prisma.InputJsonValue;
@@ -136,10 +133,9 @@ export class OrderService {
         dto.paymentMethod,
       )
     ) {
-      throw new CustomerAuthException(
-        'payment_method_unavailable',
-        'This payment method is not available',
-      );
+      throw new AppException('payment_method_unavailable', {
+        message: 'This payment method is not available',
+      });
     }
 
     // 6. Narxlash (faqat bazadagi narxlar)
@@ -159,28 +155,24 @@ export class OrderService {
 
     // 7. Mijoz ko'rgan summa bilan solishtirish (narx o'zgargan bo'lsa yangi narxlar bilan 409)
     if (dto.expectedTotal != null && dto.expectedTotal !== totals.total) {
-      throw new CustomerAuthException(
-        'price_changed',
-        'Prices have changed',
-        undefined,
-        {
+      throw new AppException('price_changed', {
+        message: 'Prices have changed',
+        details: {
           items: lines.map((l, index) => ({ index, unitPrice: l.unitPrice })),
           subtotal: totals.subtotal,
           serviceFee: totals.serviceFee,
           total: totals.total,
         },
-      );
+      });
     }
 
     const minAmount =
       mode === 'delivery' ? settings.minOrderDelivery : settings.minOrderPickup;
     if (totals.subtotal < minAmount) {
-      throw new CustomerAuthException(
-        'min_order_not_reached',
-        'Order is below the minimum amount',
-        undefined,
-        { minAmount },
-      );
+      throw new AppException('min_order_not_reached', {
+        message: 'Order is below the minimum amount',
+        details: { minAmount },
+      });
     }
 
     // 8. Suiiste'moldan himoya
@@ -188,11 +180,10 @@ export class OrderService {
       where: { customer_id: customerId, status: { in: [...ACTIVE_STATUSES] } },
     });
     if (active >= settings.maxActiveOrders) {
-      throw new CustomerAuthException(
-        'too_many_active_orders',
-        'Too many active orders',
-        60,
-      );
+      throw new AppException('too_many_active_orders', {
+        message: 'Too many active orders',
+        retryAfter: 60,
+      });
     }
 
     // 9. Yozish
@@ -350,10 +341,9 @@ export class OrderService {
     if (order.status === 'cancelled') return this.view(order, lang); // ikki marta bekor qilish xato emas
 
     if (!CUSTOMER_CANCELLABLE.has(order.status as OrderStatusName)) {
-      throw new CustomerAuthException(
-        'cancel_not_allowed',
-        'The order can no longer be cancelled',
-      );
+      throw new AppException('cancel_not_allowed', {
+        message: 'The order can no longer be cancelled',
+      });
     }
     try {
       await this.transitions.transition({
@@ -368,10 +358,9 @@ export class OrderService {
       if (e instanceof InvalidTransitionError) {
         const fresh = await this.findOwn(principal, id);
         if (fresh.status === 'cancelled') return this.view(fresh, lang);
-        throw new CustomerAuthException(
-          'cancel_not_allowed',
-          'The order can no longer be cancelled',
-        );
+        throw new AppException('cancel_not_allowed', {
+          message: 'The order can no longer be cancelled',
+        });
       }
       throw e;
     }
@@ -381,20 +370,18 @@ export class OrderService {
   async retryPayment(principal: CustomerPrincipal, id: string, lang: Lang) {
     const order = await this.findOwn(principal, id);
     if (order.status !== 'payment_failed' || order.payment_method === 'cash') {
-      throw new CustomerAuthException(
-        'payment_not_retryable',
-        'Payment cannot be retried now',
-      );
+      throw new AppException('payment_not_retryable', {
+        message: 'Payment cannot be retried now',
+      });
     }
     if (
       !(await this.payments.enabledProviders(order.organization_id)).has(
         order.payment_method,
       )
     ) {
-      throw new CustomerAuthException(
-        'payment_method_unavailable',
-        'This payment method is not available',
-      );
+      throw new AppException('payment_method_unavailable', {
+        message: 'This payment method is not available',
+      });
     }
 
     const settings = await this.settings.get(order.organization_id);
@@ -410,10 +397,9 @@ export class OrderService {
       });
     } catch (e) {
       if (e instanceof InvalidTransitionError)
-        throw new CustomerAuthException(
-          'payment_not_retryable',
-          'Payment cannot be retried now',
-        );
+        throw new AppException('payment_not_retryable', {
+          message: 'Payment cannot be retried now',
+        });
       throw e;
     }
     return this.view(await this.findOwn(principal, id), lang);
@@ -439,10 +425,9 @@ export class OrderService {
     lang: Lang,
   ) {
     if (existing.request_hash !== requestHash) {
-      throw new CustomerAuthException(
-        'idempotency_key_reused',
-        'Idempotency-Key was already used with a different request',
-      );
+      throw new AppException('idempotency_key_reused', {
+        message: 'Idempotency-Key was already used with a different request',
+      });
     }
     return this.view(existing as OrderWithItems, lang);
   }
@@ -461,7 +446,7 @@ export class OrderService {
       include: ORDER_INCLUDE,
     });
     if (!order)
-      throw new CustomerAuthException('order_not_found', 'Order not found');
+      throw new AppException('order_not_found', { message: 'Order not found' });
     return order as OrderWithItems;
   }
 
@@ -529,16 +514,14 @@ export class OrderService {
         })
       : 'ordering_channel_disabled';
     if (problem === 'ordering_channel_disabled') {
-      throw new CustomerAuthException(
-        problem,
-        'The venue does not take online orders',
-      );
+      throw new AppException(problem, {
+        message: 'The venue does not take online orders',
+      });
     }
     if (problem)
-      throw new CustomerAuthException(
-        problem,
-        'The venue is not taking orders right now',
-      );
+      throw new AppException(problem, {
+        message: 'The venue is not taking orders right now',
+      });
   }
 
   private async chooseBranch(

@@ -1,11 +1,10 @@
-import {
-  BadGatewayException,
-  Injectable,
-  Logger,
-  ServiceUnavailableException,
-} from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import OpenAI from 'openai';
 import { PrismaService } from '../_prisma/prisma.service';
+import {
+  AppException,
+  platformMisconfigured,
+} from 'src/infra/errors/app-exception';
 
 @Injectable()
 export class TranslationService {
@@ -18,10 +17,7 @@ export class TranslationService {
   private client(): OpenAI {
     const apiKey = process.env.OPENAI_API_KEY?.trim();
     if (!apiKey) {
-      throw new ServiceUnavailableException({
-        code: 'translation_unavailable',
-        message: 'Translation is not configured',
-      });
+      throw platformMisconfigured('translation', 'OPENAI_API_KEY is not set');
     }
     this.openai ??= new OpenAI({ apiKey });
     return this.openai;
@@ -48,8 +44,7 @@ export class TranslationService {
       });
     } catch (e) {
       this.logger.error(`OpenAI request failed: ${(e as Error).message}`);
-      throw new BadGatewayException({
-        code: 'translation_failed',
+      throw new AppException('translation_failed', {
         message: 'Translation service unavailable',
       });
     }
@@ -60,8 +55,7 @@ export class TranslationService {
       return JSON.parse(this.clearJson(content));
     } catch {
       this.logger.error('Invalid GPT response (not JSON)');
-      throw new BadGatewayException({
-        code: 'translation_failed',
+      throw new AppException('translation_failed', {
         message: 'Invalid translation response',
       });
     }

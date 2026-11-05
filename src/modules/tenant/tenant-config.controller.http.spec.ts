@@ -450,7 +450,7 @@ describe('GET /tenant/config', () => {
 
   it('400 tenant_required without X-Tenant-Id', async () => {
     const res = await config().expect(400);
-    expect(res.body.error.code).toBe('tenant_required');
+    expect(res.body.code).toBe('tenant_required');
     expect(res.headers['cache-control']).toBe('no-store');
   });
 
@@ -459,17 +459,17 @@ describe('GET /tenant/config', () => {
     ['an unknown id', '11111111-2222-4333-8444-555555555555'],
   ])('404 tenant_not_found for %s', async (_name, key) => {
     const res = await config(key).expect(404);
-    expect(res.body.error.code).toBe('tenant_not_found');
+    expect(res.body.code).toBe('tenant_not_found');
   });
 
   it('403 tenant_inactive for an unpublished venue', async () => {
     const res = await config(OFF).expect(403);
-    expect(res.body.error.code).toBe('tenant_inactive');
+    expect(res.body.code).toBe('tenant_inactive');
   });
 
   it('500 settings_missing when the ordering settings row is gone', async () => {
     delete orderRows[FULL];
     const res = await config(FULL).expect(500);
-    expect(res.body.error.code).toBe('settings_missing');
+    expect(res.body.code).toBe('settings_missing');
   });
 });

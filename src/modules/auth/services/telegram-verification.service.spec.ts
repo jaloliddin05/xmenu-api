@@ -1,7 +1,7 @@
-import { CustomerAuthException } from '../errors/customer-auth.exception';
 import { FakeRedis } from 'src/infra/redis/redis.fake';
 import { TelegramVerificationService } from './telegram-verification.service';
 import type { TelegramUpdate } from './telegram-verification.service';
+import { AppException } from 'src/infra/errors/app-exception';
 
 const TENANT = { id: 'tenant-1', brandName: 'Mant' } as any;
 const OTHER_TENANT = { id: 'tenant-2', brandName: 'Other' } as any;
@@ -96,7 +96,7 @@ describe('TelegramVerificationService.start', () => {
   it('website mode needs a valid phone', async () => {
     const { svc } = setup();
     await expect(svc.start(TENANT, {}, CTX)).rejects.toBeInstanceOf(
-      CustomerAuthException,
+      AppException,
     );
     await expect(
       svc.start(TENANT, { phone: '12345' }, CTX),
@@ -128,7 +128,7 @@ describe('TelegramVerificationService.start', () => {
   it('rejects invalid initData before creating anything', async () => {
     const { svc, initData, redis } = setup();
     initData.verifyWithToken.mockImplementation(() => {
-      throw new CustomerAuthException('invalid_telegram_data');
+      throw new AppException('invalid_telegram_data');
     });
     await expect(
       svc.start(TENANT, { initData: 'forged' }, CTX),
@@ -266,7 +266,7 @@ describe('website ("code") mode through the bot', () => {
 
   it('reports a delivery failure to the user instead of crashing the webhook', async () => {
     const { svc, update, priv, sent, otp, sid } = await started();
-    otp.issue.mockRejectedValueOnce(new CustomerAuthException('rate_limited'));
+    otp.issue.mockRejectedValueOnce(new AppException('rate_limited'));
     await svc.handleUpdate(BOT, update(priv({ text: `/start ${sid}` })));
     await svc.handleUpdate(
       BOT,

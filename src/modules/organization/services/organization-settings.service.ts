@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { fieldErrorsException } from 'src/infra/validators/validation-errors';
 import { PrismaService } from '../../_prisma/prisma.service';
-import { CustomerAuthException } from 'src/modules/auth/errors/customer-auth.exception';
 import { TenantService } from 'src/modules/tenant/tenant.service';
 import { RevalidateService } from 'src/modules/revalidate-queue/revalidate.service';
 import {
@@ -10,6 +9,7 @@ import {
   toSettingsData,
   toSettingsView,
 } from '../domain/organization-settings';
+import { AppException } from 'src/infra/errors/app-exception';
 
 /** The owner's venue settings (organization_settings): one row per venue, created at signup. */
 @Injectable()
@@ -56,9 +56,8 @@ export class OrganizationSettingsService {
     this.logger.error(
       `organization_settings row missing for organization ${organizationId}`,
     );
-    return new CustomerAuthException(
-      'settings_missing',
-      'Venue settings are missing',
-    );
+    return new AppException('settings_missing', {
+      message: 'Venue settings are missing',
+    });
   }
 }

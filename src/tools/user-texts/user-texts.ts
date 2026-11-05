@@ -32,6 +32,8 @@ export const BOT_TEXT_FILES = [
  * operators, not an owner, a customer or a guest.
  */
 export const ERROR_TEXT_ALLOWED: Record<string, string> = {
+  'src/infra/errors/app-error-filter.ts':
+    'builds the log line of a failed request; the body never carries it',
   'src/modules/payment/services/refund.processor.ts':
     'refund failures go to the platform ops chat',
   'src/modules/order/notifications/ops-notifier.service.ts':
@@ -117,6 +119,26 @@ function isTextPosition(node: ts.Node): boolean {
   return true;
 }
 
+/**
+ * Values that only reach the log: `cause` of an AppException and the cause argument of
+ * platformMisconfigured(feature, cause).
+ */
+function isLogOnly(node: ts.Node): boolean {
+  const p = node.parent;
+  if (!p) return false;
+  if (
+    ts.isPropertyAssignment(p) &&
+    p.initializer === node &&
+    p.name.getText() === 'cause'
+  )
+    return true;
+  return (
+    ts.isCallExpression(p) &&
+    p.expression.getText() === 'platformMisconfigured' &&
+    p.arguments[1] === node
+  );
+}
+
 export function scanSource(file: string, source: string): Finding[] {
   const sf = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
   const findings: Finding[] = [];
@@ -141,6 +163,7 @@ export function scanSource(file: string, source: string): Finding[] {
   /** Every string and error text inside an exception's arguments or a field error. */
   const checkErrorPayload = (root: ts.Node) => {
     const walk = (node: ts.Node) => {
+      if (isLogOnly(node)) return;
       if (isDirectString(node) && isTextPosition(node)) checkText(node, true);
       if (isErrorText(node))
         report(node, 'error text in a response', node.getText(sf));
@@ -150,8 +173,9 @@ export function scanSource(file: string, source: string): Finding[] {
   };
 
   const insideLogger = (node: ts.Node) => {
-    for (let p = node.parent; p; p = p.parent) {
-      if (ts.isCallExpression(p) && isLoggerCall(p)) return true;
+    for (let p: ts.Node | undefined = node; p; p = p.parent) {
+      if (p !== node && ts.isCallExpression(p) && isLoggerCall(p)) return true;
+      if (isLogOnly(p)) return true;
       if (ts.isFunctionLike(p)) return false;
     }
     return false;

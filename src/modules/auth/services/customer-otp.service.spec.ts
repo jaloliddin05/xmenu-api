@@ -2,7 +2,7 @@ import type Redis from 'ioredis';
 import { FakeRedis } from 'src/infra/redis/redis.fake';
 import type { SmsProvider } from 'src/modules/sms/providers/sms-provider.interface';
 import type { CustomerAuthConfig } from '../customer-auth.config';
-import { CustomerAuthException } from '../errors/customer-auth.exception';
+import { AppException } from 'src/infra/errors/app-exception';
 import { CustomerOtpService } from './customer-otp.service';
 import { RateLimitService } from './rate-limit.service';
 
@@ -44,8 +44,8 @@ const noopHooks = () => ({
 });
 
 async function expectCode(p: Promise<unknown>, code: string) {
-  await expect(p).rejects.toBeInstanceOf(CustomerAuthException);
-  await p.catch((e: CustomerAuthException) => expect(e.code).toBe(code));
+  await expect(p).rejects.toBeInstanceOf(AppException);
+  await p.catch((e: AppException) => expect(e.code).toBe(code));
 }
 
 describe('CustomerOtpService', () => {
@@ -131,7 +131,7 @@ describe('CustomerOtpService', () => {
     await otp.request(STAFF, PHONE, IP, 'staff');
     const p = otp.request(STAFF, PHONE, IP, 'staff');
     await expectCode(p, 'rate_limited');
-    await p.catch((e: CustomerAuthException) => expect(e.retryAfter).toBe(60));
+    await p.catch((e: AppException) => expect(e.retryAfter).toBe(60));
 
     redis.advance(60);
     await expect(otp.request(STAFF, PHONE, IP, 'staff')).resolves.toBe(60);

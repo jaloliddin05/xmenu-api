@@ -1,4 +1,4 @@
-import { CustomerAuthException } from '../auth/errors/customer-auth.exception';
+import { AppException } from 'src/infra/errors/app-exception';
 import { TenantGuard } from './tenant.guard';
 
 describe('TenantGuard', () => {
@@ -18,7 +18,7 @@ describe('TenantGuard', () => {
     });
     await expect(
       guard.canActivate(ctx({ 'x-tenant-id': '  ' }).context),
-    ).rejects.toBeInstanceOf(CustomerAuthException);
+    ).rejects.toBeInstanceOf(AppException);
   });
 
   it('never takes the tenant from Host or X-Forwarded-Host', async () => {

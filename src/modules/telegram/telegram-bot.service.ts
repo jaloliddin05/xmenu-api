@@ -1,10 +1,4 @@
-import {
-  BadRequestException,
-  ConflictException,
-  Injectable,
-  Logger,
-  ServiceUnavailableException,
-} from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { randomBytes, randomUUID } from 'crypto';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
 import {
@@ -17,6 +11,10 @@ import { RevalidateService } from 'src/modules/revalidate-queue/revalidate.servi
 import { hashWebhookSecret } from './domain/webhook-secret';
 import type { BotSettingLeft } from './dto/telegram-bot-status.dto';
 import { TelegramClient, telegramErrorText } from './telegram-client';
+import {
+  AppException,
+  platformMisconfigured,
+} from 'src/infra/errors/app-exception';
 
 /** A venue's own bot, ready to use (token decrypted). `botKey` is the row id and never changes. */
 export interface TenantBot {
@@ -66,9 +64,8 @@ const publicApiUrl = () =>
   (process.env.PUBLIC_API_URL ?? '').replace(/\/$/, '');
 
 const invalidToken = () =>
-  new BadRequestException({
+  new AppException('invalid_bot_token', {
     message: 'Telegram did not accept the bot token',
-    code: 'invalid_bot_token',
   });
 
 /**
@@ -93,8 +90,9 @@ export class TelegramBotService {
         process.env.PAYMENT_CONFIG_KEY,
       ));
     } catch {
-      throw new ServiceUnavailableException(
-        'PAYMENT_CONFIG_KEY is not configured',
+      throw platformMisconfigured(
+        'telegram_bot',
+        'PAYMENT_CONFIG_KEY is not a 32-byte key: bot tokens cannot be stored',
       );
     }
   }
@@ -169,11 +167,11 @@ export class TelegramBotService {
     const token = (rawToken ?? '').trim();
     if (!TELEGRAM_TOKEN_RE.test(token)) throw invalidToken();
     if (!publicApiUrl().startsWith('https://')) {
-      throw new BadRequestException({
-        message:
-          'PUBLIC_API_URL must be an https URL: Telegram only delivers webhooks over HTTPS',
-        code: 'webhook_url_not_https',
-      });
+      // Telegram only delivers webhooks over HTTPS
+      throw platformMisconfigured(
+        'telegram_bot',
+        'PUBLIC_API_URL is not https',
+      );
     }
     // Fail before touching Telegram if tokens cannot be stored
     const key = this.key;
@@ -191,9 +189,8 @@ export class TelegramBotService {
       where: { telegram_bot_id: telegramBotId },
     });
     if (taken && taken.organization_id !== organizationId) {
-      throw new ConflictException({
+      throw new AppException('bot_already_connected', {
         message: 'This bot is connected to another venue',
-        code: 'bot_already_connected',
       });
     }
 
@@ -215,9 +212,8 @@ export class TelegramBotService {
       this.logger.warn(
         `setWebhook failed for organization ${organizationId}: ${telegramErrorText(e)}`,
       );
-      throw new BadRequestException({
+      throw new AppException('webhook_setup_failed', {
         message: 'Telegram refused the webhook',
-        code: 'webhook_setup_failed',
       });
     }
 

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
-import { CustomerAuthException } from 'src/modules/auth/errors/customer-auth.exception';
+import { AppException } from 'src/infra/errors/app-exception';
 
 export interface AddressRecord {
   id: string;
@@ -84,9 +84,9 @@ export class CustomerAddressRepository {
           AND "deleted_at" IS NULL
         FOR UPDATE`;
 
-      if (rows.length === 0) throw new CustomerAuthException('invalid_token');
+      if (rows.length === 0) throw new AppException('invalid_token');
       if (rows[0].status === 'blocked')
-        throw new CustomerAuthException('customer_blocked');
+        throw new AppException('customer_blocked');
 
       return fn(this.createStore(tx, customerId));
     });

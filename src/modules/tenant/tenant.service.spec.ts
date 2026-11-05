@@ -1,5 +1,5 @@
-import { CustomerAuthException } from '../auth/errors/customer-auth.exception';
 import { TenantService } from './tenant.service';
+import { AppException } from 'src/infra/errors/app-exception';
 
 const ID = '3f2b8c1e-4d5a-4b6c-8d7e-9f0a1b2c3d4e';
 const OFF = '0a1b2c3d-4e5f-4a6b-8c7d-8e9f0a1b2c3d';
@@ -43,7 +43,7 @@ describe('TenantService.resolve', () => {
   const code = (p: Promise<unknown>) =>
     p.then(
       () => 'resolved',
-      (e) => (e instanceof CustomerAuthException ? e.code : e),
+      (e) => (e instanceof AppException ? e.code : e),
     );
 
   it('resolves an organization by id with its language and currency settings', async () => {

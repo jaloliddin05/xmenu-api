@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type Redis from 'ioredis';
 import { REDIS } from 'src/infra/redis/redis.module';
-import { CustomerAuthException } from '../errors/customer-auth.exception';
+import { AppException } from 'src/infra/errors/app-exception';
 
 export const LOGIN_FAILS_BEFORE_LOCK = 5;
 const FAIL_WINDOW_SECONDS = 900;
@@ -30,11 +30,10 @@ export class StaffLoginThrottleService {
   async assertNotLocked(phone: string): Promise<void> {
     const ttl = await this.redis.ttl(this.keys(phone).lock);
     if (ttl > 0) {
-      throw new CustomerAuthException(
-        'too_many_attempts',
-        'Too many login attempts',
-        ttl,
-      );
+      throw new AppException('too_many_attempts', {
+        message: 'Too many login attempts',
+        retryAfter: ttl,
+      });
     }
   }
 
