@@ -1,5 +1,5 @@
 import { isLang, Lang } from 'src/infra/http/request-helpers';
-import type { FieldError } from 'src/infra/validators/validation-errors';
+import type { FieldError } from 'src/infra/errors/app-exception';
 
 /** What the owner edits per language (and what is pushed to the venue's bot). */
 export interface BotProfileFields {
@@ -119,7 +119,7 @@ export function validateProfileInput(
       errors: [
         {
           field: 'profile',
-          reason: 'isObject',
+          code: 'is_object',
           message: 'profile must be an object',
         },
       ],
@@ -130,7 +130,7 @@ export function validateProfileInput(
     if (!isLang(lang) || !languages.includes(lang)) {
       errors.push({
         field: lang,
-        reason: 'notInLanguages',
+        code: 'not_in_languages',
         message: 'language is not enabled for this venue',
       });
       continue;
@@ -138,7 +138,7 @@ export function validateProfileInput(
     if (!value || typeof value !== 'object' || Array.isArray(value)) {
       errors.push({
         field: lang,
-        reason: 'isObject',
+        code: 'is_object',
         message: 'must be an object',
       });
       continue;
@@ -149,7 +149,7 @@ export function validateProfileInput(
       if (!(key in BOT_PROFILE_LIMITS)) {
         errors.push({
           field: `${lang}.${key}`,
-          reason: 'whitelistValidation',
+          code: 'unknown_field',
           message: `property ${key} should not exist`,
         });
       }
@@ -160,7 +160,7 @@ export function validateProfileInput(
       if (typeof raw !== 'string') {
         errors.push({
           field: path,
-          reason: 'isString',
+          code: 'is_string',
           message: `${field} must be a string`,
         });
         continue;
@@ -170,13 +170,13 @@ export function validateProfileInput(
       if (Array.from(text).length > max) {
         errors.push({
           field: path,
-          reason: 'maxLength',
+          code: 'max_length',
           message: `${field} must be at most ${max} characters`,
         });
       } else if (!text && field !== 'description') {
         errors.push({
           field: path,
-          reason: 'isNotEmpty',
+          code: 'is_not_empty',
           message: `${field} must not be empty`,
         });
       }
@@ -187,10 +187,15 @@ export function validateProfileInput(
   return errors.length ? { errors } : { profile };
 }
 
-export type SyncStatus = 'ok' | 'failed' | 'skipped_no_url';
+export type SyncStatus = 'ok' | 'failed' | 'skipped';
+/**
+ * failed: `code` telegram_error (Telegram refused, details only in the log); skipped: the menu button
+ * without a delivery address, `code` platform_misconfigured with `feature` delivery_link.
+ */
 export interface SyncItem {
   status: SyncStatus;
-  reason?: string;
+  code?: 'telegram_error' | 'platform_misconfigured';
+  feature?: 'delivery_link';
 }
 export const SYNC_ITEMS = [
   'name',

@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { AppException } from 'src/infra/errors/app-exception';
 
 /**
  * Prisma `where` fragments that tie a menu row to the caller's organization. Categories and option
@@ -28,6 +28,7 @@ export function assertOwnTranslations(
 ) {
   const own = new Set(existing.map((t) => t.id));
   for (const t of sent ?? []) {
-    if (!own.has(t.id)) throw new NotFoundException('Translation not found');
+    if (!own.has(t.id))
+      throw new AppException('not_found', { message: 'Translation not found' });
   }
 }

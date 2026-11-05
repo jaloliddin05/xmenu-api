@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
-import { CustomerAuthException } from 'src/modules/auth/errors/customer-auth.exception';
 import { parseZone } from '../domain/order-money';
+import { AppException } from 'src/infra/errors/app-exception';
 
 export interface OrderSettings {
   deliveryServiceFee: number;
@@ -36,10 +36,9 @@ export class OrderSettingsService {
       this.logger.error(
         `organization_order_settings row missing for organization ${organizationId}`,
       );
-      throw new CustomerAuthException(
-        'settings_missing',
-        'Venue settings are missing',
-      );
+      throw new AppException('settings_missing', {
+        message: 'Venue settings are missing',
+      });
     }
     const value: OrderSettings = {
       deliveryServiceFee: row.delivery_service_fee,

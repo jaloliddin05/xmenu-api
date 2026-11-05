@@ -1,9 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../_prisma/prisma.service';
 import { CreateCategoryDto, MoveCategoryDto, UpdateCategoryDto } from '../dto';
 import { RevalidateService } from 'src/modules/revalidate-queue/revalidate.service';
 import { ownCategory } from 'src/modules/product/services/menu-ownership';
+import { AppException } from 'src/infra/errors/app-exception';
 
 @Injectable()
 export class CategoryService {
@@ -18,7 +19,8 @@ export class CategoryService {
     const category = await this.prismaService.category.findFirst({
       where: { id, ...ownCategory(organizationId) },
     });
-    if (!category) throw new NotFoundException('Category not found');
+    if (!category)
+      throw new AppException('not_found', { message: 'Category not found' });
     return category;
   }
 
@@ -28,7 +30,9 @@ export class CategoryService {
     organizationId: string,
   ) {
     if (sent !== undefined && sent !== organizationId)
-      throw new NotFoundException('Organization not found');
+      throw new AppException('not_found', {
+        message: 'Organization not found',
+      });
   }
 
   async createCategory(
@@ -128,7 +132,8 @@ export class CategoryService {
       where: { id, ...ownCategory(organizationId) },
       include: { translations: true },
     });
-    if (!category) throw new NotFoundException('Category not found');
+    if (!category)
+      throw new AppException('not_found', { message: 'Category not found' });
     return category;
   }
 

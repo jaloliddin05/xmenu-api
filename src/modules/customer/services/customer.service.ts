@@ -1,8 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { CustomerRepository } from '../repositories/customer.repository';
 import { UpdateCustomerDto } from '../dto';
 import { normalizeCustomerName } from 'src/infra/helper/auth/customer-validators';
-import { CustomerAuthException } from 'src/modules/auth/errors/customer-auth.exception';
+import { AppException } from 'src/infra/errors/app-exception';
 
 export interface CustomerUser {
   id: string;
@@ -24,9 +24,10 @@ export class CustomerService {
       tenantId,
       customerId,
     );
-    if (!customer) throw new NotFoundException('Customer not found');
+    if (!customer)
+      throw new AppException('not_found', { message: 'Customer not found' });
     if (customer.status === 'blocked')
-      throw new CustomerAuthException('customer_blocked');
+      throw new AppException('customer_blocked');
     return this.toUser(customer);
   }
 
@@ -36,7 +37,7 @@ export class CustomerService {
     dto: UpdateCustomerDto,
   ): Promise<CustomerUser> {
     const name = normalizeCustomerName(dto.name);
-    if (!name) throw new CustomerAuthException('invalid_name');
+    if (!name) throw new AppException('invalid_name');
 
     const current = await this.getMe(tenantId, customerId);
     await this.customerRepository.update(tenantId, customerId, { name });

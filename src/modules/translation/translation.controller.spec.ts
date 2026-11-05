@@ -1,12 +1,8 @@
-import {
-  BadGatewayException,
-  INestApplication,
-  ValidationPipe,
-} from '@nestjs/common';
+import { BadGatewayException, INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { FakeRedis } from 'src/infra/redis/redis.fake';
-import { ErrorFilter } from 'src/infra/validators';
+import { configureErrorHandling } from 'src/infra/errors/configure';
 import { PUBLIC_KEY } from '../auth/decorators/public.decorator';
 import { RateLimitService } from '../auth/services/rate-limit.service';
 import { TranslationController } from './translation.controller';
@@ -32,15 +28,7 @@ describe('TranslationController', () => {
       ],
     }).compile();
     app = mod.createNestApplication();
-    app.useGlobalFilters(new ErrorFilter());
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        forbidUnknownValues: true,
-        transform: true,
-      }),
-    );
+    configureErrorHandling(app);
     // Stand-in for the global access-token guard: x-user header = authenticated owner.
     app.use((req, _res, next) => {
       if (req.headers['x-user']) req.user = { id: req.headers['x-user'] };

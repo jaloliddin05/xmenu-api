@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { isLang, Lang } from 'src/infra/http/request-helpers';
 import { PrismaService } from '../_prisma/prisma.service';
-import { CustomerAuthException } from '../auth/errors/customer-auth.exception';
 import { isValidSlug } from '../organization/domain/slug';
 import {
   isPlatformHost,
@@ -11,6 +10,7 @@ import {
 } from './host';
 import { PRIMARY_DOMAIN_SELECT, primaryDomainOf } from './primary-domain';
 import { parseTenantId } from './tenant-key';
+import { AppException } from 'src/infra/errors/app-exception';
 
 /** GET /tenant/by-host answer. */
 export interface TenantHostRef {
@@ -53,7 +53,7 @@ export class TenantService {
 
   async resolve(key: string): Promise<Tenant> {
     const id = parseTenantId(key);
-    if (!id) throw new CustomerAuthException('tenant_not_found');
+    if (!id) throw new AppException('tenant_not_found');
 
     const hit = this.cache.get(id);
     let entry = hit && Date.now() - hit.at < CACHE_TTL_MS ? hit : undefined;
@@ -90,17 +90,16 @@ export class TenantService {
       this.cache.set(id, entry);
     }
 
-    if (!entry.found) throw new CustomerAuthException('tenant_not_found');
-    if (!entry.active) throw new CustomerAuthException('tenant_inactive');
+    if (!entry.found) throw new AppException('tenant_not_found');
+    if (!entry.active) throw new AppException('tenant_inactive');
     // The settings row is created at signup; a missing one is a data bug, not a default
     if (!entry.tenant) {
       this.logger.error(
         `organization_settings row missing for organization ${id}`,
       );
-      throw new CustomerAuthException(
-        'settings_missing',
-        'Venue settings are missing',
-      );
+      throw new AppException('settings_missing', {
+        message: 'Venue settings are missing',
+      });
     }
     return entry.tenant;
   }

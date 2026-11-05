@@ -2,11 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { randomBytes, randomUUID } from 'crypto';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
-import { CustomerAuthException } from '../errors/customer-auth.exception';
 import { JwtTokenService } from '../jwt.service';
 import type { RequestCtx } from './customer-auth-event.service';
 import { sha256 } from './customer-session.service';
 import { StaffAuthEventService } from './staff-auth-event.service';
+import { AppException } from 'src/infra/errors/app-exception';
 
 type Db = Prisma.TransactionClient | PrismaService;
 
@@ -107,10 +107,9 @@ export class StaffSessionService {
     ctx: RequestCtx,
   ): Promise<StaffTokenPair> {
     const invalid = () =>
-      new CustomerAuthException(
-        'invalid_refresh_token',
-        'Refresh token is invalid, expired or already used',
-      );
+      new AppException('invalid_refresh_token', {
+        message: 'Refresh token is invalid, expired or already used',
+      });
     const now = new Date();
 
     const session = await this.prisma.staff_session.findUnique({
@@ -182,10 +181,9 @@ export class StaffSessionService {
       userId: session.user_id,
       meta: { family_id: session.family_id },
     });
-    throw new CustomerAuthException(
-      'invalid_refresh_token',
-      'Refresh token is invalid, expired or already used',
-    );
+    throw new AppException('invalid_refresh_token', {
+      message: 'Refresh token is invalid, expired or already used',
+    });
   }
 
   /** POST /auth/logout: always succeeds; an unknown token is ignored. */

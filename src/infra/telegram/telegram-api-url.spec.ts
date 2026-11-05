@@ -1,10 +1,8 @@
 import {
-  assertTelegramApiConfig,
   telegramApiBaseUrl,
+  telegramApiEnvIssues,
   telegramMethodUrl,
 } from './telegram-api-url';
-
-const quiet = { warn: jest.fn() };
 
 describe('telegramApiBaseUrl', () => {
   it('defaults to the real Telegram', () => {
@@ -23,47 +21,41 @@ describe('telegramApiBaseUrl', () => {
   });
 });
 
-describe('assertTelegramApiConfig', () => {
-  beforeEach(() => quiet.warn.mockClear());
-
+describe('telegramApiEnvIssues', () => {
   it('accepts the default everywhere, silently', () => {
-    expect(assertTelegramApiConfig({ NODE_ENV: 'production' }, quiet)).toBe(
-      'https://api.telegram.org',
-    );
+    expect(telegramApiEnvIssues({ NODE_ENV: 'production' })).toEqual({
+      errors: [],
+      warnings: [],
+    });
     expect(
-      assertTelegramApiConfig(
-        {
-          NODE_ENV: 'production',
-          TELEGRAM_API_BASE_URL: 'https://api.telegram.org/',
-        },
-        quiet,
-      ),
-    ).toBe('https://api.telegram.org');
-    expect(quiet.warn).not.toHaveBeenCalled();
+      telegramApiEnvIssues({
+        NODE_ENV: 'production',
+        TELEGRAM_API_BASE_URL: 'https://api.telegram.org/',
+      }),
+    ).toEqual({ errors: [], warnings: [] });
   });
 
   it('refuses any other base in production', () => {
-    expect(() =>
-      assertTelegramApiConfig(
-        { NODE_ENV: 'production', TELEGRAM_API_BASE_URL: 'http://fake:1' },
-        quiet,
-      ),
-    ).toThrow(/NODE_ENV=production/);
+    expect(
+      telegramApiEnvIssues({
+        NODE_ENV: 'production',
+        TELEGRAM_API_BASE_URL: 'http://fake:1',
+      }).errors,
+    ).toEqual([expect.stringMatching(/NODE_ENV=production/)]);
   });
 
   it('allows a fake Telegram outside production, with a warning', () => {
-    expect(
-      assertTelegramApiConfig(
-        { NODE_ENV: 'development', TELEGRAM_API_BASE_URL: 'http://fake:1' },
-        quiet,
-      ),
-    ).toBe('http://fake:1');
-    expect(quiet.warn).toHaveBeenCalledTimes(1);
+    const issues = telegramApiEnvIssues({
+      NODE_ENV: 'development',
+      TELEGRAM_API_BASE_URL: 'http://fake:1',
+    });
+    expect(issues.errors).toEqual([]);
+    expect(issues.warnings).toHaveLength(1);
   });
 
   it.each([['not a url'], ['ftp://fake:1']])('refuses %s', (value) => {
-    expect(() =>
-      assertTelegramApiConfig({ TELEGRAM_API_BASE_URL: value }, quiet),
-    ).toThrow(/TELEGRAM_API_BASE_URL/);
+    expect(
+      telegramApiEnvIssues({ TELEGRAM_API_BASE_URL: value }).errors,
+    ).toEqual([expect.stringContaining('TELEGRAM_API_BASE_URL')]);
   });
 });

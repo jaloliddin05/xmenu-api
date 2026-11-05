@@ -1,6 +1,6 @@
 import {
-  assertRevalidateConfig,
   revalidateConfigProblems,
+  revalidateEnvIssues,
 } from './revalidate-config';
 
 const ok = {
@@ -11,9 +11,6 @@ const ok = {
 };
 
 describe('revalidate configuration', () => {
-  const warn = jest.fn();
-  beforeEach(() => warn.mockClear());
-
   it('is silent when every configured target has its secret, or the client target is off', () => {
     expect(revalidateConfigProblems(ok)).toEqual([]);
     expect(
@@ -36,28 +33,33 @@ describe('revalidate configuration', () => {
   });
 
   it('production refuses to start', () => {
-    expect(() =>
-      assertRevalidateConfig(
-        { ...ok, NODE_ENV: 'production', CLIENT_REVALIDATE_SECRET: '' },
-        { warn },
-      ),
-    ).toThrow(/CLIENT_REVALIDATE_SECRET/);
-    expect(warn).not.toHaveBeenCalled();
+    const issues = revalidateEnvIssues({
+      ...ok,
+      NODE_ENV: 'production',
+      CLIENT_REVALIDATE_SECRET: '',
+    });
+    expect(issues.errors).toEqual([
+      expect.stringContaining('CLIENT_REVALIDATE_SECRET'),
+    ]);
+    expect(issues.warnings).toEqual([]);
   });
 
   it('development only warns', () => {
-    expect(() =>
-      assertRevalidateConfig(
-        { ...ok, NODE_ENV: 'development', CLIENT_REVALIDATE_SECRET: '' },
-        { warn },
-      ),
-    ).not.toThrow();
-    expect(warn).toHaveBeenCalledTimes(1);
-    expect(warn.mock.calls[0][0]).toContain('CLIENT_REVALIDATE_SECRET');
+    const issues = revalidateEnvIssues({
+      ...ok,
+      NODE_ENV: 'development',
+      CLIENT_REVALIDATE_SECRET: '',
+    });
+    expect(issues.errors).toEqual([]);
+    expect(issues.warnings).toEqual([
+      expect.stringContaining('CLIENT_REVALIDATE_SECRET'),
+    ]);
   });
 
-  it('production with a complete configuration starts quietly', () => {
-    assertRevalidateConfig({ ...ok, NODE_ENV: 'production' }, { warn });
-    expect(warn).not.toHaveBeenCalled();
+  it('production with a complete configuration has no issues', () => {
+    expect(revalidateEnvIssues({ ...ok, NODE_ENV: 'production' })).toEqual({
+      errors: [],
+      warnings: [],
+    });
   });
 });

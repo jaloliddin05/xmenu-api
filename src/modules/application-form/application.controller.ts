@@ -8,7 +8,7 @@ import {
   ApiTags,
   ApiTooManyRequestsResponse,
 } from '@nestjs/swagger';
-import { ErrorResponseDto } from 'src/infra/validators/error-response.dto';
+import { ErrorResponse } from 'src/infra/errors/error-response.dto';
 import { Public } from '../auth/decorators/public.decorator';
 import { PlatformAdminGuard } from '../auth/guards/platform-admin.guard';
 import {
@@ -36,11 +36,11 @@ export class ApplicationController {
     },
   })
   @ApiBadRequestResponse({
-    type: ErrorResponseDto,
-    description: 'validation_error with errors[] (from is required)',
+    type: ErrorResponse,
+    description: 'validation_error with fields[] (from is required)',
   })
   @ApiTooManyRequestsResponse({
-    type: ErrorResponseDto,
+    type: ErrorResponse,
     description:
       'rate_limited: 5 requests per hour per IP (requests rejected by validation count too), retryAfter in seconds',
   })

@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { AppException } from 'src/infra/errors/app-exception';
 
 export const LANGS = ['ru', 'uz', 'en'] as const;
 export type Lang = (typeof LANGS)[number];
@@ -50,7 +50,10 @@ export function requireStaffOrganizationId(req: {
   user?: { organization?: { id?: string } | null };
 }): string {
   const id = req.user?.organization?.id;
-  if (!id) throw new ForbiddenException('User has no organization');
+  if (!id)
+    throw new AppException('forbidden', {
+      message: 'User has no organization',
+    });
   return id;
 }
 

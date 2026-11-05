@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { AppException } from 'src/infra/errors/app-exception';
 import { OptionalBoolPipe } from './optional-bool.pipe';
 
 describe('OptionalBoolPipe', () => {
@@ -12,7 +12,7 @@ describe('OptionalBoolPipe', () => {
   it.each(['1', 'TRUE', 'yes', 'null', '[object Object]'])(
     'rejects %s with 400',
     (v) => {
-      expect(() => pipe.transform(v)).toThrow(BadRequestException);
+      expect(() => pipe.transform(v)).toThrow(AppException);
     },
   );
 });

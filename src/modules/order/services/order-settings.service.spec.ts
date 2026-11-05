@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { CustomerAuthException } from 'src/modules/auth/errors/customer-auth.exception';
+import { AppException } from 'src/infra/errors/app-exception';
 import { OrderSettingsService } from './order-settings.service';
 
 const ROW = {
@@ -60,7 +60,7 @@ describe('OrderSettingsService.get', () => {
 
   it('refuses a venue without its settings row instead of substituting defaults', async () => {
     const err = await service.get('org-2').catch((e) => e);
-    expect(err).toBeInstanceOf(CustomerAuthException);
+    expect(err).toBeInstanceOf(AppException);
     expect(err.code).toBe('settings_missing');
     expect(err.getStatus()).toBe(500);
   });

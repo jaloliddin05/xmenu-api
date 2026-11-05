@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../_prisma/prisma.service';
@@ -13,6 +13,7 @@ import {
   ownGroup,
   ownProduct,
 } from './menu-ownership';
+import { AppException } from 'src/infra/errors/app-exception';
 
 @Injectable()
 export class ProductService {
@@ -29,7 +30,8 @@ export class ProductService {
       where: { id, ...ownProduct(organizationId) },
       include: { translations: true },
     });
-    if (!product) throw new NotFoundException('Product not found');
+    if (!product)
+      throw new AppException('not_found', { message: 'Product not found' });
     return product;
   }
 
@@ -38,7 +40,8 @@ export class ProductService {
       where: { id, ...ownCategory(organizationId) },
       select: { id: true },
     });
-    if (!category) throw new NotFoundException('Category not found');
+    if (!category)
+      throw new AppException('not_found', { message: 'Category not found' });
   }
 
   private async assertOwnGroups(
@@ -52,7 +55,9 @@ export class ProductService {
       select: { id: true },
     });
     if (found.length !== unique.length)
-      throw new NotFoundException('Additional product group not found');
+      throw new AppException('not_found', {
+        message: 'Additional product group not found',
+      });
   }
 
   async findAll(
@@ -130,7 +135,8 @@ export class ProductService {
         },
       },
     });
-    if (!product) throw new NotFoundException('Product not found');
+    if (!product)
+      throw new AppException('not_found', { message: 'Product not found' });
     return product;
   }
 
@@ -268,7 +274,7 @@ export class ProductService {
     const product = await this.findOwnProduct(productId, organizationId);
     // The reindex below runs over categoryId, so it must be the product's own category
     if (product.category_id !== categoryId)
-      throw new NotFoundException('Category not found');
+      throw new AppException('not_found', { message: 'Category not found' });
 
     const oldIndex = product.index || 0;
 
@@ -401,7 +407,8 @@ export class ProductService {
       where: { id, product: ownProduct(organizationId) },
       select: { id: true },
     });
-    if (!image) throw new NotFoundException('Image not found');
+    if (!image)
+      throw new AppException('not_found', { message: 'Image not found' });
     await this.fileService.removeFile(id);
   }
 }

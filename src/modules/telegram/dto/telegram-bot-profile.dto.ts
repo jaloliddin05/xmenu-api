@@ -27,14 +27,23 @@ export class BotProfileFieldsDto {
 }
 
 export class SyncItemDto {
-  @ApiProperty({ enum: ['ok', 'failed', 'skipped_no_url'] })
-  status: 'ok' | 'failed' | 'skipped_no_url';
+  @ApiProperty({ enum: ['ok', 'failed', 'skipped'] })
+  status: 'ok' | 'failed' | 'skipped';
 
   @ApiProperty({
     required: false,
-    description: 'Error text from Telegram when status is failed',
+    enum: ['telegram_error', 'platform_misconfigured'],
+    description:
+      'failed: telegram_error (Telegram refused; details only in the server log). skipped: platform_misconfigured (the menu button has no delivery address)',
   })
-  reason?: string;
+  code?: 'telegram_error' | 'platform_misconfigured';
+
+  @ApiProperty({
+    required: false,
+    enum: ['delivery_link'],
+    description: 'With code platform_misconfigured',
+  })
+  feature?: 'delivery_link';
 }
 
 export class SyncResultDto {

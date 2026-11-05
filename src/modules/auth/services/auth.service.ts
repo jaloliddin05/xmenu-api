@@ -1,6 +1,7 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 
 import { UserService } from 'src/modules/user/user.service';
+import { AppException } from 'src/infra/errors/app-exception';
 
 @Injectable()
 export class AuthService {
@@ -10,9 +11,9 @@ export class AuthService {
   async validateUserById(userId: string) {
     const user = await this.userService.findOne(userId).catch(() => null);
     if (!user || !user.isActive) {
-      throw new UnauthorizedException(
-        'Valid token with non-existent or inactive user.',
-      );
+      throw new AppException('unauthorized', {
+        message: 'Valid token with non-existent or inactive user.',
+      });
     }
     return user;
   }

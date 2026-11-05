@@ -1,6 +1,4 @@
-import { Logger } from '@nestjs/common';
-
-type Env = Record<string, string | undefined>;
+import { Env, EnvIssues, isProduction } from 'src/config/env/env-issues';
 
 export const DEFAULT_TELEGRAM_API_BASE_URL = 'https://api.telegram.org';
 
@@ -23,31 +21,32 @@ export function telegramMethodUrl(
 }
 
 /**
- * Startup check. Production talks to the real Telegram only: any other base would hand every bot
- * token to that host. Elsewhere the value must be an http(s) URL, and a non-default one is a warning.
+ * Startup check (validateEnv). Production talks to the real Telegram only: any other base would hand
+ * every bot token to that host. Elsewhere the value must be an http(s) URL, and a non-default one is a
+ * warning.
  */
-export function assertTelegramApiConfig(
-  env: Env = process.env,
-  logger: Pick<Logger, 'warn'> = new Logger('TelegramApi'),
-): string {
+export function telegramApiEnvIssues(env: Env = process.env): EnvIssues {
   const base = telegramApiBaseUrl(env);
-  if (base === DEFAULT_TELEGRAM_API_BASE_URL) return base;
-  if (env.NODE_ENV === 'production') {
-    throw new Error(
+  const issues: EnvIssues = { errors: [], warnings: [] };
+  if (base === DEFAULT_TELEGRAM_API_BASE_URL) return issues;
+  if (isProduction(env)) {
+    issues.errors.push(
       `TELEGRAM_API_BASE_URL must be ${DEFAULT_TELEGRAM_API_BASE_URL} (or unset) when NODE_ENV=production`,
     );
+    return issues;
   }
-  let url: URL;
+  let url: URL | null = null;
   try {
     url = new URL(base);
   } catch {
-    throw new Error('TELEGRAM_API_BASE_URL is not a valid URL');
+    // reported below
   }
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-    throw new Error('TELEGRAM_API_BASE_URL must be an http(s) URL');
+  if (!url || (url.protocol !== 'http:' && url.protocol !== 'https:')) {
+    issues.errors.push('TELEGRAM_API_BASE_URL must be an http(s) URL');
+    return issues;
   }
-  logger.warn(
-    `TELEGRAM_API_BASE_URL=${base}: Bot API calls do not go to Telegram`,
+  issues.warnings.push(
+    'TELEGRAM_API_BASE_URL is not the default: Bot API calls do not go to Telegram',
   );
-  return base;
+  return issues;
 }

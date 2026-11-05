@@ -1,4 +1,4 @@
-import { CustomerAuthException } from 'src/modules/auth/errors/customer-auth.exception';
+import { AppException } from 'src/infra/errors/app-exception';
 import { hashOrderRequest } from '../domain/order-money';
 import { OrderService } from './order.service';
 import * as orderView from './order-view';
@@ -44,7 +44,7 @@ describe('OrderService.create: ordering channel and publication', () => {
   const codeOf = (mode: 'delivery' | 'pickup') =>
     create(mode).then(
       () => null,
-      (e: CustomerAuthException) => ({
+      (e: AppException) => ({
         code: e.code,
         status: e.getStatus(),
       }),

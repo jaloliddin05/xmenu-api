@@ -1,4 +1,4 @@
-import { CustomerAuthException } from 'src/modules/auth/errors/customer-auth.exception';
+import { AppException } from 'src/infra/errors/app-exception';
 import { PricingProduct, priceLines } from './order-pricing';
 
 const tr = (title: string) => [{ lang: 'ru', title, description: null }];
@@ -58,11 +58,11 @@ const plain = (): PricingProduct =>
 
 const catalog = (...ps: PricingProduct[]) => new Map(ps.map((p) => [p.id, p]));
 
-function thrown(fn: () => unknown): CustomerAuthException {
+function thrown(fn: () => unknown): AppException {
   try {
     fn();
   } catch (e) {
-    return e as CustomerAuthException;
+    return e as AppException;
   }
   throw new Error('expected to throw');
 }

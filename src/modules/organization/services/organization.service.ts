@@ -1,8 +1,4 @@
-import {
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { organization as Organization, Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../_prisma/prisma.service';
@@ -21,12 +17,10 @@ import {
   PLATFORM_SETTINGS,
 } from '../domain/platform-defaults';
 import { parseTenantId } from 'src/modules/tenant/tenant-key';
+import { AppException } from 'src/infra/errors/app-exception';
 
 const slugTaken = () =>
-  new ConflictException({
-    message: 'Slug is already taken',
-    code: 'slug_taken',
-  });
+  new AppException('slug_taken', { message: 'Slug is already taken' });
 
 @Injectable()
 export class OrganizationService {
@@ -110,7 +104,9 @@ export class OrganizationService {
   /** An owner may only act on their own organization; any other id looks like it does not exist. */
   assertOwn(id: string, organizationId: string) {
     if (id !== organizationId)
-      throw new NotFoundException('Organization not found');
+      throw new AppException('not_found', {
+        message: 'Organization not found',
+      });
   }
 
   async findOne(id: string) {
@@ -128,7 +124,9 @@ export class OrganizationService {
     }
 
     if (!organization) {
-      throw new NotFoundException(`Organization not found`);
+      throw new AppException('not_found', {
+        message: `Organization not found`,
+      });
     }
 
     return organization;
@@ -190,7 +188,10 @@ export class OrganizationService {
     const existing = await this.prismaService.organization.findUnique({
       where: { id },
     });
-    if (!existing) throw new NotFoundException('Organization not found');
+    if (!existing)
+      throw new AppException('not_found', {
+        message: 'Organization not found',
+      });
 
     // 3️⃣ type ni moslashtirish
     if (data.type) data.type = parseOrganizationType(data.type);

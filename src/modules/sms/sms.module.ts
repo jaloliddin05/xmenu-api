@@ -5,6 +5,7 @@ import { SMS_PROVIDER } from './providers/sms-provider.interface';
 import { ConsoleSmsProvider } from './providers/console-sms.provider';
 import { EskizSmsProvider } from './providers/eskiz-sms.provider';
 import { TelegramSmsProvider } from './providers/telegram-sms.provider';
+import { Env, EnvIssues, isProduction } from 'src/config/env/env-issues';
 
 export type SmsProviderName = 'eskiz' | 'telegram' | 'console';
 
@@ -15,7 +16,7 @@ export function resolveSmsProviderName(
   const isProd = env.NODE_ENV === 'production';
   const name = env.SMS_PROVIDER || (isProd ? 'eskiz' : 'console');
   if (name !== 'eskiz' && name !== 'telegram' && name !== 'console') {
-    throw new Error(`Noma'lum SMS_PROVIDER: ${name}`);
+    throw new Error('SMS_PROVIDER must be eskiz, telegram or console');
   }
   // Fail at boot, not on the first OTP: console would silently swallow every code
   if (isProd && name === 'console') {
@@ -43,6 +44,34 @@ export function isSmsConfigured(env: NodeJS.ProcessEnv = process.env): boolean {
     case 'console':
       return true;
   }
+}
+
+/**
+ * Startup check (validateEnv): a known provider, never console in production, and in production a
+ * provider that has what it needs (owners could not sign up and customers could not log in otherwise).
+ */
+export function smsEnvIssues(env: Env = process.env): EnvIssues {
+  const issues: EnvIssues = { errors: [], warnings: [] };
+  const raw = env.SMS_PROVIDER;
+  if (raw && raw !== 'eskiz' && raw !== 'telegram' && raw !== 'console') {
+    issues.errors.push('SMS_PROVIDER must be eskiz, telegram or console');
+    return issues;
+  }
+  if (isProduction(env) && raw === 'console') {
+    issues.errors.push(
+      'SMS_PROVIDER=console is not allowed when NODE_ENV=production',
+    );
+    return issues;
+  }
+  const name = resolveSmsProviderName(env);
+  if (isProduction(env) && !isSmsConfigured(env)) {
+    issues.errors.push(
+      name === 'eskiz'
+        ? 'SMS_PROVIDER=eskiz needs ESKIZ_EMAIL and ESKIZ_PASSWORD'
+        : 'SMS_PROVIDER=telegram needs OTP_BOT and XMENU_CHAT_ID',
+    );
+  }
+  return issues;
 }
 
 @Module({

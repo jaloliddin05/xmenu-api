@@ -6,8 +6,12 @@ import { SMS_PROVIDER } from 'src/modules/sms/providers/sms-provider.interface';
 import type { SmsProvider } from 'src/modules/sms/providers/sms-provider.interface';
 import { CUSTOMER_AUTH_CONFIG } from '../customer-auth.config';
 import type { CustomerAuthConfig } from '../customer-auth.config';
-import { CustomerAuthException } from '../errors/customer-auth.exception';
 import { RateLimitService, RateRule } from './rate-limit.service';
+import {
+  AppException,
+  platformMisconfigured,
+} from 'src/infra/errors/app-exception';
+import { isSmsConfigured } from 'src/modules/sms/sms.module';
 
 const SEND_TIMEOUT_MS = 5000;
 
@@ -93,6 +97,11 @@ export class CustomerOtpService {
     ip: string,
     scope: OtpScope = 'customer',
   ): Promise<number> {
+    if (!this.cfg.otpDevMode && !isSmsConfigured())
+      throw platformMisconfigured(
+        'sms',
+        'the SMS provider (SMS_PROVIDER) lacks its credentials',
+      );
     return this.issue(tenant, phone, {
       ip,
       scope,
@@ -168,10 +177,9 @@ export class CustomerOtpService {
       } catch {
         await this.redis.del(key);
         await this.rateLimit.rollback(rules);
-        throw new CustomerAuthException(
-          opts.unavailableCode ?? 'sms_unavailable',
-          'Code delivery unavailable',
-        );
+        throw new AppException(opts.unavailableCode ?? 'sms_unavailable', {
+          message: 'Code delivery unavailable',
+        });
       }
     }
 
@@ -180,7 +188,7 @@ export class CustomerOtpService {
 
   /**
    * Kodni tekshiradi. Muvaffaqiyatli bo'lsa kalit o'chiriladi (bir martalik).
-   * Natija: 'ok'. Aks holda CustomerAuthException; 'locked' holatni ham `onLocked` orqali bildiradi.
+   * Natija: 'ok'. Aks holda AppException; 'locked' holatni ham `onLocked` orqali bildiradi.
    */
   async consume(
     tenantId: string,
@@ -193,7 +201,7 @@ export class CustomerOtpService {
     const res = (await this.redis.eval(BUMP_LUA, 1, key)) as
       | [string, number]
       | null;
-    if (!res) throw new CustomerAuthException('code_expired');
+    if (!res) throw new AppException('code_expired');
 
     const [storedHex, attempts] = res;
     const expected = Buffer.from(storedHex, 'hex');
@@ -204,16 +212,16 @@ export class CustomerOtpService {
     if (equal) {
       // DEL faqat bitta parallel so'rov uchun 1 qaytaradi -> kod faqat bir marta ishlaydi
       const removed = await this.redis.del(key);
-      if (removed !== 1) throw new CustomerAuthException('code_expired');
+      if (removed !== 1) throw new AppException('code_expired');
       return;
     }
 
     if (attempts >= this.cfg.otpMaxAttempts) {
       await this.redis.del(key);
       await hooks.onLocked();
-      throw new CustomerAuthException('too_many_attempts');
+      throw new AppException('too_many_attempts');
     }
     await hooks.onFailed();
-    throw new CustomerAuthException('invalid_code');
+    throw new AppException('invalid_code');
   }
 }

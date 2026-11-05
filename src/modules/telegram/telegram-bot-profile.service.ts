@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { Lang, isLang } from 'src/infra/http/request-helpers';
 import { fieldErrorsException } from 'src/infra/validators/validation-errors';
@@ -15,6 +15,7 @@ import {
 } from './domain/bot-profile';
 import { TelegramBotService, TenantBot } from './telegram-bot.service';
 import { TelegramClient, telegramErrorText } from './telegram-client';
+import { AppException } from 'src/infra/errors/app-exception';
 
 export interface BotProfileView {
   /** One entry per venue language */
@@ -59,7 +60,10 @@ export class TelegramBotProfileService {
         settings: { select: { languages: true, default_language: true } },
       },
     });
-    if (!org?.settings) throw new NotFoundException('Organization not found');
+    if (!org?.settings)
+      throw new AppException('not_found', {
+        message: 'Organization not found',
+      });
     const languages = org.settings.languages.filter(isLang);
     const defaultLanguage = isLang(org.settings.default_language)
       ? org.settings.default_language
@@ -80,9 +84,8 @@ export class TelegramBotProfileService {
       where: { organization_id: organizationId },
     });
     if (!row) {
-      throw new NotFoundException({
+      throw new AppException('bot_not_connected', {
         message: 'The venue has no connected Telegram bot',
-        code: 'bot_not_connected',
       });
     }
     return row;
@@ -145,9 +148,8 @@ export class TelegramBotProfileService {
   async apply(organizationId: string): Promise<SyncResult> {
     const bot = await this.bots.forTenant(organizationId);
     if (!bot) {
-      throw new NotFoundException({
+      throw new AppException('bot_not_connected', {
         message: 'The venue has no connected Telegram bot',
-        code: 'bot_not_connected',
       });
     }
     const [row, venue] = await Promise.all([
@@ -259,12 +261,15 @@ export class TelegramBotProfileService {
             ...(code ? { language_code: code } : {}),
           });
         } catch (e) {
-          failures.push(`${code ?? 'default'}: ${telegramErrorText(e)}`);
+          failures.push(code ?? 'default');
+          this.logger.warn(
+            `${method} (${code ?? 'default'}) failed for bot ${bot.botKey}: ${telegramErrorText(e)}`,
+          );
         }
       }),
     );
     return failures.length
-      ? { status: 'failed', reason: failures.sort().join('; ') }
+      ? { status: 'failed', code: 'telegram_error' }
       : ok();
   }
 
@@ -273,7 +278,12 @@ export class TelegramBotProfileService {
     url: string | null,
     text: string | undefined,
   ): Promise<SyncItem> {
-    if (!url) return { status: 'skipped_no_url' };
+    if (!url)
+      return {
+        status: 'skipped',
+        code: 'platform_misconfigured',
+        feature: 'delivery_link',
+      };
     try {
       await this.client.call(bot.token, 'setChatMenuButton', {
         menu_button: {
@@ -284,7 +294,10 @@ export class TelegramBotProfileService {
       });
       return ok();
     } catch (e) {
-      return { status: 'failed', reason: telegramErrorText(e) };
+      this.logger.warn(
+        `setChatMenuButton failed for bot ${bot.botKey}: ${telegramErrorText(e)}`,
+      );
+      return { status: 'failed', code: 'telegram_error' };
     }
   }
 

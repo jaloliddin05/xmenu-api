@@ -2,8 +2,11 @@ import { Inject, Injectable } from '@nestjs/common';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { CUSTOMER_AUTH_CONFIG } from '../customer-auth.config';
 import type { CustomerAuthConfig } from '../customer-auth.config';
-import { CustomerAuthException } from '../errors/customer-auth.exception';
 import { TelegramBotService } from '../../telegram/telegram-bot.service';
+import {
+  AppException,
+  platformMisconfigured,
+} from 'src/infra/errors/app-exception';
 
 export interface TelegramUser {
   id: number | string;
@@ -28,17 +31,20 @@ export class TelegramInitDataService {
     initData: string,
   ): Promise<TelegramUser> {
     const token = await this.bots.initDataToken(tenantId);
-    if (!token) throw new Error('TELEGRAM_BOT_TOKEN is not configured');
+    if (!token)
+      throw platformMisconfigured(
+        'telegram_bot',
+        'no venue bot and TELEGRAM_BOT_TOKEN is not set',
+      );
     return this.verifyWithToken(initData, token);
   }
 
   /** Verifies the WebApp initData signature against `botToken` and returns the user. */
   verifyWithToken(initData: string, botToken: string): TelegramUser {
     const bad = () =>
-      new CustomerAuthException(
-        'invalid_telegram_data',
-        'Invalid Telegram initData',
-      );
+      new AppException('invalid_telegram_data', {
+        message: 'Invalid Telegram initData',
+      });
 
     const params = new URLSearchParams(initData);
     const hash = params.get('hash');

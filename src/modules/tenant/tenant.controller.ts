@@ -1,4 +1,4 @@
-import { Controller, Get, Header, Param, UseFilters } from '@nestjs/common';
+import { Controller, Get, Header, Param } from '@nestjs/common';
 import {
   ApiNotFoundResponse,
   ApiOkResponse,
@@ -6,10 +6,9 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { Public } from '../auth/decorators/public.decorator';
-import { CustomerAuthException } from '../auth/errors/customer-auth.exception';
-import { CustomerExceptionFilter } from '../auth/errors/customer-exception.filter';
 import { TenantHostRefDto, TenantRefDto } from './dto/tenant-ref.dto';
 import { TenantService } from './tenant.service';
+import { AppException } from 'src/infra/errors/app-exception';
 
 /** Public tenant lookups for the QR menu and the delivery front-end. */
 @ApiTags('Tenant')
@@ -22,7 +21,6 @@ export class TenantController {
    * id in X-Tenant-Id. Short cache: the answer changes when the owner renames the slug.
    */
   @Public()
-  @UseFilters(CustomerExceptionFilter)
   @Get('by-slug/:slug')
   @Header('Cache-Control', 'public, max-age=60')
   @ApiOperation({
@@ -35,7 +33,7 @@ export class TenantController {
   })
   async bySlug(@Param('slug') slug: string): Promise<TenantRefDto> {
     const tenant = await this.tenants.findActiveBySlug(slug);
-    if (!tenant) throw new CustomerAuthException('tenant_not_found');
+    if (!tenant) throw new AppException('tenant_not_found');
     return tenant;
   }
 
@@ -45,7 +43,6 @@ export class TenantController {
    * platform lookup turns a host into a venue. Short cache, as by-slug: domains and slugs change.
    */
   @Public()
-  @UseFilters(CustomerExceptionFilter)
   @Get('by-host/:host')
   @Header('Cache-Control', 'public, max-age=60')
   @ApiOperation({
@@ -59,7 +56,7 @@ export class TenantController {
   })
   async byHost(@Param('host') host: string): Promise<TenantHostRefDto> {
     const tenant = await this.tenants.findActiveByHost(host);
-    if (!tenant) throw new CustomerAuthException('tenant_not_found');
+    if (!tenant) throw new AppException('tenant_not_found');
     return tenant;
   }
 }

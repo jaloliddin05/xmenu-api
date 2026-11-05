@@ -1,6 +1,4 @@
-import { Logger } from '@nestjs/common';
-
-type Env = Record<string, string | undefined>;
+import { Env, EnvIssues, isProduction } from 'src/config/env/env-issues';
 
 /**
  * Targets that have an address but no secret. The receivers answer 503/400 to such a request and
@@ -20,14 +18,12 @@ export function revalidateConfigProblems(env: Env = process.env): string[] {
   return problems;
 }
 
-/** Production refuses to start with such a configuration; elsewhere it is a warning. */
-export function assertRevalidateConfig(
-  env: Env = process.env,
-  logger: Pick<Logger, 'warn'> = new Logger('Revalidate'),
-): void {
-  const problems = revalidateConfigProblems(env);
-  if (!problems.length) return;
-  const text = `Front-end revalidation is misconfigured: ${problems.join('; ')} (docs/REVALIDATE.md)`;
-  if (env.NODE_ENV === 'production') throw new Error(text);
-  logger.warn(text);
+/** Startup check (validateEnv): production refuses to start with such a configuration; elsewhere it is a warning. */
+export function revalidateEnvIssues(env: Env = process.env): EnvIssues {
+  const problems = revalidateConfigProblems(env).map(
+    (p) => `Front-end revalidation: ${p} (docs/REVALIDATE.md)`,
+  );
+  return isProduction(env)
+    ? { errors: problems, warnings: [] }
+    : { errors: [], warnings: problems };
 }

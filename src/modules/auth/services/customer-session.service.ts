@@ -7,11 +7,11 @@ import { REDIS } from 'src/infra/redis/redis.module';
 import { CUSTOMER_AUTH_CONFIG } from '../customer-auth.config';
 import type { CustomerAuthConfig } from '../customer-auth.config';
 import { CustomerTokenService } from './customer-token.service';
-import { CustomerAuthException } from '../errors/customer-auth.exception';
 import {
   CustomerAuthEventService,
   RequestCtx,
 } from './customer-auth-event.service';
+import { AppException } from 'src/infra/errors/app-exception';
 
 type Db = Prisma.TransactionClient | PrismaService;
 
@@ -137,7 +137,7 @@ export class CustomerSessionService {
     tenantId: string,
     ctx: RequestCtx,
   ): Promise<TokenPair> {
-    const invalid = () => new CustomerAuthException('invalid_refresh_token');
+    const invalid = () => new AppException('invalid_refresh_token');
     const now = new Date();
 
     const session = await this.prisma.customer_session.findUnique({
@@ -166,7 +166,7 @@ export class CustomerSessionService {
         phone: customer?.phone,
         meta: { via: 'refresh' },
       });
-      throw new CustomerAuthException('customer_blocked');
+      throw new AppException('customer_blocked');
     }
 
     if (session.used_at) {
@@ -240,7 +240,7 @@ export class CustomerSessionService {
       customerId: session.customer_id,
       meta: { family_id: session.family_id },
     });
-    throw new CustomerAuthException('invalid_refresh_token');
+    throw new AppException('invalid_refresh_token');
   }
 
   // ---------- logout ----------

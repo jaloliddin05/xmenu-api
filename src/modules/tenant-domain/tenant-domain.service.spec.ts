@@ -88,7 +88,7 @@ describe('TenantDomainService', () => {
       expect(status).toBe(400);
       expect(body).toMatchObject({
         code,
-        errors: [{ field: 'host', reason: code }],
+        fields: [{ field: 'host', code: code }],
       });
       expect(db.client.$transaction).not.toHaveBeenCalled();
     });

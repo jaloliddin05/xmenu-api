@@ -2,11 +2,9 @@ import {
   CanActivate,
   ExecutionContext,
   INestApplication,
-  ValidationPipe,
 } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
-import { CustomerAuthException } from 'src/modules/auth/errors/customer-auth.exception';
 import { CustomerAccessTokenGuard } from 'src/modules/auth/passport-strategies/customer-access-token/customer-access-token.guard';
 import { TenantGuard } from 'src/modules/tenant/tenant.guard';
 import { CustomerAddressController } from './customer-address.controller';
@@ -14,6 +12,8 @@ import {
   AddressView,
   CustomerAddressService,
 } from './services/customer-address.service';
+import { AppException } from 'src/infra/errors/app-exception';
+import { configureErrorHandling } from 'src/infra/errors/configure';
 
 const PRINCIPAL = { customerId: 'cust-1', tenantId: 'tenant-1', sid: 'sid-1' };
 const ID = '3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b';
@@ -41,7 +41,10 @@ class FakeAuthGuard implements CanActivate {
 }
 
 interface ErrorBody {
-  error: { code: string; message: string };
+  code: string;
+  message: string;
+  status: number;
+  requestId: string;
 }
 
 describe('CustomerAddressController (HTTP)', () => {
@@ -68,14 +71,7 @@ describe('CustomerAddressController (HTTP)', () => {
 
     app = moduleRef.createNestApplication();
     // main.ts dagi bilan bir xil sozlama.
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        forbidUnknownValues: true,
-        transform: true,
-      }),
-    );
+    configureErrorHandling(app);
     await app.init();
   });
 
@@ -168,7 +164,7 @@ describe('CustomerAddressController (HTTP)', () => {
           .send(body)
           .expect(400);
 
-        expect((res.body as ErrorBody).error.code).toBe('validation_error');
+        expect((res.body as ErrorBody).code).toBe('validation_error');
         expect(res.headers['cache-control']).toBe('no-store');
         expect(service.create).not.toHaveBeenCalled();
       },
@@ -193,10 +189,10 @@ describe('CustomerAddressController (HTTP)', () => {
       ['customer_blocked', 403],
       ['invalid_token', 401],
     ] as const)(
-      'maps the service error %s to HTTP %i in the customer error format',
+      'maps the service error %s to HTTP %i in the common error format',
       async (code, status) => {
         service.create.mockRejectedValue(
-          new CustomerAuthException(code, 'detail'),
+          new AppException(code, { message: 'detail' }),
         );
 
         const res = await request(http())
@@ -204,7 +200,12 @@ describe('CustomerAddressController (HTTP)', () => {
           .send({ address: 'Shamol oti 42' });
 
         expect(res.status).toBe(status);
-        expect(res.body).toEqual({ error: { code, message: 'detail' } });
+        expect(res.body).toEqual({
+          code,
+          message: 'detail',
+          status,
+          requestId: res.headers['x-request-id'],
+        });
       },
     );
   });
@@ -227,14 +228,14 @@ describe('CustomerAddressController (HTTP)', () => {
 
     it('answers 404 address_not_found for an address that is not the customer’s', async () => {
       service.setDefault.mockRejectedValue(
-        new CustomerAuthException('address_not_found'),
+        new AppException('address_not_found'),
       );
 
       const res = await request(http())
         .post(`/customers/me/addresses/${ID}/default`)
         .expect(404);
 
-      expect((res.body as ErrorBody).error.code).toBe('address_not_found');
+      expect((res.body as ErrorBody).code).toBe('address_not_found');
     });
 
     it('answers 400 for an id that is not a UUID', async () => {
@@ -242,7 +243,8 @@ describe('CustomerAddressController (HTTP)', () => {
         .post('/customers/me/addresses/not-a-uuid/default')
         .expect(400);
 
-      expect((res.body as ErrorBody).error.code).toBe('validation_error');
+      // ParseUUIDPipe: a framework 400 without a field
+      expect((res.body as ErrorBody).code).toBe('bad_request');
       expect(service.setDefault).not.toHaveBeenCalled();
     });
   });
@@ -264,16 +266,16 @@ describe('CustomerAddressController (HTTP)', () => {
     });
 
     it('answers 404 address_not_found when there is nothing to delete', async () => {
-      service.remove.mockRejectedValue(
-        new CustomerAuthException('address_not_found'),
-      );
+      service.remove.mockRejectedValue(new AppException('address_not_found'));
 
       const res = await request(http())
         .delete(`/customers/me/addresses/${ID}`)
         .expect(404);
 
-      expect(res.body).toEqual({
-        error: { code: 'address_not_found', message: 'address_not_found' },
+      expect(res.body).toMatchObject({
+        code: 'address_not_found',
+        message: 'Address not found',
+        status: 404,
       });
     });
 

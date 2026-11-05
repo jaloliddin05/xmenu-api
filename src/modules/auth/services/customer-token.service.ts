@@ -3,7 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { randomUUID } from 'crypto';
 import { CUSTOMER_AUTH_CONFIG } from '../customer-auth.config';
 import type { CustomerAuthConfig } from '../customer-auth.config';
-import { CustomerAuthException } from '../errors/customer-auth.exception';
+import { AppException } from 'src/infra/errors/app-exception';
 
 export const ISSUER = 'xmenu';
 export const AUD_CUSTOMER = 'xmenu:customer';
@@ -63,11 +63,11 @@ export class CustomerTokenService {
       });
     } catch (err) {
       if ((err as { name?: string } | null)?.name === 'TokenExpiredError')
-        throw new CustomerAuthException('registration_expired');
-      throw new CustomerAuthException('invalid_registration_token');
+        throw new AppException('registration_expired');
+      throw new AppException('invalid_registration_token');
     }
     if (payload.tid !== tenantId || !payload.phone || !payload.jti) {
-      throw new CustomerAuthException('invalid_registration_token');
+      throw new AppException('invalid_registration_token');
     }
     return { phone: payload.phone, tid: payload.tid, jti: payload.jti };
   }

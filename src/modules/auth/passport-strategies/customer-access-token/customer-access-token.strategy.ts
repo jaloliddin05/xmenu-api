@@ -4,9 +4,9 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import type { Request } from 'express';
 import { CUSTOMER_AUTH_CONFIG } from '../../customer-auth.config';
 import type { CustomerAuthConfig } from '../../customer-auth.config';
-import { CustomerAuthException } from '../../errors/customer-auth.exception';
 import { AUD_CUSTOMER, ISSUER } from '../../services/customer-token.service';
 import { CustomerSessionService } from '../../services/customer-session.service';
+import { AppException } from 'src/infra/errors/app-exception';
 
 export const CUSTOMER_ACCESS_TOKEN = 'customer_access_token';
 
@@ -39,14 +39,14 @@ export class CustomerAccessTokenStrategy extends PassportStrategy(
     payload: { sub: string; tid: string; sid: string },
   ) {
     if (!payload?.sub || !payload.tid || !payload.sid)
-      throw new CustomerAuthException('invalid_token');
+      throw new AppException('invalid_token');
 
     // 403 (401 emas): klient refresh'ni aylantirib yubormasligi uchun
     if (!req.tenant || payload.tid !== req.tenant.id)
-      throw new CustomerAuthException('tenant_mismatch');
+      throw new AppException('tenant_mismatch');
 
     if (await this.sessions.isSidDenied(payload.sid))
-      throw new CustomerAuthException('invalid_token');
+      throw new AppException('invalid_token');
 
     return { customerId: payload.sub, tenantId: payload.tid, sid: payload.sid };
   }

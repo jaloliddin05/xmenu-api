@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common';
+import { Env, EnvIssues, isProduction } from 'src/config/env/env-issues';
 
 export const CUSTOMER_AUTH_CONFIG = 'CUSTOMER_AUTH_CONFIG';
 
@@ -26,64 +26,68 @@ export interface CustomerAuthConfig {
   telegramVerifyTtlSeconds: number;
 }
 
-function int(name: string, def: number): number {
-  const raw = process.env[name];
-  if (raw === undefined || raw === '') return def;
-  const n = Number(raw);
-  if (!Number.isInteger(n) || n <= 0) {
-    throw new Error(
-      `${name} musbat butun son bo'lishi kerak (hozir: "${raw}")`,
+const CUSTOMER_SECRETS = [
+  'JWT_CUSTOMER_ACCESS_SECRET',
+  'JWT_CUSTOMER_REGISTRATION_SECRET',
+  'OTP_HMAC_SECRET',
+] as const;
+
+/**
+ * Startup check (validateEnv): the three customer secrets are required everywhere, at least 32
+ * characters in production, distinct from each other and from the staff JWT secret; OTP_DEV_MODE is
+ * refused in production and a warning elsewhere. Integer settings are checked by the env schema.
+ */
+export function customerAuthEnvIssues(env: Env = process.env): EnvIssues {
+  const prod = isProduction(env);
+  const issues: EnvIssues = { errors: [], warnings: [] };
+  if (env.OTP_DEV_MODE === 'true') {
+    if (prod)
+      issues.errors.push(
+        'OTP_DEV_MODE=true is not allowed when NODE_ENV=production',
+      );
+    else
+      issues.warnings.push(
+        'OTP_DEV_MODE=true: no codes are sent, every code is the fixed test code',
+      );
+  }
+  for (const name of CUSTOMER_SECRETS) {
+    const v = env[name];
+    if (!v) issues.errors.push(`${name} is required (customer auth)`);
+    else if (prod && v.length < 32)
+      issues.errors.push(
+        `${name} must be at least 32 characters when NODE_ENV=production`,
+      );
+  }
+  const access = env.JWT_CUSTOMER_ACCESS_SECRET;
+  const registration = env.JWT_CUSTOMER_REGISTRATION_SECRET;
+  if (access && access === registration) {
+    issues.errors.push(
+      'JWT_CUSTOMER_ACCESS_SECRET and JWT_CUSTOMER_REGISTRATION_SECRET must differ',
     );
   }
-  return n;
+  const staff = env.JWT_ACCESS_TOKEN_SECRET;
+  if (staff && (staff === access || staff === registration)) {
+    issues.errors.push(
+      'Customer JWT secrets must differ from JWT_ACCESS_TOKEN_SECRET',
+    );
+  }
+  return issues;
 }
 
-function secret(name: string, isProd: boolean): string {
-  const v = process.env[name];
-  if (!v) {
-    throw new Error(
-      `${name} env o'zgaruvchisi majburiy (mijoz autentifikatsiyasi uchun)`,
-    );
-  }
-  if (isProd && v.length < 32) {
-    throw new Error(`${name} production'da kamida 32 belgi bo'lishi kerak`);
-  }
-  return v;
+/** Positive integer setting; validateEnv rejects other values at startup, here they fall back. */
+function int(name: string, def: number): number {
+  const n = Number(process.env[name]);
+  return Number.isInteger(n) && n > 0 ? n : def;
 }
 
 export function loadCustomerAuthConfig(): CustomerAuthConfig {
-  const isProd = process.env.NODE_ENV === 'production';
+  // Also checked by validateEnv at startup; kept here so the module never builds with bad secrets
+  const { errors } = customerAuthEnvIssues(process.env);
+  if (errors.length) throw new Error(errors.join('; '));
   const otpDevMode = process.env.OTP_DEV_MODE === 'true';
-
-  if (otpDevMode && isProd) {
-    throw new Error(
-      'OTP_DEV_MODE=true bilan NODE_ENV=production da ishga tushmaydi',
-    );
-  }
-  if (otpDevMode) {
-    new Logger('CustomerAuthConfig').warn(
-      "OTP_DEV_MODE yoqilgan: SMS yuborilmaydi, kod har doim 123456... bo'ladi",
-    );
-  }
-
-  const accessSecret = secret('JWT_CUSTOMER_ACCESS_SECRET', isProd);
-  const registrationSecret = secret('JWT_CUSTOMER_REGISTRATION_SECRET', isProd);
-  const otpHmacSecret = secret('OTP_HMAC_SECRET', isProd);
-
-  if (accessSecret === registrationSecret) {
-    throw new Error(
-      "JWT_CUSTOMER_ACCESS_SECRET va JWT_CUSTOMER_REGISTRATION_SECRET har xil bo'lishi kerak",
-    );
-  }
-  const staffSecrets = [process.env.JWT_ACCESS_TOKEN_SECRET].filter(Boolean);
-  if (
-    staffSecrets.includes(accessSecret) ||
-    staffSecrets.includes(registrationSecret)
-  ) {
-    throw new Error(
-      'Mijoz JWT secretlari xodimlar (user) secretlaridan farq qilishi kerak',
-    );
-  }
+  const accessSecret = process.env.JWT_CUSTOMER_ACCESS_SECRET!;
+  const registrationSecret = process.env.JWT_CUSTOMER_REGISTRATION_SECRET!;
+  const otpHmacSecret = process.env.OTP_HMAC_SECRET!;
 
   const locale = process.env.SMS_LOCALE === 'ru' ? 'ru' : 'uz';
 

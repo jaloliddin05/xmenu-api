@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { Prisma } from '@prisma/client';
 
@@ -11,6 +7,7 @@ import { ChangePasswordDto, UpdateUserDto } from './dto';
 import { FileService } from '../file/file.service';
 import { hashPassword } from 'src/infra/helper/auth/hash-password';
 import { toStaffUser } from 'src/infra/helper/auth/staff-user';
+import { AppException } from 'src/infra/errors/app-exception';
 
 @Injectable()
 export class UserService {
@@ -79,7 +76,7 @@ export class UserService {
         where: { id },
       })
       .catch(() => {
-        throw new NotFoundException('data not found');
+        throw new AppException('not_found', { message: 'data not found' });
       });
 
     const isSamePassword =
@@ -87,7 +84,7 @@ export class UserService {
       (await bcrypt.compare(data.oldPassword, user.password));
 
     if (!isSamePassword) {
-      throw new BadRequestException("Old password doesn't match");
+      throw new AppException('wrong_password');
     }
 
     return await this.updatePassword(id, data.newPassword);
@@ -95,7 +92,7 @@ export class UserService {
 
   async updatePassword(id: string, password: string) {
     await this.prismaService.user.findUnique({ where: { id } }).catch(() => {
-      throw new NotFoundException('user not found');
+      throw new AppException('not_found', { message: 'user not found' });
     });
 
     const newPassword = await hashPassword(password);

@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { Lang } from 'src/infra/http/request-helpers';
 import { publicFileUrl } from 'src/modules/menu/menu.mapper';
-import { CustomerAuthException } from 'src/modules/auth/errors/customer-auth.exception';
 import { OrderSettingsService } from 'src/modules/order/services/order-settings.service';
 import {
   resolveTheme,
@@ -22,6 +21,7 @@ import { resolveMapView } from './map-view';
 import { PRIMARY_DOMAIN_SELECT, primaryDomainOf } from './primary-domain';
 import type { LatLng } from 'src/modules/organization/domain/organization-settings';
 import type { Tenant } from './tenant.service';
+import { AppException } from 'src/infra/errors/app-exception';
 
 /** Description in the response language, else in the venue's default language; blank counts as missing. */
 export function pickDescription(
@@ -143,15 +143,14 @@ export class TenantConfigService {
         },
       }),
     ]);
-    if (!org) throw new CustomerAuthException('tenant_not_found');
+    if (!org) throw new AppException('tenant_not_found');
     if (!org.settings) {
       this.logger.error(
         `organization_settings row missing for organization ${tenant.id}`,
       );
-      throw new CustomerAuthException(
-        'settings_missing',
-        'Venue settings are missing',
-      );
+      throw new AppException('settings_missing', {
+        message: 'Venue settings are missing',
+      });
     }
 
     const s = toSettingsView(org.settings);

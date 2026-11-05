@@ -47,9 +47,7 @@ describe('GET /tenant/by-slug/:slug', () => {
     const res = await request(app.getHttpServer())
       .get(`/tenant/by-slug/${slug}`)
       .expect(404);
-    expect(res.body).toEqual({
-      error: { code: 'tenant_not_found', message: 'tenant_not_found' },
-    });
+    expect(res.body).toMatchObject({ code: 'tenant_not_found', status: 404 });
     expect(res.headers['cache-control']).toBe('no-store');
   });
 
@@ -153,9 +151,7 @@ describe('GET /tenant/by-host/:host', () => {
     ['not a host name', 'mant.xmenu.uz/admin'],
   ])('404s %s, not cached', async (_why, host) => {
     const res = await byHost(host).expect(404);
-    expect(res.body).toEqual({
-      error: { code: 'tenant_not_found', message: 'tenant_not_found' },
-    });
+    expect(res.body).toMatchObject({ code: 'tenant_not_found', status: 404 });
     expect(res.headers['cache-control']).toBe('no-store');
   });
 

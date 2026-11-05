@@ -6,8 +6,8 @@
 исполняемой версией этой спецификации.
 
 Общее: заголовки `Authorization: Bearer`, `X-Tenant-Id` (как у остальных
-customer-эндпоинтов). Ошибки — единый формат клиента:
-`{ "error": { "code", "message", "retryAfter?", "details?" } }`.
+customer-эндпоинтов). Ошибки — общий формат API:
+`{ "code", "message", "status", "retryAfter?", "details?", "requestId" }` (общая форма, `docs/API.md`, «Ошибки»).
 Все эндпоинты — только для авторизованного клиента; чужой заказ = `404`.
 
 ## Эндпоинты

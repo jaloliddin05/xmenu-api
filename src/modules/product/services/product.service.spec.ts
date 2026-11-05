@@ -1,4 +1,3 @@
-import { NotFoundException } from '@nestjs/common';
 import {
   FakeMenuPrisma,
   seedTwoTenants,
@@ -32,7 +31,7 @@ describe('ProductService: organization ownership (IDOR)', () => {
   });
 
   async function refused(p: Promise<unknown>) {
-    await expect(p).rejects.toBeInstanceOf(NotFoundException);
+    await expect(p).rejects.toMatchObject({ code: 'not_found' });
     expect(db.log).toEqual([]);
     expect(revalidate.addRevalidationJob).not.toHaveBeenCalled();
     expect(files.removeFile).not.toHaveBeenCalled();

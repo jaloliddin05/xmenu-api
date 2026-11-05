@@ -1,4 +1,5 @@
-import { BadRequestException, Injectable, PipeTransform } from '@nestjs/common';
+import { Injectable, PipeTransform } from '@nestjs/common';
+import { fieldError } from 'src/infra/validators/validation-errors';
 
 /** Optional boolean query parameter: absent/empty -> undefined, 'true'/'false' -> boolean, anything else -> 400. */
 @Injectable()
@@ -11,6 +12,10 @@ export class OptionalBoolPipe
     if (value === undefined || value === '') return undefined;
     if (value === 'true') return true;
     if (value === 'false') return false;
-    throw new BadRequestException(`${this.name} must be "true" or "false"`);
+    throw fieldError(
+      this.name,
+      'is_boolean',
+      `${this.name} must be "true" or "false"`,
+    );
   }
 }

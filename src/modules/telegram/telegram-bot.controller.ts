@@ -17,6 +17,7 @@ import {
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiServiceUnavailableResponse,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
@@ -61,10 +62,14 @@ export class TelegramBotController {
   @ApiOkResponse({ type: TelegramBotFullStatusDto })
   @ApiBadRequestResponse({
     description:
-      'invalid_bot_token (malformed or rejected by Telegram), webhook_setup_failed, webhook_url_not_https (server PUBLIC_API_URL is not https)',
+      'invalid_bot_token (malformed or rejected by Telegram), webhook_setup_failed',
   })
   @ApiConflictResponse({
     description: 'bot_already_connected: the bot belongs to another venue',
+  })
+  @ApiServiceUnavailableResponse({
+    description:
+      'platform_misconfigured, details.feature telegram_bot: the platform cannot host bots (its API address is not https or bot tokens cannot be stored)',
   })
   async connect(@Body() dto: ConnectTelegramBotDto, @Req() req: StaffRequest) {
     const organizationId = requireStaffOrganizationId(req);
@@ -84,7 +89,7 @@ export class TelegramBotController {
   @ApiOkResponse({ type: TelegramBotFullStatusDto })
   @ApiBadRequestResponse({
     description:
-      'validation_error with errors[] (ru.name, uz.description, ...): lengths, empty fields, languages not enabled for the venue',
+      'validation_error with fields[] (ru.name, uz.description, ...): lengths, empty fields, languages not enabled for the venue',
   })
   @ApiNotFoundResponse({ description: 'bot_not_connected' })
   async saveProfile(@Body() dto: SaveBotProfileDto, @Req() req: StaffRequest) {

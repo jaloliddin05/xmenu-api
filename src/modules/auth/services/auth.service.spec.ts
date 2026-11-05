@@ -1,4 +1,3 @@
-import { UnauthorizedException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 
 function serviceWith(findOne: (id: string) => Promise<unknown>) {
@@ -23,6 +22,6 @@ describe('AuthService.validateUserById', () => {
   ])('rejects %s with 401', async (_name, findOne) => {
     await expect(
       serviceWith(findOne).validateUserById('u1'),
-    ).rejects.toBeInstanceOf(UnauthorizedException);
+    ).rejects.toMatchObject({ code: 'unauthorized' });
   });
 });

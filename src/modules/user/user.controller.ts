@@ -11,7 +11,6 @@ import {
   Req,
   UploadedFile,
   UseInterceptors,
-  NotFoundException,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { ChangePasswordDto, UpdateUserDto } from './dto';
@@ -19,6 +18,7 @@ import { ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { MulterStorage } from 'src/infra/helper/upload/multer-upload';
 import { FileUploadValidationForOptional } from 'src/infra/validators/file-upload-validation-update';
+import { AppException } from 'src/infra/errors/app-exception';
 
 /** An owner may only act on their own account; anyone else's id looks like it does not exist. */
 export function assertSelf(
@@ -26,7 +26,7 @@ export function assertSelf(
   id: string,
 ): string {
   if (!req.user?.id || req.user.id !== id)
-    throw new NotFoundException('User not found');
+    throw new AppException('not_found', { message: 'User not found' });
   return id;
 }
 

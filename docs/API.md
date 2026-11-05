@@ -14,24 +14,55 @@
 |---|---|---|
 | Пути | `/auth/*` и все прочие эндпоинты админки | `/auth/customer/*`, `/customers/*`, `/orders/*` |
 | Тенант | организация владельца из access-токена | заголовок `X-Tenant-Id: <organization.id>` (UUID; slug не принимается) |
-| Формат ошибки | `{ status, timestamp, code, message, retryAfter?, errors?, details? }` | `{ error: { code, message, retryAfter?, details? } }` |
 
-При 429 всегда приходит заголовок `Retry-After` (секунды) и поле `retryAfter`.
+## Ошибки
 
-**Ошибки валидации.** Тело, не прошедшее DTO, в обоих контурах даёт `400` с `code: validation_error`; `message`
-перечисляет поля (`"theme.brand: …; mapZoom: …"`), а список полей приходит отдельно: у владельца в `errors`, у
-клиента в `details.errors`:
+Одна форма для обоих контуров и любого эндпоинта (схема `ErrorResponse` в OpenAPI, ответ `default` у каждой
+операции):
 
 ```json
-{ "status": 400, "timestamp": "…", "code": "validation_error",
-  "message": "theme.brand: brand must be a hex color: #RGB, #RRGGBB or #RRGGBBAA",
-  "errors": [{ "field": "theme.brand", "reason": "matches", "message": "brand must be a hex color: …" }] }
+{ "code": "validation_error", "message": "theme.brand: brand must be a hex color",
+  "status": 400, "fields": [{ "field": "theme.brand", "code": "matches", "message": "brand must be a hex color" }],
+  "requestId": "3f1c2a8e-5b7d-4e0a-9c61-2d4f8b7a1e90" }
 ```
 
-`field`: путь в теле (`mapCenter.lat`, `languages[1]`), `reason`: имя правила (`matches`, `isIn`, `min`, `max`,
-`isInt`, `whitelistValidation` для лишнего поля…). У владельца `code` есть всегда: свой код ошибки, иначе по статусу
-(`bad_request`, `unauthorized`, `forbidden`, `not_found`, `conflict`, `payload_too_large`, `rate_limited`,
-`internal_error`, `unavailable`…).
+| Поле | Что это |
+|---|---|
+| `code` | стабильный код в snake_case из одного реестра (`src/infra/errors/error-codes.ts`); полный список с HTTP-статусом, условиями и `details`: `docs/ERRORS.md` (генерируется `npm run openapi`) |
+| `message` | подсказка разработчику по-английски; не для показа людям. Текст на экране фронт выбирает по `code` из своего словаря, неизвестный `code` даёт общий текст |
+| `status` | тот же HTTP-статус |
+| `fields?` | ошибки полей: `field` путь в запросе (`mapCenter.lat`, `languages[1]`, `file`), `code` правило в snake_case (`matches`, `is_in`, `min`, `max`, `is_int`, `max_length`, `required`, `unknown_field` для лишнего поля, доменные `not_in_languages`, `outside_bounds`…), `message` подсказка разработчику |
+| `retryAfter?` | секунды до повтора (429), вместе с заголовком `Retry-After` |
+| `details?` | данные отдельных кодов, только ключи из реестра (`branch_closed`: `opensAt`, `price_changed`: новые цены…) |
+| `requestId` | id запроса, тот же в заголовке `X-Request-Id`; по нему подробности в логе сервера. Входящий `X-Request-Id` от прокси сохраняется, если похож на id (`[A-Za-z0-9-]{8,64}`) |
+
+Ответ с ошибкой всегда `Cache-Control: no-store`.
+
+**Что не попадает в ответ.** Имена переменных окружения, пути, стектрейсы, тексты исключений, ответы внешних
+сервисов (Telegram, Click, Payme, OpenAI, Eskiz) и ошибки базы уходят только в лог вместе с `requestId`. Исключения
+фреймворка (неизвестный маршрут, `ParseUUIDPipe`, multer) сохраняют статус, но получают код по статусу
+(`not_found`, `bad_request`…) и сообщение из реестра; всё прочее непредвиденное: `500 internal_error` без деталей.
+Битый JSON: `400 invalid_body`. `npm run check:user-texts` (шаг CI) проверяет сообщения ошибок и тексты бота.
+
+**Функция выключена настройкой платформы.** Если не хватает настройки платформы (не заведения), ответ
+`503 platform_misconfigured` с `details.feature`:
+
+| `feature` | Когда |
+|---|---|
+| `telegram_bot` | `PUT /telegram-bot`: адрес API платформы не https или ключ шифрования токенов не задан; проверка `initData` без бота заведения и платформенного бота |
+| `payments` | сохранение ключей Click/Payme без ключа шифрования |
+| `sms` | `otp/request` и регистрация владельца: у выбранного SMS-провайдера нет учётных данных (сбой самого провайдера остаётся `503 sms_unavailable`) |
+| `domains` | добавление своего домена без `PLATFORM_DOMAIN` (только development: production без него не стартует) |
+| `translation` | `/translation` без ключа OpenAI |
+| `order_notifications` | вебхук платформенного бота заказов без секрета |
+| `delivery_link` | не ошибка запроса: пункт синхронизации кнопки меню бота `{ status: "skipped", code: "platform_misconfigured", feature: "delivery_link" }` без адреса сайта доставки |
+
+Какие функции выключены и почему, бэкенд печатает при старте (development) или не стартует (production);
+без запуска: `npm run check:env`.
+
+**Правила кодов.** Код не переименовывается и не используется повторно для другого смысла. Новый смысл получает
+новый код; старый остаётся в реестре с пометкой `deprecated` (в `docs/ERRORS.md` зачёркнут, указана замена) и больше
+не отдаётся. Устаревшие сейчас: `webhook_url_not_https` и `translation_unavailable` (оба → `platform_misconfigured`).
 
 ## Авторизация владельцев
 
@@ -99,7 +130,7 @@ translations [{ id, lang, description }] }`. Хеша пароля, `owner_id`, 
 
 | HTTP | `code` | Когда |
 |---|---|---|
-| 400 | `validation_error` | тело не прошло DTO (пароль короче 8, неизвестный `type`...), поля в `errors` |
+| 400 | `validation_error` | тело не прошло DTO (пароль короче 8, неизвестный `type`...), поля в `fields` |
 | 400 | `invalid_phone` | номер не `+998XXXXXXXXX` |
 | 400 | `invalid_code` | неверный код или код не той длины (попытка не тратится, если формат неверен) |
 | 400 | `code_expired` | код истёк или уже использован |
@@ -110,6 +141,7 @@ translations [{ id, lang, description }] }`. Хеша пароля, `owner_id`, 
 | 429 | `too_many_attempts` | 5 неверных кодов (код сгорает) или блокировка входа по телефону |
 | 429 | `rate_limited` | лимиты отправки кода, регистраций, проверок или входов по IP |
 | 503 | `sms_unavailable` | провайдер SMS не ответил; заявка не сохраняется, лимиты откатываются |
+| 503 | `platform_misconfigured` | `details.feature: sms`: у SMS-провайдера платформы нет учётных данных; заявка не сохраняется |
 
 ### Лимиты
 
@@ -180,7 +212,8 @@ IP берётся из `X-Forwarded-For` только от локального 
 - `channels.auth`: как клиент может подтвердить номер, подсказка, чтобы не показывать нерабочую кнопку. `telegram`: у
   заведения подключён и включён бот (то же условие, что у `telegram/start`; иначе тот отвечает `503
   telegram_unavailable`). `sms`: у платформы настроен выбранный SMS-провайдер (`eskiz`: заданы `ESKIZ_EMAIL` и
-  `ESKIZ_PASSWORD`; `telegram`: заданы `OTP_BOT` и `XMENU_CHAT_ID`; `console`: только вне production); это проверка настроек, не доступности: сбой провайдера приходит ответом
+  `ESKIZ_PASSWORD`; `telegram`: заданы `OTP_BOT` и `XMENU_CHAT_ID`; `console`: только вне production); это проверка настроек, не доступности: при
+  `sms: false` `otp/request` отвечает `503 platform_misconfigured` (`feature: sms`), сбой провайдера приходит ответом
   `503 sms_unavailable`. Подключение и отключение бота ставит ревалидацию `route: 'channels'`. Источник истины остаются
   сами эндпоинты.
 - `fulfillment.modes`: пусто, пока `channels.delivery.published` не `true`. Иначе `pickup`, если есть активный филиал с
@@ -240,16 +273,18 @@ IP берётся из `X-Forwarded-For` только от локального 
 общая строка; ≤512), короткое = его начало (≤120), текст кнопки = «Меню» / «Menyu» / «Menu» (≤32).
 
 - `PUT /telegram-bot/profile { "profile": { "ru": { ... } } }`: проверяет, сохраняет и сразу применяет. Языки, не
-  присланные в теле, остаются со своими значениями. Ошибки: `400 validation_error` с `errors[]` (`ru.name` / `maxLength`,
-  `isNotEmpty`, `isString`, `notInLanguages`, `whitelistValidation`), `404 bot_not_connected`.
+  присланные в теле, остаются со своими значениями. Ошибки: `400 validation_error` с `fields[]` (`ru.name` / `max_length`,
+  `is_not_empty`, `is_string`, `not_in_languages`, `unknown_field`), `404 bot_not_connected`.
 - `POST /telegram-bot/sync`: применить сохранённое ещё раз (после ошибки). `404 bot_not_connected`.
 - Применение вызывает Bot API по пунктам, каждый независим: `setMyName`, `setMyDescription`,
   `setMyShortDescription`, `setMyCommands` (одна команда `/start`) для каждого языка и один раз без `language_code`
   (язык по умолчанию), и `setChatMenuButton` (кнопка `web_app`, адрес `deliveryUrl`). Итог хранится и приходит в
   `lastSync: { syncedAt, result: { name, description, shortDescription, commands, menuButton } }`, где каждый пункт
-  `{ status: "ok" | "failed" | "skipped_no_url", reason? }`; `reason` текст Telegram (у имени есть лимит частоты смены).
+  `{ status: "ok" | "failed" | "skipped", code?, feature? }`: `failed` с `code: "telegram_error"` (Telegram отказал,
+  текст ответа только в логе сервера; у имени есть лимит частоты смены), `skipped` у кнопки меню без адреса.
 - `deliveryUrl` строится из `DELIVERY_URL_TEMPLATE` (`https://{slug}.xmenu.uz`, только https); без переменной или без
-  `{slug}` в шаблоне кнопка не ставится (`skipped_no_url`), остальное применяется.
+  `{slug}` в шаблоне кнопка не ставится (`{ status: "skipped", code: "platform_misconfigured", feature: "delivery_link" }`),
+  остальное применяется.
 - Смена slug (`PUT /organization/:id`) перенастраивает только кнопку меню, в фоне и без влияния на ответ. Правка
   названия, описания или языков заведения профиль бота сама не меняет: применить вручную (`PUT .../profile` или `sync`).
 - Аватар бота API не меняет: только в @BotFather. Приветствие `/start` в боте получает кнопку Mini App, если адрес известен.
@@ -257,9 +292,9 @@ IP берётся из `X-Forwarded-For` только от локального 
 | HTTP | `code` | Когда |
 |---|---|---|
 | 400 | `invalid_bot_token` | токен не по формату или Telegram его не принял |
-| 400 | `webhook_url_not_https` | на сервере `PUBLIC_API_URL` не `https://` (ошибка настройки платформы, не владельца) |
 | 400 | `webhook_setup_failed` | Telegram отказал в `setWebhook`; ничего не сохранено |
 | 409 | `bot_already_connected` | этот бот подключён к другому заведению |
+| 503 | `platform_misconfigured` | `details.feature: telegram_bot`: адрес API платформы не https или ключ шифрования токенов не задан (настройка платформы, не владельца) |
 
 Пока бот не подключён, `initData` Mini App проверяется платформенным ботом (`TELEGRAM_BOT_TOKEN`).
 
@@ -325,9 +360,9 @@ IP берётся из `X-Forwarded-For` только от локального 
 | `mapZoom` | целое 0..21 |
 | `mapBounds` | `[[swLat, swLng], [neLat, neLng]]`, юго-запад строго южнее и западнее; `mapCenter` внутри, если задан |
 
-Ошибки полей: `400 validation_error` со списком `errors` (`theme.brand`, `languages`, `mapCenter.lat`, `mapZoom`…);
-несогласованные поля: `400 invalid_settings` с тем же списком (`defaultLanguage` / `notInLanguages`, `foundedYear` /
-`inFuture`, `mapBounds` / `invalidBounds`, `mapCenter` / `outsideBounds`). Сохранение сразу меняет язык и валюту
+Ошибки полей: `400 validation_error` со списком `fields` (`theme.brand`, `languages`, `mapCenter.lat`, `mapZoom`…);
+несогласованные поля: `400 invalid_settings` с тем же списком (`defaultLanguage` / `not_in_languages`, `foundedYear` /
+`in_future`, `mapBounds` / `invalid_bounds`, `mapCenter` / `outside_bounds`). Сохранение сразу меняет язык и валюту
 клиентских ответов (кэш заведения в процессе сбрасывается; в других процессах pm2 до 30 с) и ставит ревалидацию
 QR-меню и сайта доставки (`REVALIDATE.md`).
 
@@ -398,7 +433,7 @@ QR-меню и сайта доставки (`REVALIDATE.md`).
 { "qr": true, "delivery": { "enabled": true, "mode": "site" } }
 ```
 
-`mode`: `site`, `miniapp`, `both`. Ошибки: `400 validation_error` с `errors[]` (`qr`, `delivery`, `delivery.enabled`,
+`mode`: `site`, `miniapp`, `both`. Ошибки: `400 validation_error` с `fields[]` (`qr`, `delivery`, `delivery.enabled`,
 `delivery.mode`); `miniapp` или `both` без подключённого и включённого бота → `422 telegram_bot_required` (ничего не
 сохраняется, даже при `enabled: false`).
 
@@ -406,9 +441,9 @@ QR-меню и сайта доставки (`REVALIDATE.md`).
 
 ```json
 {
-  "status": 409, "timestamp": "2026-10-31T10:00:00.000Z", "code": "publication_incomplete",
-  "message": "Publication checklist is not complete",
-  "details": { "missing": [ { "id": "branch", "status": "todo", "hint": "Добавьте филиал: адрес, точка на карте и часы работы" } ] }
+  "code": "publication_incomplete", "message": "Publication checklist is not complete", "status": 409,
+  "details": { "missing": [ { "id": "branch", "status": "todo", "hint": "Добавьте филиал: адрес, точка на карте и часы работы" } ] },
+  "requestId": "…"
 }
 ```
 
@@ -452,7 +487,7 @@ QR-меню и сайта доставки (`REVALIDATE.md`).
   `isPrimary`: самый ранний подтверждённый домен (`verifiedAt`, затем `host`); отдельного выбора основного нет, его
   можно сменить только удалением. `limit`: 5 доменов на заведение, `pending` считаются.
 - Хост (`POST`): только имя, без схемы, пути и порта. Регистр, точка в конце и IDN нормализуются, хранится ASCII
-  (punycode) в нижнем регистре. Ошибки `400` с полем в `errors[]` (`field: "host"`, `reason` = код): `invalid_host`
+  (punycode) в нижнем регистре. Ошибки `400` с полем в `fields[]` (`field: "host"`, `code` = код ответа): `invalid_host`
   (не имя домена, одна метка, схема, путь, порт), `platform_host` (`PLATFORM_DOMAIN` или любой хост под ним, в том
   числе зарезервированные `api`, `qr`, `dashboard`), `reserved_host` (`localhost`, `.localhost`, `.local`,
   `.internal`, `.invalid`, `.onion`, `.arpa`, IP). Нет поля → `400 validation_error`.
@@ -466,7 +501,8 @@ QR-меню и сайта доставки (`REVALIDATE.md`).
   (`lastCheckError`, `lastCheckAt`). Другое заведение подтвердило хост раньше → `409 domain_taken`
   (`lastCheckError: "domain_taken"`).
 - `DOMAIN_VERIFY_SKIP=true` (только разработка): DNS не проверяется, домен подтверждается при добавлении. С
-  `NODE_ENV=production` приложение с этим флагом не стартует; без годного `PLATFORM_DOMAIN` в production тоже.
+  `NODE_ENV=production` приложение с этим флагом не стартует; без годного `PLATFORM_DOMAIN` в production тоже, а в
+  разработке добавление домена отвечает `503 platform_misconfigured` (`feature: domains`).
 - Подтверждение и удаление подтверждённого домена сбрасывают кэш тенанта и ставят ревалидацию сайта доставки
   (`route: "domains"`, `host`; `docs/REVALIDATE.md`). Добавление и удаление `pending` публично ничего не меняют.
 - Подтверждённые домены повторно не проверяются (TXT можно удалить после подтверждения). TLS и nginx для своих
@@ -506,7 +542,7 @@ QR-меню и сайта доставки (`REVALIDATE.md`).
   `TRANSLATION_IP_RATE_LIMIT` за `TRANSLATION_IP_RATE_WINDOW_SECONDS` (60 за 600 с); сверх любого лимита `429` с
   `code: rate_limited` и `retryAfter`.
   `text` до `TRANSLATION_MAX_TEXT` символов (2000), `promptName` до 100: иначе `400`. Сбой модели:
-  `502 translation_failed`. Без `OPENAI_API_KEY` бэкенд стартует, а перевод отвечает `503 translation_unavailable`.
+  `502 translation_failed`. Без `OPENAI_API_KEY` бэкенд стартует, а перевод отвечает `503 platform_misconfigured` (`feature: translation`).
 - `GET /application`: только платформенные администраторы (`PLATFORM_ADMIN_USER_IDS`, пусто = никто): остальным `403`.
   `POST /application` остаётся публичным и отвечает только `{ id }`. Тело: `from` (`web` или `admin`) обязателен, иначе
   `400 validation_error` с полем `from` (раньше пустое тело давало `500`); `fullName` до 120 символов, `phone` до 32,

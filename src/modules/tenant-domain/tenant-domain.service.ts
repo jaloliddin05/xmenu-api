@@ -1,10 +1,4 @@
-import {
-  ConflictException,
-  Inject,
-  Injectable,
-  NotFoundException,
-  UnprocessableEntityException,
-} from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { Prisma, tenant_domain } from '@prisma/client';
 import { randomBytes } from 'crypto';
 import { fieldErrorsException } from 'src/infra/validators/validation-errors';
@@ -28,6 +22,10 @@ import {
 } from './domain-verifier';
 import type { DomainOwnershipVerifier } from './domain-verifier';
 import { TenantDomainDto, TenantDomainListDto } from './dto/tenant-domain.dto';
+import {
+  AppException,
+  platformMisconfigured,
+} from 'src/infra/errors/app-exception';
 
 /** Domains a venue may have, pending ones included. */
 export const TENANT_DOMAIN_LIMIT = 5;
@@ -42,16 +40,12 @@ const HOST_PROBLEM_TEXT: Record<HostProblem, string> = {
 };
 
 const domainTaken = () =>
-  new ConflictException({
-    code: 'domain_taken',
+  new AppException('domain_taken', {
     message: 'The domain is verified by another venue',
   });
 
 const domainNotFound = () =>
-  new NotFoundException({
-    code: 'domain_not_found',
-    message: 'Domain not found',
-  });
+  new AppException('domain_not_found', { message: 'Domain not found' });
 
 function isUniqueViolation(e: unknown): boolean {
   return (
@@ -120,12 +114,16 @@ export class TenantDomainService {
   }
 
   async add(organizationId: string, rawHost: string): Promise<TenantDomainDto> {
-    const parsed = parseCustomHost(rawHost, platformDomainFrom());
+    const platformDomain = platformDomainFrom();
+    // Without it hosts under the platform domain could be claimed (production does not start so)
+    if (!platformDomain)
+      throw platformMisconfigured('domains', 'PLATFORM_DOMAIN is not set');
+    const parsed = parseCustomHost(rawHost, platformDomain);
     if ('problem' in parsed) {
       throw fieldErrorsException(parsed.problem, [
         {
           field: 'host',
-          reason: parsed.problem,
+          code: parsed.problem,
           message: HOST_PROBLEM_TEXT[parsed.problem],
         },
       ]);
@@ -148,8 +146,7 @@ export class TenantDomainService {
         select: { id: true },
       });
       if (own) {
-        throw new ConflictException({
-          code: 'domain_already_added',
+        throw new AppException('domain_already_added', {
           message: 'The venue already has this domain',
         });
       }
@@ -157,8 +154,7 @@ export class TenantDomainService {
         where: { organization_id: organizationId },
       });
       if (count >= TENANT_DOMAIN_LIMIT) {
-        throw new UnprocessableEntityException({
-          code: 'domain_limit_reached',
+        throw new AppException('domain_limit_reached', {
           message: `A venue can have at most ${TENANT_DOMAIN_LIMIT} domains`,
           details: { limit: TENANT_DOMAIN_LIMIT },
         });
@@ -190,8 +186,7 @@ export class TenantDomainService {
     const now = new Date();
     if (!result.ok) {
       await this.recordFailure(row.id, now, result.reason);
-      throw new UnprocessableEntityException({
-        code: 'domain_verification_failed',
+      throw new AppException('domain_verification_failed', {
         message: `Ownership check failed: ${result.reason}`,
         details: {
           reason: result.reason,

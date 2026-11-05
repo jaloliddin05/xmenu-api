@@ -68,9 +68,10 @@ export class TelegramUpdateProcessor implements OnModuleInit, OnModuleDestroy {
     this.worker.on('failed', (job, err) => {
       const attempts = job?.opts.attempts ?? 1;
       const made = job?.attemptsMade ?? 0;
-      const text = `${describeTelegramUpdate(job?.data)}, attempt ${made}/${attempts}: ${errorMessage(err)}`;
-      if (made >= attempts) this.logger.error(`Failed: ${text}`);
-      else this.logger.warn(`Will retry: ${text}`);
+      const what = `${describeTelegramUpdate(job?.data)}, attempt ${made}/${attempts}`;
+      if (made >= attempts)
+        this.logger.error(`Failed: ${what}: ${errorMessage(err)}`);
+      else this.logger.warn(`Will retry: ${what}: ${errorMessage(err)}`);
     });
   }
 

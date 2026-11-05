@@ -10,18 +10,24 @@ Swagger (`/docs`), Jest. Prettier: одинарные кавычки, trailing c
 
 ## Команды
 `npm run start:dev` · `npm run build` · `npm run lint` · `npm run format:check` · `npm run format` · `npm run lint:fix` · `npm test` ·
-`npm run test:e2e` · `npm run openapi`
-(`openapi` собирает проект и пишет `docs/openapi.json` из сборки, без БД и Redis; `docs/API.md` правится руками).
+`npm run test:e2e` · `npm run openapi` · `npm run check:env` · `npm run check:user-texts`
+(`openapi` собирает проект и пишет `docs/openapi.json` и `docs/ERRORS.md` из сборки, без БД и Redis; `docs/API.md` правится руками;
+`check:env` проверяет `.env` той же схемой, что старт, `-- --production` как production; `check:user-texts` см. «Ошибки»).
 Миграции: `npm run migrate` (собирает схему и запускает `prisma migrate dev`), на сервере `npx prisma migrate deploy`.
 `generate-schema` вызывает `cat`: под Windows (npm запускает скрипты через cmd) он падает и оставляет
 `prisma/schema.prisma` пустым. Собирай схему из Git Bash (`cat ./src/modules/*/*/*.prisma > prisma/schema.prisma`);
 порядок файлов в glob там другой, поэтому лишние перестановки моделей в диффе лучше не коммитить.
-Env: см. `.env.example` (полный). Ключевые: `JWT_*`, `OTP_*`, `SMS_PROVIDER`, `PAYMENT_CONFIG_KEY`, `REDIS_URL`, `PUBLIC_API_URL`, `PUBLIC_FILES_URL`,
+Env: см. `.env.example` (полный; тест сверяет его со схемой и со всеми `process.env` в коде). Схема и проверка при
+старте: `src/config/env/env-schema.ts` (`ENV_SCHEMA`: тип, обязательность, https в production; перекрёстные правила
+лежат рядом с кодом, который их использует, функциями `*EnvIssues`, `validateEnv` их собирает; вызов в `main.ts` до
+создания приложения). Production при любой ошибке не стартует; development останавливают только неразбираемые
+значения и отсутствие секретов клиента, остальное печатается сводкой «функция выключена: причина» (`featureStatus`).
+Новую переменную добавляй в схему и `.env.example`. Ключевые: `JWT_*`, `OTP_*`, `SMS_PROVIDER`, `PAYMENT_CONFIG_KEY`, `REDIS_URL`, `PUBLIC_API_URL`, `PUBLIC_FILES_URL`,
 `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ORDERS_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `TELEGRAM_VERIFY_TTL_SECONDS`,
 `TELEGRAM_API_BASE_URL` (база всех вызовов Bot API, `infra/telegram/telegram-api-url.ts`; фейк в тестах и e2e, в production только
 `https://api.telegram.org`), `OPS_CHAT_ID`, `ORDER_QUEUES`,
 `MINIAPP_URL`, `UPLOAD_MAX_BYTES`, `PLATFORM_ADMIN_USER_IDS`, `TRANSLATION_*`, `OPENAI_API_KEY` (необязателен: без него
-`/translation` → 503 `translation_unavailable`), `NEXT_PUBLIC_URL` + `REVALIDATE_SECRET` (QR),
+`/translation` → `503 platform_misconfigured`, `feature: translation`), `NEXT_PUBLIC_URL` + `REVALIDATE_SECRET` (QR),
 `CLIENT_REVALIDATE_URL` + `CLIENT_REVALIDATE_SECRET` (сайт доставки), `DELIVERY_URL_TEMPLATE` (адрес Mini App для кнопки бота),
 `PLATFORM_DOMAIN` (`xmenu.uz`; в dev `localhost`), `DOMAIN_VERIFY_SKIP` (только dev), `STAFF_REFRESH_TTL_DAYS`,
 `STAFF_SESSION_ABSOLUTE_DAYS`, `PUBLIC_POST_RATE_*`, `APPLICATION_RATE_*`, `TRANSLATION_IP_RATE_*` (лимиты по IP). Окончания строк LF (`.gitattributes`, `.editorconfig`).
@@ -43,7 +49,7 @@ Env: см. `.env.example` (полный). Ключевые: `JWT_*`, `OTP_*`, `S
 Единое место: `docs/API.md` и `docs/openapi.json`. Подробности: `docs/ORDERS_API.md`, `docs/BRANCHES_API.md`,
 `docs/BACKEND_ORDERS.md`, `docs/TELEGRAM_VERIFICATION.md`. Меняешь контроллер или DTO: добавь `@ApiProperty` и
 `@ApiOperation`, запусти `npm run openapi`, закоммить результат вместе с кодом. `.github/workflows/ci.yml` (build,
-test, `npm run openapi` + `git diff --exit-code docs/`, `format:check` и `lint` блокирующие) проверяет это на PR. Шаги: чистая БД `migrate deploy`, `migrate diff` без расхождений, `scripts/check-migration-upgrade.sh`, build, test, openapi); `deploy.yml` отдельный и без проверок, запускается только вручную (`workflow_dispatch`), см. «Деплой».
+test, `npm run openapi` + `git diff --exit-code docs/`, `format:check`, `lint` и `check:user-texts` блокирующие) проверяет это на PR. Шаги: чистая БД `migrate deploy`, `migrate diff` без расхождений, `scripts/check-migration-upgrade.sh`, build, test, openapi); `deploy.yml` отдельный и без проверок, запускается только вручную (`workflow_dispatch`), см. «Деплой».
 Локально те же шаги: временные БД (`createdb xmenu_ci`, `xmenu_ci_shadow`, `xmenu_upgrade`), `DATABASE_URL=… npx prisma migrate deploy`, `npx prisma migrate diff --from-url $DATABASE_URL --to-schema-datamodel prisma/schema.prisma --exit-code`, `DATABASE_URL=<пустая БД> scripts/check-migration-upgrade.sh`, затем `npm run build`, `npm test`, `npm run openapi && git diff --exit-code docs/`. В Windows psql принимает URL только через `--dbname=`.
 
 ## Тенантность
@@ -62,7 +68,8 @@ test, `npm run openapi` + `git diff --exit-code docs/`, `format:check` и `lint`
   токеном). Добавление в транзакции с `FOR UPDATE` строки организации (лимит 5). Проверка владения за интерфейсом
   `DomainOwnershipVerifier` (`DOMAIN_VERIFIER`): `DnsTxtVerifier` (TXT `_xmenu-verify.<host>` =
   `xmenu-verify=<token>`), `SkipDomainVerifier` при `DOMAIN_VERIFY_SKIP=true`, в тестах `FakeDomainVerifier`.
-  `assertDomainConfig` (фабрика модуля): production не стартует с флагом и без годного `PLATFORM_DOMAIN`.
+  `domainEnvIssues` (проверка при старте): production не стартует с флагом и без годного `PLATFORM_DOMAIN`; фабрика
+  верификатора флагу в production не верит. Без `PLATFORM_DOMAIN` (development) добавление домена → `503 platform_misconfigured`.
   `primaryDomain` = самый ранний подтверждённый (`tenant/primary-domain.ts`, один select для всех ответов).
   Подтверждение и удаление подтверждённого: `TenantService.invalidate` + ревалидация `route: 'domains'` с `host`.
   Новый платформенный поддомен по-прежнему надо добавить в `RESERVED_SLUGS`; свои домены под `PLATFORM_DOMAIN`
@@ -91,9 +98,9 @@ test, `npm run openapi` + `git diff --exit-code docs/`, `format:check` и `lint`
 - Нет зоны доставки (`delivery_zone = null`) → доставка недоступна: `POST /orders` отвечает
   `422 delivery_unavailable_no_zone`.
 - Ошибки валидации: глобальный пайп `createValidationPipe()` (`infra/validators/validation-errors.ts`) отдаёт
-  `400 validation_error` со списком `errors: [{ field, reason, message }]`; доменные проверки настроек тем же списком
-  с кодом `invalid_settings` (`fieldErrorsException`). `ErrorFilter` (staff) всегда ставит `code` (иначе по
-  статусу), пробрасывает `errors` и `details`, логирует только 5xx (без стектрейсов 4xx).
+  `400 validation_error` со списком `fields: [{ field, code, message }]` (`code` правило в snake_case, `fieldCode`);
+  доменные проверки настроек тем же списком с кодом `invalid_settings` (`fieldErrorsException`), одиночное поле вне
+  class-validator: `fieldError(field, code, message)`. Общий контракт ошибок: раздел «Ошибки».
 
 ## Каналы и публикация
 Контракт: `docs/API.md`, «Каналы и публикация». Код: `organization/domain/publication.ts` (чеклист, `orderingProblem`),
@@ -179,7 +186,6 @@ Payme вручную через ops-чат.
   bcrypt-проверка на любую неудачу (фиктивный хеш для неизвестного номера).
 - Токены staff принимаются только для существующего пользователя с `isActive=true`; хеш пароля не уходит в ответы.
 - IP клиента: `trust proxy = loopback` в `main.ts`, nginx должен передавать `X-Forwarded-For`.
-- Ошибки staff идут через глобальный `ErrorFilter`, он добавляет `code` и `retryAfter` (+ `Retry-After`).
 - Владение данными: организация из `requireStaffOrganizationId(req)`; меню проверяется фрагментами из
   `product/services/menu-ownership.ts`; чужой id в пути или в теле → 404. Новые эндпоинты админки делай так же.
 
@@ -232,8 +238,30 @@ Payme вручную через ops-чат.
   `npx prisma migrate deploy` → `pm2 reload xmenu-backend` → проверка живости и откат на предыдущий коммит и дамп,
   если проверка не прошла. Миграции только после бэкапа и только `migrate deploy`.
 - Прод не стартует с `SMS_PROVIDER=console`, `OTP_DEV_MODE`, пустым `REVALIDATE_SECRET`, `DOMAIN_VERIFY_SKIP=true`, без
-  `PLATFORM_DOMAIN`, с `TELEGRAM_API_BASE_URL` не на `https://api.telegram.org` (проверки уже в коде); перед
+  `PLATFORM_DOMAIN`, с `TELEGRAM_API_BASE_URL` не на `https://api.telegram.org`, без https `PUBLIC_API_URL` и
+  `DELIVERY_URL_TEMPLATE` (с `{slug}`), без годного `PAYMENT_CONFIG_KEY` и без учётных данных выбранного SMS-провайдера
+  (`validateEnv`). Перед `pm2 reload` на сервере: `node dist/config/env/check-env.cli.js` (или `npm run check:env`); перед
   первым запуском: staging, бэкапы по расписанию, чек-лист безопасности (корневой `CLAUDE.md`, очередь, п. 6).
+
+## Ошибки
+Контракт: `docs/API.md`, «Ошибки»; список кодов `docs/ERRORS.md` (генерируется).
+- Одна форма для обоих контуров: `{ code, message, status, fields?, retryAfter?, details?, requestId }`. Пишет её
+  глобальный `AppErrorFilter` (`infra/errors/app-error-filter.ts`); `configureErrorHandling` (`infra/errors/configure.ts`)
+  подключает его, `requestIdMiddleware` (`X-Request-Id`), парсеры тела (битый JSON → `invalid_body`) и пайп валидации
+  в `main.ts` и в `createHttpApp` для HTTP-спеков. Своих фильтров на контроллерах нет.
+- Коды только из реестра `infra/errors/error-codes.ts` (`ERROR_CODES`: статус, сообщение по умолчанию, когда, какие
+  ключи `details` можно отдавать; лишние ключи фильтр отбрасывает с warn в лог). Бросаем только
+  `AppException(code, { message?, details?, fields?, retryAfter?, cause? })`; Nest-исключения в коде не используем.
+  Код не переименовывается и не используется повторно: новый смысл = новый код, старый получает `deprecated`.
+- `message` для разработчика, по-английски, без имён переменных, путей, текстов исключений и ответов сервисов.
+  Внутренняя причина в `cause` (уходит только в лог с `requestId`). Исключения фреймворка сохраняют статус, но не
+  текст; прочее → `500 internal_error`.
+- Функция выключена настройкой платформы: `platformMisconfigured(feature, cause)` → `503 platform_misconfigured`,
+  `details.feature` (`MisconfiguredFeature`).
+- `npm run check:user-texts` (`src/tools/user-texts`, шаг CI): строки внутри `new …Exception(…)` и `{ field, message }`,
+  файлы текстов бота и SMS (`BOT_TEXT_FILES`), `errorMessage`/`errorStack`/`telegramErrorText` вне вызова логгера.
+  Исключения по файлам с причиной: `ERROR_TEXT_ALLOWED` (ops-чат платформы, сам фильтр). Новый файл с текстами бота
+  добавь в `BOT_TEXT_FILES`.
 
 ## Лимиты публичных POST
 `PublicRateLimitGuard` (`infra/http/public-rate-limit.ts`, глобальный `APP_GUARD`): POST к `@Public()` маршрутам по IP через

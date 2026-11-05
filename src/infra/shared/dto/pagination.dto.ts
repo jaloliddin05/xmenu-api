@@ -1,13 +1,15 @@
 import { IsNumber, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform, TransformFnParams } from 'class-transformer';
-import { BadRequestException } from '@nestjs/common';
+import { fieldError } from 'src/infra/validators/validation-errors';
 
 export function parsePaginationQuery({ key, value }: TransformFnParams) {
   const raw = value as string;
   const int = parseInt(raw);
   if (isNaN(int) || `${int}`.length !== raw.length) {
-    throw new BadRequestException(
+    throw fieldError(
+      key,
+      'is_int',
       `${key} should be integer. Or pagination query string may be absent, then the page=1, limit=10 will be used.`,
     );
   }
@@ -17,7 +19,7 @@ export function parsePaginationQuery({ key, value }: TransformFnParams) {
 export function parseNumberQuery({ key, value }: TransformFnParams) {
   const float = parseFloat(value as string);
   if (isNaN(float)) {
-    throw new BadRequestException(`${key} should be a number.`);
+    throw fieldError(key, 'is_number', `${key} should be a number.`);
   }
   return float;
 }

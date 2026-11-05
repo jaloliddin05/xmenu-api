@@ -35,11 +35,11 @@
             }
           },
           "400": {
-            "description": "validation_error with errors[] (from is required)",
+            "description": "validation_error with fields[] (from is required)",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -49,7 +49,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -66,6 +76,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Platform admins only (PLATFORM_ADMIN_USER_IDS)",
@@ -95,6 +115,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/StaffLoginResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -130,6 +160,16 @@
                 }
               }
             }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Start owner signup: nothing is stored in the DB until the SMS code is confirmed",
@@ -159,6 +199,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/StaffCheckCodeResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -194,6 +244,16 @@
                 }
               }
             }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Send a new signup code (respects the resend cooldown)",
@@ -226,6 +286,16 @@
                 }
               }
             }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "New token pair for a refresh token; the old refresh token is spent (rotation). 401 invalid_refresh_token",
@@ -251,6 +321,16 @@
         "responses": {
           "204": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Revoke the login behind a refresh token (idempotent, always 204)",
@@ -290,6 +370,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CustomerOtpRequestResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -341,6 +431,16 @@
                 }
               }
             }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Check the code: known phone signs in (isNewUser false), new phone gets a registrationToken",
@@ -380,6 +480,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CustomerTelegramStartResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -425,6 +535,16 @@
                 }
               }
             }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Poll the Telegram verification session every 2 s (the login result is returned once)",
@@ -464,6 +584,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CustomerSessionDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -508,6 +638,16 @@
                 }
               }
             }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -542,6 +682,16 @@
         "responses": {
           "204": {
             "description": "Always 204 (idempotent); the login and its access tokens are revoked"
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -570,6 +720,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CustomerUserDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -629,6 +789,16 @@
                 }
               }
             }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -643,6 +813,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Method: returns user",
@@ -677,6 +857,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Method: updating user",
@@ -699,6 +889,16 @@
         "responses": {
           "204": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Method: delete",
@@ -733,6 +933,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Method: updating user password",
@@ -757,6 +967,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Method: get one (your own organization only)",
@@ -789,6 +1009,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Method: updating organization",
@@ -811,6 +1041,16 @@
         "responses": {
           "204": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Method: delete",
@@ -840,6 +1080,16 @@
                 "schema": {
                   "type": "string",
                   "example": "mant"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -878,6 +1128,16 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Slug mavjudligini tekshirish",
@@ -918,6 +1178,16 @@
           },
           "404": {
             "description": "Not your organization (any other id looks missing)"
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -974,6 +1244,16 @@
           },
           "404": {
             "description": "Not your organization (any other id looks missing)"
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1016,7 +1296,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1026,7 +1306,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1036,7 +1316,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1088,11 +1378,11 @@
             }
           },
           "400": {
-            "description": "validation_error with errors[] (qr, delivery.enabled, delivery.mode)",
+            "description": "validation_error with fields[] (qr, delivery.enabled, delivery.mode)",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1102,7 +1392,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1112,7 +1402,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1122,7 +1412,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1133,6 +1423,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TelegramBotRequiredErrorDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1178,7 +1478,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1188,7 +1488,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1198,7 +1498,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1209,6 +1509,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PublicationIncompleteErrorDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1254,7 +1564,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1264,7 +1574,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1274,7 +1584,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1317,6 +1637,16 @@
           },
           "404": {
             "description": "tenant_not_found: no such slug, invalid slug or inactive venue"
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Resolve a public slug to the tenant id (send it in X-Tenant-Id)",
@@ -1351,6 +1681,16 @@
           },
           "404": {
             "description": "tenant_not_found: unknown or unverified host, another platform host, inactive venue, not a host name"
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Resolve the host of the delivery site to the tenant id: {slug}.PLATFORM_DOMAIN or a verified venue domain",
@@ -1379,6 +1719,16 @@
           },
           "403": {
             "description": "The user has no organization"
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1416,7 +1766,7 @@
             }
           },
           "400": {
-            "description": "invalid_bot_token (malformed or rejected by Telegram), webhook_setup_failed, webhook_url_not_https (server PUBLIC_API_URL is not https)"
+            "description": "invalid_bot_token (malformed or rejected by Telegram), webhook_setup_failed"
           },
           "401": {
             "description": "No or invalid owner token"
@@ -1426,6 +1776,19 @@
           },
           "409": {
             "description": "bot_already_connected: the bot belongs to another venue"
+          },
+          "503": {
+            "description": "platform_misconfigured, details.feature telegram_bot: the platform cannot host bots (its API address is not https or bot tokens cannot be stored)"
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1458,6 +1821,16 @@
           },
           "403": {
             "description": "The user has no organization"
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1497,7 +1870,7 @@
             }
           },
           "400": {
-            "description": "validation_error with errors[] (ru.name, uz.description, ...): lengths, empty fields, languages not enabled for the venue"
+            "description": "validation_error with fields[] (ru.name, uz.description, ...): lengths, empty fields, languages not enabled for the venue"
           },
           "401": {
             "description": "No or invalid owner token"
@@ -1507,6 +1880,16 @@
           },
           "404": {
             "description": "bot_not_connected"
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1543,6 +1926,16 @@
           },
           "404": {
             "description": "bot_not_connected"
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1573,6 +1966,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1611,6 +2014,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1641,6 +2054,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1679,6 +2102,16 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1717,6 +2150,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1755,6 +2198,16 @@
         "responses": {
           "204": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1795,6 +2248,16 @@
                 }
               }
             }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Faol filiallar (hours/isOpen/opensAt serverda hisoblanadi)",
@@ -1810,6 +2273,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Barcha filiallar (yashirinlari ham) jadvali bilan",
@@ -1833,6 +2306,16 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Filial yaratish",
@@ -1867,6 +2350,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Filial maydonlarini o'zgartirish (isActive=false — yashirish)",
@@ -1889,6 +2382,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "O'chirish (buyurtmasi bor filial faqat yashiriladi)",
@@ -1923,6 +2426,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Haftalik ish jadvalini to'liq almashtirish",
@@ -1957,6 +2470,16 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Sana uchun istisno (bayram, ta'mir) qo'shish/yangilash",
@@ -1989,6 +2512,16 @@
         "responses": {
           "204": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Istisnoni o'chirish",
@@ -2013,6 +2546,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Method: get all",
@@ -2036,6 +2579,16 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Method: create",
@@ -2068,6 +2621,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Method: get all for select (only your own organization id)",
@@ -2092,6 +2655,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Method: get one",
@@ -2124,6 +2697,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Method: update",
@@ -2146,6 +2729,16 @@
         "responses": {
           "204": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Method: delete",
@@ -2190,6 +2783,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Method: activate/deactivate category",
@@ -2215,6 +2818,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Method: update index",
@@ -2230,6 +2843,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -2261,6 +2884,16 @@
                   "items": {
                     "$ref": "#/components/schemas/MenuCategoryDto"
                   }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2315,6 +2948,16 @@
                 }
               }
             }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -2350,6 +2993,16 @@
                   "items": {
                     "$ref": "#/components/schemas/OrderViewDto"
                   }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2398,6 +3051,16 @@
                 }
               }
             }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -2443,6 +3106,16 @@
                 }
               }
             }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -2485,6 +3158,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/OrderViewDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2549,6 +3232,16 @@
                 }
               }
             }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Buyurtmalar ro'yxati (yangilari birinchi, cursor pagination)",
@@ -2577,6 +3270,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/StaffOrderViewDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2621,6 +3324,16 @@
                 }
               }
             }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Qabul qilish (ixtiyoriy: ETA)",
@@ -2662,6 +3375,16 @@
                 }
               }
             }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Rad etish (to'langan bo'lsa pul qaytariladi)",
@@ -2690,6 +3413,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/StaffOrderViewDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2734,6 +3467,16 @@
                 }
               }
             }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Aniq holatga o'tkazish (holatlar mashinasi ruxsat bergan taqdirda)",
@@ -2749,6 +3492,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Current ordering settings (the row is created at signup)",
@@ -2772,6 +3525,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Sozlamalarni saqlash (faqat yuborilgan maydonlar o'zgaradi)",
@@ -2804,6 +3567,16 @@
                 }
               }
             }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Savat sozlamalari: yetkazib berish narxi, minimal summa, ETA, to'lov usullari",
@@ -2819,6 +3592,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Yoqilgan/sozlangan provayderlar + kabinetga kiritiladigan webhook manzillari",
@@ -2853,6 +3636,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Provayder kalitlarini saqlash (shifrlanadi) va yoqish",
@@ -2877,6 +3670,16 @@
         "responses": {
           "204": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Provayderni o'chirish (kalitlar saqlanadi)",
@@ -2928,6 +3731,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Method: get all",
@@ -2951,6 +3764,16 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Create new product with translations and options",
@@ -2975,6 +3798,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Method: get one",
@@ -3007,6 +3840,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Update existing product",
@@ -3029,6 +3872,16 @@
         "responses": {
           "204": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Method: delete",
@@ -3054,6 +3907,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Method: update index",
@@ -3098,6 +3961,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Method: activate/deactivate product",
@@ -3132,6 +4005,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Upload images for a product",
@@ -3156,6 +4039,16 @@
         "responses": {
           "204": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Method: delete image",
@@ -3181,6 +4074,16 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Create new additional product group",
@@ -3206,6 +4109,16 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Create new additional product",
@@ -3240,6 +4153,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Update additional product group",
@@ -3262,6 +4185,16 @@
         "responses": {
           "204": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Method: delete",
@@ -3296,6 +4229,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Update additional product",
@@ -3318,6 +4261,16 @@
         "responses": {
           "204": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Method: delete",
@@ -3368,6 +4321,16 @@
           },
           "404": {
             "description": "tenant_not_found: X-Tenant-Id is not a venue id"
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Venue configuration: brand, colors, languages, currency, contacts, fulfillment modes, map",
@@ -3405,7 +4368,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3415,7 +4378,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3425,7 +4388,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3475,11 +4448,11 @@
             }
           },
           "400": {
-            "description": "invalid_host (not a bare domain name), platform_host (the platform domain or under it), reserved_host (localhost, .local, .internal, IP); field in errors[]",
+            "description": "invalid_host (not a bare domain name), platform_host (the platform domain or under it), reserved_host (localhost, .local, .internal, IP); field in fields[]",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3489,7 +4462,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3499,7 +4472,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3509,7 +4482,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3519,7 +4492,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3529,7 +4502,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3583,7 +4566,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3593,7 +4576,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3603,7 +4586,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3613,7 +4596,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3623,7 +4606,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3670,7 +4663,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3680,7 +4673,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3690,7 +4683,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3724,6 +4727,16 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Translate menu text (owner token required; rate limited per owner, 429 rate_limited)",
@@ -3785,52 +4798,139 @@
           "from"
         ]
       },
+      "ErrorCode": {
+        "type": "string",
+        "enum": [
+          "bad_request",
+          "invalid_body",
+          "validation_error",
+          "unauthorized",
+          "forbidden",
+          "not_found",
+          "payload_too_large",
+          "unsupported_media_type",
+          "rate_limited",
+          "internal_error",
+          "unavailable",
+          "platform_misconfigured",
+          "tenant_required",
+          "tenant_not_found",
+          "tenant_inactive",
+          "tenant_mismatch",
+          "invalid_phone",
+          "invalid_code",
+          "code_expired",
+          "too_many_attempts",
+          "invalid_name",
+          "registration_expired",
+          "invalid_registration_token",
+          "invalid_refresh_token",
+          "missing_token",
+          "token_expired",
+          "invalid_token",
+          "customer_blocked",
+          "sms_unavailable",
+          "telegram_unavailable",
+          "invalid_telegram_data",
+          "invalid_credentials",
+          "phone_taken",
+          "wrong_password",
+          "invalid_address",
+          "address_not_found",
+          "address_limit_reached",
+          "invalid_order",
+          "invalid_modifiers",
+          "item_unavailable",
+          "price_changed",
+          "min_order_not_reached",
+          "out_of_delivery_zone",
+          "fulfillment_unavailable",
+          "branch_closed",
+          "branch_hours_not_set",
+          "payment_method_unavailable",
+          "idempotency_key_required",
+          "idempotency_key_reused",
+          "too_many_active_orders",
+          "cancel_not_allowed",
+          "payment_not_retryable",
+          "order_not_found",
+          "order_status_conflict",
+          "delivery_unavailable_no_zone",
+          "ordering_channel_disabled",
+          "ordering_not_published",
+          "settings_missing",
+          "invalid_settings",
+          "invalid_slug",
+          "slug_taken",
+          "telegram_bot_required",
+          "publication_incomplete",
+          "invalid_bot_token",
+          "bot_already_connected",
+          "bot_not_connected",
+          "webhook_setup_failed",
+          "webhook_url_not_https",
+          "invalid_host",
+          "reserved_host",
+          "platform_host",
+          "domain_taken",
+          "domain_not_found",
+          "domain_already_added",
+          "domain_limit_reached",
+          "domain_verification_failed",
+          "translation_failed",
+          "translation_unavailable"
+        ],
+        "description": "Stable code (never renamed or reused), docs/ERRORS.md"
+      },
       "FieldErrorDto": {
         "type": "object",
         "properties": {
           "field": {
             "type": "string",
-            "example": "name",
-            "description": "Path in the request body, e.g. `theme.brand`, `languages[1]`"
+            "example": "theme.brand",
+            "description": "Path in the request: `theme.brand`, `languages[1]`, `file`"
           },
-          "reason": {
+          "code": {
             "type": "string",
-            "example": "length",
-            "description": "Constraint name or domain rule"
+            "example": "matches",
+            "description": "snake_case rule: `is_in`, `max`, `max_length`, `required`, `unknown_field`, or a domain rule"
           },
           "message": {
             "type": "string",
-            "example": "name must be longer than or equal to 2 characters"
+            "example": "brand must be a hex color",
+            "description": "English hint for developers; never shown to people"
           }
         },
         "required": [
           "field",
-          "reason",
+          "code",
           "message"
         ]
       },
-      "ErrorResponseDto": {
+      "ErrorResponse": {
         "type": "object",
         "properties": {
-          "status": {
-            "type": "number",
-            "example": 400
-          },
-          "timestamp": {
-            "type": "string",
-            "format": "date-time"
-          },
           "code": {
-            "type": "string",
             "example": "validation_error",
-            "description": "Stable machine-readable code"
+            "description": "Stable code (never renamed or reused), docs/ERRORS.md",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorCode"
+              }
+            ]
           },
           "message": {
             "type": "string",
-            "example": "Validation failed"
+            "example": "Validation failed",
+            "description": "English hint for developers; never shown to people"
           },
-          "errors": {
-            "description": "Failed fields (400 validation_error)",
+          "status": {
+            "type": "number",
+            "example": 400,
+            "description": "Same as the HTTP status"
+          },
+          "fields": {
+            "description": "Failed fields (validation_error, invalid_settings, …)",
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/FieldErrorDto"
@@ -3838,20 +4938,25 @@
           },
           "retryAfter": {
             "type": "number",
-            "example": 3600,
-            "description": "Seconds to wait (429 rate_limited), also the Retry-After header"
+            "example": 60,
+            "description": "Seconds to wait (429), also the Retry-After header"
           },
           "details": {
             "type": "object",
             "additionalProperties": true,
-            "description": "Extra data of some codes"
+            "description": "Structured data of some codes (keys per code in docs/ERRORS.md), e.g. platform_misconfigured: { feature }"
+          },
+          "requestId": {
+            "type": "string",
+            "example": "3f1c2a8e-5b7d-4e0a-9c61-2d4f8b7a1e90",
+            "description": "Id of the request in the server log, also the X-Request-Id header"
           }
         },
         "required": [
-          "status",
-          "timestamp",
           "code",
-          "message"
+          "message",
+          "status",
+          "requestId"
         ]
       },
       "LoginDto": {
@@ -5091,30 +6196,53 @@
       "TelegramBotRequiredErrorDto": {
         "type": "object",
         "properties": {
-          "status": {
-            "type": "number",
-            "example": 422
-          },
-          "timestamp": {
-            "type": "string",
-            "format": "date-time"
-          },
           "code": {
-            "type": "string",
-            "enum": [
-              "telegram_bot_required"
+            "example": "validation_error",
+            "description": "Stable code (never renamed or reused), docs/ERRORS.md",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorCode"
+              }
             ]
           },
           "message": {
             "type": "string",
-            "example": "Connect the venue Telegram bot before choosing the Mini App"
+            "example": "Validation failed",
+            "description": "English hint for developers; never shown to people"
+          },
+          "status": {
+            "type": "number",
+            "example": 400,
+            "description": "Same as the HTTP status"
+          },
+          "fields": {
+            "description": "Failed fields (validation_error, invalid_settings, …)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldErrorDto"
+            }
+          },
+          "retryAfter": {
+            "type": "number",
+            "example": 60,
+            "description": "Seconds to wait (429), also the Retry-After header"
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Structured data of some codes (keys per code in docs/ERRORS.md), e.g. platform_misconfigured: { feature }"
+          },
+          "requestId": {
+            "type": "string",
+            "example": "3f1c2a8e-5b7d-4e0a-9c61-2d4f8b7a1e90",
+            "description": "Id of the request in the server log, also the X-Request-Id header"
           }
         },
         "required": [
-          "status",
-          "timestamp",
           "code",
-          "message"
+          "message",
+          "status",
+          "requestId"
         ]
       },
       "PublicationMissingDto": {
@@ -5135,34 +6263,57 @@
       "PublicationIncompleteErrorDto": {
         "type": "object",
         "properties": {
-          "status": {
-            "type": "number",
-            "example": 409
-          },
-          "timestamp": {
-            "type": "string",
-            "format": "date-time"
-          },
           "code": {
-            "type": "string",
-            "enum": [
-              "publication_incomplete"
+            "example": "validation_error",
+            "description": "Stable code (never renamed or reused), docs/ERRORS.md",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorCode"
+              }
             ]
           },
           "message": {
             "type": "string",
-            "example": "Publication checklist is not complete"
+            "example": "Validation failed",
+            "description": "English hint for developers; never shown to people"
+          },
+          "status": {
+            "type": "number",
+            "example": 400,
+            "description": "Same as the HTTP status"
+          },
+          "fields": {
+            "description": "Failed fields (validation_error, invalid_settings, …)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldErrorDto"
+            }
+          },
+          "retryAfter": {
+            "type": "number",
+            "example": 60,
+            "description": "Seconds to wait (429), also the Retry-After header"
           },
           "details": {
-            "$ref": "#/components/schemas/PublicationMissingDto"
+            "additionalProperties": true,
+            "description": "Structured data of some codes (keys per code in docs/ERRORS.md), e.g. platform_misconfigured: { feature }",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PublicationMissingDto"
+              }
+            ]
+          },
+          "requestId": {
+            "type": "string",
+            "example": "3f1c2a8e-5b7d-4e0a-9c61-2d4f8b7a1e90",
+            "description": "Id of the request in the server log, also the X-Request-Id header"
           }
         },
         "required": [
-          "status",
-          "timestamp",
           "code",
           "message",
-          "details"
+          "status",
+          "requestId"
         ]
       },
       "TenantRefDto": {
@@ -5222,12 +6373,23 @@
             "enum": [
               "ok",
               "failed",
-              "skipped_no_url"
+              "skipped"
             ]
           },
-          "reason": {
+          "code": {
             "type": "string",
-            "description": "Error text from Telegram when status is failed"
+            "enum": [
+              "telegram_error",
+              "platform_misconfigured"
+            ],
+            "description": "failed: telegram_error (Telegram refused; details only in the server log). skipped: platform_misconfigured (the menu button has no delivery address)"
+          },
+          "feature": {
+            "type": "string",
+            "enum": [
+              "delivery_link"
+            ],
+            "description": "With code platform_misconfigured"
           }
         },
         "required": [

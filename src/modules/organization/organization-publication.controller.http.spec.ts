@@ -484,7 +484,7 @@ describe('Organization channels and publication (owner)', () => {
     ])('400 validation_error: %s', async (_, body) => {
       const res = await putChannels(body).expect(400);
       expect(res.body.code).toBe('validation_error');
-      expect(res.body.errors.length).toBeGreaterThan(0);
+      expect(res.body.fields.length).toBeGreaterThan(0);
       expect(prisma.organization.update).not.toHaveBeenCalled();
     });
   });

@@ -34,7 +34,7 @@ npx prisma migrate deploy   # 20261010090000_branches_orders_payments
 |---|---|---|
 | `PAYMENT_CONFIG_KEY` | для онлайн-оплаты | 32 байта (64 hex или base64): ключ AES-256-GCM, которым шифруются ключи Click/Payme в БД. `openssl rand -hex 32`. **Потеря ключа = все тенанты вводят ключи заново** |
 | `TELEGRAM_BOT_TOKEN` | для уведомлений | бот: сообщения в группу филиала и клиенту. Для отдельного бота ресторанов — `TELEGRAM_ORDERS_BOT_TOKEN` |
-| `TELEGRAM_WEBHOOK_SECRET` | для кнопок | `secret_token` webhook'а; без него эндпоинт отвечает 503 |
+| `TELEGRAM_WEBHOOK_SECRET` | для кнопок | `secret_token` webhook'а; без него эндпоинт отвечает `503 platform_misconfigured` (`feature: order_notifications`) |
 | `PUBLIC_API_URL` | да | публичный адрес API: абсолютные URL картинок меню, адреса вебхуков в `GET /payment-provider` |
 | `PUBLIC_FILES_URL` | нет | если картинки отдаются с другого домена/CDN |
 | `MINIAPP_URL` / `MINIAPP_RETURN_URL` | желательно | куда Click/Payme возвращают клиента (`…/order/{orderId}`) |

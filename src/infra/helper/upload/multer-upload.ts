@@ -1,9 +1,10 @@
-import { BadRequestException, PayloadTooLargeException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { createWriteStream, mkdirSync, unlink } from 'fs';
 import { join } from 'path';
 import type { Request } from 'express';
 import type { StorageEngine } from 'multer';
+import { AppException } from 'src/infra/errors/app-exception';
+import { fieldError } from 'src/infra/validators/validation-errors';
 
 export const decodeFilename = (filename: string): string => {
   return Buffer.from(filename, 'latin1').toString('utf8');
@@ -73,7 +74,10 @@ class ImageStorage implements StorageEngine {
       size += c.length;
       if (size > max)
         return fail(
-          new PayloadTooLargeException(`File is larger than ${max} bytes`),
+          new AppException('payload_too_large', {
+            message: `File is larger than ${max} bytes`,
+            details: { maxBytes: max },
+          }),
         );
       chunks.push(c);
     });
@@ -84,7 +88,9 @@ class ImageStorage implements StorageEngine {
       const ext = detectImageExt(buf);
       if (!ext)
         return fail(
-          new BadRequestException(
+          fieldError(
+            file.fieldname,
+            'image_type',
             'Only JPEG, PNG, GIF and WebP images are allowed',
           ),
         );

@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import Redis from 'ioredis';
 import { REDIS } from 'src/infra/redis/redis.module';
-import { CustomerAuthException } from '../errors/customer-auth.exception';
+import { AppException } from 'src/infra/errors/app-exception';
 
 export interface RateRule {
   key: string;
@@ -50,11 +50,10 @@ export class RateLimitService {
     )) as [number, number];
 
     if (idx > 0) {
-      throw new CustomerAuthException(
-        'rate_limited',
-        'Too many requests',
-        Math.max(1, ttl),
-      );
+      throw new AppException('rate_limited', {
+        message: 'Too many requests',
+        retryAfter: Math.max(1, ttl),
+      });
     }
   }
 

@@ -1,4 +1,4 @@
-import { INestApplication, NotFoundException } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { createHttpApp } from 'src/infra/testing/http-app.fake';
 import { FileService } from 'src/modules/file/file.service';
@@ -33,17 +33,17 @@ describe('Public organization endpoints', () => {
   });
 
   it('return-slug: 404 for a numeric int_id without touching the database', async () => {
-    await expect(controller.getSlugById('7')).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(controller.getSlugById('7')).rejects.toMatchObject({
+      code: 'not_found',
+    });
     expect(findFirst).not.toHaveBeenCalled();
   });
 
   it('return-slug: 404 for an inactive or unknown venue', async () => {
     findFirst.mockResolvedValue(null);
-    await expect(controller.getSlugById(ID)).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(controller.getSlugById(ID)).rejects.toMatchObject({
+      code: 'not_found',
+    });
   });
 });
 

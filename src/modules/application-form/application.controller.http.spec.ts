@@ -55,7 +55,7 @@ describe('POST /application (public landing form)', () => {
   it('an empty body is 400 naming `from`, not a 500, and writes nothing', async () => {
     const res = await post({}).expect(400);
     expect(res.body.code).toBe('validation_error');
-    expect(res.body.errors).toEqual([
+    expect(res.body.fields).toEqual([
       expect.objectContaining({ field: 'from' }),
     ]);
     expect(create).not.toHaveBeenCalled();
@@ -75,7 +75,7 @@ describe('POST /application (public landing form)', () => {
     ['unknown field', { from: 'web', admin: true }, 'admin'],
   ])('%s → 400 on that field', async (_why, body, field) => {
     const res = await post(body).expect(400);
-    expect(res.body.errors.map((e: { field: string }) => e.field)).toContain(
+    expect(res.body.fields.map((e: { field: string }) => e.field)).toContain(
       field,
     );
     expect(create).not.toHaveBeenCalled();

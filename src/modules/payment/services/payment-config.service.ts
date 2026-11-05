@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
 import {
   decryptConfig,
@@ -6,6 +6,9 @@ import {
   parsePaymentConfigKey,
 } from '../domain/payment-crypto';
 import { ClickConfig, PaymeConfig } from '../domain/payment-url';
+import { fieldError } from 'src/infra/validators/validation-errors';
+import { platformMisconfigured } from 'src/infra/errors/app-exception';
+import { errorMessage } from 'src/infra/helper/error-text';
 
 export type OnlineProvider = 'click' | 'payme';
 
@@ -23,9 +26,14 @@ export class PaymentConfigService {
 
   private get key(): Buffer {
     // Kalit faqat kerak bo'lganda tekshiriladi: to'lov ishlatilmaydigan o'rnatishlar PAYMENT_CONFIG_KEY'siz ham yuklanadi.
-    return (this.cachedKey ??= parsePaymentConfigKey(
-      process.env.PAYMENT_CONFIG_KEY,
-    ));
+    if (this.cachedKey) return this.cachedKey;
+    try {
+      return (this.cachedKey = parsePaymentConfigKey(
+        process.env.PAYMENT_CONFIG_KEY,
+      ));
+    } catch (e) {
+      throw platformMisconfigured('payments', errorMessage(e));
+    }
   }
 
   async getClick(organizationId: string): Promise<ClickConfig | null> {
@@ -80,7 +88,9 @@ export class PaymentConfigService {
     for (const field of FIELDS[provider]) {
       const v = config?.[field];
       if (typeof v !== 'string' || !v.trim())
-        throw new BadRequestException(
+        throw fieldError(
+          `config.${field}`,
+          'required',
           `config.${field} is required for ${provider}`,
         );
       clean[field] = v.trim();
