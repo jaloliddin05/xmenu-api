@@ -75,6 +75,10 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # Error messages and bot texts carry no env names, paths, stack traces or service responses
+      - name: User-facing texts
+        run: npm run check:user-texts
+
       - name: Build
         run: npm run build
 
