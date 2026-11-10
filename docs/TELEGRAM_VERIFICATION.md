@@ -14,7 +14,7 @@ Telegram доступен, когда заведение подключило б
 
 | Метод | Путь | Что делает |
 |---|---|---|
-| `GET` | `/telegram-bot` | Статус: `{ connected, username, link, webhookUrl, isEnabled }`. Токен не возвращается никогда |
+| `GET` | `/telegram-bot` | Статус: `{ connected, username, link, isEnabled }`. Токен и адрес вебхука (в нём внутренний ключ бота) не возвращаются; адрес пишется в лог сервера при подключении |
 | `PUT` | `/telegram-bot` | Тело `{ "token": "123456:AA..." }`. Проверяет токен через `getMe`, регистрирует webhook с секретом, сохраняет токен зашифрованным (AES-256-GCM, `PAYMENT_CONFIG_KEY`) |
 | `DELETE` | `/telegram-bot` | Снимает webhook, возвращает стандартную кнопку меню и удаляет бота. 200 `{ connected: false, leftOnBot: ["name", "description", "shortDescription", "commands"] }`: это остаётся у бота в Telegram (бот принадлежит владельцу, его настройки не сбрасываем; меняются в @BotFather). Бота не было: `leftOnBot: []` |
 
@@ -42,6 +42,10 @@ Webhook и секрет ставятся автоматически, рукам�
 ## Клиентский контур (`X-Tenant-Id: <id организации>`)
 
 Если у заведения нет подключённого бота, `telegram/start` отвечает `503 telegram_unavailable`: показывай только SMS.
+Если токен бота не расшифровывается (сменён или потерян `PAYMENT_CONFIG_KEY`, значение повреждено), `telegram/start`,
+проверка `initData` и вебхук бота отвечают `503 platform_misconfigured` (`feature: telegram_bot`), а
+`GET /auth/customer/methods` и `channels.auth` отдают `telegram: false`. Какие способы показать в шторке, клиент
+узнаёт из `GET /auth/customer/methods` (без кэша) при её открытии.
 Заранее это видно в `GET /tenant/config`: `channels.auth.telegram` (бот подключён и включён). Подключение и отключение
 бота ставит ревалидацию `route: 'channels'`, чтобы кэш фронтов не держал старый признак.
 
@@ -115,7 +119,7 @@ Webhook и секрет ставятся автоматически, рукам�
 3. `PUT /telegram-bot` требует https `PUBLIC_API_URL`; адрес вебхука уходит только фейку в `setWebhook`, сам Telegram
    его не вызывает, поэтому достаточно любого `https://…` в `PUBLIC_API_URL` стека.
 4. Секрет вебхука тест берёт из тела `setWebhook` (`secret_token`): в БД только хеш. `botKey` — из `url` того же тела
-   (`…/telegram/bot/<botKey>/webhook`) или из `webhookUrl` ответа `GET /telegram-bot`.
+   (`…/telegram/bot/<botKey>/webhook`); в ответах API адреса вебхука нет.
 5. Апдейты тест шлёт сам: `POST /telegram/bot/<botKey>/webhook` с заголовком `X-Telegram-Bot-Api-Secret-Token` и
    телом `{ update_id, message: { chat: { id, type: "private" }, from: { id }, text: "/start <sessionId>" } }`, затем
    `{ …, message: { …, contact: { phone_number, user_id: <from.id> } } }`.

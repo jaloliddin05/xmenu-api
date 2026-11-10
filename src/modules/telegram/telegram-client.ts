@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import axios from 'axios';
 import { telegramMethodUrl } from 'src/infra/telegram/telegram-api-url';
+import { AppException } from 'src/infra/errors/app-exception';
 
 export class TelegramApiError extends Error {
   constructor(
@@ -64,5 +65,8 @@ export class TelegramClient {
 /** Safe to log: Telegram's own description, never the request (its URL holds the token). */
 export function telegramErrorText(e: unknown): string {
   if (e instanceof TelegramApiError) return e.description;
+  // Our own refusal before any call (e.g. a token that cannot be decrypted): the cause says why
+  if (e instanceof AppException && typeof e.cause === 'string')
+    return `${e.message}: ${e.cause}`;
   return e instanceof Error ? e.message : 'unknown';
 }
