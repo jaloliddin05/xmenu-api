@@ -339,6 +339,48 @@
         ]
       }
     },
+    "/auth/customer/methods": {
+      "get": {
+        "operationId": "AuthCustomerController_methods",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantAuthChannelsDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Ways a customer can confirm a phone now: sms (platform) and telegram (venue bot). Not cached",
+        "tags": [
+          "Auth-Customer"
+        ]
+      }
+    },
     "/auth/customer/otp/request": {
       "post": {
         "operationId": "AuthCustomerController_requestOtp",
@@ -5428,6 +5470,25 @@
           "requiresPhone"
         ]
       },
+      "TenantAuthChannelsDto": {
+        "type": "object",
+        "properties": {
+          "sms": {
+            "type": "boolean",
+            "example": true,
+            "description": "The platform can send SMS codes (provider configured, or development codes in the log). A provider outage still answers 503 sms_unavailable on otp/request"
+          },
+          "telegram": {
+            "type": "boolean",
+            "example": false,
+            "description": "The venue has an enabled Telegram bot whose token the platform can read, so telegram/start can work. false = offer SMS only"
+          }
+        },
+        "required": [
+          "sms",
+          "telegram"
+        ]
+      },
       "CustomerOtpRequestDto": {
         "type": "object",
         "properties": {
@@ -6156,6 +6217,29 @@
           "hint"
         ]
       },
+      "PublicationWarningDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "enum": [
+              "guest_login_telegram_only",
+              "guest_login_unavailable"
+            ],
+            "example": "guest_login_telegram_only",
+            "description": "guest_login_telegram_only: platform SMS is not available, customers sign in through the venue bot only (not raised in the miniapp mode). guest_login_unavailable: neither SMS nor the venue bot works, customers cannot sign in; the platform side is the likely cause"
+          },
+          "hint": {
+            "type": "string",
+            "example": "Вход по SMS сейчас недоступен на платформе: гости смогут войти только через Telegram-бота заведения",
+            "description": "What it means for the owner, in Russian"
+          }
+        },
+        "required": [
+          "id",
+          "hint"
+        ]
+      },
       "PublicationViewDto": {
         "type": "object",
         "properties": {
@@ -6184,6 +6268,13 @@
             "items": {
               "$ref": "#/components/schemas/ChecklistItemDto"
             }
+          },
+          "warnings": {
+            "description": "Problems that never block publication (POST /publish passes with them). Empty while the ordering channel is off",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicationWarningDto"
+            }
           }
         },
         "required": [
@@ -6191,7 +6282,8 @@
           "publishedAt",
           "ready",
           "channels",
-          "checklist"
+          "checklist",
+          "warnings"
         ]
       },
       "TelegramBotRequiredErrorDto": {
@@ -6457,12 +6549,6 @@
             "nullable": true,
             "example": "https://t.me/venue_bot"
           },
-          "webhookUrl": {
-            "type": "string",
-            "nullable": true,
-            "description": "Registered automatically on connect; shown for diagnostics only",
-            "example": "https://api.example.uz/telegram/bot/0b6a6c3e-7c1f-4b8e-9d4e-3f2a1b0c9d8e/webhook"
-          },
           "isEnabled": {
             "type": "boolean",
             "example": true
@@ -6499,7 +6585,6 @@
           "connected",
           "username",
           "link",
-          "webhookUrl",
           "isEnabled",
           "profile",
           "isDefault",
@@ -8300,25 +8385,6 @@
           "telegramUsername",
           "workingHours",
           "address"
-        ]
-      },
-      "TenantAuthChannelsDto": {
-        "type": "object",
-        "properties": {
-          "sms": {
-            "type": "boolean",
-            "example": true,
-            "description": "The platform can send SMS codes (provider configured). A provider outage still answers 503 sms_unavailable on otp/request"
-          },
-          "telegram": {
-            "type": "boolean",
-            "example": false,
-            "description": "The venue has an enabled Telegram bot, so telegram/start can work. false = it answers 503 telegram_unavailable: offer SMS only"
-          }
-        },
-        "required": [
-          "sms",
-          "telegram"
         ]
       },
       "TenantDeliveryChannelDto": {

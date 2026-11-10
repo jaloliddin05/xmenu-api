@@ -29,7 +29,7 @@ Env: см. `.env.example` (полный; тест сверяет его со с�
 `MINIAPP_URL`, `UPLOAD_MAX_BYTES`, `PLATFORM_ADMIN_USER_IDS`, `TRANSLATION_*`, `OPENAI_API_KEY` (необязателен: без него
 `/translation` → `503 platform_misconfigured`, `feature: translation`), `NEXT_PUBLIC_URL` + `REVALIDATE_SECRET` (QR),
 `CLIENT_REVALIDATE_URL` + `CLIENT_REVALIDATE_SECRET` (сайт доставки), `DELIVERY_URL_TEMPLATE` (адрес Mini App для кнопки бота),
-`PLATFORM_DOMAIN` (`xmenu.uz`; в dev `localhost`), `DOMAIN_VERIFY_SKIP` (только dev), `STAFF_REFRESH_TTL_DAYS`,
+`PLATFORM_DOMAIN` (`xmenu.uz`; в dev `localhost`), `DOMAIN_VERIFY_SKIP` (только dev), `DOMAIN_VERIFY_DNS_SERVERS` (DNS проверки доменов, фейк в e2e), `STAFF_REFRESH_TTL_DAYS`,
 `STAFF_SESSION_ABSOLUTE_DAYS`, `PUBLIC_POST_RATE_*`, `APPLICATION_RATE_*`, `TRANSLATION_IP_RATE_*` (лимиты по IP). Окончания строк LF (`.gitattributes`, `.editorconfig`).
 
 ## Схема Prisma
@@ -43,7 +43,8 @@ Env: см. `.env.example` (полный; тест сверяет его со с�
 `order` (state machine, очереди, уведомления), `payment` (Click, Payme, ключи тенанта, возвраты),
 `sms` (провайдеры eskiz, telegram, console), `telegram` (боты заведений: `TelegramBotService`, `TelegramClient`,
 `/telegram-bot`), `tenant-domain` (свои домены заведения, `/organization/:id/domains`), `file`, `translation`, `application`,
-`revalidate-queue` (`RevalidateModule`: ревалидация QR-меню и сайта доставки, `docs/REVALIDATE.md`).
+`revalidate-queue` (`RevalidateModule`: ревалидация QR-меню и сайта доставки, `docs/REVALIDATE.md`), `guest-login` (способы входа
+клиентов заведения: `GuestLoginService`).
 
 ## Контракт API
 Единое место: `docs/API.md` и `docs/openapi.json`. Подробности: `docs/ORDERS_API.md`, `docs/BRANCHES_API.md`,
@@ -67,7 +68,8 @@ test, `npm run openapi` + `git diff --exit-code docs/`, `format:check`, `lint` �
   `@@unique([organization_id, host])`; неподтверждённый хост может быть у нескольких заведений, каждое со своим
   токеном). Добавление в транзакции с `FOR UPDATE` строки организации (лимит 5). Проверка владения за интерфейсом
   `DomainOwnershipVerifier` (`DOMAIN_VERIFIER`): `DnsTxtVerifier` (TXT `_xmenu-verify.<host>` =
-  `xmenu-verify=<token>`), `SkipDomainVerifier` при `DOMAIN_VERIFY_SKIP=true`, в тестах `FakeDomainVerifier`.
+  `xmenu-verify=<token>`; резолверы системные или `DOMAIN_VERIFY_DNS_SERVERS`, так e2e подставляют фейковый DNS),
+  `SkipDomainVerifier` при `DOMAIN_VERIFY_SKIP=true`, в тестах `FakeDomainVerifier` и UDP-сервер `dns-server.fake.ts`.
   `domainEnvIssues` (проверка при старте): production не стартует с флагом и без годного `PLATFORM_DOMAIN`; фабрика
   верификатора флагу в production не верит. Без `PLATFORM_DOMAIN` (development) добавление домена → `503 platform_misconfigured`.
   `primaryDomain` = самый ранний подтверждённый (`tenant/primary-domain.ts`, один select для всех ответов).
@@ -118,17 +120,21 @@ test, `npm run openapi` + `git diff --exit-code docs/`, `format:check`, `lint` �
   `GET /tenant/config` отдаёт `channels`, `fulfillment.modes` пуст без публикации. `channels.qr` бэкенд не применяет
   (меню отдаётся), его читает QR-фронт.
 - Изменения ставят ревалидацию с `route: 'channels'` (QR и клиент); её ставит и `TelegramBotService` при подключении и
-  отключении бота. `channels.auth` `{ sms, telegram }` в `GET /tenant/config`: подсказка, как подтвердить номер
-  (`telegram` = включённый бот заведения, `sms` = `isSmsConfigured()` в `sms.module.ts`: учётные данные Eskiz, `OTP_BOT` и `XMENU_CHAT_ID` для `telegram`,
-  `console` вне production; проверка настроек, не пинг);
-  источник истины остаются `otp/request` и `telegram/start`.
+  отключении бота. Способы входа клиентов `{ sms, telegram }` считает `GuestLoginService` (`modules/guest-login`):
+  `telegram` = `TelegramBotService.usable` (бот включён и токен расшифровывается), `sms` = `smsLoginAvailable()`
+  (`isSmsConfigured()` из `sms.module.ts` или `OTP_DEV_MODE`, как решает `otp/request`; проверка настроек, не пинг).
+  Отдаются в `channels.auth` `GET /tenant/config` (кэшируется) и в `GET /auth/customer/methods` (`no-store`, для шторки
+  входа); источник истины остаются `otp/request` и `telegram/start`. Опубликованное заведение с включённым каналом без
+  единого способа: `warn` в лог и ops-чат (`OpsNotifierService`), не чаще раза в час на заведение (Redis `SET NX EX`).
+- `GET /publication` и остальные ответы публикации несут `warnings` (`guestLoginWarnings` в `publication.ts`:
+  `guest_login_telegram_only`, `guest_login_unavailable`), отдельно от чеклиста; публикацию они не блокируют.
 - Бот удалён (`DELETE /telegram-bot`) при режиме `miniapp`/`both`: режим остаётся, пункт `telegram_bot` в чеклисте
   становится `todo`, публикация не снимается.
 
 ## Филиалы
 - Часы считает `branch/domain/branch-hours.ts` (одна функция для `GET /branches` и `POST /orders`). Филиал без
-  расписания закрыт: `isOpen: false`, `opensAt: null`, заказ → `422 branch_hours_not_set`. `GET /branches` отдаёт `opensAt` как ISO 8601 с датой и поясом филиала
-  (`opensAtIso`), а `details.opensAt` у `branch_closed` остаётся временем `HH:mm`. Круглосуточно: `is24h`
+  расписания закрыт: `isOpen: false`, `opensAt: null`, заказ → `422 branch_hours_not_set`. `GET /branches` и `details.opensAt` у `branch_closed` отдают `opensAt` как ISO
+  8601 с датой и поясом филиала (`opensAtIso`); при доставке ближайшее открытие выбирается по моменту времени. Круглосуточно: `is24h`
   на всех семи днях. Выбор филиала для заказа: `order/domain/branch-choice.ts`.
 
 ## Заказы
@@ -155,7 +161,9 @@ Payme вручную через ops-чат.
   в очередь BullMQ `telegram-update` и сразу отвечает 200; обработка (`TelegramUpdateProcessor`, 3 попытки) идёт в фоне,
   сбой постановки в очередь → 503. `DELETE /telegram-bot` → 200 `{ connected: false, leftOnBot }`: имя, описания и
   команды остаются у бота (не сбрасываем), кнопка меню возвращается к стандартной. `TelegramClient` не
-  кладёт токен в ошибки: логируй через `telegramErrorText(e)`.
+  кладёт токен в ошибки: логируй через `telegramErrorText(e)`. Токен, который не расшифровывается (сменён `PAYMENT_CONFIG_KEY`,
+  повреждён), даёт `platform_misconfigured` (`telegram_bot`) с причиной в логе, а не 500; `DELETE` при этом работает. Адрес
+  вебхука (с `botKey`) в ответы владельцу не попадает, только в лог при подключении.
 - `TelegramBotProfileService` (`modules/telegram`): автонастройка бота заведения (имя, описания, `/start`, кнопка меню Mini App) по
   профилю из `organization_telegram_bot.profile` или дефолтам из данных заведения (`domain/bot-profile.ts`); `PUT
   /telegram-bot` применяет её после подключения, `PUT /telegram-bot/profile` и `POST /telegram-bot/sync` вручную, смена slug
