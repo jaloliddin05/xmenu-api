@@ -280,7 +280,7 @@ IP берётся из `X-Forwarded-For` только от локального 
   `setMyShortDescription`, `setMyCommands` (одна команда `/start`) для каждого языка и один раз без `language_code`
   (язык по умолчанию), и `setChatMenuButton` (кнопка `web_app`, адрес `deliveryUrl`). Итог хранится и приходит в
   `lastSync: { syncedAt, result: { name, description, shortDescription, commands, menuButton } }`, где каждый пункт
-  `{ status: "ok" | "failed" | "skipped", code?, feature? }`: `failed` с `code: "telegram_error"` (Telegram отказал,
+  `{ status: "ok" | "failed" | "skipped", code?, feature? }`: `failed` с `code: "telegram_request_failed"` (Telegram отказал,
   текст ответа только в логе сервера; у имени есть лимит частоты смены), `skipped` у кнопки меню без адреса.
 - `deliveryUrl` строится из `DELIVERY_URL_TEMPLATE` (`https://{slug}.xmenu.uz`, только https); без переменной или без
   `{slug}` в шаблоне кнопка не ставится (`{ status: "skipped", code: "platform_misconfigured", feature: "delivery_link" }`),

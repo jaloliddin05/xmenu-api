@@ -84,5 +84,6 @@
 | `domain_already_added` | 409 | Домен уже добавлен этим заведением | — |
 | `domain_limit_reached` | 422 | У заведения уже максимум доменов; `details.limit` | `details.limit` |
 | `domain_verification_failed` | 422 | Проверка TXT не прошла; `details.reason`: `record_not_found` \| `token_mismatch` \| `dns_error`, `details.record` ожидаемая запись | `details.reason`, `details.record` |
+| `telegram_request_failed` | 502 | Bot API отказал в применении пункта профиля бота (`code` пункта в `lastSync`); текст ответа только в логе | — |
 | `translation_failed` | 502 | Сервис перевода не ответил или ответил не по формату | — |
 | ~~`translation_unavailable`~~ устарел → `platform_misconfigured` | 503 | Перевод не настроен на платформе | — |

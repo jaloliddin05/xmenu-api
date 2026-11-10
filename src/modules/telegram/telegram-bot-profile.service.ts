@@ -269,7 +269,7 @@ export class TelegramBotProfileService {
       }),
     );
     return failures.length
-      ? { status: 'failed', code: 'telegram_error' }
+      ? { status: 'failed', code: 'telegram_request_failed' }
       : ok();
   }
 
@@ -297,7 +297,7 @@ export class TelegramBotProfileService {
       this.logger.warn(
         `setChatMenuButton failed for bot ${bot.botKey}: ${telegramErrorText(e)}`,
       );
-      return { status: 'failed', code: 'telegram_error' };
+      return { status: 'failed', code: 'telegram_request_failed' };
     }
   }
 

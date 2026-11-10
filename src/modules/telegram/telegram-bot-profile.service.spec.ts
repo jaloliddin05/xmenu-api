@@ -141,7 +141,10 @@ describe('TelegramBotProfileService', () => {
       .mockImplementation(() => undefined);
     const result = await svc.apply(ORG);
 
-    expect(result.name).toEqual({ status: 'failed', code: 'telegram_error' });
+    expect(result.name).toEqual({
+      status: 'failed',
+      code: 'telegram_request_failed',
+    });
     expect(JSON.stringify(row().sync_result)).not.toContain('Too Many');
     expect(warn).toHaveBeenCalledWith(
       expect.stringContaining('Too Many Requests'),

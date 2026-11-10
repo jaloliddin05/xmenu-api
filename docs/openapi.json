@@ -4877,6 +4877,7 @@
           "domain_already_added",
           "domain_limit_reached",
           "domain_verification_failed",
+          "telegram_request_failed",
           "translation_failed",
           "translation_unavailable"
         ],
@@ -6379,10 +6380,10 @@
           "code": {
             "type": "string",
             "enum": [
-              "telegram_error",
+              "telegram_request_failed",
               "platform_misconfigured"
             ],
-            "description": "failed: telegram_error (Telegram refused; details only in the server log). skipped: platform_misconfigured (the menu button has no delivery address)"
+            "description": "failed: telegram_request_failed (Telegram refused; details only in the server log). skipped: platform_misconfigured (the menu button has no delivery address)"
           },
           "feature": {
             "type": "string",
