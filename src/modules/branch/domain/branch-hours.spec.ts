@@ -5,6 +5,7 @@ import {
   evaluateOpenState,
   formatHours,
   hasSchedule,
+  opensAtIso,
 } from './branch-hours';
 
 const day = (
@@ -39,6 +40,7 @@ describe('evaluateOpenState', () => {
     expect(evaluateOpenState(schedule({ days: [] }), new Date())).toEqual({
       isOpen: false,
       opensAt: null,
+      opensDate: null,
     });
     expect(hasSchedule(schedule({ days: [] }))).toBe(false);
     expect(hasSchedule(schedule())).toBe(true);
@@ -58,6 +60,7 @@ describe('evaluateOpenState', () => {
       expect(evaluateOpenState(s, tashkent(t))).toEqual({
         isOpen: true,
         opensAt: null,
+        opensDate: null,
       });
     }
     expect(formatHours(s.days)).toBe('Круглосуточно');
@@ -66,19 +69,19 @@ describe('evaluateOpenState', () => {
   it('is open inside the interval', () => {
     expect(
       evaluateOpenState(schedule(), tashkent('2026-10-12T12:00:00')),
-    ).toEqual({ isOpen: true, opensAt: null });
+    ).toEqual({ isOpen: true, opensAt: null, opensDate: null });
   });
 
   it("is closed before opening and reports today's opening time", () => {
     expect(
       evaluateOpenState(schedule(), tashkent('2026-10-12T07:30:00')),
-    ).toEqual({ isOpen: false, opensAt: '09:00' });
+    ).toEqual({ isOpen: false, opensAt: '09:00', opensDate: '2026-10-12' });
   });
 
   it("is closed after closing and reports the next day's opening time", () => {
     expect(
       evaluateOpenState(schedule(), tashkent('2026-10-12T23:30:00')),
-    ).toEqual({ isOpen: false, opensAt: '09:00' });
+    ).toEqual({ isOpen: false, opensAt: '09:00', opensDate: '2026-10-13' });
   });
 
   it('closing time itself is already closed', () => {
@@ -112,6 +115,7 @@ describe('evaluateOpenState', () => {
     expect(evaluateOpenState(s, tashkent('2026-10-12T12:00:00'))).toEqual({
       isOpen: false,
       opensAt: '18:00',
+      opensDate: '2026-10-12',
     });
   });
 
@@ -143,7 +147,7 @@ describe('evaluateOpenState', () => {
       .concat(day(7, '00:00', '00:00', { isClosed: true }));
     expect(
       evaluateOpenState(schedule({ days }), tashkent('2026-10-17T23:00:00')),
-    ).toEqual({ isOpen: false, opensAt: '09:00' });
+    ).toEqual({ isOpen: false, opensAt: '09:00', opensDate: '2026-10-19' });
     expect(
       evaluateOpenState(schedule({ days }), tashkent('2026-10-18T12:00:00'))
         .isOpen,
@@ -165,6 +169,7 @@ describe('evaluateOpenState', () => {
     expect(evaluateOpenState(closed, tashkent('2026-10-12T12:00:00'))).toEqual({
       isOpen: false,
       opensAt: '09:00',
+      opensDate: '2026-10-13',
     });
 
     const shortDay = schedule({
@@ -296,5 +301,53 @@ describe('branchStatus', () => {
       },
     ];
     expect(status(base({ exceptions }))).toBe('closed_now');
+  });
+});
+
+describe('opensAtIso', () => {
+  const closedState = (opensAt: string | null, opensDate: string | null) => ({
+    isOpen: false,
+    opensAt,
+    opensDate,
+  });
+
+  it('writes the date and the branch UTC offset', () => {
+    expect(
+      opensAtIso(closedState('09:00', '2026-10-13'), 'Asia/Tashkent'),
+    ).toBe('2026-10-13T09:00:00+05:00');
+  });
+
+  it('takes the offset of that day, so a DST switch in between is honoured', () => {
+    expect(
+      opensAtIso(closedState('09:00', '2026-11-01'), 'America/New_York'),
+    ).toBe('2026-11-01T09:00:00-05:00');
+    expect(
+      opensAtIso(closedState('09:00', '2026-10-31'), 'America/New_York'),
+    ).toBe('2026-10-31T09:00:00-04:00');
+  });
+
+  it('is null without a next opening, and +00:00 for UTC', () => {
+    expect(opensAtIso(closedState(null, null), 'Asia/Tashkent')).toBeNull();
+    expect(opensAtIso(closedState('09:00', '2026-10-13'), 'UTC')).toBe(
+      '2026-10-13T09:00:00+00:00',
+    );
+  });
+
+  it('tells today from tomorrow for an exception that closes today', () => {
+    const s: BranchSchedule = {
+      timezone: 'Asia/Tashkent',
+      days: everyDay('09:00', '23:00'),
+      exceptions: [
+        {
+          date: '2026-10-12',
+          opensAt: null,
+          closesAt: null,
+          is24h: false,
+          isClosed: true,
+        },
+      ],
+    };
+    const state = evaluateOpenState(s, tashkent('2026-10-12T06:00:00'));
+    expect(opensAtIso(state, s.timezone)).toBe('2026-10-13T09:00:00+05:00');
   });
 });

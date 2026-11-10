@@ -39,6 +39,8 @@ export interface OpenState {
   isOpen: boolean;
   /** "HH:mm" — yopiq bo'lsa, keyingi ochilish vaqti */
   opensAt: string | null;
+  /** YYYY-MM-DD in the branch time zone: the day of that opening (today or a later day) */
+  opensDate: string | null;
 }
 
 export type HoursLang = 'ru' | 'uz' | 'en';
@@ -138,7 +140,8 @@ export function evaluateOpenState(
   schedule: BranchSchedule,
   now: Date,
 ): OpenState {
-  if (!hasSchedule(schedule)) return { isOpen: false, opensAt: null };
+  if (!hasSchedule(schedule))
+    return { isOpen: false, opensAt: null, opensDate: null };
 
   const today = localParts(now, schedule.timezone);
   const todayInterval = intervalFor(schedule, today.date, today.weekday);
@@ -147,7 +150,7 @@ export function evaluateOpenState(
     today.minutes >= todayInterval.start &&
     today.minutes < Math.min(todayInterval.end, DAY)
   ) {
-    return { isOpen: true, opensAt: null };
+    return { isOpen: true, opensAt: null, opensDate: null };
   }
 
   // Kechagi tungi smena bugun ertalab davom etishi mumkin.
@@ -161,12 +164,16 @@ export function evaluateOpenState(
     yesterdayInterval.end > DAY &&
     today.minutes < yesterdayInterval.end - DAY
   ) {
-    return { isOpen: true, opensAt: null };
+    return { isOpen: true, opensAt: null, opensDate: null };
   }
 
   // Yopiq: keyingi ochilish.
   if (todayInterval && todayInterval.start > today.minutes) {
-    return { isOpen: false, opensAt: formatMinutes(todayInterval.start) };
+    return {
+      isOpen: false,
+      opensAt: formatMinutes(todayInterval.start),
+      opensDate: today.date,
+    };
   }
   for (let i = 1; i <= 7; i++) {
     const interval = intervalFor(
@@ -175,9 +182,34 @@ export function evaluateOpenState(
       wrapWeekday(today.weekday + i),
     );
     if (interval)
-      return { isOpen: false, opensAt: formatMinutes(interval.start) };
+      return {
+        isOpen: false,
+        opensAt: formatMinutes(interval.start),
+        opensDate: addDays(today.date, i),
+      };
   }
-  return { isOpen: false, opensAt: null };
+  return { isOpen: false, opensAt: null, opensDate: null };
+}
+
+/** UTC offset of the zone at the given instant, as "+05:00". */
+function zoneOffset(at: Date, timeZone: string): string {
+  const name =
+    new Intl.DateTimeFormat('en-US', { timeZone, timeZoneName: 'longOffset' })
+      .formatToParts(at)
+      .find((p) => p.type === 'timeZoneName')?.value ?? 'GMT';
+  const m = /^GMT(?:([+-])(\d{2}):(\d{2}))?$/.exec(name);
+  return m && m[1] ? `${m[1]}${m[2]}:${m[3]}` : '+00:00';
+}
+
+/**
+ * The next opening as an ISO 8601 string in the branch time zone ("2026-11-11T09:00:00+05:00"), so a
+ * client can tell today from tomorrow. null when the branch does not open in the next seven days.
+ */
+export function opensAtIso(state: OpenState, timeZone: string): string | null {
+  if (!state.opensAt || !state.opensDate) return null;
+  // The offset is looked up at the local wall time read as UTC: exact except within an hour of a DST switch
+  const guess = new Date(`${state.opensDate}T${state.opensAt}:00Z`);
+  return `${state.opensDate}T${state.opensAt}:00${zoneOffset(guess, timeZone)}`;
 }
 
 export type BranchStatus =
