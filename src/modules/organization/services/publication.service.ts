@@ -25,6 +25,9 @@ const CHANNEL_FIELDS = {
   published_at: true,
 } as const;
 
+/** The view as read inside the transaction; warnings are added after it commits (withWarnings). */
+type LockedView = Omit<PublicationViewDto, 'warnings'>;
+
 type ChannelRow = {
   qr_enabled: boolean;
   delivery_enabled: boolean;
@@ -45,8 +48,11 @@ export class PublicationService {
     private readonly guestLogin: GuestLoginService,
   ) {}
 
-  view(organizationId: string): Promise<PublicationViewDto> {
-    return this.buildView(this.prisma, organizationId);
+  async view(organizationId: string): Promise<PublicationViewDto> {
+    return this.withWarnings(
+      organizationId,
+      await this.buildView(this.prisma, organizationId),
+    );
   }
 
   async setChannels(
@@ -86,7 +92,7 @@ export class PublicationService {
       },
     );
     if (changed) await this.changed(organizationId);
-    return view;
+    return this.withWarnings(organizationId, view);
   }
 
   async publish(organizationId: string): Promise<PublicationViewDto> {
@@ -121,7 +127,7 @@ export class PublicationService {
       },
     );
     if (changed) await this.changed(organizationId);
-    return view;
+    return this.withWarnings(organizationId, view);
   }
 
   async unpublish(organizationId: string): Promise<PublicationViewDto> {
@@ -136,7 +142,7 @@ export class PublicationService {
       };
     });
     if (changed) await this.changed(organizationId);
-    return view;
+    return this.withWarnings(organizationId, view);
   }
 
   /** Front-ends show the ordering state (GET /tenant/config channels, fulfillment). */
@@ -172,20 +178,14 @@ export class PublicationService {
     return row;
   }
 
-  private async buildView(
-    db: Db,
-    organizationId: string,
-  ): Promise<PublicationViewDto> {
+  private async buildView(db: Db, organizationId: string): Promise<LockedView> {
     const [row, facts] = await Promise.all([
       this.channelRow(db, organizationId),
       this.facts(db, organizationId),
     ]);
     const checklist = evaluateChecklist(facts);
-    const published = row.delivery_enabled && row.published_at !== null;
-    // Read outside the transaction: platform settings and the bot row, never locked here
-    const methods = await this.guestLogin.methods(organizationId, published);
     return {
-      published,
+      published: row.delivery_enabled && row.published_at !== null,
       publishedAt: row.published_at?.toISOString() ?? null,
       ready: isReady(checklist),
       channels: {
@@ -193,10 +193,27 @@ export class PublicationService {
         delivery: { enabled: row.delivery_enabled, mode: row.delivery_mode },
       },
       checklist,
+    };
+  }
+
+  /**
+   * Adds the guest sign-in warnings after the transaction has committed: GuestLoginService reads with
+   * its own connections and may call the ops chat, which must never run while the row lock is held.
+   */
+  private async withWarnings(
+    organizationId: string,
+    view: LockedView,
+  ): Promise<PublicationViewDto> {
+    const methods = await this.guestLogin.methods(
+      organizationId,
+      view.published,
+    );
+    return {
+      ...view,
       warnings: guestLoginWarnings(
         {
-          deliveryEnabled: row.delivery_enabled,
-          deliveryMode: row.delivery_mode,
+          deliveryEnabled: view.channels.delivery.enabled,
+          deliveryMode: view.channels.delivery.mode,
         },
         methods,
       ),

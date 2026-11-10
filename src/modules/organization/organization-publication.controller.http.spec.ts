@@ -104,10 +104,20 @@ describe('Organization channels and publication (owner)', () => {
   const A = `Bearer ${staffToken('owner-a')}`;
   const NO_ORG = `Bearer ${staffToken('no-org')}`;
 
+  // Open transactions: sign-in methods must never be read while the row lock is held
+  let openTx = 0;
+  const inTx = (fn: (tx: unknown) => Promise<unknown>) => async () => {
+    openTx++;
+    try {
+      return await fn(prisma);
+    } finally {
+      openTx--;
+    }
+  };
   const prisma = {
     $transaction: jest.fn((fn: (tx: unknown) => Promise<unknown>) => {
-      if (!serialize) return fn(prisma);
-      const run = queue.then(() => fn(prisma));
+      if (!serialize) return inTx(fn)();
+      const run = queue.then(inTx(fn));
       queue = run.catch(() => undefined);
       return run;
     }),
@@ -186,8 +196,12 @@ describe('Organization channels and publication (owner)', () => {
 
   // Sign-in methods of the venue's customers (GuestLoginService has its own spec)
   let loginMethods = { sms: true, telegram: false };
+  const methodsCalledInTx: boolean[] = [];
   const guestLogin = {
-    methods: jest.fn(async () => loginMethods),
+    methods: jest.fn(async () => {
+      methodsCalledInTx.push(openTx > 0);
+      return loginMethods;
+    }),
   };
 
   beforeAll(async () => {
@@ -583,6 +597,16 @@ describe('Organization channels and publication (owner)', () => {
         );
       },
     );
+
+    it('reads the sign-in methods only after the transaction, never under the row lock', async () => {
+      venues[ORG_A] = ready(ORG_A);
+      methodsCalledInTx.length = 0;
+      await putChannels(CHANNELS).expect(200);
+      await publish().expect(200);
+      await unpublish().expect(200);
+      await get().expect(200);
+      expect(methodsCalledInTx).toEqual([false, false, false, false]);
+    });
 
     it('publishing again keeps publishedAt and revalidates nothing', async () => {
       venues[ORG_A] = ready(ORG_A);
