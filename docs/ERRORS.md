@@ -52,7 +52,7 @@
 | `min_order_not_reached` | 422 | Сумма меньше минимальной; `details.minAmount` | `details.minAmount` |
 | `out_of_delivery_zone` | 422 | Адрес вне зоны доставки | — |
 | `fulfillment_unavailable` | 422 | Тип получения выключен у заведения | — |
-| `branch_closed` | 409 | Филиал закрыт сейчас; `details.opensAt` | `details.opensAt` |
+| `branch_closed` | 409 | Филиал закрыт сейчас; `details.opensAt`: ближайшее открытие, ISO 8601 с датой и поясом филиала (как в `GET /branches`), `null`, если в 7 дней открытий нет | `details.opensAt` |
 | `branch_hours_not_set` | 422 | У филиала нет расписания | — |
 | `payment_method_unavailable` | 422 | Способ оплаты не подключён у заведения | — |
 | `idempotency_key_required` | 400 | `POST /orders` без заголовка `Idempotency-Key` | — |
