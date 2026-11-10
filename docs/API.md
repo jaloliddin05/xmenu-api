@@ -42,7 +42,10 @@
 сервисов (Telegram, Click, Payme, OpenAI, Eskiz) и ошибки базы уходят только в лог вместе с `requestId`. Исключения
 фреймворка (неизвестный маршрут, `ParseUUIDPipe`, multer) сохраняют статус, но получают код по статусу
 (`not_found`, `bad_request`…) и сообщение из реестра; всё прочее непредвиденное: `500 internal_error` без деталей.
-Битый JSON: `400 invalid_body`. `npm run check:user-texts` (шаг CI) проверяет сообщения ошибок и тексты бота.
+Битый JSON: `400 invalid_body`.
+Каждый ответ с ошибкой пишет в лог одну строку `[requestId] МЕТОД маршрут статус code`: `warn` для 4xx, `error` с
+причиной и стеком для 5xx. Маршрут это шаблон (`/products/:id`, без значений), тела запроса в строке нет, телефоны
+в тексте причины маскируются. По «Коду для поддержки» запись находится всегда. `npm run check:user-texts` (шаг CI) проверяет сообщения ошибок и тексты бота.
 
 **Функция выключена настройкой платформы.** Если не хватает настройки платформы (не заведения), ответ
 `503 platform_misconfigured` с `details.feature`:
@@ -280,7 +283,7 @@ IP берётся из `X-Forwarded-For` только от локального 
   `setMyShortDescription`, `setMyCommands` (одна команда `/start`) для каждого языка и один раз без `language_code`
   (язык по умолчанию), и `setChatMenuButton` (кнопка `web_app`, адрес `deliveryUrl`). Итог хранится и приходит в
   `lastSync: { syncedAt, result: { name, description, shortDescription, commands, menuButton } }`, где каждый пункт
-  `{ status: "ok" | "failed" | "skipped", code?, feature? }`: `failed` с `code: "telegram_error"` (Telegram отказал,
+  `{ status: "ok" | "failed" | "skipped", code?, feature? }`: `failed` с `code: "telegram_request_failed"` (Telegram отказал,
   текст ответа только в логе сервера; у имени есть лимит частоты смены), `skipped` у кнопки меню без адреса.
 - `deliveryUrl` строится из `DELIVERY_URL_TEMPLATE` (`https://{slug}.xmenu.uz`, только https); без переменной или без
   `{slug}` в шаблоне кнопка не ставится (`{ status: "skipped", code: "platform_misconfigured", feature: "delivery_link" }`),

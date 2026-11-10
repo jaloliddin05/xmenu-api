@@ -445,6 +445,11 @@ export const ERROR_CODES = spec({
   },
 
   // Translation
+  telegram_request_failed: {
+    status: 502,
+    message: 'Telegram rejected the request',
+    when: 'Bot API отказал в применении пункта профиля бота (`code` пункта в `lastSync`); текст ответа только в логе',
+  },
   translation_failed: {
     status: 502,
     message: 'Translation service failed',

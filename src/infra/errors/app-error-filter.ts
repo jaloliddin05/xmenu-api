@@ -6,7 +6,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { errorMessage, errorStack } from '../helper/error-text';
+import { errorMessage, errorStack, maskPhones } from '../helper/error-text';
 import { AppException, FieldError } from './app-exception';
 import {
   codeForStatus,
@@ -35,7 +35,8 @@ interface LogEntry {
 
 export interface DescribedError {
   body: Omit<ErrorBody, 'requestId'>;
-  log?: LogEntry;
+  /** Every error response is logged: the request id from the support code must always be findable */
+  log: LogEntry;
 }
 
 /** Express body-parser errors arrive as plain errors with `type` and `status`. */
@@ -81,16 +82,14 @@ export function describeError(exception: unknown): DescribedError {
     }
     const cause = exception.cause;
     if (cause !== undefined) notes.unshift(`cause: ${errorMessage(cause)}`);
-    let log: LogEntry | undefined;
-    if (status >= 500) {
-      log = {
-        level: 'error',
-        text: [exception.code, ...notes].join('; '),
-        stack: cause instanceof Error ? errorStack(cause) : undefined,
-      };
-    } else if (notes.length) {
-      log = { level: 'warn', text: [exception.code, ...notes].join('; ') };
-    }
+    const log: LogEntry =
+      status >= 500
+        ? {
+            level: 'error',
+            text: [exception.code, ...notes].join('; '),
+            stack: cause instanceof Error ? errorStack(cause) : undefined,
+          }
+        : { level: 'warn', text: [exception.code, ...notes].join('; ') };
     return { body, log };
   }
 
@@ -102,6 +101,7 @@ export function describeError(exception: unknown): DescribedError {
         message: ERROR_CODES[parserCode].message,
         status: ERROR_CODES[parserCode].status,
       },
+      log: { level: 'warn', text: parserCode },
     };
   }
 
@@ -119,7 +119,7 @@ export function describeError(exception: unknown): DescribedError {
               text: `${code}: ${exception.message}`,
               stack: exception.stack,
             }
-          : undefined,
+          : { level: 'warn', text: code },
     };
   }
 
@@ -139,8 +139,8 @@ export function describeError(exception: unknown): DescribedError {
 
 /**
  * Global filter of both APIs: { code, message, status, fields?, retryAfter?, details?, requestId }.
- * Sets Retry-After and Cache-Control: no-store; logs 5xx (with the stack) and causes of handled
- * errors under the request id.
+ * Sets Retry-After and Cache-Control: no-store; logs every error response under the request id
+ * (warn for 4xx, error with the stack for 5xx).
  */
 @Catch()
 export class AppErrorFilter implements ExceptionFilter {
@@ -153,11 +153,15 @@ export class AppErrorFilter implements ExceptionFilter {
     const requestId = requestIdOf(req, res);
     const { body, log } = describeError(exception);
 
-    if (log) {
-      const line = `[${requestId}] ${req?.method ?? ''} ${req?.path ?? ''} ${body.status} ${log.text}`;
-      if (log.level === 'error') AppErrorFilter.logger.error(line, log.stack);
-      else AppErrorFilter.logger.warn(line);
-    }
+    // One line per error response: request id, method, route pattern (no parameter values), status and
+    // the text. Never the body or the query; phone numbers in the text are masked.
+    const route = (req?.route as { path?: unknown } | undefined)?.path;
+    const where = typeof route === 'string' ? route : (req?.path ?? '');
+    const line = maskPhones(
+      `[${requestId}] ${req?.method ?? ''} ${where} ${body.status} ${log.text}`,
+    );
+    if (log.level === 'error') AppErrorFilter.logger.error(line, log.stack);
+    else AppErrorFilter.logger.warn(line);
 
     if (res.headersSent) return;
     res.setHeader('Cache-Control', 'no-store');

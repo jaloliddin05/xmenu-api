@@ -64,6 +64,18 @@ describe('toBranchView: status', () => {
     is_closed: false,
   };
 
+  it('closed now: opensAt is an ISO time with the branch offset and the day of the opening', () => {
+    const before = new Date('2026-10-12T02:00:00Z'); // Monday 07:00 in Tashkent
+    expect(toBranchView(row([open]), 'ru', before)).toMatchObject({
+      status: 'closed_now',
+      opensAt: '2026-10-12T09:00:00+05:00',
+    });
+    const evening = new Date('2026-10-12T19:00:00Z'); // Tuesday 00:00 in Tashkent: Monday-only schedule
+    expect(toBranchView(row([open]), 'ru', evening).opensAt).toBe(
+      '2026-10-19T09:00:00+05:00',
+    );
+  });
+
   it('no hours: no_schedule with an empty hours string', () => {
     expect(toBranchView(row([]), 'ru', now)).toMatchObject({
       status: 'no_schedule',

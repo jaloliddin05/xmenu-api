@@ -1,5 +1,6 @@
 import { isLang, Lang } from 'src/infra/http/request-helpers';
 import type { FieldError } from 'src/infra/errors/app-exception';
+import type { ErrorCode } from 'src/infra/errors/error-codes';
 
 /** What the owner edits per language (and what is pushed to the venue's bot). */
 export interface BotProfileFields {
@@ -189,12 +190,15 @@ export function validateProfileInput(
 
 export type SyncStatus = 'ok' | 'failed' | 'skipped';
 /**
- * failed: `code` telegram_error (Telegram refused, details only in the log); skipped: the menu button
+ * failed: `code` telegram_request_failed (Telegram refused, details only in the log); skipped: the menu button
  * without a delivery address, `code` platform_misconfigured with `feature` delivery_link.
  */
 export interface SyncItem {
   status: SyncStatus;
-  code?: 'telegram_error' | 'platform_misconfigured';
+  code?: Extract<
+    ErrorCode,
+    'telegram_request_failed' | 'platform_misconfigured'
+  >;
   feature?: 'delivery_link';
 }
 export const SYNC_ITEMS = [

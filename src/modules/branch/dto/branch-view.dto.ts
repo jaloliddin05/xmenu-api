@@ -24,8 +24,9 @@ export class BranchViewDto implements BranchView {
   @ApiProperty({
     type: String,
     nullable: true,
-    example: '09:00',
-    description: 'HH:mm when a closed branch opens next',
+    example: '2026-11-11T09:00:00+05:00',
+    description:
+      'ISO 8601 date and time with the branch UTC offset when a closed branch opens next, e.g. 2026-11-11T09:00:00+05:00',
   })
   opensAt: string | null;
   @ApiProperty({

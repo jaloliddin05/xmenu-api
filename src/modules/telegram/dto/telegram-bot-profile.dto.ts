@@ -32,11 +32,11 @@ export class SyncItemDto {
 
   @ApiProperty({
     required: false,
-    enum: ['telegram_error', 'platform_misconfigured'],
+    enum: ['telegram_request_failed', 'platform_misconfigured'],
     description:
-      'failed: telegram_error (Telegram refused; details only in the server log). skipped: platform_misconfigured (the menu button has no delivery address)',
+      'failed: telegram_request_failed (Telegram refused; details only in the server log). skipped: platform_misconfigured (the menu button has no delivery address)',
   })
-  code?: 'telegram_error' | 'platform_misconfigured';
+  code?: 'telegram_request_failed' | 'platform_misconfigured';
 
   @ApiProperty({
     required: false,

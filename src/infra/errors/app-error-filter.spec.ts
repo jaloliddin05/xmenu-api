@@ -45,6 +45,11 @@ class ThrowingController {
     throw platformMisconfigured('sms', 'ESKIZ_PASSWORD is not set');
   }
 
+  @Get('phone')
+  phone() {
+    throw new AppException('not_found', { cause: 'duplicate +998901234567' });
+  }
+
   @Get('crash')
   crash() {
     throw new Error(LEAK);
@@ -120,6 +125,31 @@ describe('AppErrorFilter (HTTP)', () => {
     expect(warn).toHaveBeenCalledWith(
       expect.stringContaining('details dropped: internalNote'),
     );
+  });
+
+  it('4xx without a cause still leaves one warn line: requestId, method, route pattern, status, code', async () => {
+    const id = '0a0a0a0a-0000-4000-8000-000000000001';
+    const res = await http()
+      .get(`/t/uuid/${id}-bad`)
+      .set('X-Request-Id', 'support-code-0001')
+      .expect(400);
+    expect(res.body.requestId).toBe('support-code-0001');
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith(
+      '[support-code-0001] GET /t/uuid/:id 400 bad_request',
+    );
+  });
+
+  it('the log line has no request body and masks phone numbers', async () => {
+    await http()
+      .post('/t/body')
+      .send({ name: 42, secret: 'hunter2' })
+      .expect(400);
+    await http().get('/t/phone').expect(404);
+    const lines = warn.mock.calls.map((c) => String(c[0])).join(' | ');
+    expect(lines).not.toContain('hunter2');
+    expect(lines).toContain('+998*******67');
+    expect(lines).not.toContain('998901234567');
   });
 
   it('keeps a well-formed X-Request-Id from the proxy and replaces a bad one', async () => {
@@ -236,8 +266,13 @@ describe('describeError', () => {
     }
   });
 
-  it('logs 4xx AppExceptions only when there is something to report', () => {
-    expect(describeError(new AppException('not_found')).log).toBeUndefined();
+  it('logs every error: warn for 4xx, error for 5xx', () => {
+    expect(describeError(new AppException('not_found')).log).toEqual({
+      level: 'warn',
+      text: 'not_found',
+    });
+    expect(describeError(new NotFoundException()).log.level).toBe('warn');
+    expect(describeError(new Error('x')).log.level).toBe('error');
     expect(
       describeError(new AppException('not_found', { cause: 'gone' })).log,
     ).toMatchObject({ level: 'warn', text: 'not_found; cause: gone' });
