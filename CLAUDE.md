@@ -127,7 +127,8 @@ test, `npm run openapi` + `git diff --exit-code docs/`, `format:check`, `lint` �
 
 ## Филиалы
 - Часы считает `branch/domain/branch-hours.ts` (одна функция для `GET /branches` и `POST /orders`). Филиал без
-  расписания закрыт: `isOpen: false`, `opensAt: null`, заказ → `422 branch_hours_not_set`. Круглосуточно: `is24h`
+  расписания закрыт: `isOpen: false`, `opensAt: null`, заказ → `422 branch_hours_not_set`. `GET /branches` отдаёт `opensAt` как ISO 8601 с датой и поясом филиала
+  (`opensAtIso`), а `details.opensAt` у `branch_closed` остаётся временем `HH:mm`. Круглосуточно: `is24h`
   на всех семи днях. Выбор филиала для заказа: `order/domain/branch-choice.ts`.
 
 ## Заказы
@@ -256,6 +257,8 @@ Payme вручную через ops-чат.
 - `message` для разработчика, по-английски, без имён переменных, путей, текстов исключений и ответов сервисов.
   Внутренняя причина в `cause` (уходит только в лог с `requestId`). Исключения фреймворка сохраняют статус, но не
   текст; прочее → `500 internal_error`.
+- Каждый ответ с ошибкой пишет одну строку в лог (`[requestId] МЕТОД шаблон-маршрута статус code`): 4xx `warn`, 5xx `error` со
+  стеком; без тела запроса, телефоны в причине маскирует `maskPhones` (`infra/helper/error-text.ts`).
 - Функция выключена настройкой платформы: `platformMisconfigured(feature, cause)` → `503 platform_misconfigured`,
   `details.feature` (`MisconfiguredFeature`).
 - `npm run check:user-texts` (`src/tools/user-texts`, шаг CI): строки внутри `new …Exception(…)` и `{ field, message }`,
