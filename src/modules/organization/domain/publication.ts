@@ -143,6 +143,48 @@ export function evaluateChecklist(f: PublicationFacts): ChecklistItem[] {
   ];
 }
 
+/**
+ * Warnings next to the checklist: they never block publication. Guest sign-in depends on the platform
+ * too (SMS), so a missing method is reported here, not as a checklist item.
+ * - guest_login_telegram_only: platform SMS is not available, only the venue bot works. Not raised
+ *   in the miniapp mode, whose customers are in Telegram anyway.
+ * - guest_login_unavailable: neither SMS nor the bot works; the platform side is the likely cause.
+ * Both only while the ordering channel is on: customers sign in to order.
+ */
+export const PUBLICATION_WARNING_IDS = [
+  'guest_login_telegram_only',
+  'guest_login_unavailable',
+] as const;
+export type PublicationWarningId = (typeof PUBLICATION_WARNING_IDS)[number];
+
+export interface PublicationWarning {
+  id: PublicationWarningId;
+  /** What it means for the owner, in Russian (the dashboard language). */
+  hint: string;
+}
+
+export function guestLoginWarnings(
+  channel: { deliveryEnabled: boolean; deliveryMode: DeliveryMode },
+  methods: { sms: boolean; telegram: boolean },
+): PublicationWarning[] {
+  if (!channel.deliveryEnabled || methods.sms) return [];
+  if (methods.telegram)
+    return channel.deliveryMode === 'miniapp'
+      ? []
+      : [
+          {
+            id: 'guest_login_telegram_only',
+            hint: 'Вход по SMS сейчас недоступен на платформе: гости смогут войти только через Telegram-бота заведения',
+          },
+        ];
+  return [
+    {
+      id: 'guest_login_unavailable',
+      hint: 'Гости сейчас не могут войти: вход по SMS недоступен на платформе, а Telegram-бот заведения не работает. Подключите бота заново или обратитесь в поддержку',
+    },
+  ];
+}
+
 export const isReady = (items: ChecklistItem[]) =>
   items.every((i) => i.status !== 'todo');
 

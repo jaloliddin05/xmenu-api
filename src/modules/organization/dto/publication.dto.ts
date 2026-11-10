@@ -6,6 +6,7 @@ import {
   CHECKLIST_IDS,
   CHECKLIST_STATUSES,
   DELIVERY_MODES,
+  PUBLICATION_WARNING_IDS,
 } from '../domain/publication';
 import type {
   Channels,
@@ -13,6 +14,8 @@ import type {
   ChecklistItem,
   ChecklistStatus,
   DeliveryMode,
+  PublicationWarning,
+  PublicationWarningId,
 } from '../domain/publication';
 
 export class DeliveryChannelDto {
@@ -72,7 +75,24 @@ export class ChecklistItemDto implements ChecklistItem {
   hint: string | null;
 }
 
-/** Answer of every publication endpoint: state, channels and the checklist. */
+export class PublicationWarningDto implements PublicationWarning {
+  @ApiProperty({
+    enum: PUBLICATION_WARNING_IDS,
+    example: 'guest_login_telegram_only',
+    description:
+      'guest_login_telegram_only: platform SMS is not available, customers sign in through the venue bot only (not raised in the miniapp mode). guest_login_unavailable: neither SMS nor the venue bot works, customers cannot sign in; the platform side is the likely cause',
+  })
+  id: PublicationWarningId;
+
+  @ApiProperty({
+    example:
+      'Вход по SMS сейчас недоступен на платформе: гости смогут войти только через Telegram-бота заведения',
+    description: 'What it means for the owner, in Russian',
+  })
+  hint: string;
+}
+
+/** Answer of every publication endpoint: state, channels, the checklist and the warnings. */
 export class PublicationViewDto {
   @ApiProperty({
     example: false,
@@ -105,6 +125,14 @@ export class PublicationViewDto {
     description: 'Every item, always in the same order',
   })
   checklist: ChecklistItemDto[];
+
+  @ApiProperty({
+    type: PublicationWarningDto,
+    isArray: true,
+    description:
+      'Problems that never block publication (POST /publish passes with them). Empty while the ordering channel is off',
+  })
+  warnings: PublicationWarningDto[];
 }
 
 export class PublicationMissingDto {

@@ -7,12 +7,14 @@ import {
   Channels,
   DeliveryMode,
   evaluateChecklist,
+  guestLoginWarnings,
   isReady,
   modeNeedsBot,
   PublicationFacts,
 } from '../domain/publication';
 import { PublicationViewDto } from '../dto/publication.dto';
 import { AppException } from 'src/infra/errors/app-exception';
+import { GuestLoginService } from 'src/modules/guest-login/guest-login.service';
 
 type Db = Prisma.TransactionClient;
 
@@ -40,6 +42,7 @@ export class PublicationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly revalidate: RevalidateService,
+    private readonly guestLogin: GuestLoginService,
   ) {}
 
   view(organizationId: string): Promise<PublicationViewDto> {
@@ -178,8 +181,11 @@ export class PublicationService {
       this.facts(db, organizationId),
     ]);
     const checklist = evaluateChecklist(facts);
+    const published = row.delivery_enabled && row.published_at !== null;
+    // Read outside the transaction: platform settings and the bot row, never locked here
+    const methods = await this.guestLogin.methods(organizationId, published);
     return {
-      published: row.delivery_enabled && row.published_at !== null,
+      published,
       publishedAt: row.published_at?.toISOString() ?? null,
       ready: isReady(checklist),
       channels: {
@@ -187,6 +193,13 @@ export class PublicationService {
         delivery: { enabled: row.delivery_enabled, mode: row.delivery_mode },
       },
       checklist,
+      warnings: guestLoginWarnings(
+        {
+          deliveryEnabled: row.delivery_enabled,
+          deliveryMode: row.delivery_mode,
+        },
+        methods,
+      ),
     };
   }
 

@@ -7,6 +7,10 @@ import { OrderSettingsService } from '../order/services/order-settings.service';
 import { TenantConfigController } from './tenant-config.controller';
 import { TenantConfigService } from './tenant-config.service';
 import { TenantService } from './tenant.service';
+import { GuestLoginService } from '../guest-login/guest-login.service';
+import { TelegramBotService } from '../telegram/telegram-bot.service';
+import { OpsNotifierService } from '../order/notifications/ops-notifier.service';
+import { REDIS } from 'src/infra/redis/redis.module';
 
 const FULL = '3f2b8c1e-4d5a-4b6c-8d7e-9f0a1b2c3d4e';
 const BARE = '0a1b2c3d-4e5f-4a6b-8c7d-8e9f0a1b2c3d';
@@ -80,7 +84,20 @@ describe('GET /tenant/config', () => {
         TenantConfigService,
         TenantService,
         OrderSettingsService,
+        GuestLoginService,
         { provide: PrismaService, useValue: prisma },
+        // usable(): an enabled bot whose token decrypts; the fixture says it with telegram_bot.usable
+        {
+          provide: TelegramBotService,
+          useValue: {
+            usable: async (id: string) => {
+              const bot = orgs[id]?.telegram_bot;
+              return !!bot?.is_enabled && bot.usable !== false;
+            },
+          },
+        },
+        { provide: OpsNotifierService, useValue: { alert: jest.fn() } },
+        { provide: REDIS, useValue: { set: jest.fn(async () => 'OK') } },
       ],
     });
   });
@@ -411,6 +428,14 @@ describe('GET /tenant/config', () => {
 
   it('reports which ways of confirming a phone work', async () => {
     orgs[FULL].telegram_bot = { is_enabled: false };
+    expect((await config(FULL).expect(200)).body.channels.auth).toEqual({
+      sms: true,
+      telegram: false,
+    });
+  });
+
+  it('does not offer Telegram when the bot token cannot be decrypted (W9-05)', async () => {
+    orgs[FULL].telegram_bot = { is_enabled: true, usable: false };
     expect((await config(FULL).expect(200)).body.channels.auth).toEqual({
       sms: true,
       telegram: false,

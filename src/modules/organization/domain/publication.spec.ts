@@ -1,4 +1,5 @@
 import {
+  guestLoginWarnings,
   BranchFacts,
   CHECKLIST_IDS,
   ChecklistId,
@@ -198,5 +199,59 @@ describe('orderingProblem', () => {
     expect(orderingOpen({ deliveryEnabled: true, publishedAt: null })).toBe(
       false,
     );
+  });
+});
+
+describe('guestLoginWarnings', () => {
+  const ids = (
+    deliveryEnabled: boolean,
+    deliveryMode: 'site' | 'miniapp' | 'both',
+    sms: boolean,
+    telegram: boolean,
+  ) =>
+    guestLoginWarnings(
+      { deliveryEnabled, deliveryMode },
+      { sms, telegram },
+    ).map((w) => w.id);
+
+  // Every combination: [ordering on, mode, sms, telegram] -> warnings
+  it.each<[boolean, 'site' | 'miniapp' | 'both', boolean, boolean, string[]]>([
+    [true, 'site', true, true, []],
+    [true, 'site', true, false, []],
+    [true, 'site', false, true, ['guest_login_telegram_only']],
+    [true, 'site', false, false, ['guest_login_unavailable']],
+    [true, 'both', true, true, []],
+    [true, 'both', true, false, []],
+    [true, 'both', false, true, ['guest_login_telegram_only']],
+    [true, 'both', false, false, ['guest_login_unavailable']],
+    // Mini App customers are in Telegram: the bot alone is enough
+    [true, 'miniapp', true, true, []],
+    [true, 'miniapp', true, false, []],
+    [true, 'miniapp', false, true, []],
+    [true, 'miniapp', false, false, ['guest_login_unavailable']],
+    // Ordering off: nobody needs to sign in
+    [false, 'site', false, false, []],
+    [false, 'site', false, true, []],
+    [false, 'both', false, true, []],
+    [false, 'miniapp', false, false, []],
+  ])(
+    'ordering %s, mode %s, sms %s, telegram %s -> %j',
+    (enabled, mode, sms, telegram, expected) => {
+      expect(ids(enabled, mode, sms, telegram)).toEqual(expected);
+    },
+  );
+
+  it('every warning has a hint for the owner', () => {
+    for (const w of [
+      ...guestLoginWarnings(
+        { deliveryEnabled: true, deliveryMode: 'site' },
+        { sms: false, telegram: true },
+      ),
+      ...guestLoginWarnings(
+        { deliveryEnabled: true, deliveryMode: 'site' },
+        { sms: false, telegram: false },
+      ),
+    ])
+      expect(w.hint.length).toBeGreaterThan(10);
   });
 });

@@ -85,18 +85,22 @@ export class TenantDeliveryChannelDto {
   published: boolean;
 }
 
+/**
+ * How a customer can confirm a phone: channels.auth of GET /tenant/config (cached with the config) and
+ * GET /auth/customer/methods (never cached: what the sign-in sheet should use).
+ */
 export class TenantAuthChannelsDto {
   @ApiProperty({
     example: true,
     description:
-      'The platform can send SMS codes (provider configured). A provider outage still answers 503 sms_unavailable on otp/request',
+      'The platform can send SMS codes (provider configured, or development codes in the log). A provider outage still answers 503 sms_unavailable on otp/request',
   })
   sms: boolean;
 
   @ApiProperty({
     example: false,
     description:
-      'The venue has an enabled Telegram bot, so telegram/start can work. false = it answers 503 telegram_unavailable: offer SMS only',
+      'The venue has an enabled Telegram bot whose token the platform can read, so telegram/start can work. false = offer SMS only',
   })
   telegram: boolean;
 }

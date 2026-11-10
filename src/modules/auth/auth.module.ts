@@ -16,6 +16,7 @@ import { CustomerAuthService } from './services/customer-auth.service';
 import { CustomerModule } from '../customer/customer.module';
 import { TenantModule } from '../tenant/tenant.module';
 import { TelegramModule } from '../telegram/telegram.module';
+import { GuestLoginModule } from '../guest-login/guest-login.module';
 import { PrismaModule } from '../_prisma/prisma.module';
 import {
   CUSTOMER_AUTH_CONFIG,
@@ -50,6 +51,7 @@ import { NoStoreMiddleware } from './middleware/no-store.middleware';
     CustomerModule,
     TenantModule,
     TelegramModule,
+    GuestLoginModule,
     PrismaModule,
     JwtModule.registerAsync({
       useFactory: (configService: ConfigService) => {
