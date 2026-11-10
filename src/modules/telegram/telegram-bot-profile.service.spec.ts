@@ -51,14 +51,12 @@ function setup(
             connected: false,
             username: null,
             link: null,
-            webhookUrl: null,
             isEnabled: false,
           }
         : {
             connected: true,
             username: 'mant_bot',
             link: 'https://t.me/mant_bot',
-            webhookUrl: 'w',
             isEnabled: true,
           },
     ),

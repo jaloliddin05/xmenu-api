@@ -269,7 +269,7 @@ export const ERROR_CODES = spec({
   branch_closed: {
     status: 409,
     message: 'Branch is closed',
-    when: 'Филиал закрыт сейчас; `details.opensAt`',
+    when: 'Филиал закрыт сейчас; `details.opensAt`: ближайшее открытие, ISO 8601 с датой и поясом филиала (как в `GET /branches`), `null`, если в 7 дней открытий нет',
     details: ['opensAt'],
   },
   branch_hours_not_set: {

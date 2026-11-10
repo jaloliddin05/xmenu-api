@@ -7,15 +7,21 @@ import {
   DnsTxtVerifier,
   DOMAIN_VERIFIER,
   SkipDomainVerifier,
+  txtResolver,
 } from './domain-verifier';
 import { TenantDomainController } from './tenant-domain.controller';
 import { TenantDomainService } from './tenant-domain.service';
 
 type Env = Record<string, string | undefined>;
 
-/** DnsTxtVerifier, or SkipDomainVerifier with DOMAIN_VERIFY_SKIP=true outside production. */
+/**
+ * DnsTxtVerifier (with DOMAIN_VERIFY_DNS_SERVERS when set), or SkipDomainVerifier with
+ * DOMAIN_VERIFY_SKIP=true outside production.
+ */
 export function createDomainVerifier(env: Env = process.env) {
-  if (!domainConfigFrom(env).skipVerification) return new DnsTxtVerifier();
+  const config = domainConfigFrom(env);
+  if (!config.skipVerification)
+    return new DnsTxtVerifier(txtResolver(config.dnsServers));
   // validateEnv already refuses this at startup; the factory never trusts the flag in production
   if (env.NODE_ENV === 'production') {
     throw new Error(

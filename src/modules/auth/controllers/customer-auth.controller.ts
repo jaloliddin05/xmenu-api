@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   HttpCode,
   HttpStatus,
   Post,
@@ -53,6 +54,8 @@ import {
 import type { CustomerPrincipal } from '../decorators/customer-route.decorator';
 import { CurrentTenant } from '../../tenant/current-tenant.decorator';
 import type { Tenant } from '../../tenant/tenant.service';
+import { TenantAuthChannelsDto } from '../../tenant/dto/tenant-config.dto';
+import { GuestLoginService } from '../../guest-login/guest-login.service';
 
 @ApiTags('Auth-Customer')
 @ApiExtraModels(
@@ -77,7 +80,24 @@ export class AuthCustomerController {
   constructor(
     private readonly auth: CustomerAuthService,
     private readonly telegramVerification: TelegramVerificationService,
+    private readonly guestLogin: GuestLoginService,
   ) {}
+
+  /**
+   * Sign-in methods right now, for the sign-in sheet. Unlike channels.auth of GET /tenant/config it is
+   * never cached (Cache-Control: no-store on every /auth/customer route).
+   */
+  @CustomerPublicRoute()
+  @Get('methods')
+  @Header('Cache-Control', 'no-store')
+  @ApiOperation({
+    summary:
+      'Ways a customer can confirm a phone now: sms (platform) and telegram (venue bot). Not cached',
+  })
+  @ApiOkResponse({ type: TenantAuthChannelsDto })
+  methods(@CurrentTenant() tenant: Tenant): Promise<TenantAuthChannelsDto> {
+    return this.guestLogin.methods(tenant.id);
+  }
 
   @CustomerPublicRoute()
   @Post('otp/request')

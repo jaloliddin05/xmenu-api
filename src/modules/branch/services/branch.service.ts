@@ -112,10 +112,13 @@ export class BranchService {
     const now = new Date();
     return rows.map((branch) => {
       const schedule = toSchedule(branch);
+      const state = evaluateOpenState(schedule, now);
       return {
         branch,
         scheduled: hasSchedule(schedule),
-        state: evaluateOpenState(schedule, now),
+        state,
+        // The same form as GET /branches: branch_closed reports it as is
+        opensAt: opensAtIso(state, schedule.timezone),
       };
     });
   }

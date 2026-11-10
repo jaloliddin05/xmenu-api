@@ -10,13 +10,18 @@ export interface BranchCandidate<B> {
   /** Working hours were entered; a branch without them is closed (branch_hours_not_set). */
   scheduled: boolean;
   state: OpenState;
+  /**
+   * Next opening as ISO 8601 with the date and the branch UTC offset (opensAtIso, as in GET /branches);
+   * null while open or when nothing opens in the next seven days.
+   */
+  opensAt: string | null;
 }
 
 /**
  * Branch for a new order. pickup: the branch the customer chose, it must be open. delivery: the
  * requested branch if it is open, otherwise the first open branch that delivers. Branches without
  * working hours never take orders: if they are the only candidates the error is branch_hours_not_set,
- * otherwise branch_closed with the earliest opening time.
+ * otherwise branch_closed with the earliest opening (details.opensAt: ISO 8601 with date and offset).
  */
 export function chooseBranch<B>(
   all: BranchCandidate<B>[],
@@ -47,7 +52,7 @@ export function chooseBranch<B>(
     if (!isOpen(chosen)) {
       throw new AppException('branch_closed', {
         message: 'Branch is closed',
-        details: { opensAt: chosen.state.opensAt },
+        details: { opensAt: chosen.opensAt },
       });
     }
     return chosen.branch;
@@ -71,11 +76,12 @@ export function chooseBranch<B>(
   const scheduled = candidates.filter((b) => b.scheduled);
   if (scheduled.length === 0)
     throw noHours('No delivering branch has working hours');
+  // Compared as instants: branches may open on different days and in different time zones
   const next =
     scheduled
-      .map((b) => b.state.opensAt)
-      .filter(Boolean)
-      .sort()[0] ?? null;
+      .map((b) => b.opensAt)
+      .filter((at): at is string => at !== null)
+      .sort((a, b) => Date.parse(a) - Date.parse(b))[0] ?? null;
   throw new AppException('branch_closed', {
     message: 'All branches are closed',
     details: { opensAt: next },

@@ -9,6 +9,7 @@ import { TenantService } from '../tenant/tenant.service';
 import { OrganizationPublicationController } from './organization-publication.controller';
 import { OrganizationService } from './services/organization.service';
 import { PublicationService } from './services/publication.service';
+import { GuestLoginService } from '../guest-login/guest-login.service';
 
 const ORG_A = '3f2b8c1e-4d5a-4b6c-8d7e-9f0a1b2c3d4e';
 const ORG_B = '0a1b2c3d-4e5f-4a6b-8c7d-8e9f0a1b2c3d';
@@ -103,10 +104,20 @@ describe('Organization channels and publication (owner)', () => {
   const A = `Bearer ${staffToken('owner-a')}`;
   const NO_ORG = `Bearer ${staffToken('no-org')}`;
 
+  // Open transactions: sign-in methods must never be read while the row lock is held
+  let openTx = 0;
+  const inTx = (fn: (tx: unknown) => Promise<unknown>) => async () => {
+    openTx++;
+    try {
+      return await fn(prisma);
+    } finally {
+      openTx--;
+    }
+  };
   const prisma = {
     $transaction: jest.fn((fn: (tx: unknown) => Promise<unknown>) => {
-      if (!serialize) return fn(prisma);
-      const run = queue.then(() => fn(prisma));
+      if (!serialize) return inTx(fn)();
+      const run = queue.then(inTx(fn));
       queue = run.catch(() => undefined);
       return run;
     }),
@@ -183,6 +194,16 @@ describe('Organization channels and publication (owner)', () => {
     },
   };
 
+  // Sign-in methods of the venue's customers (GuestLoginService has its own spec)
+  let loginMethods = { sms: true, telegram: false };
+  const methodsCalledInTx: boolean[] = [];
+  const guestLogin = {
+    methods: jest.fn(async () => {
+      methodsCalledInTx.push(openTx > 0);
+      return loginMethods;
+    }),
+  };
+
   beforeAll(async () => {
     app = await createHttpApp(
       {
@@ -195,6 +216,7 @@ describe('Organization channels and publication (owner)', () => {
           { provide: TenantService, useValue: { invalidate: jest.fn() } },
           { provide: RevalidateService, useValue: { addRevalidationJob } },
           { provide: TelegramBotProfileService, useValue: {} },
+          { provide: GuestLoginService, useValue: guestLogin },
         ],
       },
       [
@@ -208,6 +230,7 @@ describe('Organization channels and publication (owner)', () => {
   beforeEach(() => {
     venues = { [ORG_A]: fresh(ORG_A), [ORG_B]: ready(ORG_B) };
     publishWrites = 0;
+    loginMethods = { sms: true, telegram: false };
     serialize = false;
     queue = Promise.resolve();
     jest.clearAllMocks();
@@ -252,6 +275,13 @@ describe('Organization channels and publication (owner)', () => {
       for (const item of res.body.checklist) {
         expect(item.hint === null).toBe(item.status !== 'todo');
       }
+    });
+
+    it('no warnings while the ordering channel is off, whatever the sign-in methods', async () => {
+      loginMethods = { sms: false, telegram: false };
+      const res = await get().expect(200);
+      expect(res.body.warnings).toEqual([]);
+      expect(guestLogin.methods).toHaveBeenLastCalledWith(ORG_A, false);
     });
 
     it('a venue with everything in place is ready', async () => {
@@ -534,6 +564,48 @@ describe('Organization channels and publication (owner)', () => {
         tenantId: ORG_A,
         route: 'channels',
       });
+    });
+
+    it.each<[string, { sms: boolean; telegram: boolean }, string[]]>([
+      ['SMS and bot', { sms: true, telegram: true }, []],
+      ['SMS only', { sms: true, telegram: false }, []],
+      [
+        'bot only',
+        { sms: false, telegram: true },
+        ['guest_login_telegram_only'],
+      ],
+      ['neither', { sms: false, telegram: false }, ['guest_login_unavailable']],
+    ])(
+      'guest sign-in %s: publish passes, warnings say what is missing',
+      async (_name, methods, expected) => {
+        venues[ORG_A] = ready(ORG_A);
+        loginMethods = methods;
+        const res = await publish().expect(200);
+        expect(res.body.published).toBe(true);
+        expect(res.body.warnings.map((w) => w.id)).toEqual(expected);
+        for (const w of res.body.warnings)
+          expect(w).toEqual({
+            id: expect.any(String),
+            hint: expect.any(String),
+          });
+        // The warnings are no checklist items
+        expect(res.body.checklist.map((i) => i.id)).not.toContain(expected[0]);
+        // The service is told the venue is live, so it can alert the ops chat itself
+        expect(guestLogin.methods).toHaveBeenLastCalledWith(ORG_A, true);
+        expect((await get().expect(200)).body.warnings).toEqual(
+          res.body.warnings,
+        );
+      },
+    );
+
+    it('reads the sign-in methods only after the transaction, never under the row lock', async () => {
+      venues[ORG_A] = ready(ORG_A);
+      methodsCalledInTx.length = 0;
+      await putChannels(CHANNELS).expect(200);
+      await publish().expect(200);
+      await unpublish().expect(200);
+      await get().expect(200);
+      expect(methodsCalledInTx).toEqual([false, false, false, false]);
     });
 
     it('publishing again keeps publishedAt and revalidates nothing', async () => {

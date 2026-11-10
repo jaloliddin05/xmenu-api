@@ -52,7 +52,7 @@
 
 | `feature` | Когда |
 |---|---|
-| `telegram_bot` | `PUT /telegram-bot`: адрес API платформы не https или ключ шифрования токенов не задан; проверка `initData` без бота заведения и платформенного бота |
+| `telegram_bot` | `PUT /telegram-bot`: адрес API платформы не https или ключ шифрования токенов не задан; проверка `initData` без бота заведения и платформенного бота; сохранённый токен бота не расшифровывается (сменён или потерян `PAYMENT_CONFIG_KEY`, значение повреждено): `telegram/start`, проверка `initData`, вебхук бота, `PUT /telegram-bot/profile` и `sync`. Владельцу нужно подключить бота заново (`DELETE` работает) |
 | `payments` | сохранение ключей Click/Payme без ключа шифрования |
 | `sms` | `otp/request` и регистрация владельца: у выбранного SMS-провайдера нет учётных данных (сбой самого провайдера остаётся `503 sms_unavailable`) |
 | `domains` | добавление своего домена без `PLATFORM_DOMAIN` (только development: production без него не стартует) |
@@ -212,10 +212,12 @@ IP берётся из `X-Forwarded-For` только от локального 
   доставка и самовывоз); `delivery.mode`: `site`, `miniapp` или `both`; `delivery.published`: заказы открыты
   (включено **и** опубликовано). При `published: false` `POST /orders` отвечает `422` (`ordering_channel_disabled` или
   `ordering_not_published`), меню, филиалы и карта отдаются как обычно (предпросмотр).
-- `channels.auth`: как клиент может подтвердить номер, подсказка, чтобы не показывать нерабочую кнопку. `telegram`: у
-  заведения подключён и включён бот (то же условие, что у `telegram/start`; иначе тот отвечает `503
-  telegram_unavailable`). `sms`: у платформы настроен выбранный SMS-провайдер (`eskiz`: заданы `ESKIZ_EMAIL` и
-  `ESKIZ_PASSWORD`; `telegram`: заданы `OTP_BOT` и `XMENU_CHAT_ID`; `console`: только вне production); это проверка настроек, не доступности: при
+- `channels.auth`: как клиент может подтвердить номер, подсказка для первого рендера; кэшируется вместе с конфигом (у
+  клиента ISR), поэтому шторка входа берёт свежие значения из `GET /auth/customer/methods` (тот же расчёт, без кэша).
+  `telegram`: у заведения подключён и включён бот, и его токен расшифровывается (иначе `telegram/start` отвечает `503
+  telegram_unavailable` или `503 platform_misconfigured`, `feature: telegram_bot`). `sms`: у платформы настроен
+  выбранный SMS-провайдер (`eskiz`: заданы `ESKIZ_EMAIL` и `ESKIZ_PASSWORD`; `telegram`: заданы `OTP_BOT` и
+  `XMENU_CHAT_ID`; `console`: только вне production) или включён `OTP_DEV_MODE`; это проверка настроек, не доступности: при
   `sms: false` `otp/request` отвечает `503 platform_misconfigured` (`feature: sms`), сбой провайдера приходит ответом
   `503 sms_unavailable`. Подключение и отключение бота ставит ревалидацию `route: 'channels'`. Источник истины остаются
   сами эндпоинты.
@@ -247,19 +249,29 @@ IP берётся из `X-Forwarded-For` только от локального 
 
 ### Вход клиента
 
+`GET /auth/customer/methods` (заголовок `X-Tenant-Id`, без токена) → `{ "sms": true, "telegram": false }`: способы
+подтвердить номер прямо сейчас, `Cache-Control: no-store`. Поля и расчёт те же, что у `channels.auth` в
+`GET /tenant/config`; клиент зовёт его при открытии шторки входа, чтобы не предлагать способ, выключенный после
+сборки страницы. Оба `false`: войти нельзя (причина на стороне платформы или бота заведения), шторка показывает
+общий текст. Если так у опубликованного заведения с включённым каналом, бэкенд пишет об этом в лог и в ops-чат
+платформы (`OPS_CHAT_ID`), не чаще раза в час на заведение (ключ Redis `ops:guest-login-unavailable:{id}`); проверка
+идёт при запросах `methods`, `GET /tenant/config` и `GET /organization/:id/publication`.
+
 `POST /auth/customer/otp/request` → `{ "resendAfter": 60, "codeLength": 6 }`: поле ввода кода строится по
 `codeLength`, а не по константе во фронте.
 
 Альтернатива SMS: подтверждение номера через бота заведения, `POST /auth/customer/telegram/start` и
 `POST /auth/customer/telegram/status` (сценарии, статусы и защита: `TELEGRAM_VERIFICATION.md`). Нет бота у
-заведения → `503 telegram_unavailable`: показывать только SMS (заранее это видно в `GET /tenant/config`,
-`channels.auth`). В режиме сайта вход завершается обычным
+заведения → `503 telegram_unavailable`: показывать только SMS (заранее это видно в `GET /auth/customer/methods`).
+Токен бота не расшифровывается → `503 platform_misconfigured` (`feature: telegram_bot`), `methods` в этом случае
+отдаёт `telegram: false`. В режиме сайта вход завершается обычным
 `otp/verify` с кодом из чата бота (длина кода в `codeLength` ответа `telegram/status`); в Mini App ответ `status: "verified"` уже содержит результат входа.
 
 ## Бот заведения (владелец)
 
-`GET /telegram-bot` → `{ connected, username, link, webhookUrl, isEnabled, profile, isDefault, deliveryUrl, lastSync }`
-(токен не возвращается никогда; без бота `profile`, `deliveryUrl`, `lastSync` = `null`).
+`GET /telegram-bot` → `{ connected, username, link, isEnabled, profile, isDefault, deliveryUrl, lastSync }`
+(токен не возвращается никогда; адрес вебхука тоже: в нём внутренний ключ бота, он пишется в лог сервера при
+подключении; без бота `profile`, `deliveryUrl`, `lastSync` = `null`).
 `PUT /telegram-bot { "token": "123456:AA..." }` проверяет токен через `getMe`, ставит webhook с секретом, хранит токен
 зашифрованным (`PAYMENT_CONFIG_KEY`), затем сам настраивает бота (см. ниже) и отвечает полным статусом. Сбой настройки
 профиля подключение не отменяет: он виден в `lastSync`. `DELETE /telegram-bot` → 200
@@ -297,7 +309,7 @@ IP берётся из `X-Forwarded-For` только от локального 
 | 400 | `invalid_bot_token` | токен не по формату или Telegram его не принял |
 | 400 | `webhook_setup_failed` | Telegram отказал в `setWebhook`; ничего не сохранено |
 | 409 | `bot_already_connected` | этот бот подключён к другому заведению |
-| 503 | `platform_misconfigured` | `details.feature: telegram_bot`: адрес API платформы не https или ключ шифрования токенов не задан (настройка платформы, не владельца) |
+| 503 | `platform_misconfigured` | `details.feature: telegram_bot`: адрес API платформы не https, ключ шифрования токенов не задан, или сохранённый токен не расшифровывается (`profile`, `sync`; настройка платформы, не владельца) |
 
 Пока бот не подключён, `initData` Mini App проверяется платформенным ботом (`TELEGRAM_BOT_TOKEN`).
 
@@ -405,6 +417,9 @@ QR-меню и сайта доставки (`REVALIDATE.md`).
     { "id": "branch", "status": "todo", "hint": "Укажите у филиала часы работы (или «круглосуточно»)" },
     { "id": "delivery_zone", "status": "todo", "hint": "Нарисуйте зону доставки или отключите доставку в филиалах" },
     { "id": "telegram_bot", "status": "not_required", "hint": null }
+  ],
+  "warnings": [
+    { "id": "guest_login_telegram_only", "hint": "Вход по SMS сейчас недоступен на платформе: гости смогут войти только через Telegram-бота заведения" }
   ]
 }
 ```
@@ -429,6 +444,16 @@ QR-меню и сайта доставки (`REVALIDATE.md`).
 | `telegram_bot` | бот заведения подключён и включён (`/telegram-bot`); `not_required` в режиме `site` |
 
 Логотип, цвета, контакты и ключи Click/Payme публикацию не блокируют; наличные доступны всегда.
+
+`warnings`: предупреждения отдельно от чеклиста, публикацию не блокируют (`publish` с ними проходит). Пусто, пока канал
+заказов выключен. Сейчас только о входе гостей: он зависит и от платформы (SMS), поэтому пунктом чеклиста не является.
+Способы входа считаются так же, как в `GET /auth/customer/methods`. `hint` по-русски; дашборд может показывать свои
+тексты по `id`.
+
+| `id` | Когда |
+|---|---|
+| `guest_login_telegram_only` | SMS платформы недоступен, гости входят только через бота заведения. В режиме `miniapp` не выдаётся: клиенты Mini App и так в Telegram |
+| `guest_login_unavailable` | не работает ни SMS, ни бот заведения (нет, выключен, токен не расшифровывается): гости не могут войти; причина, скорее всего, на стороне платформы |
 
 `PUT /organization/:id/channels`, тело целиком (лишние поля → `400`):
 
@@ -506,6 +531,15 @@ QR-меню и сайта доставки (`REVALIDATE.md`).
 - `DOMAIN_VERIFY_SKIP=true` (только разработка): DNS не проверяется, домен подтверждается при добавлении. С
   `NODE_ENV=production` приложение с этим флагом не стартует; без годного `PLATFORM_DOMAIN` в production тоже, а в
   разработке добавление домена отвечает `503 platform_misconfigured` (`feature: domains`).
+- `DOMAIN_VERIFY_DNS_SERVERS` (необязательно): DNS-серверы проверки TXT через запятую, `ip[:port]` (`127.0.0.1:5353`,
+  `[::1]:53`); пусто = системные резолверы. Неразбираемое значение не даёт стартовать; в production разрешено с
+  предупреждением при старте. `DOMAIN_VERIFY_SKIP` от неё не зависит.
+- Как этим пользуются e2e: стек `xmenu-e2e` поднимает свой фейковый DNS-сервер (UDP, отвечает на TXT из таблицы, на
+  остальное `NXDOMAIN`) и запускает бэкенд с `DOMAIN_VERIFY_DNS_SERVERS=127.0.0.1:<порт>` и без `DOMAIN_VERIFY_SKIP`.
+  Тест добавляет домен (`pending`), кладёт в фейковый DNS `_xmenu-verify.<host>` = `verification.value` из ответа и
+  вызывает `POST …/domains/:domainId/verify` → `verified`; без записи тот же вызов даёт `422 domain_verification_failed`
+  (`record_not_found`), поэтому оба сценария (`hosts`, `domains`) работают в одном стеке. Образец сервера:
+  `src/modules/tenant-domain/dns-server.fake.ts` (тест бэкенда, в сборку не попадает).
 - Подтверждение и удаление подтверждённого домена сбрасывают кэш тенанта и ставят ревалидацию сайта доставки
   (`route: "domains"`, `host`; `docs/REVALIDATE.md`). Добавление и удаление `pending` публично ничего не меняют.
 - Подтверждённые домены повторно не проверяются (TXT можно удалить после подтверждения). TLS и nginx для своих

@@ -30,7 +30,6 @@ export interface BotStatus {
   connected: boolean;
   username: string | null;
   link: string | null;
-  webhookUrl: string | null;
   isEnabled: boolean;
 }
 
@@ -101,11 +100,30 @@ export class TelegramBotService {
     return `${publicApiUrl()}/telegram/bot/${botKey}/webhook`;
   }
 
+  /**
+   * The stored token, or platform_misconfigured (telegram_bot) when it cannot be decrypted:
+   * PAYMENT_CONFIG_KEY was changed or lost, or the stored value is corrupted. The owner has to
+   * connect the bot again; the cause goes to the log line of the error response.
+   */
+  private decryptToken(row: BotRow): string {
+    const key = this.key;
+    try {
+      const { token } = decryptConfig<{ token: string }>(
+        row.token_encrypted,
+        key,
+      );
+      if (typeof token !== 'string' || !token) throw new Error('no token');
+      return token;
+    } catch {
+      throw platformMisconfigured(
+        'telegram_bot',
+        `bot token of organization ${row.organization_id} cannot be decrypted: PAYMENT_CONFIG_KEY changed or the stored token is corrupted; the owner has to connect the bot again`,
+      );
+    }
+  }
+
   private toTenantBot(row: BotRow): TenantBot {
-    const { token } = decryptConfig<{ token: string }>(
-      row.token_encrypted,
-      this.key,
-    );
+    const token = this.decryptToken(row);
     return {
       botKey: row.id,
       organizationId: row.organization_id,
@@ -140,6 +158,23 @@ export class TelegramBotService {
     return bot?.token ?? process.env.TELEGRAM_BOT_TOKEN ?? null;
   }
 
+  /**
+   * True when the venue's bot can serve customers right now: connected, enabled and its token
+   * decrypts. What GET /tenant/config and GET /auth/customer/methods report as telegram.
+   */
+  async usable(organizationId: string): Promise<boolean> {
+    const row = await this.prisma.organization_telegram_bot.findUnique({
+      where: { organization_id: organizationId },
+    });
+    if (!row?.is_enabled) return false;
+    try {
+      this.decryptToken(row);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   async status(organizationId: string): Promise<BotStatus> {
     const row = await this.prisma.organization_telegram_bot.findUnique({
       where: { organization_id: organizationId },
@@ -149,7 +184,6 @@ export class TelegramBotService {
         connected: false,
         username: null,
         link: null,
-        webhookUrl: null,
         isEnabled: false,
       };
     }
@@ -157,7 +191,6 @@ export class TelegramBotService {
       connected: true,
       username: row.username,
       link: `https://t.me/${row.username}`,
-      webhookUrl: this.webhookUrl(row.id),
       isEnabled: row.is_enabled,
     };
   }
@@ -229,6 +262,10 @@ export class TelegramBotService {
       create: { id, organization_id: organizationId, ...data },
       update: data,
     });
+    // The webhook address carries the internal bot key: kept out of API responses, logged for debugging
+    this.logger.log(
+      `Bot connected for organization ${organizationId}, webhook ${this.webhookUrl(id)}`,
+    );
 
     // The venue switched to a different bot: stop the old one from calling us
     if (existing && existing.telegram_bot_id !== telegramBotId) {

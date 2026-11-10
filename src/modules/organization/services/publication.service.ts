@@ -7,12 +7,14 @@ import {
   Channels,
   DeliveryMode,
   evaluateChecklist,
+  guestLoginWarnings,
   isReady,
   modeNeedsBot,
   PublicationFacts,
 } from '../domain/publication';
 import { PublicationViewDto } from '../dto/publication.dto';
 import { AppException } from 'src/infra/errors/app-exception';
+import { GuestLoginService } from 'src/modules/guest-login/guest-login.service';
 
 type Db = Prisma.TransactionClient;
 
@@ -22,6 +24,9 @@ const CHANNEL_FIELDS = {
   delivery_mode: true,
   published_at: true,
 } as const;
+
+/** The view as read inside the transaction; warnings are added after it commits (withWarnings). */
+type LockedView = Omit<PublicationViewDto, 'warnings'>;
 
 type ChannelRow = {
   qr_enabled: boolean;
@@ -40,10 +45,14 @@ export class PublicationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly revalidate: RevalidateService,
+    private readonly guestLogin: GuestLoginService,
   ) {}
 
-  view(organizationId: string): Promise<PublicationViewDto> {
-    return this.buildView(this.prisma, organizationId);
+  async view(organizationId: string): Promise<PublicationViewDto> {
+    return this.withWarnings(
+      organizationId,
+      await this.buildView(this.prisma, organizationId),
+    );
   }
 
   async setChannels(
@@ -83,7 +92,7 @@ export class PublicationService {
       },
     );
     if (changed) await this.changed(organizationId);
-    return view;
+    return this.withWarnings(organizationId, view);
   }
 
   async publish(organizationId: string): Promise<PublicationViewDto> {
@@ -118,7 +127,7 @@ export class PublicationService {
       },
     );
     if (changed) await this.changed(organizationId);
-    return view;
+    return this.withWarnings(organizationId, view);
   }
 
   async unpublish(organizationId: string): Promise<PublicationViewDto> {
@@ -133,7 +142,7 @@ export class PublicationService {
       };
     });
     if (changed) await this.changed(organizationId);
-    return view;
+    return this.withWarnings(organizationId, view);
   }
 
   /** Front-ends show the ordering state (GET /tenant/config channels, fulfillment). */
@@ -169,10 +178,7 @@ export class PublicationService {
     return row;
   }
 
-  private async buildView(
-    db: Db,
-    organizationId: string,
-  ): Promise<PublicationViewDto> {
+  private async buildView(db: Db, organizationId: string): Promise<LockedView> {
     const [row, facts] = await Promise.all([
       this.channelRow(db, organizationId),
       this.facts(db, organizationId),
@@ -187,6 +193,30 @@ export class PublicationService {
         delivery: { enabled: row.delivery_enabled, mode: row.delivery_mode },
       },
       checklist,
+    };
+  }
+
+  /**
+   * Adds the guest sign-in warnings after the transaction has committed: GuestLoginService reads with
+   * its own connections and may call the ops chat, which must never run while the row lock is held.
+   */
+  private async withWarnings(
+    organizationId: string,
+    view: LockedView,
+  ): Promise<PublicationViewDto> {
+    const methods = await this.guestLogin.methods(
+      organizationId,
+      view.published,
+    );
+    return {
+      ...view,
+      warnings: guestLoginWarnings(
+        {
+          deliveryEnabled: view.channels.delivery.enabled,
+          deliveryMode: view.channels.delivery.mode,
+        },
+        methods,
+      ),
     };
   }
 

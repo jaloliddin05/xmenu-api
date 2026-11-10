@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { GuestLoginModule } from '../guest-login/guest-login.module';
 import { OrganizationService } from './services/organization.service';
 import { OrganizationController } from './organization.controller';
 import { PrismaModule } from '../_prisma/prisma.module';
@@ -11,7 +12,13 @@ import { OrganizationPublicationController } from './organization-publication.co
 import { PublicationService } from './services/publication.service';
 
 @Module({
-  imports: [PrismaModule, RevalidateModule, TenantModule, TelegramModule],
+  imports: [
+    PrismaModule,
+    RevalidateModule,
+    TenantModule,
+    TelegramModule,
+    GuestLoginModule,
+  ],
   controllers: [
     OrganizationController,
     OrganizationSettingsController,

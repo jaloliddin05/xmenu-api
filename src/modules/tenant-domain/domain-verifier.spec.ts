@@ -1,10 +1,18 @@
-import { domainConfigFrom, domainEnvIssues } from './domain-config';
+import {
+  domainConfigFrom,
+  domainEnvIssues,
+  parseDnsServers,
+} from './domain-config';
+import { FakeDnsServer } from './dns-server.fake';
 import {
   DnsTxtVerifier,
   SkipDomainVerifier,
   TxtResolver,
+  txtResolver,
   verifyRecordName,
+  verifyRecordValue,
 } from './domain-verifier';
+import { createDomainVerifier } from './tenant-domain.module';
 
 const resolver = (
   answer: string[][] | Error,
@@ -90,6 +98,7 @@ describe('domainEnvIssues', () => {
     expect(domainConfigFrom({ PLATFORM_DOMAIN: 'XMenu.uz' })).toEqual({
       platformDomain: 'xmenu.uz',
       skipVerification: false,
+      dnsServers: [],
     });
   });
 
@@ -109,5 +118,97 @@ describe('domainEnvIssues', () => {
         PLATFORM_DOMAIN: 'localhost',
       }).skipVerification,
     ).toBe(false);
+  });
+});
+
+describe('DOMAIN_VERIFY_DNS_SERVERS', () => {
+  it.each<[string | undefined, string[] | null]>([
+    [undefined, []],
+    ['', []],
+    ['  ', []],
+    ['127.0.0.1', ['127.0.0.1']],
+    ['127.0.0.1:5353', ['127.0.0.1:5353']],
+    [' 10.0.0.2:53 , 8.8.8.8 ', ['10.0.0.2:53', '8.8.8.8']],
+    ['::1', ['::1']],
+    ['[::1]:5353', ['[::1]:5353']],
+    ['localhost', null],
+    ['dns.example:53', null],
+    ['127.0.0.1:0', null],
+    ['127.0.0.1:70000', null],
+    ['127.0.0.1:53,nope', null],
+    ['[::1]', null],
+  ])('%j -> %j', (raw, expected) => {
+    expect(parseDnsServers(raw)).toEqual(expected);
+  });
+
+  it('an unreadable list stops the start, in development too', () => {
+    for (const NODE_ENV of ['development', 'production'])
+      expect(
+        domainEnvIssues({
+          NODE_ENV,
+          PLATFORM_DOMAIN: 'xmenu.uz',
+          DOMAIN_VERIFY_DNS_SERVERS: 'localhost:53',
+        }).errors,
+      ).toEqual([expect.stringContaining('DOMAIN_VERIFY_DNS_SERVERS')]);
+  });
+
+  it('allowed in production with a warning; silent in development', () => {
+    const env = {
+      PLATFORM_DOMAIN: 'xmenu.uz',
+      DOMAIN_VERIFY_DNS_SERVERS: '10.0.0.2',
+    };
+    const prod = domainEnvIssues({ ...env, NODE_ENV: 'production' });
+    expect(prod.errors).toEqual([]);
+    expect(prod.warnings).toEqual([expect.stringContaining('10.0.0.2')]);
+    expect(
+      domainEnvIssues({ ...env, NODE_ENV: 'development' }).warnings,
+    ).toEqual([]);
+  });
+
+  it('domainConfigFrom gives the servers, [] when unset', () => {
+    expect(
+      domainConfigFrom({ DOMAIN_VERIFY_DNS_SERVERS: '127.0.0.1:5353' })
+        .dnsServers,
+    ).toEqual(['127.0.0.1:5353']);
+    expect(domainConfigFrom({}).dnsServers).toEqual([]);
+  });
+
+  describe('against a DNS server on a custom port', () => {
+    const dns = new FakeDnsServer();
+    let server: string;
+    beforeAll(async () => {
+      server = await dns.start();
+    });
+    afterAll(() => dns.stop());
+
+    it('txtResolver asks the given server', async () => {
+      dns.records.set('_xmenu-verify.cafe.example', ['xmenu-verify=t1']);
+      expect(
+        await txtResolver([server]).resolveTxt('_xmenu-verify.cafe.example'),
+      ).toEqual([['xmenu-verify=t1']]);
+    });
+
+    it('the module factory uses DOMAIN_VERIFY_DNS_SERVERS: verified, mismatch, not found', async () => {
+      const verifier = createDomainVerifier({
+        NODE_ENV: 'development',
+        DOMAIN_VERIFY_DNS_SERVERS: server,
+      });
+      expect(verifier).toBeInstanceOf(DnsTxtVerifier);
+      dns.records.set(verifyRecordName('order.cafe.uz'), [
+        verifyRecordValue('tok-1'),
+      ]);
+      expect(await verifier.check('order.cafe.uz', 'tok-1')).toEqual({
+        ok: true,
+      });
+      expect(await verifier.check('order.cafe.uz', 'other')).toEqual({
+        ok: false,
+        reason: 'token_mismatch',
+      });
+      expect(await verifier.check('nothing.cafe.uz', 'tok-1')).toEqual({
+        ok: false,
+        reason: 'record_not_found',
+      });
+      expect(dns.asked).toContain('_xmenu-verify.order.cafe.uz');
+    });
   });
 });

@@ -19,7 +19,12 @@ const branch = (
     accepts_delivery: over.delivery ?? true,
   },
   scheduled: over.scheduled ?? true,
-  state: { isOpen: over.isOpen ?? true, opensAt: over.opensAt ?? null },
+  state: {
+    isOpen: over.isOpen ?? true,
+    opensAt: over.opensAt?.slice(11, 16) ?? null,
+    opensDate: over.opensAt?.slice(0, 10) ?? null,
+  },
+  opensAt: over.opensAt ?? null,
 });
 const noHours = (id: string) => branch(id, { scheduled: false, isOpen: false });
 
@@ -49,13 +54,21 @@ describe('chooseBranch', () => {
     it('refuses a closed branch with branch_closed and the next opening', () => {
       const e = errorOf(() =>
         chooseBranch(
-          [branch('a', { isOpen: false, opensAt: '09:00' })],
+          [
+            branch('a', {
+              isOpen: false,
+              opensAt: '2026-11-11T09:00:00+05:00',
+            }),
+          ],
           'pickup',
           'a',
         ),
       );
       expect(e.code).toBe('branch_closed');
-      expect(e.getResponse()).toMatchObject({ details: { opensAt: '09:00' } });
+      // The same form as GET /branches: the date tells today from tomorrow (W9-09)
+      expect(e.getResponse()).toMatchObject({
+        details: { opensAt: '2026-11-11T09:00:00+05:00' },
+      });
     });
 
     it('checks pickup support before hours', () => {
@@ -96,14 +109,72 @@ describe('chooseBranch', () => {
         chooseBranch(
           [
             noHours('a'),
-            branch('b', { isOpen: false, opensAt: '10:00' }),
-            branch('c', { isOpen: false, opensAt: '08:00' }),
+            branch('b', {
+              isOpen: false,
+              opensAt: '2026-11-11T10:00:00+05:00',
+            }),
+            branch('c', {
+              isOpen: false,
+              opensAt: '2026-11-11T08:00:00+05:00',
+            }),
           ],
           'delivery',
         ),
       );
       expect(e.code).toBe('branch_closed');
-      expect(e.getResponse()).toMatchObject({ details: { opensAt: '08:00' } });
+      expect(e.getResponse()).toMatchObject({
+        details: { opensAt: '2026-11-11T08:00:00+05:00' },
+      });
+    });
+
+    it('compares openings as instants: 10:00 today is earlier than 08:00 tomorrow', () => {
+      const e = errorOf(() =>
+        chooseBranch(
+          [
+            branch('tomorrow', {
+              isOpen: false,
+              opensAt: '2026-11-12T08:00:00+05:00',
+            }),
+            branch('today', {
+              isOpen: false,
+              opensAt: '2026-11-11T10:00:00+05:00',
+            }),
+          ],
+          'delivery',
+        ),
+      );
+      expect(e.getResponse()).toMatchObject({
+        details: { opensAt: '2026-11-11T10:00:00+05:00' },
+      });
+    });
+
+    it('compares across time zones: 09:00+05:00 is later than 03:00+00:00', () => {
+      const e = errorOf(() =>
+        chooseBranch(
+          [
+            branch('tashkent', {
+              isOpen: false,
+              opensAt: '2026-11-11T09:00:00+05:00',
+            }),
+            branch('utc', {
+              isOpen: false,
+              opensAt: '2026-11-11T03:00:00+00:00',
+            }),
+          ],
+          'delivery',
+        ),
+      );
+      expect(e.getResponse()).toMatchObject({
+        details: { opensAt: '2026-11-11T03:00:00+00:00' },
+      });
+    });
+
+    it('opensAt null when no scheduled branch opens within seven days', () => {
+      const e = errorOf(() =>
+        chooseBranch([branch('a', { isOpen: false })], 'delivery'),
+      );
+      expect(e.code).toBe('branch_closed');
+      expect(e.getResponse()).toMatchObject({ details: { opensAt: null } });
     });
   });
 });

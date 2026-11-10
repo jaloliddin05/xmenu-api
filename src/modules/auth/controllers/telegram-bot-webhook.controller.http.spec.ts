@@ -1,3 +1,4 @@
+import { platformMisconfigured } from 'src/infra/errors/app-exception';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { createHttpApp } from 'src/infra/testing/http-app.fake';
@@ -141,6 +142,19 @@ describe('POST /telegram/bot/:botKey/webhook', () => {
   ])('refuses %s with 401 and queues nothing', async (_why, secret) => {
     await post(startUpdate(3), secret).expect(401);
     expect(queue.jobs).toHaveLength(0);
+  });
+
+  it('503 platform_misconfigured when the bot token cannot be decrypted (W9-05)', async () => {
+    bots.byKey.mockRejectedValueOnce(
+      platformMisconfigured('telegram_bot', 'bot token cannot be decrypted'),
+    );
+    const res = await post(startUpdate(6)).expect(503);
+    expect(res.body).toMatchObject({
+      code: 'platform_misconfigured',
+      details: { feature: 'telegram_bot' },
+      requestId: expect.any(String),
+    });
+    expect(JSON.stringify(res.body)).not.toContain('decrypted');
   });
 
   it('404s an unknown bot', async () => {

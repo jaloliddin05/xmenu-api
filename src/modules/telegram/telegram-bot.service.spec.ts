@@ -10,40 +10,42 @@ import { TelegramBotService } from './telegram-bot.service';
 const TOKEN = '123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw0';
 const ORG = 'org-1';
 
+function setupPrisma(rows: Map<string, any>) {
+  return {
+    findUnique: jest.fn(async ({ where }: any) => {
+      for (const r of rows.values()) {
+        if (
+          where.organization_id &&
+          r.organization_id === where.organization_id
+        )
+          return r;
+        if (
+          where.telegram_bot_id &&
+          r.telegram_bot_id === where.telegram_bot_id
+        )
+          return r;
+        if (where.id && r.id === where.id) return r;
+      }
+      return null;
+    }),
+    upsert: jest.fn(async ({ create, update, where }: any) => {
+      const existing = [...rows.values()].find(
+        (r) => r.organization_id === where.organization_id,
+      );
+      // A new object, as Prisma returns: rows read earlier must not change under the caller
+      const row = existing ? { ...existing, ...update } : { ...create };
+      rows.set(row.organization_id, row);
+      return row;
+    }),
+    delete: jest.fn(async ({ where }: any) =>
+      rows.delete(where.organization_id),
+    ),
+  };
+}
+
 function setup() {
   const rows = new Map<string, any>();
-  const prisma = {
-    organization_telegram_bot: {
-      findUnique: jest.fn(async ({ where }: any) => {
-        for (const r of rows.values()) {
-          if (
-            where.organization_id &&
-            r.organization_id === where.organization_id
-          )
-            return r;
-          if (
-            where.telegram_bot_id &&
-            r.telegram_bot_id === where.telegram_bot_id
-          )
-            return r;
-          if (where.id && r.id === where.id) return r;
-        }
-        return null;
-      }),
-      upsert: jest.fn(async ({ create, update, where }: any) => {
-        const existing = [...rows.values()].find(
-          (r) => r.organization_id === where.organization_id,
-        );
-        // A new object, as Prisma returns: rows read earlier must not change under the caller
-        const row = existing ? { ...existing, ...update } : { ...create };
-        rows.set(row.organization_id, row);
-        return row;
-      }),
-      delete: jest.fn(async ({ where }: any) =>
-        rows.delete(where.organization_id),
-      ),
-    },
-  };
+  const prisma = { organization_telegram_bot: setupPrisma(rows) };
   // (token, method, payload): the payload is read back from mock.calls
   const client = {
     call: jest.fn<Promise<unknown>, [string, string, unknown?]>(
@@ -141,6 +143,9 @@ describe('TelegramBotService', () => {
       username: 'mant_bot',
       link: 'https://t.me/mant_bot',
     });
+    // The webhook address carries the internal bot key: not for the owner (W9-08)
+    expect(status).not.toHaveProperty('webhookUrl');
+    expect(JSON.stringify(status)).not.toContain(row.id);
 
     const bot = await svc.forTenant(ORG);
     expect(bot).toMatchObject({
@@ -271,5 +276,79 @@ describe('TelegramBotService', () => {
     expect(await svc.initDataToken(ORG)).toBe('platform:token');
     await svc.connect(ORG, TOKEN);
     expect(await svc.initDataToken(ORG)).toBe(TOKEN);
+  });
+
+  describe('a stored token that cannot be decrypted (W9-05)', () => {
+    const misconfigured = {
+      code: 'platform_misconfigured',
+      details: { feature: 'telegram_bot' },
+    };
+
+    /** Connected with one PAYMENT_CONFIG_KEY, then the key is replaced (or the value is damaged). */
+    async function broken(damage: 'key_changed' | 'corrupted' | 'malformed') {
+      const { svc, rows, client } = setup();
+      await svc.connect(ORG, TOKEN);
+      const row = rows.get(ORG);
+      if (damage === 'corrupted')
+        row.token_encrypted = row.token_encrypted.replace(/.$/, (c: string) =>
+          c === 'A' ? 'B' : 'A',
+        );
+      if (damage === 'malformed') row.token_encrypted = 'garbage';
+      if (damage === 'key_changed')
+        process.env.PAYMENT_CONFIG_KEY = randomBytes(32).toString('base64');
+      // A fresh service: the key is read once per process, as after a restart with a new key
+      const fresh = new TelegramBotService(
+        { organization_telegram_bot: setupPrisma(rows) } as any,
+        client as any,
+        { addRevalidationJob: jest.fn() } as any,
+      );
+      return { svc: fresh, row, client };
+    }
+
+    it.each(['key_changed', 'corrupted', 'malformed'] as const)(
+      '%s: forTenant and byKey give platform_misconfigured telegram_bot, not a 500',
+      async (damage) => {
+        const { svc, row } = await broken(damage);
+        await expect(svc.forTenant(ORG)).rejects.toMatchObject(misconfigured);
+        await expect(svc.byKey(row.id)).rejects.toMatchObject(misconfigured);
+        // Customer Mini App sessions are not checked with the platform bot instead
+        await expect(svc.initDataToken(ORG)).rejects.toMatchObject(
+          misconfigured,
+        );
+      },
+    );
+
+    it('the cause says what happened without the token; the message is neutral', async () => {
+      const { svc } = await broken('key_changed');
+      const err = (await svc.forTenant(ORG).catch((e) => e)) as AppException;
+      expect(err).toBeInstanceOf(AppException);
+      const text = `${err.message} ${String(err.cause)}`;
+      expect(text).not.toContain(TOKEN);
+      expect(String(err.cause)).toContain('cannot be decrypted');
+      expect(err.message).not.toMatch(/PAYMENT_CONFIG_KEY/);
+    });
+
+    it('usable() is false, so channels.auth does not offer Telegram', async () => {
+      const { svc } = await broken('key_changed');
+      expect(await svc.usable(ORG)).toBe(false);
+    });
+
+    it('the owner can still see the status and disconnect the bot', async () => {
+      const { svc, row } = await broken('key_changed');
+      expect(await svc.status(ORG)).toMatchObject({ connected: true });
+      await expect(svc.disconnect(ORG)).resolves.toMatchObject({
+        connected: false,
+      });
+      expect(row).toBeDefined();
+    });
+  });
+
+  it('usable(): no bot, disabled bot, working bot', async () => {
+    const { svc, rows } = setup();
+    expect(await svc.usable(ORG)).toBe(false);
+    await svc.connect(ORG, TOKEN);
+    expect(await svc.usable(ORG)).toBe(true);
+    rows.get(ORG).is_enabled = false;
+    expect(await svc.usable(ORG)).toBe(false);
   });
 });
