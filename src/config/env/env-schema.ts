@@ -103,6 +103,8 @@ export const ENV_SCHEMA: readonly EnvVarSpec[] = [
   }),
   { name: 'PLATFORM_DOMAIN', kind: 'host' },
   bool('DOMAIN_VERIFY_SKIP'),
+  // format and production rule: domainEnvIssues
+  str('DOMAIN_VERIFY_DNS_SERVERS'),
   url('PUBLIC_FILES_URL', { httpsInProduction: true }),
   // Orders
   secret('TELEGRAM_ORDERS_BOT_TOKEN'),

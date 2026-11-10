@@ -22,17 +22,22 @@ export interface TxtResolver {
   resolveTxt(name: string): Promise<string[][]>;
 }
 
+/**
+ * Resolver of the TXT check: the system resolvers, or the given servers (DOMAIN_VERIFY_DNS_SERVERS,
+ * e.g. the fake DNS of the e2e stack).
+ */
+export function txtResolver(servers: readonly string[] = []): TxtResolver {
+  const resolver = new Resolver({ timeout: 3000, tries: 2 });
+  if (servers.length) resolver.setServers([...servers]);
+  return resolver;
+}
+
 const NOT_FOUND_CODES = new Set(['ENOTFOUND', 'ENODATA']);
 
 export class DnsTxtVerifier implements DomainOwnershipVerifier {
   readonly verifiesOnAdd = false;
 
-  constructor(
-    private readonly resolver: TxtResolver = new Resolver({
-      timeout: 3000,
-      tries: 2,
-    }),
-  ) {}
+  constructor(private readonly resolver: TxtResolver = txtResolver()) {}
 
   async check(host: string, token: string): Promise<VerifyResult> {
     let records: string[][];
