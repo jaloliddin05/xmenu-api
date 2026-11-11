@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { createHmac, timingSafeEqual } from 'crypto';
-import { CUSTOMER_AUTH_CONFIG } from '../customer-auth.config';
-import type { CustomerAuthConfig } from '../customer-auth.config';
+import { INIT_DATA_CONFIG } from '../customer-auth.config';
+import type { InitDataConfig } from '../customer-auth.config';
 import { TelegramBotService } from '../../telegram/telegram-bot.service';
 import {
   AppException,
@@ -18,7 +18,7 @@ export interface TelegramUser {
 @Injectable()
 export class TelegramInitDataService {
   constructor(
-    @Inject(CUSTOMER_AUTH_CONFIG) private readonly cfg: CustomerAuthConfig,
+    @Inject(INIT_DATA_CONFIG) private readonly cfg: InitDataConfig,
     private readonly bots: TelegramBotService,
   ) {}
 

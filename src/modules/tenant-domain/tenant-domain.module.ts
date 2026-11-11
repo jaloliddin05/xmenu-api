@@ -2,6 +2,7 @@ import { FactoryProvider, Module } from '@nestjs/common';
 import { PrismaModule } from '../_prisma/prisma.module';
 import { RevalidateModule } from '../revalidate-queue/revalidate.module';
 import { TenantModule } from '../tenant/tenant.module';
+import { TelegramModule } from '../telegram/telegram.module';
 import { domainConfigFrom } from './domain-config';
 import {
   DnsTxtVerifier,
@@ -37,7 +38,7 @@ export const domainVerifierProvider: FactoryProvider = {
 };
 
 @Module({
-  imports: [PrismaModule, TenantModule, RevalidateModule],
+  imports: [PrismaModule, TenantModule, RevalidateModule, TelegramModule],
   controllers: [TenantDomainController],
   providers: [TenantDomainService, domainVerifierProvider],
 })

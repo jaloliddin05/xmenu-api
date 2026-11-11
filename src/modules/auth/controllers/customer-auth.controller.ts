@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Header,
+  Headers,
   HttpCode,
   HttpStatus,
   Post,
@@ -45,6 +46,10 @@ import {
 } from '../dto/customer-telegram-verify.dto';
 import { CustomerAuthService } from '../services/customer-auth.service';
 import { TelegramVerificationService } from '../services/telegram-verification.service';
+import {
+  INIT_DATA_HEADER,
+  MiniAppAccessService,
+} from '../services/mini-app-access.service';
 import { requestCtx as ctxOf } from 'src/infra/http/request-helpers';
 import {
   CurrentCustomer,
@@ -56,6 +61,17 @@ import { CurrentTenant } from '../../tenant/current-tenant.decorator';
 import type { Tenant } from '../../tenant/tenant.service';
 import { TenantAuthChannelsDto } from '../../tenant/dto/tenant-config.dto';
 import { GuestLoginService } from '../../guest-login/guest-login.service';
+
+/** Sign-in steps that the venue's delivery mode applies to (docs/TELEGRAM_VERIFICATION.md). */
+const ApiInitDataHeader = () =>
+  ApiHeader({
+    name: 'X-Telegram-Init-Data',
+    description:
+      'Raw Telegram.WebApp.initData inside the venue Mini App. Mode miniapp: required (403 miniapp_required); ' +
+      'miniapp and both: checked against the venue bot and TELEGRAM_INITDATA_MAX_AGE_SECONDS (403 miniapp_init_data_invalid); ' +
+      'site: ignored',
+    required: false,
+  });
 
 @ApiTags('Auth-Customer')
 @ApiExtraModels(
@@ -81,6 +97,7 @@ export class AuthCustomerController {
     private readonly auth: CustomerAuthService,
     private readonly telegramVerification: TelegramVerificationService,
     private readonly guestLogin: GuestLoginService,
+    private readonly miniApp: MiniAppAccessService,
   ) {}
 
   /**
@@ -102,12 +119,15 @@ export class AuthCustomerController {
   @CustomerPublicRoute()
   @Post('otp/request')
   @HttpCode(200)
+  @ApiInitDataHeader()
   @ApiOkResponse({ type: CustomerOtpRequestResponseDto })
-  requestOtp(
+  async requestOtp(
     @CurrentTenant() tenant: Tenant,
     @Body() dto: CustomerOtpRequestDto,
+    @Headers(INIT_DATA_HEADER) initData: string | undefined,
     @Req() req: Request,
   ) {
+    await this.miniApp.assert(tenant.id, initData);
     return this.auth.requestOtp(tenant, dto.phone, ctxOf(req));
   }
 
@@ -126,12 +146,20 @@ export class AuthCustomerController {
       ],
     },
   })
-  verifyOtp(
+  @ApiInitDataHeader()
+  async verifyOtp(
     @CurrentTenant() tenant: Tenant,
     @Body() dto: CustomerOtpVerifyDto,
+    @Headers(INIT_DATA_HEADER) initData: string | undefined,
     @Req() req: Request,
   ) {
-    return this.auth.verifyOtp(tenant, dto, ctxOf(req));
+    const tg = await this.miniApp.assert(tenant.id, initData);
+    // A checked header links the Telegram user like initData in the body does
+    return this.auth.verifyOtp(
+      tenant,
+      tg && !dto.initData ? { ...dto, initData } : dto,
+      ctxOf(req),
+    );
   }
 
   /**
@@ -147,12 +175,20 @@ export class AuthCustomerController {
       'Start phone verification through the venue Telegram bot (503 telegram_unavailable: no bot, offer SMS only)',
   })
   @ApiOkResponse({ type: CustomerTelegramStartResponseDto })
-  telegramStart(
+  @ApiInitDataHeader()
+  async telegramStart(
     @CurrentTenant() tenant: Tenant,
     @Body() dto: CustomerTelegramStartDto,
+    @Headers(INIT_DATA_HEADER) initData: string | undefined,
     @Req() req: Request,
   ) {
-    return this.telegramVerification.start(tenant, dto, ctxOf(req));
+    const tg = await this.miniApp.assert(tenant.id, initData ?? dto.initData);
+    // Inside the Mini App the header alone starts the instant mode
+    return this.telegramVerification.start(
+      tenant,
+      tg && !dto.initData ? { ...dto, initData } : dto,
+      ctxOf(req),
+    );
   }
 
   @CustomerPublicRoute()
@@ -175,12 +211,19 @@ export class AuthCustomerController {
   @Post('register')
   @HttpCode(200)
   @ApiOkResponse({ type: CustomerSessionDto })
-  register(
+  @ApiInitDataHeader()
+  async register(
     @CurrentTenant() tenant: Tenant,
     @Body() dto: CustomerRegisterDto,
+    @Headers(INIT_DATA_HEADER) initData: string | undefined,
     @Req() req: Request,
   ) {
-    return this.auth.register(tenant, dto, ctxOf(req));
+    const tg = await this.miniApp.assert(tenant.id, initData);
+    return this.auth.register(
+      tenant,
+      tg && !dto.initData ? { ...dto, initData } : dto,
+      ctxOf(req),
+    );
   }
 
   @CustomerPublicRoute()
@@ -231,11 +274,15 @@ export class AuthCustomerController {
       ],
     },
   })
-  telegramLogin(
+  @ApiInitDataHeader()
+  async telegramLogin(
     @CurrentTenant() tenant: Tenant,
     @Body() dto: CustomerTelegramDto,
+    @Headers(INIT_DATA_HEADER) initData: string | undefined,
     @Req() req: Request,
   ) {
+    // The body initData is the Mini App data too: the mode check sees it when the header is missing
+    await this.miniApp.assert(tenant.id, initData ?? dto.initData);
     return this.auth.telegramLogin(tenant, dto.initData, ctxOf(req));
   }
 }

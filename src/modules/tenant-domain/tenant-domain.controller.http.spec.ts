@@ -1,3 +1,4 @@
+import { TelegramBotProfileService } from '../telegram/telegram-bot-profile.service';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { createHttpApp, staffToken } from 'src/infra/testing/http-app.fake';
@@ -33,6 +34,10 @@ describe('/organization/:id/domains (owner)', () => {
           { provide: PrismaService, useValue: db.client },
           { provide: TenantService, useValue: { invalidate: jest.fn() } },
           { provide: RevalidateService, useValue: revalidate },
+          {
+            provide: TelegramBotProfileService,
+            useValue: { syncMenuButton: jest.fn(async () => undefined) },
+          },
           { provide: DOMAIN_VERIFIER, useValue: verifier },
         ],
       },

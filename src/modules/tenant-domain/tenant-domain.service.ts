@@ -4,6 +4,7 @@ import { randomBytes } from 'crypto';
 import { fieldErrorsException } from 'src/infra/validators/validation-errors';
 import { PrismaService } from '../_prisma/prisma.service';
 import { RevalidateService } from '../revalidate-queue/revalidate.service';
+import { TelegramBotProfileService } from '../telegram/telegram-bot-profile.service';
 import {
   hostToUnicode,
   HostProblem,
@@ -89,6 +90,7 @@ export class TenantDomainService {
     private readonly revalidate: RevalidateService,
     @Inject(DOMAIN_VERIFIER)
     private readonly verifier: DomainOwnershipVerifier,
+    private readonly botProfile: TelegramBotProfileService,
   ) {}
 
   async list(organizationId: string): Promise<TenantDomainListDto> {
@@ -266,5 +268,7 @@ export class TenantDomainService {
       route: 'domains',
       host,
     });
+    // The Mini App opens on the primary domain, which may have changed
+    void this.botProfile.syncMenuButton(organizationId);
   }
 }

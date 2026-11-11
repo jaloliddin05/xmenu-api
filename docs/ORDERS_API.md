@@ -65,7 +65,7 @@ Webhook'и Click/Payme переводят заказ `awaiting_payment → pendi
 Ответ `201` — объект заказа (ниже).
 
 Порядок проверок на сервере: повтор по ключу → клиент (не заблокирован) → канал заказов
-и публикация заведения → филиал и его часы → адрес и зона доставки → способ оплаты → расчёт по БД (`item_unavailable`,
+и публикация заведения → режим доставки (Mini App) → филиал и его часы → адрес и зона доставки → способ оплаты → расчёт по БД (`item_unavailable`,
 `invalid_modifiers`, `invalid_order`) → `price_changed` → `min_order_not_reached` →
 лимит активных заказов. Первая найденная проблема возвращается сразу.
 
@@ -74,6 +74,10 @@ Webhook'и Click/Payme переводят заказ `awaiting_payment → pendi
   выключен → `422 ordering_channel_disabled`, включён без публикации или на паузе →
   `422 ordering_not_published`. `GET /tenant/config` в этом случае отдаёт
   `channels.delivery.published: false` и пустой `fulfillment.modes`.
+* **Режим доставки.** Заголовок `X-Telegram-Init-Data` (`Telegram.WebApp.initData` внутри Mini App заведения).
+  Режим `miniapp`: без заголовка → `403 miniapp_required`; `miniapp` и `both`: заголовок не подписан ботом заведения
+  или просрочен → `403 miniapp_init_data_invalid`; режим `site` заголовок не смотрит. Бота нет при режиме
+  `miniapp`/`both` → `503 telegram_unavailable`. Подробно: `API.md`, «Mini App и режимы доставки».
 * **Филиал.** pickup — `branchId` обязателен, филиал должен быть открыт. delivery —
   `branchId` лишь подсказка: если он закрыт или не доставляет, берётся первый открытый
   филиал с доставкой; если открытых нет — `branch_closed` с ближайшим `opensAt`.
@@ -155,6 +159,9 @@ cash ─────────────────────▶ pending_
 | 422 | `fulfillment_unavailable` | — | сообщение (филиал не делает самовывоз/доставку) |
 | 422 | `ordering_channel_disabled` | — | заведение не принимает заказы онлайн: оформление скрыто |
 | 422 | `ordering_not_published` | — | заказы временно не принимаются (не опубликовано или пауза) |
+| 403 | `miniapp_required` | — | заказ только в Telegram: ссылка `https://t.me/<channels.delivery.botUsername>` |
+| 403 | `miniapp_init_data_invalid` | — | переоткрыть Mini App (данные Telegram устарели или чужие) |
+| 503 | `telegram_unavailable` | — | режим Mini App без бота заведения: заказы недоступны |
 | 429 | `too_many_active_orders` | `retryAfter` | сообщение |
 | 422 | `invalid_modifiers` | `{ items: [{ index, itemId, reason, groupId? }] }` (`reason`: `missing_required`, `below_min`, `above_max`, `unknown_group`, `unknown_option`, `duplicate_group`, `duplicate_option`) | строки помечаются, «Убрать» |
 | 409 | `item_unavailable` | `{ items: [{ index, reason }] }` | то же |

@@ -192,7 +192,7 @@ IP берётся из `X-Forwarded-For` только от локального 
              "serviceArea": "#4A6FA5" },
   "locale": { "defaultLanguage": "ru", "languages": ["ru", "uz", "en"], "currency": "UZS" },
   "contacts": { "phone": null, "telegramUsername": null, "workingHours": null, "address": null },
-  "channels": { "qr": true, "auth": { "sms": true, "telegram": false }, "delivery": { "enabled": true, "mode": "site", "published": true } },
+  "channels": { "qr": true, "auth": { "sms": true, "telegram": false }, "delivery": { "enabled": true, "mode": "site", "published": true, "miniApp": false, "botUsername": null } },
   "fulfillment": { "modes": ["pickup"], "defaultMode": "pickup", "deliveryOffered": true, "deliveryAvailable": false,
                    "deliveryUnavailableReason": "no_zone" },
   "map": { "center": [41.311081, 69.240562], "centerSource": "saved", "zoom": 15, "city": "Ташкент",
@@ -212,6 +212,11 @@ IP берётся из `X-Forwarded-For` только от локального 
   доставка и самовывоз); `delivery.mode`: `site`, `miniapp` или `both`; `delivery.published`: заказы открыты
   (включено **и** опубликовано). При `published: false` `POST /orders` отвечает `422` (`ordering_channel_disabled` или
   `ordering_not_published`), меню, филиалы и карта отдаются как обычно (предпросмотр).
+- `channels.delivery.miniApp`: у заведения есть Mini App: режим `miniapp` или `both` и бот работает (как
+  `channels.auth.telegram`). `channels.delivery.botUsername`: имя бота для ссылки «Открыть в Telegram»
+  (`https://t.me/<botUsername>`), только при `miniApp: true`, иначе `null`. В режиме `miniapp` вход гостя и заказ
+  возможны только внутри Mini App (заголовок `X-Telegram-Init-Data`, см. «Mini App и режимы доставки»); сайт вне
+  Telegram должен показать ссылку на бота вместо оформления.
 - `channels.auth`: как клиент может подтвердить номер, подсказка для первого рендера; кэшируется вместе с конфигом (у
   клиента ISR), поэтому шторка входа берёт свежие значения из `GET /auth/customer/methods` (тот же расчёт, без кэша).
   `telegram`: у заведения подключён и включён бот, и его токен расшифровывается (иначе `telegram/start` отвечает `503
@@ -267,6 +272,30 @@ IP берётся из `X-Forwarded-For` только от локального 
 отдаёт `telegram: false`. В режиме сайта вход завершается обычным
 `otp/verify` с кодом из чата бота (длина кода в `codeLength` ответа `telegram/status`); в Mini App ответ `status: "verified"` уже содержит результат входа.
 
+### Mini App и режимы доставки
+
+Режим `channels.delivery.mode` применяется к шагам входа гостя (`otp/request`, `otp/verify`, `register`,
+`telegram/start`, `login`) и к `POST /orders` через заголовок `X-Telegram-Init-Data` (сырая строка
+`Telegram.WebApp.initData`). Заголовок проверяется только токеном бота заведения (не платформенным) и сроком
+`TELEGRAM_INITDATA_MAX_AGE_SECONDS` от `auth_date`. `refresh`, `logout`, `me`, `telegram/status` режим не проверяют.
+
+| Режим | Без заголовка | Заголовок неверный, просрочен или подписан другим ботом | Заголовок действителен |
+|---|---|---|---|
+| `site` | как обычно | не проверяется, как обычно | не проверяется, как обычно |
+| `miniapp` | `403 miniapp_required` | `403 miniapp_init_data_invalid` | дальше обычные проверки |
+| `both` | как обычно | `403 miniapp_init_data_invalid` | дальше обычные проверки |
+
+- `miniapp`/`both` после удаления бота (режим остаётся, `DELETE /telegram-bot` его не меняет): `503 telegram_unavailable`.
+- Коды 403, а не 401: клиент не должен обновлять токены и повторять запрос; `miniapp_required` → ссылка «Открыть в
+  Telegram» (`channels.delivery.botUsername`), `miniapp_init_data_invalid` → переоткрыть Mini App.
+- Порядок в `POST /orders`: канал и публикация (`422`) раньше режима.
+- `login` (вход по привязанному Telegram): `initData` из тела тоже проходит проверку режима, если заголовка нет.
+- `telegram/start` в Mini App: заголовка достаточно, без `initData` в теле он запускает режим `instant`.
+- Проверенный заголовок на `otp/verify` и `register` привязывает Telegram-пользователя к клиенту, как `initData` в теле.
+- Подтверждение номера в Mini App (`instant`) для нового номера кладёт Telegram-пользователя в `registrationToken`:
+  `register` привязывает его сам, следующий `login` по `initData` входит сразу. Занятый другим клиентом Telegram-id не
+  перехватывается.
+
 ## Бот заведения (владелец)
 
 `GET /telegram-bot` → `{ connected, username, link, isEnabled, profile, isDefault, deliveryUrl, lastSync }`
@@ -293,16 +322,23 @@ IP берётся из `X-Forwarded-For` только от локального 
 - `POST /telegram-bot/sync`: применить сохранённое ещё раз (после ошибки). `404 bot_not_connected`.
 - Применение вызывает Bot API по пунктам, каждый независим: `setMyName`, `setMyDescription`,
   `setMyShortDescription`, `setMyCommands` (одна команда `/start`) для каждого языка и один раз без `language_code`
-  (язык по умолчанию), и `setChatMenuButton` (кнопка `web_app`, адрес `deliveryUrl`). Итог хранится и приходит в
+  (язык по умолчанию), и `setChatMenuButton` (по режиму доставки, см. ниже). Итог хранится и приходит в
   `lastSync: { syncedAt, result: { name, description, shortDescription, commands, menuButton } }`, где каждый пункт
   `{ status: "ok" | "failed" | "skipped", code?, feature? }`: `failed` с `code: "telegram_request_failed"` (Telegram отказал,
   текст ответа только в логе сервера; у имени есть лимит частоты смены), `skipped` у кнопки меню без адреса.
-- `deliveryUrl` строится из `DELIVERY_URL_TEMPLATE` (`https://{slug}.xmenu.uz`, только https); без переменной или без
-  `{slug}` в шаблоне кнопка не ставится (`{ status: "skipped", code: "platform_misconfigured", feature: "delivery_link" }`),
+- Кнопка меню следует режиму доставки: `site` → стандартная кнопка Telegram (`{ type: "default" }`, пункт `ok`);
+  `miniapp`/`both` → кнопка `web_app` на адрес `deliveryUrl`.
+- `deliveryUrl` (адрес Mini App): `https://<primaryDomain>`, если у заведения есть подтверждённый свой домен, иначе из
+  `DELIVERY_URL_TEMPLATE` (`https://{slug}.xmenu.uz`, только https); `null` в режиме `site`. Без домена и без годного
+  шаблона кнопка не ставится (`{ status: "skipped", code: "platform_misconfigured", feature: "delivery_link" }`),
   остальное применяется.
-- Смена slug (`PUT /organization/:id`) перенастраивает только кнопку меню, в фоне и без влияния на ответ. Правка
-  названия, описания или языков заведения профиль бота сама не меняет: применить вручную (`PUT .../profile` или `sync`).
-- Аватар бота API не меняет: только в @BotFather. Приветствие `/start` в боте получает кнопку Mini App, если адрес известен.
+- Кнопка перенастраивается сама, в фоне и без влияния на ответ: подключение бота, смена режима
+  (`PUT /organization/:id/channels`), смена slug (`PUT /organization/:id`), подтверждение и удаление подтверждённого
+  домена. Каждый раз отправляется полное нужное состояние (повтор безвреден); ошибки Telegram только в лог и в
+  `lastSync`. Правка названия, описания или языков заведения профиль бота сама не меняет: применить вручную
+  (`PUT .../profile` или `sync`).
+- Аватар бота API не меняет: только в @BotFather. Приветствие `/start` в режимах `miniapp` и `both` получает кнопку
+  «Открыть меню» (`web_app`, тот же адрес), в режиме `site` приходит без кнопки.
 
 | HTTP | `code` | Когда |
 |---|---|---|
@@ -311,7 +347,8 @@ IP берётся из `X-Forwarded-For` только от локального 
 | 409 | `bot_already_connected` | этот бот подключён к другому заведению |
 | 503 | `platform_misconfigured` | `details.feature: telegram_bot`: адрес API платформы не https, ключ шифрования токенов не задан, или сохранённый токен не расшифровывается (`profile`, `sync`; настройка платформы, не владельца) |
 
-Пока бот не подключён, `initData` Mini App проверяется платформенным ботом (`TELEGRAM_BOT_TOKEN`).
+Пока бот не подключён, `initData` в теле `login`, `otp/verify` и `register` проверяется платформенным ботом
+(`TELEGRAM_BOT_TOKEN`); заголовок `X-Telegram-Init-Data` проверяется только ботом заведения.
 
 ### Цвета темы по умолчанию (`PLATFORM_THEME`)
 
@@ -483,8 +520,9 @@ QR-меню и сайта доставки (`REVALIDATE.md`).
 (`REVALIDATE.md`); запрос без изменений её не ставит.
 
 Заказы (`POST /orders`, доставка и самовывоз) при выключенном канале → `422 ordering_channel_disabled`, при
-включённом без публикации или на паузе → `422 ordering_not_published`. Состояние читается из БД при каждом заказе
-(не из кэша тенанта), пауза действует сразу. Повтор уже созданного заказа (тот же `Idempotency-Key`), отмена и
+включённом без публикации или на паузе → `422 ordering_not_published`, затем режим доставки (`403
+miniapp_required` / `miniapp_init_data_invalid`, «Mini App и режимы доставки»). Состояние читается из БД при каждом заказе
+(не из кэша тенанта), пауза и смена режима действуют сразу. Повтор уже созданного заказа (тот же `Idempotency-Key`), отмена и
 повторная оплата не блокируются.
 
 ## Домены заведения (владелец)

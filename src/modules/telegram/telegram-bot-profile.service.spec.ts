@@ -11,9 +11,16 @@ function setup(
     languages?: string[];
     slug?: string | null;
     connected?: boolean;
+    mode?: 'site' | 'miniapp' | 'both';
+    primaryDomain?: string;
   } = {},
 ) {
   const languages = opts.languages ?? ['ru', 'uz'];
+  // Mutable so a test can change the mode or the primary domain between calls
+  const venue = {
+    delivery_mode: opts.mode ?? 'miniapp',
+    domains: opts.primaryDomain ? [{ host: opts.primaryDomain }] : [],
+  };
   let row: any = {
     organization_id: ORG,
     profile: null,
@@ -24,8 +31,9 @@ function setup(
     organization: {
       findUnique: jest.fn(async ({ select }: any) =>
         select.slug && !select.name
-          ? { slug: opts.slug === undefined ? 'mant' : opts.slug }
+          ? { slug: opts.slug === undefined ? 'mant' : opts.slug, ...venue }
           : {
+              ...venue,
               name: 'Mant',
               slug: opts.slug === undefined ? 'mant' : opts.slug,
               translations: [{ lang: 'ru', description: 'Лучший плов' }],
@@ -68,7 +76,7 @@ function setup(
   );
   const calls = (method: string) =>
     client.call.mock.calls.filter((c) => c[1] === method).map((c) => c[2]);
-  return { svc, prisma, client, bots, calls, row: () => row };
+  return { svc, prisma, client, bots, calls, venue, row: () => row };
 }
 
 describe('TelegramBotProfileService', () => {
@@ -235,12 +243,12 @@ describe('TelegramBotProfileService', () => {
     });
   });
 
-  it('refreshMenuButton updates only the button and keeps the other sync results; never throws', async () => {
+  it('syncMenuButton updates only the button and keeps the other sync results; never throws', async () => {
     const { svc, calls, row, client } = setup();
     await svc.apply(ORG);
     client.call.mockClear();
 
-    await svc.refreshMenuButton(ORG);
+    await svc.syncMenuButton(ORG);
     expect(client.call).toHaveBeenCalledTimes(1);
     expect(calls('setChatMenuButton')).toHaveLength(1);
     expect(row().sync_result.name).toEqual({ status: 'ok' });
@@ -248,7 +256,71 @@ describe('TelegramBotProfileService', () => {
     client.call.mockRejectedValue(
       new TelegramApiError('setChatMenuButton', 'boom'),
     );
-    await expect(svc.refreshMenuButton(ORG)).resolves.toBeUndefined();
+    await expect(svc.syncMenuButton(ORG)).resolves.toBeUndefined();
+  });
+
+  describe('the menu button follows the delivery mode and the primary domain', () => {
+    it.each(['miniapp', 'both'] as const)(
+      '%s: web_app button to the platform address',
+      async (mode) => {
+        const { svc, calls } = setup({ mode });
+        await svc.syncMenuButton(ORG);
+        expect(calls('setChatMenuButton')).toEqual([
+          {
+            menu_button: {
+              type: 'web_app',
+              text: 'Меню',
+              web_app: { url: 'https://mant.xmenu.uz' },
+            },
+          },
+        ]);
+      },
+    );
+
+    it('a primary own domain wins over the platform address, also without a template', async () => {
+      delete process.env.DELIVERY_URL_TEMPLATE;
+      const { svc, calls } = setup({ primaryDomain: 'mant.uz' });
+      await svc.syncMenuButton(ORG);
+      expect(calls('setChatMenuButton')[0].menu_button.web_app).toEqual({
+        url: 'https://mant.uz',
+      });
+      await expect(svc.startUrl(ORG)).resolves.toBe('https://mant.uz');
+    });
+
+    it('site: Telegram default button, reported ok; /start has no Mini App button', async () => {
+      const { svc, calls, row } = setup({ mode: 'site' });
+      await svc.apply(ORG);
+      expect(calls('setChatMenuButton')).toEqual([
+        { menu_button: { type: 'default' } },
+      ]);
+      expect(row().sync_result.menuButton).toEqual({ status: 'ok' });
+      await expect(svc.startUrl(ORG)).resolves.toBeNull();
+      expect((await svc.view(ORG)).deliveryUrl).toBeNull();
+    });
+
+    it('is idempotent: every sync sends the whole wanted state again', async () => {
+      const { svc, calls, venue } = setup();
+      await svc.syncMenuButton(ORG);
+      await svc.syncMenuButton(ORG);
+      venue.delivery_mode = 'site';
+      await svc.syncMenuButton(ORG);
+      const sent = calls('setChatMenuButton');
+      expect(sent[0]).toEqual(sent[1]);
+      expect(sent[2]).toEqual({ menu_button: { type: 'default' } });
+    });
+
+    it('a Telegram failure on the default button is logged and recorded as telegram_request_failed', async () => {
+      const { svc, client, row } = setup({ mode: 'site' });
+      await svc.apply(ORG);
+      client.call.mockRejectedValue(
+        new TelegramApiError('setChatMenuButton', 'boom'),
+      );
+      await expect(svc.syncMenuButton(ORG)).resolves.toBeUndefined();
+      expect(row().sync_result.menuButton).toEqual({
+        status: 'failed',
+        code: 'telegram_request_failed',
+      });
+    });
   });
 
   it('startUrl: the venue Mini App address, null without a template or on errors', async () => {

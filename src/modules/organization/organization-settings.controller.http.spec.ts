@@ -92,7 +92,7 @@ describe('GET/PUT /organization/:id/settings', () => {
           { provide: RevalidateService, useValue: { addRevalidationJob } },
           {
             provide: TelegramBotProfileService,
-            useValue: { refreshMenuButton: jest.fn() },
+            useValue: { syncMenuButton: jest.fn() },
           },
         ],
       },

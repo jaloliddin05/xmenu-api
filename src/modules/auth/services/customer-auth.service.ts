@@ -122,9 +122,14 @@ export class CustomerAuthService {
 
     if (!customer) {
       // Hech narsa yaratilmaydi: faqat bir martalik registration token beriladi
+      // A Telegram user who proved the phone (Mini App) travels in the token and is linked on register
       return {
         isNewUser: true,
-        registrationToken: this.tokens.signRegistration(phone, tenant.id),
+        registrationToken: this.tokens.signRegistration(
+          phone,
+          tenant.id,
+          link?.telegramId,
+        ),
       };
     }
 
@@ -172,9 +177,11 @@ export class CustomerAuthService {
     );
     if (burned !== 'OK') throw new AppException('registration_expired');
 
-    const telegramId = dto.initData
-      ? await this.safeTelegramId(tenant.id, dto.initData)
-      : null;
+    const telegramId =
+      claims.tg ??
+      (dto.initData
+        ? await this.safeTelegramId(tenant.id, dto.initData)
+        : null);
 
     try {
       const result = await this.prisma.$transaction(async (tx) => {

@@ -9,6 +9,7 @@ import { TelegramBotService } from '../../telegram/telegram-bot.service';
 import { TenantService } from '../../tenant/tenant.service';
 import { CustomerAuthService } from '../services/customer-auth.service';
 import { TelegramVerificationService } from '../services/telegram-verification.service';
+import { MiniAppAccessService } from '../services/mini-app-access.service';
 import { AuthCustomerController } from './customer-auth.controller';
 
 const ORG = '3f2b8c1e-4d5a-4b6c-8d7e-9f0a1b2c3d4e';
@@ -48,6 +49,7 @@ describe('GET /auth/customer/methods', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: CustomerAuthService, useValue: {} },
         { provide: TelegramVerificationService, useValue: {} },
+        { provide: MiniAppAccessService, useValue: {} },
         {
           provide: TelegramBotService,
           useValue: { usable: async () => botUsable },

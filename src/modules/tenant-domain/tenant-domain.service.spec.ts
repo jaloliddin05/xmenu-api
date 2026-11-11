@@ -1,3 +1,4 @@
+import { TelegramBotProfileService } from '../telegram/telegram-bot-profile.service';
 import { PrismaService } from '../_prisma/prisma.service';
 import { RevalidateService } from '../revalidate-queue/revalidate.service';
 import { TenantService } from '../tenant/tenant.service';
@@ -27,6 +28,7 @@ describe('TenantDomainService', () => {
   let verifier: FakeDomainVerifier;
   let revalidate: { addRevalidationJob: jest.Mock };
   let tenants: { invalidate: jest.Mock };
+  let botProfile: { syncMenuButton: jest.Mock };
   let service: TenantDomainService;
 
   const build = (instant = false) => {
@@ -36,6 +38,7 @@ describe('TenantDomainService', () => {
       tenants as unknown as TenantService,
       revalidate as unknown as RevalidateService,
       verifier,
+      botProfile as unknown as TelegramBotProfileService,
     );
   };
 
@@ -47,6 +50,7 @@ describe('TenantDomainService', () => {
     ]);
     revalidate = { addRevalidationJob: jest.fn(async () => undefined) };
     tenants = { invalidate: jest.fn() };
+    botProfile = { syncMenuButton: jest.fn(async () => undefined) };
     build();
   });
 
@@ -164,6 +168,8 @@ describe('TenantDomainService', () => {
       expect(verifier.calls).toEqual([{ host: 'restaurant.uz', token }]);
       expect(db.domains[0].verified_host).toBe('restaurant.uz');
       expect(tenants.invalidate).toHaveBeenCalledWith(ORG_A);
+      // The Mini App address follows the primary domain
+      expect(botProfile.syncMenuButton).toHaveBeenCalledWith(ORG_A);
       expect(revalidate.addRevalidationJob).toHaveBeenCalledWith({
         tenantId: ORG_A,
         route: 'domains',

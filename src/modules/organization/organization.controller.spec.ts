@@ -40,7 +40,7 @@ describe('Organization endpoints: own organization only (IDOR)', () => {
         files as any,
         revalidate as any,
         tenants as any,
-        { refreshMenuButton: jest.fn() } as any,
+        { syncMenuButton: jest.fn() } as any,
       ),
     );
     req = { user: { organization: { id: t.mine.org.id, slug: 'mine' } } };
@@ -132,7 +132,7 @@ describe('Organization slug', () => {
         { updateFile: jest.fn(), removeFile: jest.fn() } as any,
         { addRevalidationJob: jest.fn() } as any,
         { invalidate: jest.fn() } as any,
-        { refreshMenuButton: jest.fn() } as any,
+        { syncMenuButton: jest.fn() } as any,
       ),
     );
     req = { user: { organization: { id: t.mine.org.id, slug: 'mine' } } };

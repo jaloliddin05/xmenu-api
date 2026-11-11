@@ -119,7 +119,7 @@ describe('GET /tenant/config', () => {
         delivery_enabled: true,
         delivery_mode: 'both',
         published_at: new Date('2026-10-31T10:00:00Z'),
-        telegram_bot: { is_enabled: true },
+        telegram_bot: { is_enabled: true, username: 'demo_cafe_bot' },
         logo: { url: '/image/organization/logo.png' },
         banner: null,
         // PRIMARY_DOMAIN_SELECT result: the earliest verified domain
@@ -217,7 +217,13 @@ describe('GET /tenant/config', () => {
       channels: {
         qr: true,
         auth: { sms: true, telegram: true },
-        delivery: { enabled: true, mode: 'both', published: true },
+        delivery: {
+          enabled: true,
+          mode: 'both',
+          published: true,
+          miniApp: true,
+          botUsername: 'demo_cafe_bot',
+        },
       },
       fulfillment: {
         modes: ['delivery', 'pickup'],
@@ -276,7 +282,13 @@ describe('GET /tenant/config', () => {
       channels: {
         qr: true,
         auth: { sms: true, telegram: false },
-        delivery: { enabled: false, mode: 'site', published: false },
+        delivery: {
+          enabled: false,
+          mode: 'site',
+          published: false,
+          miniApp: false,
+          botUsername: null,
+        },
       },
       fulfillment: {
         modes: [],
@@ -370,6 +382,8 @@ describe('GET /tenant/config', () => {
         enabled: state.delivery_enabled,
         mode: 'both',
         published: false,
+        miniApp: true,
+        botUsername: 'demo_cafe_bot',
       });
       // The map and zone stay: the site can still show them while orders are paused
       expect(res.body.map.deliveryZone).toEqual(ZONE);
@@ -439,6 +453,29 @@ describe('GET /tenant/config', () => {
     expect((await config(FULL).expect(200)).body.channels.auth).toEqual({
       sms: true,
       telegram: false,
+    });
+  });
+
+  it.each([
+    ['miniapp with a working bot', 'miniapp', { is_enabled: true }, true],
+    ['both with a working bot', 'both', { is_enabled: true }, true],
+    ['site with a working bot', 'site', { is_enabled: true }, false],
+    ['miniapp with a disabled bot', 'miniapp', { is_enabled: false }, false],
+    [
+      'miniapp with an unreadable token',
+      'miniapp',
+      { is_enabled: true, usable: false },
+      false,
+    ],
+    ['miniapp after the bot was removed', 'miniapp', null, false],
+  ] as const)('Mini App: %s → miniApp %s', async (_why, mode, bot, miniApp) => {
+    orgs[FULL].delivery_mode = mode;
+    orgs[FULL].telegram_bot = bot && { ...bot, username: 'demo_cafe_bot' };
+    const { delivery } = (await config(FULL).expect(200)).body.channels;
+    expect(delivery).toMatchObject({
+      mode,
+      miniApp,
+      botUsername: miniApp ? 'demo_cafe_bot' : null,
     });
   });
 

@@ -129,7 +129,14 @@ test, `npm run openapi` + `git diff --exit-code docs/`, `format:check`, `lint` �
 - `GET /publication` и остальные ответы публикации несут `warnings` (`guestLoginWarnings` в `publication.ts`:
   `guest_login_telegram_only`, `guest_login_unavailable`), отдельно от чеклиста; публикацию они не блокируют.
 - Бот удалён (`DELETE /telegram-bot`) при режиме `miniapp`/`both`: режим остаётся, пункт `telegram_bot` в чеклисте
-  становится `todo`, публикация не снимается.
+  становится `todo`, публикация не снимается; вход гостя и заказ в этих режимах отвечают `503 telegram_unavailable`.
+- Режим доставки применяется к шагам входа гостя (`otp/request`, `otp/verify`, `register`, `telegram/start`, `login`) и
+  к `POST /orders`: `MiniAppAccessService` (`auth/services/mini-app-access.service.ts`, модуль `MiniAppModule`, его
+  импортирует и `OrderModule`), правило `deliveryModeProblem` (`organization/domain/delivery-mode.ts`). Заголовок
+  `X-Telegram-Init-Data` проверяется только токеном бота заведения и сроком `TELEGRAM_INITDATA_MAX_AGE_SECONDS`:
+  `site` его не смотрит, `miniapp` требует (`403 miniapp_required`), неверный в `miniapp`/`both` → `403
+  miniapp_init_data_invalid`. В `POST /orders` после канала и публикации, режим читается из БД тем же select.
+  `GET /tenant/config`: `channels.delivery.miniApp` (режим не `site` и бот `usable`) и `botUsername` (только при `miniApp`).
 
 ## Филиалы
 - Часы считает `branch/domain/branch-hours.ts` (одна функция для `GET /branches` и `POST /orders`). Филиал без
@@ -148,8 +155,10 @@ Payme вручную через ops-чат.
 сессиями. `CustomerOtpService.issue()` не зависит от канала доставки (SMS или Telegram), лимиты по телефону общие.
 Параметры и значения по умолчанию: `OTP_LENGTH`, `OTP_TTL_SECONDS`, `OTP_MAX_ATTEMPTS`, `OTP_COOLDOWN_SECONDS` (см. `.env.example`).
 Длина кода приходит в `codeLength`; фронты читают её из ответа, своих констант у них нет.
-`TelegramInitDataService.verifyForTenant` проверяет `initData` токеном бота заведения (иначе платформенным
-`TELEGRAM_BOT_TOKEN`) и входом не является.
+`TelegramInitDataService.verifyForTenant` проверяет `initData` из тела токеном бота заведения (иначе платформенным
+`TELEGRAM_BOT_TOKEN`); заголовок `X-Telegram-Init-Data` проверяет `MiniAppAccessService` только ботом заведения.
+Вход по `initData` (`POST /auth/customer/login`) только для клиента с уже привязанным `telegram_id`. Подтверждение в Mini
+App (`instant`) нового номера кладёт Telegram-id в `registrationToken` (`tg`), `register` его привязывает.
 
 ## Боты заведений и подтверждение номера через Telegram
 Контракт и сценарии: `docs/TELEGRAM_VERIFICATION.md`.
@@ -166,8 +175,11 @@ Payme вручную через ops-чат.
   вебхука (с `botKey`) в ответы владельцу не попадает, только в лог при подключении.
 - `TelegramBotProfileService` (`modules/telegram`): автонастройка бота заведения (имя, описания, `/start`, кнопка меню Mini App) по
   профилю из `organization_telegram_bot.profile` или дефолтам из данных заведения (`domain/bot-profile.ts`); `PUT
-  /telegram-bot` применяет её после подключения, `PUT /telegram-bot/profile` и `POST /telegram-bot/sync` вручную, смена slug
-  перенастраивает кнопку. Пункты независимы, итог в `sync_result`. Аватар не меняется (нет метода в Bot API).
+  /telegram-bot` применяет её после подключения, `PUT /telegram-bot/profile` и `POST /telegram-bot/sync` вручную. Кнопка меню
+  и кнопка `/start` следуют режиму доставки (`miniAppUrl` в `domain/bot-profile.ts`: `site` → стандартная кнопка и `/start`
+  без кнопки; иначе `https://<primaryDomain>` или `DELIVERY_URL_TEMPLATE`); `syncMenuButton` (не бросает, шлёт полное
+  состояние) вызывают смена режима (`PublicationService.setChannels`), смена slug и `TenantDomainService` при
+  подтверждении и удалении подтверждённого домена. Пункты независимы, итог в `sync_result`. Аватар не меняется (нет метода в Bot API).
 - `TelegramVerificationService` + `TelegramBotWebhookController` (в `auth`), клиентские `POST
   /auth/customer/telegram/start` и `/status`. Режимы: Mini App (`instant`, сессия привязана к Telegram-пользователю
   из `initData`, вход выдаётся в `status` один раз) и сайт (`code`, код приходит в чат только при совпадении номера,

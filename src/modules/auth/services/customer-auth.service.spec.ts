@@ -96,7 +96,12 @@ describe('CustomerAuthService.completeVerifiedPhone', () => {
     await expect(
       svc.completeVerifiedPhone(TENANT, PHONE, CTX, { telegramId: '555' }),
     ).resolves.toEqual({ isNewUser: true, registrationToken: 'reg-token' });
-    expect(tokens.signRegistration).toHaveBeenCalledWith(PHONE, TENANT.id);
+    // The Telegram user who proved the phone travels in the token, to be linked on register
+    expect(tokens.signRegistration).toHaveBeenCalledWith(
+      PHONE,
+      TENANT.id,
+      '555',
+    );
     expect(customers.update).not.toHaveBeenCalled();
   });
 
@@ -116,5 +121,86 @@ describe('CustomerAuthService.completeVerifiedPhone', () => {
     const { svc, customers } = service({ telegramOwner: { id: 'other' } });
     await svc.completeVerifiedPhone(TENANT, PHONE, CTX, { telegramId: '555' });
     expect(customers.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('Mini App sign-up: the Telegram user proven in instant mode is linked on register', () => {
+  const PHONE = '+998901234567';
+
+  function service(claims: { tg?: string }) {
+    const created: any[] = [];
+    const customers = {
+      findByPhone: jest.fn(async () => null),
+      findByTelegramId: jest.fn(
+        async (_t: string, id: string) =>
+          created.find((c) => c.telegram_id === id) ?? null,
+      ),
+      create: jest.fn(async (_t: string, data: any) => {
+        const row = { id: 'cust-new', status: 'active', ...data };
+        created.push(row);
+        return row;
+      }),
+    };
+    const tx = { customer: { update: jest.fn(async () => undefined) } };
+    const prisma = { $transaction: jest.fn(async (fn: any) => fn(tx)) };
+    const sessions = {
+      createSession: jest.fn(async () => ({
+        accessToken: 'a',
+        refreshToken: 'r',
+      })),
+    };
+    const tokens = {
+      verifyRegistration: jest.fn(() => ({
+        phone: PHONE,
+        tid: TENANT.id,
+        jti: 'j1',
+        ...claims,
+      })),
+    };
+    const telegram = {
+      verifyForTenant: jest.fn(async () => ({ id: 555 })),
+    };
+    const svc = new CustomerAuthService(
+      prisma as any,
+      customers as any,
+      { toUser: (c: any) => ({ id: c.id }) } as any,
+      null as any,
+      sessions as any,
+      tokens as any,
+      { log: jest.fn(async () => undefined) } as any,
+      { hit: jest.fn(async () => undefined) } as any,
+      telegram as any,
+      { set: jest.fn(async () => 'OK') } as any,
+      {} as CustomerAuthConfig,
+    );
+    return { svc, customers, telegram, created };
+  }
+
+  it('register stores telegram_id from the token without initData, and the next Mini App login signs in', async () => {
+    const { svc, created, telegram } = service({ tg: '555' });
+    await svc.register(TENANT, { registrationToken: 'reg', name: 'Aziz' }, CTX);
+    expect(created[0]).toMatchObject({ phone: PHONE, telegram_id: '555' });
+    expect(telegram.verifyForTenant).not.toHaveBeenCalled();
+
+    await expect(
+      svc.telegramLogin(TENANT, 'init-data', CTX),
+    ).resolves.toMatchObject({
+      isNewUser: false,
+      user: { id: 'cust-new' },
+    });
+  });
+
+  it('a token without a Telegram user still links initData sent to register', async () => {
+    const { svc, created, telegram } = service({});
+    await svc.register(
+      TENANT,
+      { registrationToken: 'reg', name: 'Aziz', initData: 'init-data' },
+      CTX,
+    );
+    expect(telegram.verifyForTenant).toHaveBeenCalledWith(
+      TENANT.id,
+      'init-data',
+    );
+    expect(created[0].telegram_id).toBe('555');
   });
 });
