@@ -14,7 +14,6 @@ export const staffTestConfig = {
   otpMaxAttempts: 5,
   otpCooldownSeconds: 60,
   otpDevMode: false,
-  smsLocale: 'ru',
 } as CustomerAuthConfig;
 
 export class FakeSms implements SmsProvider {

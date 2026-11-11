@@ -173,7 +173,7 @@ describe('Mini App sign-up: the Telegram user proven in instant mode is linked o
       { set: jest.fn(async () => 'OK') } as any,
       {} as CustomerAuthConfig,
     );
-    return { svc, customers, telegram, created };
+    return { svc, customers, telegram, created, tx };
   }
 
   it('register stores telegram_id from the token without initData, and the next Mini App login signs in', async () => {
@@ -188,6 +188,38 @@ describe('Mini App sign-up: the Telegram user proven in instant mode is linked o
       isNewUser: false,
       user: { id: 'cust-new' },
     });
+  });
+
+  it('register stores the request language on the customer', async () => {
+    const { svc, created } = service({});
+    await svc.register(
+      TENANT,
+      { registrationToken: 'reg', name: 'Aziz' },
+      { ...CTX, lang: 'uz' },
+    );
+    expect(created[0].language).toBe('uz');
+  });
+
+  it('a first sign-in fixes the language, a later one keeps it', async () => {
+    const { svc, tx } = service({});
+    const customers = (svc as any).customers;
+    customers.findByTelegramId = jest.fn(async () => ({
+      id: 'c1',
+      status: 'active',
+      language: null,
+    }));
+    await svc.telegramLogin(TENANT, 'init-data', { ...CTX, lang: 'en' });
+    expect(tx.customer.update.mock.calls[0][0].data.language).toBe('en');
+
+    customers.findByTelegramId = jest.fn(async () => ({
+      id: 'c1',
+      status: 'active',
+      language: 'ru',
+    }));
+    await svc.telegramLogin(TENANT, 'init-data', { ...CTX, lang: 'en' });
+    expect(tx.customer.update.mock.calls[1][0].data).not.toHaveProperty(
+      'language',
+    );
   });
 
   it('a token without a Telegram user still links initData sent to register', async () => {

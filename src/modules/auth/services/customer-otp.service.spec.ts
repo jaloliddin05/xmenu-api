@@ -18,7 +18,6 @@ const cfg = {
   otpMaxAttempts: 5,
   otpCooldownSeconds: 60,
   otpDevMode: false,
-  smsLocale: 'ru',
 } as CustomerAuthConfig;
 
 class FakeSms implements SmsProvider {
@@ -58,6 +57,26 @@ describe('CustomerOtpService', () => {
     sms = new FakeSms();
     const r = redis as unknown as Redis;
     otp = new CustomerOtpService(r, cfg, sms, new RateLimitService(r));
+  });
+
+  it('writes the SMS in the requested language (uz is Latin script)', async () => {
+    const texts: Record<string, RegExp> = {
+      ru: /Код для входа в Mant/,
+      uz: /Mant ga kirish uchun kod/,
+      en: /Your Mant sign-in code/,
+    };
+    let i = 0;
+    for (const lang of ['ru', 'uz', 'en'] as const) {
+      // distinct phones: the per-phone cooldown is not under test
+      await otp.request(TENANT, `+99890123456${i++}`, IP, 'customer', lang);
+      expect(sms.sent[sms.sent.length - 1].text).toMatch(texts[lang]);
+    }
+    expect(sms.sent[1].text).not.toMatch(/[Ѐ-ӿ]/);
+  });
+
+  it('falls back to the venue default language when none is passed', async () => {
+    await otp.request({ ...TENANT, defaultLanguage: 'en' }, PHONE, IP);
+    expect(sms.sent[0].text).toMatch(/sign-in code/);
   });
 
   it('sends a random 6-digit code by SMS and stores only its hash', async () => {

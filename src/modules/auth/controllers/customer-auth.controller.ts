@@ -50,7 +50,7 @@ import {
   INIT_DATA_HEADER,
   MiniAppAccessService,
 } from '../services/mini-app-access.service';
-import { requestCtx as ctxOf } from 'src/infra/http/request-helpers';
+import { requestCtx, resolveLang } from 'src/infra/http/request-helpers';
 import {
   CurrentCustomer,
   CustomerProtectedRoute,
@@ -63,6 +63,12 @@ import { TenantAuthChannelsDto } from '../../tenant/dto/tenant-config.dto';
 import { GuestLoginService } from '../../guest-login/guest-login.service';
 
 /** Sign-in steps that the venue's delivery mode applies to (docs/TELEGRAM_VERIFICATION.md). */
+/** IP, user agent and the request language (?lang / Accept-Language within the venue's languages). */
+const ctxOf = (req: Request, tenant: Tenant) => ({
+  ...requestCtx(req),
+  lang: resolveLang(req, tenant),
+});
+
 const ApiInitDataHeader = () =>
   ApiHeader({
     name: 'X-Telegram-Init-Data',
@@ -128,7 +134,7 @@ export class AuthCustomerController {
     @Req() req: Request,
   ) {
     await this.miniApp.assert(tenant.id, initData);
-    return this.auth.requestOtp(tenant, dto.phone, ctxOf(req));
+    return this.auth.requestOtp(tenant, dto.phone, ctxOf(req, tenant));
   }
 
   @CustomerPublicRoute()
@@ -158,7 +164,7 @@ export class AuthCustomerController {
     return this.auth.verifyOtp(
       tenant,
       tg && !dto.initData ? { ...dto, initData } : dto,
-      ctxOf(req),
+      ctxOf(req, tenant),
     );
   }
 
@@ -187,7 +193,7 @@ export class AuthCustomerController {
     return this.telegramVerification.start(
       tenant,
       tg && !dto.initData ? { ...dto, initData } : dto,
-      ctxOf(req),
+      ctxOf(req, tenant),
     );
   }
 
@@ -204,7 +210,11 @@ export class AuthCustomerController {
     @Body() dto: CustomerTelegramStatusDto,
     @Req() req: Request,
   ) {
-    return this.telegramVerification.status(tenant, dto.sessionId, ctxOf(req));
+    return this.telegramVerification.status(
+      tenant,
+      dto.sessionId,
+      ctxOf(req, tenant),
+    );
   }
 
   @CustomerPublicRoute()
@@ -222,7 +232,7 @@ export class AuthCustomerController {
     return this.auth.register(
       tenant,
       tg && !dto.initData ? { ...dto, initData } : dto,
-      ctxOf(req),
+      ctxOf(req, tenant),
     );
   }
 
@@ -235,7 +245,7 @@ export class AuthCustomerController {
     @Body() dto: CustomerRefreshDto,
     @Req() req: Request,
   ) {
-    return this.auth.refresh(tenant, dto.refreshToken, ctxOf(req));
+    return this.auth.refresh(tenant, dto.refreshToken, ctxOf(req, tenant));
   }
 
   @CustomerPublicRoute()
@@ -250,7 +260,7 @@ export class AuthCustomerController {
     @Body() dto: CustomerLogoutDto,
     @Req() req: Request,
   ) {
-    await this.auth.logout(tenant, dto?.refreshToken, ctxOf(req));
+    await this.auth.logout(tenant, dto?.refreshToken, ctxOf(req, tenant));
   }
 
   @CustomerProtectedRoute()
@@ -283,6 +293,6 @@ export class AuthCustomerController {
   ) {
     // The body initData is the Mini App data too: the mode check sees it when the header is missing
     await this.miniApp.assert(tenant.id, initData ?? dto.initData);
-    return this.auth.telegramLogin(tenant, dto.initData, ctxOf(req));
+    return this.auth.telegramLogin(tenant, dto.initData, ctxOf(req, tenant));
   }
 }

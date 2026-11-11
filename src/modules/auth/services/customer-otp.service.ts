@@ -11,6 +11,7 @@ import {
   AppException,
   platformMisconfigured,
 } from 'src/infra/errors/app-exception';
+import type { Lang } from 'src/infra/http/request-helpers';
 import { isSmsConfigured } from 'src/modules/sms/sms.module';
 
 const SEND_TIMEOUT_MS = 5000;
@@ -33,19 +34,23 @@ const KEY_PREFIX: Record<OtpScope, string> = { customer: 'otp', staff: 'sotp' };
 
 const SMS_TEXT: Record<
   OtpScope,
-  Record<'uz' | 'ru', (brand: string, code: string) => string>
+  Record<Lang, (brand: string, code: string) => string>
 > = {
   customer: {
     uz: (brand, code) =>
       `${brand} ga kirish uchun kod: ${code}. Hech kimga bermang.`,
     ru: (brand, code) =>
       `Код для входа в ${brand}: ${code}. Никому не сообщайте.`,
+    en: (brand, code) =>
+      `Your ${brand} sign-in code: ${code}. Do not share it with anyone.`,
   },
   staff: {
     uz: (brand, code) =>
       `${brand} tasdiqlash kodi: ${code}. Hech kimga bermang.`,
     ru: (brand, code) =>
       `Код подтверждения ${brand}: ${code}. Никому не сообщайте.`,
+    en: (brand, code) =>
+      `${brand} confirmation code: ${code}. Do not share it with anyone.`,
   },
 };
 
@@ -92,10 +97,11 @@ export class CustomerOtpService {
 
   /** otp/request: customers jadvaliga umuman tegmaydi. Qaytaradi: resendAfter (sekund). */
   async request(
-    tenant: { id: string; brandName: string },
+    tenant: { id: string; brandName: string; defaultLanguage?: Lang },
     phone: string,
     ip: string,
     scope: OtpScope = 'customer',
+    lang: Lang = tenant.defaultLanguage ?? 'ru',
   ): Promise<number> {
     if (!this.cfg.otpDevMode && !isSmsConfigured())
       throw platformMisconfigured(
@@ -106,10 +112,7 @@ export class CustomerOtpService {
       ip,
       scope,
       deliver: (code) =>
-        this.sms.send(
-          phone,
-          SMS_TEXT[scope][this.cfg.smsLocale](tenant.brandName, code),
-        ),
+        this.sms.send(phone, SMS_TEXT[scope][lang](tenant.brandName, code)),
     });
   }
 

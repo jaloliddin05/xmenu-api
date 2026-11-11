@@ -51,16 +51,16 @@ export const BOT_MESSAGES: Record<BotLang, Messages> = {
     code: (brand, code) =>
       `«${b(brand)}» ga kirish kodi: <b>${code}</b>\nBu kodni hech kimga bermang.`,
     notYourContact:
-      'Faqat o‘zingizning raqamingizni «Raqamni yuborish» tugmasi orqali yuboring.',
+      "Faqat o'zingizning raqamingizni «Raqamni yuborish» tugmasi orqali yuboring.",
     onlyUzbek:
-      'Hozircha faqat O‘zbekiston raqamlari (+998) qo‘llab-quvvatlanadi.',
+      "Hozircha faqat O'zbekiston raqamlari (+998) qo'llab-quvvatlanadi.",
     phoneMismatch:
       'Bu raqam ilovadagi raqamga mos kelmadi. Raqamni tekshirib, qaytadan boshlang.',
     expired: 'Sessiya tugadi. Ilovaga qayting va qaytadan boshlang.',
-    wrongAccount: 'Bu havola boshqa Telegram akkaunti uchun mo‘ljallangan.',
+    wrongAccount: "Bu havola boshqa Telegram akkaunti uchun mo'ljallangan.",
     alreadyDone: 'Raqam allaqachon tasdiqlangan. Ilovaga qayting.',
-    tooMany: 'Juda ko‘p urinish. Keyinroq urinib ko‘ring.',
-    failed: 'Kodni yuborib bo‘lmadi. Qaytadan urinib ko‘ring.',
+    tooMany: "Juda ko'p urinish. Keyinroq urinib ko'ring.",
+    failed: "Kodni yuborib bo'lmadi. Qaytadan urinib ko'ring.",
   },
   en: {
     greeting: 'Open the restaurant app to sign in.',

@@ -140,6 +140,11 @@ export const ERROR_CODES = spec({
     message: 'Invalid name',
     when: 'Имя клиента пустое или слишком длинное',
   },
+  language_not_supported: {
+    status: 422,
+    message: 'Language not supported',
+    when: 'Язык клиента не ru, uz или en либо не включён у заведения',
+  },
   registration_expired: {
     status: 400,
     message: 'Registration expired',

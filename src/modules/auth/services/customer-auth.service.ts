@@ -60,7 +60,13 @@ export class CustomerAuthService {
     if (!isValidPhone(phone)) throw new AppException('invalid_phone');
 
     try {
-      const resendAfter = await this.otp.request(tenant, phone, ctx.ip);
+      const resendAfter = await this.otp.request(
+        tenant,
+        phone,
+        ctx.ip,
+        'customer',
+        ctx.lang,
+      );
       await this.events.log('otp_requested', ctx, {
         tenantId: tenant.id,
         phone,
@@ -193,6 +199,7 @@ export class CustomerAuthService {
           {
             phone: claims.phone,
             name,
+            language: ctx.lang ?? null,
             telegram_id: taken ? null : telegramId,
             last_login_at: new Date(),
           },
@@ -317,7 +324,11 @@ export class CustomerAuthService {
     const pair = await this.prisma.$transaction(async (tx) => {
       await tx.customer.update({
         where: { id: customer.id },
-        data: { last_login_at: new Date() },
+        data: {
+          last_login_at: new Date(),
+          // The first sign-in fixes the language; later changes only via PATCH /customers/me
+          ...(!customer.language && ctx.lang ? { language: ctx.lang } : {}),
+        },
       });
       return this.sessions.createSession(tx, customer.id, tenant.id, ctx);
     });

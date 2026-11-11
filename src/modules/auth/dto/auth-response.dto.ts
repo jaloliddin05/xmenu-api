@@ -8,6 +8,13 @@ export class CustomerUserDto implements CustomerUser {
   @ApiProperty() id: string;
   @ApiProperty({ example: '+998901234567' }) phone: string;
   @ApiProperty({ example: 'Ali' }) name: string;
+  @ApiProperty({
+    enum: ['ru', 'uz', 'en'],
+    nullable: true,
+    description:
+      'Preferred language; null until the first sign-in. SMS and order notifications use it (the venue default when null or no longer offered)',
+  })
+  language: string | null;
 }
 
 export class CustomerTokenPairDto {

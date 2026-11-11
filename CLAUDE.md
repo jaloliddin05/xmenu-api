@@ -160,6 +160,11 @@ Payme вручную через ops-чат.
 Вход по `initData` (`POST /auth/customer/login`) только для клиента с уже привязанным `telegram_id`. Подтверждение в Mini
 App (`instant`) нового номера кладёт Telegram-id в `registrationToken` (`tg`), `register` его привязывает.
 
+Язык клиента: `customer.language` (`ru|uz|en`, null до первого входа), задаётся из языка запроса (`RequestCtx.lang`,
+`resolveLang`) при регистрации и первом входе, меняется `PATCH /customers/me`. SMS-коды берут язык запроса
+(`SMS_TEXT` в `customer-otp.service.ts`), уведомления клиенту `customerLangFor` (язык клиента, если заведение его
+предлагает, иначе язык заведения) и `CUSTOMER_TEXTS` (`order/notifications/customer-messages.ts`).
+
 ## Боты заведений и подтверждение номера через Telegram
 Контракт и сценарии: `docs/TELEGRAM_VERIFICATION.md`.
 - `TelegramBotService` (`modules/telegram`): `GET/PUT/DELETE /telegram-bot` из админки. Таблица
@@ -221,7 +226,7 @@ App (`instant`) нового номера кладёт Telegram-id в `registrat
 - Отзыв всех сессий владельца при смене пароля, восстановление пароля, выход «везде».
 - Роли сотрудников для отдельного приложения (курьеры, официанты, менеджеры). Таблица `employee` есть, не используется.
 - Позже: POS, Web Push/WebSocket для админки, фискальные чеки, промокоды (поле `discount` всегда 0), заказ ко
-  времени, меню по филиалам, язык уведомлений клиенту (только русский), ротация `PAYMENT_CONFIG_KEY`, rate limit на
+  времени, меню по филиалам, ротация `PAYMENT_CONFIG_KEY`, rate limit на
   `POST /orders`.
 
 ## Известные долги

@@ -104,6 +104,33 @@ describe('restaurant keyboard', () => {
   });
 });
 
+describe('customer message languages', () => {
+  it.each([
+    ['ru', /№1042/, 'готовится'],
+    ['uz', /№1042/, 'tayyorlanmoqda'],
+    ['en', /#1042/, 'prepared'],
+  ] as const)('%s', (lang, num, word) => {
+    const text = buildCustomerText(order({ status: 'preparing' }), null, lang)!;
+    expect(text).toMatch(num);
+    expect(text).toContain(word);
+  });
+
+  it('keeps the refund note in every language and Latin script for uz', () => {
+    const cancelled = order({
+      status: 'cancelled',
+      cancelled_by: 'restaurant',
+      payment_status: 'refund_pending',
+    });
+    for (const lang of ['ru', 'uz', 'en'] as const)
+      expect(
+        buildCustomerText(cancelled, 'pending_acceptance', lang),
+      ).toContain('\n');
+    expect(
+      buildCustomerText(cancelled, 'pending_acceptance', 'uz'),
+    ).not.toMatch(/[\u0400-\u04FF]/);
+  });
+});
+
 describe('customer message', () => {
   it('tells about payment only on the awaiting_payment → pending_acceptance step', () => {
     expect(buildCustomerText(order(), 'awaiting_payment')).toContain(

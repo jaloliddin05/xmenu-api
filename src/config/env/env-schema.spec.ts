@@ -124,7 +124,6 @@ describe('validateEnv', () => {
     ['OTP_LENGTH', 'six', /integer/],
     ['HTTP_MAX_REDIRECTS', '-1', /integer >= 0/],
     ['OTP_DEV_MODE', 'yes', /true or false/],
-    ['SMS_LOCALE', 'kk', /one of/],
     ['ORDER_QUEUES', 'no', /one of/],
     ['DATABASE_URL', 'mysql://x', /postgresql/],
     ['PUBLIC_API_URL', 'not a url', /must be a URL/],

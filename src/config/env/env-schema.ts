@@ -77,7 +77,6 @@ export const ENV_SCHEMA: readonly EnvVarSpec[] = [
   int('REFRESH_TTL_DAYS'),
   int('SESSION_ABSOLUTE_DAYS'),
   int('REFRESH_REUSE_LEEWAY_SECONDS'),
-  { name: 'SMS_LOCALE', kind: 'enum', values: ['uz', 'ru'] },
   bool('OTP_DEV_MODE'),
   {
     name: 'SMS_PROVIDER',
