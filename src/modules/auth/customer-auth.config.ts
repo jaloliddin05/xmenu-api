@@ -1,6 +1,12 @@
 import { Env, EnvIssues, isProduction } from 'src/config/env/env-issues';
 
 export const CUSTOMER_AUTH_CONFIG = 'CUSTOMER_AUTH_CONFIG';
+/** The initData check alone: needs no customer secrets (POST /orders uses it through MiniAppModule). */
+export const INIT_DATA_CONFIG = 'INIT_DATA_CONFIG';
+
+export interface InitDataConfig {
+  telegramInitDataMaxAgeSeconds: number;
+}
 
 export interface CustomerAuthConfig {
   accessSecret: string;
@@ -80,6 +86,15 @@ function int(name: string, def: number): number {
   return Number.isInteger(n) && n > 0 ? n : def;
 }
 
+export function loadInitDataConfig(): InitDataConfig {
+  return {
+    telegramInitDataMaxAgeSeconds: int(
+      'TELEGRAM_INITDATA_MAX_AGE_SECONDS',
+      86400,
+    ),
+  };
+}
+
 export function loadCustomerAuthConfig(): CustomerAuthConfig {
   // Also checked by validateEnv at startup; kept here so the module never builds with bad secrets
   const { errors } = customerAuthEnvIssues(process.env);
@@ -107,10 +122,7 @@ export function loadCustomerAuthConfig(): CustomerAuthConfig {
     refreshReuseLeewaySeconds: int('REFRESH_REUSE_LEEWAY_SECONDS', 10),
     maxActiveFamilies: 10,
     smsLocale: locale,
-    telegramInitDataMaxAgeSeconds: int(
-      'TELEGRAM_INITDATA_MAX_AGE_SECONDS',
-      86400,
-    ),
+    ...loadInitDataConfig(),
     telegramVerifyTtlSeconds: int('TELEGRAM_VERIFY_TTL_SECONDS', 300),
   };
 }

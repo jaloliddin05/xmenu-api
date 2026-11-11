@@ -1,10 +1,7 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../_prisma/prisma.module';
 import { TelegramModule } from '../telegram/telegram.module';
-import {
-  CUSTOMER_AUTH_CONFIG,
-  loadCustomerAuthConfig,
-} from './customer-auth.config';
+import { INIT_DATA_CONFIG, loadInitDataConfig } from './customer-auth.config';
 import { MiniAppAccessService } from './services/mini-app-access.service';
 import { TelegramInitDataService } from './services/telegram-init-data.service';
 
@@ -15,7 +12,7 @@ import { TelegramInitDataService } from './services/telegram-init-data.service';
 @Module({
   imports: [PrismaModule, TelegramModule],
   providers: [
-    { provide: CUSTOMER_AUTH_CONFIG, useFactory: loadCustomerAuthConfig },
+    { provide: INIT_DATA_CONFIG, useFactory: loadInitDataConfig },
     TelegramInitDataService,
     MiniAppAccessService,
   ],
