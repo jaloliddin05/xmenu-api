@@ -115,6 +115,16 @@ describe('CustomerTokenService', () => {
       expect(claims.jti.length).toBeGreaterThan(0);
     });
 
+    it('carries the Telegram user of a Mini App verification, and only when given', () => {
+      const service = new CustomerTokenService(makeConfig());
+      const withTg = service.signRegistration('+998901234567', TENANT_A, '555');
+      expect(service.verifyRegistration(withTg, TENANT_A).tg).toBe('555');
+      const without = service.signRegistration('+998901234567', TENANT_A);
+      expect(service.verifyRegistration(without, TENANT_A)).not.toHaveProperty(
+        'tg',
+      );
+    });
+
     it('gives each registration token a distinct jti (one-time-use identifier)', () => {
       const service = new CustomerTokenService(makeConfig());
       const tokenA = service.signRegistration('+998901234567', TENANT_A);

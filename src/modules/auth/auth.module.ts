@@ -32,7 +32,7 @@ import { StaffSessionService } from './services/staff-session.service';
 import { StaffLoginThrottleService } from './services/staff-login-throttle.service';
 import { CustomerCleanupService } from './services/customer-cleanup.service';
 import { RateLimitService } from './services/rate-limit.service';
-import { TelegramInitDataService } from './services/telegram-init-data.service';
+import { MiniAppModule } from './mini-app.module';
 import { TelegramVerificationService } from './services/telegram-verification.service';
 import {
   BullTelegramUpdateQueue,
@@ -51,6 +51,7 @@ import { NoStoreMiddleware } from './middleware/no-store.middleware';
     CustomerModule,
     TenantModule,
     TelegramModule,
+    MiniAppModule,
     GuestLoginModule,
     PrismaModule,
     JwtModule.registerAsync({
@@ -79,7 +80,6 @@ import { NoStoreMiddleware } from './middleware/no-store.middleware';
     StaffAuthEventService,
     CustomerCleanupService,
     RateLimitService,
-    TelegramInitDataService,
     TelegramVerificationService,
     { provide: TELEGRAM_UPDATE_QUEUE, useClass: BullTelegramUpdateQueue },
     TelegramUpdateProcessor,

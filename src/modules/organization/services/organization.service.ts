@@ -248,7 +248,7 @@ export class OrganizationService {
     });
 
     // The Mini App menu button of the venue's bot points at the slug address; best effort, never throws
-    if (slugChanged) void this.botProfile.refreshMenuButton(id);
+    if (slugChanged) void this.botProfile.syncMenuButton(id);
 
     // 7️⃣ yangilangan ma’lumotni qaytarish
     return await this.prismaService.organization.findUnique({

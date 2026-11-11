@@ -6,7 +6,10 @@ import {
   resolveTheme,
   toSettingsView,
 } from 'src/modules/organization/domain/organization-settings';
-import { orderingProblem } from 'src/modules/organization/domain/publication';
+import {
+  modeNeedsBot,
+  orderingProblem,
+} from 'src/modules/organization/domain/publication';
 import type { OrderingProblem } from 'src/modules/organization/domain/publication';
 import { GuestLoginService } from 'src/modules/guest-login/guest-login.service';
 import { PrismaService } from '../_prisma/prisma.service';
@@ -118,6 +121,7 @@ export class TenantConfigService {
           delivery_mode: true,
           published_at: true,
           domains: PRIMARY_DOMAIN_SELECT,
+          telegram_bot: { select: { username: true } },
         },
       }),
       this.orderSettings.get(tenant.id),
@@ -149,6 +153,8 @@ export class TenantConfigService {
     const published = problem === null;
     // Same answer as GET /auth/customer/methods: a bot whose token cannot be decrypted is not offered
     const auth = await this.guestLogin.methods(tenant.id, published);
+    // Same bot check as channels.auth: a bot that cannot serve guests offers no Mini App
+    const miniApp = auth.telegram && modeNeedsBot(org.delivery_mode);
     const modes = fulfillmentModes(
       branches,
       ordering.deliveryZone !== null,
@@ -188,6 +194,8 @@ export class TenantConfigService {
           enabled: org.delivery_enabled,
           mode: org.delivery_mode,
           published,
+          miniApp,
+          botUsername: miniApp ? (org.telegram_bot?.username ?? null) : null,
         },
       },
       fulfillment: {

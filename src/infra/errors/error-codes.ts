@@ -362,6 +362,16 @@ export const ERROR_CODES = spec({
     message: 'Connect the venue Telegram bot first',
     when: 'Режим `miniapp`/`both` без подключённого бота',
   },
+  miniapp_required: {
+    status: 403,
+    message: 'The venue takes orders only in its Telegram Mini App',
+    when: 'Режим `miniapp`: заказ или вход гостя без заголовка `X-Telegram-Init-Data`; открыть заведение в Telegram',
+  },
+  miniapp_init_data_invalid: {
+    status: 403,
+    message: 'Telegram Mini App data is invalid or expired',
+    when: 'Режимы `miniapp`/`both`: `X-Telegram-Init-Data` не подписан ботом заведения или устарел; переоткрыть Mini App',
+  },
   publication_incomplete: {
     status: 409,
     message: 'Publication checklist is not complete',

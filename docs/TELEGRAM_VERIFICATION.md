@@ -4,8 +4,10 @@
 Telegram доступен, когда заведение подключило бота. Пока нет договора с SMS-провайдером, это единственный реальный
 способ подтверждения без тестовой группы.
 
-Входом через `initData` это **не** является. `initData` используется только в режиме Mini App, чтобы привязать сессию
-к Telegram-пользователю (защита от пересылки ссылки).
+Само подтверждение номера входом через `initData` не является: в режиме Mini App `initData` привязывает сессию к
+Telegram-пользователю (защита от пересылки ссылки). Отдельно `POST /auth/customer/login` с `initData` впускает клиента,
+к которому этот Telegram-пользователь уже привязан. Режим доставки заведения (`site`, `miniapp`, `both`) решает, нужен ли
+`initData` для входа и заказа: раздел «Mini App и режимы доставки».
 
 Код: `src/modules/telegram/` (боты заведений), `auth/services/telegram-verification.service.ts`,
 `auth/controllers/telegram-bot-webhook.controller.ts`. Сессии в Redis (`tgv:*`).
@@ -53,8 +55,9 @@ Webhook и секрет ставятся автоматически, рукам�
 
 Тело: `{ phone?: string, initData?: string }`.
 
-- **С `initData`** (внутри Mini App): режим `instant`. `phone` необязателен; если передан, контакт должен с ним совпасть.
-  `initData` проверяется токеном бота заведения; неверная подпись → `401 invalid_telegram_data`.
+- **С `initData`** (внутри Mini App, в теле или в заголовке `X-Telegram-Init-Data`): режим `instant`. `phone`
+  необязателен; если передан, контакт должен с ним совпасть. `initData` проверяется токеном бота заведения; неверная
+  подпись в теле → `401 invalid_telegram_data`, в заголовке (режимы `miniapp`, `both`) → `403 miniapp_init_data_invalid`.
 - **Без `initData`** (сайт): режим `code`. `phone` обязателен (`+998XXXXXXXXX`), иначе `400 invalid_phone`.
 
 Ответ: `{ sessionId, mode: "instant" | "code", botUsername, deepLink, expiresIn }`. `expiresIn` в секундах
@@ -76,7 +79,10 @@ Webhook и секрет ставятся автоматически, рукам�
 **Mini App (`instant`):**
 1. `telegram/start` с `initData`, затем `Telegram.WebApp.requestContact()`; если не поддерживается, открыть `deepLink`.
 2. Пользователь делится контактом; бот отвечает «Номер подтверждён».
-3. Опрос `telegram/status` вернёт `verified` с готовым входом. Telegram-пользователь привязывается к клиенту.
+3. Опрос `telegram/status` вернёт `verified` с готовым входом. Telegram-пользователь привязывается к клиенту. Новый
+   номер получает `registrationToken`, в нём уже лежит Telegram-пользователь: `register` (имя) привязывает его без
+   повторного `initData`.
+4. Следующие открытия Mini App: `POST /auth/customer/login { initData }` впускает сразу, без телефона.
 
 **Сайт (`code`):**
 1. Пользователь вводит телефон; `telegram/start` с `phone`; открыть `deepLink` (ссылка на бота).
@@ -85,6 +91,31 @@ Webhook и секрет ставятся автоматически, рукам�
 4. Пользователь вводит код; `POST /auth/customer/otp/verify { phone, code }`, как с SMS (длина кода `OTP_LENGTH`).
 
 Повторная отправка кода: пользователь снова делится контактом в боте (действуют те же лимиты, что и у SMS).
+
+## Mini App и режимы доставки
+
+Режим `channels.delivery.mode` заведения (владелец выбирает в `PUT /organization/:id/channels`, `miniapp` и `both`
+требуют бота):
+
+- `site`: Mini App нет. Кнопка меню бота стандартная (Telegram), `/start` отвечает приветствием без кнопки. Вход и
+  заказы как обычно, заголовок `X-Telegram-Init-Data` не проверяется.
+- `miniapp`: заказать и войти можно только внутри Mini App. Шаги входа (`otp/request`, `otp/verify`, `register`,
+  `telegram/start`, `login`) и `POST /orders` требуют заголовка `X-Telegram-Init-Data` с `Telegram.WebApp.initData`,
+  подписанным ботом заведения и не старше `TELEGRAM_INITDATA_MAX_AGE_SECONDS` (по умолчанию сутки). Нет заголовка →
+  `403 miniapp_required`; поддельный, просроченный или подписанный другим ботом → `403 miniapp_init_data_invalid`.
+- `both`: сайт и Mini App. Без заголовка всё как в `site`; пришедший заголовок проверяется так же, как в `miniapp`, и
+  годится для входа и привязки Telegram.
+- Бот удалён при режиме `miniapp`/`both` (режим остаётся): `503 telegram_unavailable` на шагах входа и заказе.
+
+Кнопка меню бота в `miniapp` и `both`: `web_app` на адрес сайта доставки заведения (`https://<primaryDomain>`, иначе
+`DELIVERY_URL_TEMPLATE`); в `site` стандартная. Бэкенд ставит её сам при подключении бота, смене режима, смене slug,
+подтверждении и удалении подтверждённого домена (`TelegramBotProfileService.syncMenuButton`: каждый раз полное нужное
+состояние, ошибки Telegram только в лог и в `lastSync`). `/start` без параметра в `miniapp` и `both` отвечает
+приветствием с кнопкой «Открыть меню» (`web_app`, тот же адрес).
+
+Для клиента в `GET /tenant/config`: `channels.delivery.mode`, `channels.delivery.miniApp` (режим `miniapp`/`both` и бот
+работает) и `channels.delivery.botUsername` (для ссылки `https://t.me/<botUsername>`, только при `miniApp`). Коды и таблица:
+`API.md`, «Mini App и режимы доставки».
 
 ## Защита
 
@@ -137,11 +168,17 @@ Webhook и секрет ставятся автоматически, рукам�
 4. Автонастройка (`PUT /telegram-bot`, `PUT /telegram-bot/profile`, `POST /telegram-bot/sync`, см. `API.md`): имя, описания и
    команда `/start` реально появились у бота (по языкам), кнопка меню открывает `https://{slug}.xmenu.uz` как Mini App,
    `DELETE /telegram-bot` вернул стандартную кнопку, смена slug перенастроила кнопку; ответ Telegram на частую смену имени.
+5. Режимы доставки: смена `site` ↔ `miniapp` меняет кнопку меню у клиентов Telegram (кэш клиента Telegram может держать
+   старую кнопку до перезапуска чата); кнопка «Открыть меню» в `/start` открывает Mini App.
+6. `initData` от настоящего клиента Telegram (iOS, Android, Desktop) проходит проверку подписи и срока; заголовок
+   `X-Telegram-Init-Data` доходит через nginx (размер заголовка).
+7. Mini App на своём домене заведения (`https://<primaryDomain>`): Telegram открывает его как Web App по кнопке меню.
 
 ## Известные ограничения и следующие шаги
 
 - Уведомления о заказах (кнопки в группах филиалов) пока идут через платформенного бота (`TELEGRAM_BOT_TOKEN` /
   `TELEGRAM_ORDERS_BOT_TOKEN`), не через бота заведения.
-- Заведение без своего бота: `initData` проверяется токеном платформенного бота (как раньше).
-- Кнопка меню Mini App в BotFather пока настраивается вручную.
-- UI в админке (экран бота) и в клиенте (кнопка «Войти через Telegram») не сделаны.
+- Заведение без своего бота: `initData` в теле (`login`, `otp/verify`, `register`) проверяется токеном платформенного
+  бота (как раньше); заголовок `X-Telegram-Init-Data` проверяется только ботом заведения.
+- Заказ в режиме `miniapp` не сверяет Telegram-пользователя из `initData` с привязанным к клиенту: проверяется только,
+  что запрос пришёл из Mini App заведения.

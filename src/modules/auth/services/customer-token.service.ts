@@ -13,6 +13,8 @@ export interface RegistrationClaims {
   phone: string;
   tid: string;
   jti: string;
+  /** Telegram user who proved the phone in the Mini App (instant mode): linked on register */
+  tg?: string;
 }
 
 /** Xodimlar JwtModule'idan alohida, o'z secretlari bilan. Algoritm allowlist: faqat HS256. */
@@ -38,9 +40,13 @@ export class CustomerTokenService {
     );
   }
 
-  signRegistration(phone: string, tenantId: string): string {
+  signRegistration(
+    phone: string,
+    tenantId: string,
+    telegramId?: string,
+  ): string {
     return this.jwt.sign(
-      { phone, tid: tenantId },
+      { phone, tid: tenantId, ...(telegramId ? { tg: telegramId } : {}) },
       {
         secret: this.cfg.registrationSecret,
         algorithm: 'HS256',
@@ -69,6 +75,13 @@ export class CustomerTokenService {
     if (payload.tid !== tenantId || !payload.phone || !payload.jti) {
       throw new AppException('invalid_registration_token');
     }
-    return { phone: payload.phone, tid: payload.tid, jti: payload.jti };
+    return {
+      phone: payload.phone,
+      tid: payload.tid,
+      jti: payload.jti,
+      ...(typeof payload.tg === 'string' && payload.tg
+        ? { tg: payload.tg }
+        : {}),
+    };
   }
 }

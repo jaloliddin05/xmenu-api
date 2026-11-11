@@ -393,6 +393,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "X-Telegram-Init-Data",
+            "in": "header",
+            "description": "Raw Telegram.WebApp.initData inside the venue Mini App. Mode miniapp: required (403 miniapp_required); miniapp and both: checked against the venue bot and TELEGRAM_INITDATA_MAX_AGE_SECONDS (403 miniapp_init_data_invalid); site: ignored",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -441,6 +450,15 @@
             "in": "header",
             "description": "Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Telegram-Init-Data",
+            "in": "header",
+            "description": "Raw Telegram.WebApp.initData inside the venue Mini App. Mode miniapp: required (403 miniapp_required); miniapp and both: checked against the venue bot and TELEGRAM_INITDATA_MAX_AGE_SECONDS (403 miniapp_init_data_invalid); site: ignored",
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -500,6 +518,15 @@
             "in": "header",
             "description": "Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Telegram-Init-Data",
+            "in": "header",
+            "description": "Raw Telegram.WebApp.initData inside the venue Mini App. Mode miniapp: required (403 miniapp_required); miniapp and both: checked against the venue bot and TELEGRAM_INITDATA_MAX_AGE_SECONDS (403 miniapp_init_data_invalid); site: ignored",
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -604,6 +631,15 @@
             "in": "header",
             "description": "Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Telegram-Init-Data",
+            "in": "header",
+            "description": "Raw Telegram.WebApp.initData inside the venue Mini App. Mode miniapp: required (403 miniapp_required); miniapp and both: checked against the venue bot and TELEGRAM_INITDATA_MAX_AGE_SECONDS (403 miniapp_init_data_invalid); site: ignored",
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -796,6 +832,15 @@
             "in": "header",
             "description": "Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Telegram-Init-Data",
+            "in": "header",
+            "description": "Raw Telegram.WebApp.initData inside the venue Mini App. Mode miniapp: required (403 miniapp_required); miniapp and both: checked against the venue bot and TELEGRAM_INITDATA_MAX_AGE_SECONDS (403 miniapp_init_data_invalid); site: ignored",
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -2961,6 +3006,15 @@
             }
           },
           {
+            "name": "X-Telegram-Init-Data",
+            "in": "header",
+            "description": "Raw Telegram.WebApp.initData inside the venue Mini App. Mode miniapp: required (403 miniapp_required); miniapp and both: checked against the venue bot (403 miniapp_init_data_invalid); site: ignored",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "Idempotency-Key",
             "in": "header",
             "description": "Har bir buyurtma urinishi uchun noyob kalit (8-128 belgi). Takrorda o'sha buyurtma qaytadi.",
@@ -4905,6 +4959,8 @@
           "invalid_slug",
           "slug_taken",
           "telegram_bot_required",
+          "miniapp_required",
+          "miniapp_init_data_invalid",
           "publication_incomplete",
           "invalid_bot_token",
           "bot_already_connected",
@@ -8409,12 +8465,25 @@
             "type": "boolean",
             "example": true,
             "description": "Orders are open: enabled and published. false = never published or paused by the owner; POST /orders answers 422"
+          },
+          "miniApp": {
+            "type": "boolean",
+            "example": false,
+            "description": "The venue has a Mini App: mode miniapp or both and its Telegram bot works (channels.auth.telegram). Mode miniapp takes sign-in and orders only inside it (X-Telegram-Init-Data)"
+          },
+          "botUsername": {
+            "type": "string",
+            "nullable": true,
+            "example": "mant_cafe_bot",
+            "description": "Username of the venue bot when miniApp, for the «Открыть в Telegram» link https://t.me/<botUsername>; null otherwise"
           }
         },
         "required": [
           "enabled",
           "mode",
-          "published"
+          "published",
+          "miniApp",
+          "botUsername"
         ]
       },
       "TenantChannelsDto": {

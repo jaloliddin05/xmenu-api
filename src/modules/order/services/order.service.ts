@@ -22,6 +22,7 @@ import {
 } from '../domain/order-state-machine';
 import type { Tenant } from 'src/modules/tenant/tenant.service';
 import { orderingProblem } from 'src/modules/organization/domain/publication';
+import { MiniAppAccessService } from 'src/modules/auth/services/mini-app-access.service';
 import { OrderSettingsService } from './order-settings.service';
 import {
   InvalidTransitionError,
@@ -47,6 +48,7 @@ export class OrderService {
     private readonly transitions: OrderTransitionService,
     private readonly payments: PaymentConfigService,
     private readonly links: PaymentLinkService,
+    private readonly miniApp: MiniAppAccessService,
   ) {}
 
   // ------------------------------------------------------------------ create
@@ -62,6 +64,7 @@ export class OrderService {
     idempotencyKey: string | undefined,
     lang: Lang,
     tenant: Pick<Tenant, 'currency' | 'defaultLanguage'>,
+    initData?: string,
   ) {
     if (!idempotencyKey || !IDEMPOTENCY_KEY.test(idempotencyKey)) {
       throw new AppException('idempotency_key_required', {
@@ -89,8 +92,8 @@ export class OrderService {
     if (customer.status === 'blocked')
       throw new AppException('customer_blocked');
 
-    // Ordering channel and publication, read fresh (not from the tenant cache): a pause applies at once
-    await this.assertOrderingOpen(organizationId);
+    // Ordering channel, publication and delivery mode, read fresh (not from the tenant cache): a pause applies at once
+    await this.assertOrderingOpen(organizationId, initData);
 
     const settings = await this.settings.get(organizationId);
     const mode = dto.fulfillmentMode;
@@ -502,10 +505,14 @@ export class OrderService {
       );
   }
 
-  private async assertOrderingOpen(organizationId: string) {
+  private async assertOrderingOpen(organizationId: string, initData?: string) {
     const org = await this.prisma.organization.findUnique({
       where: { id: organizationId },
-      select: { delivery_enabled: true, published_at: true },
+      select: {
+        delivery_enabled: true,
+        published_at: true,
+        delivery_mode: true,
+      },
     });
     const problem = org
       ? orderingProblem({
@@ -522,6 +529,8 @@ export class OrderService {
       throw new AppException(problem, {
         message: 'The venue is not taking orders right now',
       });
+    // Mode miniapp: only from the venue Mini App (docs/TELEGRAM_VERIFICATION.md)
+    await this.miniApp.assert(organizationId, initData, org!.delivery_mode);
   }
 
   private async chooseBranch(

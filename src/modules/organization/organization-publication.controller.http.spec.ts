@@ -100,6 +100,7 @@ describe('Organization channels and publication (owner)', () => {
   let serialize: boolean;
   let queue: Promise<unknown>;
   const addRevalidationJob = jest.fn();
+  const syncMenuButton = jest.fn(async () => undefined);
   const queryRaw = jest.fn();
   const A = `Bearer ${staffToken('owner-a')}`;
   const NO_ORG = `Bearer ${staffToken('no-org')}`;
@@ -215,7 +216,7 @@ describe('Organization channels and publication (owner)', () => {
           { provide: FileService, useValue: {} },
           { provide: TenantService, useValue: { invalidate: jest.fn() } },
           { provide: RevalidateService, useValue: { addRevalidationJob } },
-          { provide: TelegramBotProfileService, useValue: {} },
+          { provide: TelegramBotProfileService, useValue: { syncMenuButton } },
           { provide: GuestLoginService, useValue: guestLogin },
         ],
       },
@@ -472,8 +473,19 @@ describe('Organization channels and publication (owner)', () => {
         }).expect(200);
         expect(res.body.channels.delivery.mode).toBe(mode);
         expect(venues[ORG_A].org.delivery_mode).toBe(mode);
+        // The bot menu button follows the mode
+        expect(syncMenuButton).toHaveBeenCalledWith(ORG_A);
       },
     );
+
+    it('the menu button is synced only when the mode changes', async () => {
+      syncMenuButton.mockClear();
+      await putChannels({
+        qr: false,
+        delivery: { enabled: false, mode: 'site' },
+      }).expect(200);
+      expect(syncMenuButton).not.toHaveBeenCalled();
+    });
 
     it('turning ordering off unpublishes', async () => {
       venues[ORG_A] = ready(ORG_A);

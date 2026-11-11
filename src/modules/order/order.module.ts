@@ -1,3 +1,4 @@
+import { MiniAppModule } from '../auth/mini-app.module';
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../_prisma/prisma.module';
 import { BranchModule } from '../branch/branch.module';
@@ -22,6 +23,7 @@ import { OrderService } from './services/order.service';
     PaymentModule,
     OrderCoreModule,
     RevalidateModule,
+    MiniAppModule,
   ],
   controllers: [
     CustomerOrderController,

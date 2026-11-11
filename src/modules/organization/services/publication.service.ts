@@ -15,6 +15,7 @@ import {
 import { PublicationViewDto } from '../dto/publication.dto';
 import { AppException } from 'src/infra/errors/app-exception';
 import { GuestLoginService } from 'src/modules/guest-login/guest-login.service';
+import { TelegramBotProfileService } from 'src/modules/telegram/telegram-bot-profile.service';
 
 type Db = Prisma.TransactionClient;
 
@@ -46,6 +47,7 @@ export class PublicationService {
     private readonly prisma: PrismaService,
     private readonly revalidate: RevalidateService,
     private readonly guestLogin: GuestLoginService,
+    private readonly botProfile: TelegramBotProfileService,
   ) {}
 
   async view(organizationId: string): Promise<PublicationViewDto> {
@@ -59,7 +61,7 @@ export class PublicationService {
     organizationId: string,
     channels: Channels,
   ): Promise<PublicationViewDto> {
-    const { view, changed } = await this.locked(
+    const { view, changed, modeChanged } = await this.locked(
       organizationId,
       async (tx, row) => {
         const { enabled, mode } = channels.delivery;
@@ -88,10 +90,16 @@ export class PublicationService {
             data: next,
           });
         }
-        return { changed, view: await this.buildView(tx, organizationId) };
+        return {
+          changed,
+          modeChanged: mode !== row.delivery_mode,
+          view: await this.buildView(tx, organizationId),
+        };
       },
     );
     if (changed) await this.changed(organizationId);
+    // The menu button of the venue bot follows the mode (Mini App or Telegram's default)
+    if (modeChanged) void this.botProfile.syncMenuButton(organizationId);
     return this.withWarnings(organizationId, view);
   }
 

@@ -9,26 +9,36 @@ import {
   SyncItem,
   SyncResult,
   VenueFacts,
-  deliveryUrl,
+  miniAppUrl,
   resolveProfile,
   validateProfileInput,
 } from './domain/bot-profile';
 import { TelegramBotService, TenantBot } from './telegram-bot.service';
 import { TelegramClient, telegramErrorText } from './telegram-client';
 import { AppException } from 'src/infra/errors/app-exception';
+import type { DeliveryMode } from 'src/modules/organization/domain/publication';
+import {
+  PRIMARY_DOMAIN_SELECT,
+  primaryDomainOf,
+} from 'src/modules/tenant/primary-domain';
 
 export interface BotProfileView {
   /** One entry per venue language */
   profile: Record<Lang, BotProfileFields>;
   /** false once the owner has saved the profile */
   isDefault: boolean;
-  /** Address the menu button opens, null when DELIVERY_URL_TEMPLATE is not set */
+  /**
+   * Address the menu button and the /start button open: the primary own domain, else the platform address
+   * (DELIVERY_URL_TEMPLATE). null in mode site (the button is Telegram's default) or when no address can be built
+   */
   deliveryUrl: string | null;
   lastSync: { syncedAt: Date; result: SyncResult } | null;
 }
 
 interface Venue extends VenueFacts {
   slug: string | null;
+  primaryDomain: string | null;
+  mode: DeliveryMode;
   languages: Lang[];
 }
 
@@ -56,6 +66,8 @@ export class TelegramBotProfileService {
       select: {
         name: true,
         slug: true,
+        delivery_mode: true,
+        domains: PRIMARY_DOMAIN_SELECT,
         translations: { select: { lang: true, description: true } },
         settings: { select: { languages: true, default_language: true } },
       },
@@ -71,6 +83,8 @@ export class TelegramBotProfileService {
     return {
       name: org.name,
       slug: org.slug,
+      primaryDomain: primaryDomainOf(org.domains),
+      mode: org.delivery_mode,
       languages,
       defaultLanguage,
       descriptions: Object.fromEntries(
@@ -115,7 +129,7 @@ export class TelegramBotProfileService {
     return {
       profile: resolveProfile(row.profile, venue.languages, venue),
       isDefault: row.profile == null,
-      deliveryUrl: deliveryUrl(venue.slug),
+      deliveryUrl: miniAppUrl(venue),
       lastSync:
         row.synced_at && row.sync_result
           ? {
@@ -189,7 +203,7 @@ export class TelegramBotProfileService {
       ),
       menuButton: await this.menuButton(
         bot,
-        deliveryUrl(venue.slug),
+        venue,
         profile[venue.defaultLanguage]?.menuButtonText,
       ),
     };
@@ -197,21 +211,36 @@ export class TelegramBotProfileService {
     return result;
   }
 
-  /** Mini App address for the /start greeting button; null when it cannot be built. Never throws. */
+  /**
+   * Mini App address for the /start greeting button: null in mode site or when it cannot be built.
+   * Never throws.
+   */
   async startUrl(organizationId: string): Promise<string | null> {
     try {
       const org = await this.prisma.organization.findUnique({
         where: { id: organizationId },
-        select: { slug: true },
+        select: {
+          slug: true,
+          delivery_mode: true,
+          domains: PRIMARY_DOMAIN_SELECT,
+        },
       });
-      return deliveryUrl(org?.slug);
+      if (!org) return null;
+      return miniAppUrl({
+        slug: org.slug,
+        primaryDomain: primaryDomainOf(org.domains),
+        mode: org.delivery_mode,
+      });
     } catch {
       return null;
     }
   }
 
-  /** Only the menu button: its address follows the venue slug. Never throws. */
-  async refreshMenuButton(organizationId: string): Promise<void> {
+  /**
+   * Only the menu button, after what it depends on changed: delivery mode, slug, primary domain.
+   * Sends the whole wanted state every time, so repeating it is harmless. Never throws.
+   */
+  async syncMenuButton(organizationId: string): Promise<void> {
     try {
       const bot = await this.bots.forTenant(organizationId);
       if (!bot) return;
@@ -222,7 +251,7 @@ export class TelegramBotProfileService {
       const profile = resolveProfile(row.profile, venue.languages, venue);
       const item = await this.menuButton(
         bot,
-        deliveryUrl(venue.slug),
+        venue,
         profile[venue.defaultLanguage]?.menuButtonText,
       );
       const previous = (row.sync_result ?? {}) as Partial<SyncResult>;
@@ -273,11 +302,26 @@ export class TelegramBotProfileService {
       : ok();
   }
 
+  /** Mode site: Telegram's default button; otherwise a web_app button to the Mini App address. */
   private async menuButton(
     bot: TenantBot,
-    url: string | null,
+    venue: Venue,
     text: string | undefined,
   ): Promise<SyncItem> {
+    if (venue.mode === 'site') {
+      try {
+        await this.client.call(bot.token, 'setChatMenuButton', {
+          menu_button: { type: 'default' },
+        });
+        return ok();
+      } catch (e) {
+        this.logger.warn(
+          `setChatMenuButton (default) failed for bot ${bot.botKey}: ${telegramErrorText(e)}`,
+        );
+        return { status: 'failed', code: 'telegram_request_failed' };
+      }
+    }
+    const url = miniAppUrl(venue);
     if (!url)
       return {
         status: 'skipped',

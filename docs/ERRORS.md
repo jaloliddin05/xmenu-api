@@ -70,6 +70,8 @@
 | `invalid_slug` | 400 | Slug не по правилам (формат, UUID, зарезервирован) | — |
 | `slug_taken` | 409 | Slug занят другим заведением | — |
 | `telegram_bot_required` | 422 | Режим `miniapp`/`both` без подключённого бота | — |
+| `miniapp_required` | 403 | Режим `miniapp`: заказ или вход гостя без заголовка `X-Telegram-Init-Data`; открыть заведение в Telegram | — |
+| `miniapp_init_data_invalid` | 403 | Режимы `miniapp`/`both`: `X-Telegram-Init-Data` не подписан ботом заведения или устарел; переоткрыть Mini App | — |
 | `publication_incomplete` | 409 | Публикация: не выполнены пункты чеклиста; `details.missing` | `details.missing` |
 | `invalid_bot_token` | 400 | Токен бота не по формату или Telegram его не принял | — |
 | `bot_already_connected` | 409 | Бот уже подключён к другому заведению | — |

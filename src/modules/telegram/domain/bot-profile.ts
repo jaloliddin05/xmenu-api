@@ -1,3 +1,5 @@
+import type { DeliveryMode } from 'src/modules/organization/domain/publication';
+import { modeNeedsBot } from 'src/modules/organization/domain/publication';
 import { isLang, Lang } from 'src/infra/http/request-helpers';
 import type { FieldError } from 'src/infra/errors/app-exception';
 import type { ErrorCode } from 'src/infra/errors/error-codes';
@@ -218,4 +220,21 @@ export function deliveryUrl(
   if (!slug || !template || !template.includes('{slug}')) return null;
   const url = template.replaceAll('{slug}', slug);
   return url.startsWith('https://') ? url : null;
+}
+
+/**
+ * Address the venue's Mini App opens (menu button, /start): its primary own domain, else the platform
+ * address from DELIVERY_URL_TEMPLATE. null in mode site (no Mini App) or when no address can be built.
+ */
+export function miniAppUrl(
+  venue: {
+    slug: string | null | undefined;
+    primaryDomain: string | null | undefined;
+    mode: DeliveryMode;
+  },
+  template: string | undefined = process.env.DELIVERY_URL_TEMPLATE,
+): string | null {
+  if (!modeNeedsBot(venue.mode)) return null;
+  if (venue.primaryDomain) return `https://${venue.primaryDomain}`;
+  return deliveryUrl(venue.slug, template);
 }

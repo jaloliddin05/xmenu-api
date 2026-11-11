@@ -28,6 +28,7 @@ import {
   CustomerProtectedRoute,
 } from 'src/modules/auth/decorators/customer-route.decorator';
 import type { CustomerPrincipal } from 'src/modules/auth/decorators/customer-route.decorator';
+import { INIT_DATA_HEADER } from 'src/modules/auth/services/mini-app-access.service';
 import { CurrentTenant } from 'src/modules/tenant/current-tenant.decorator';
 import type { Tenant } from 'src/modules/tenant/tenant.service';
 import { CreateOrderDto } from '../dto/create-order.dto';
@@ -58,12 +59,20 @@ export class CustomerOrderController {
       "Har bir buyurtma urinishi uchun noyob kalit (8-128 belgi). Takrorda o'sha buyurtma qaytadi.",
     required: true,
   })
+  @ApiHeader({
+    name: 'X-Telegram-Init-Data',
+    description:
+      'Raw Telegram.WebApp.initData inside the venue Mini App. Mode miniapp: required (403 miniapp_required); ' +
+      'miniapp and both: checked against the venue bot (403 miniapp_init_data_invalid); site: ignored',
+    required: false,
+  })
   @ApiOperation({ summary: 'Buyurtma yaratish' })
   @ApiCreatedResponse({ type: OrderViewDto })
   create(
     @CurrentCustomer() principal: CustomerPrincipal,
     @Body() dto: CreateOrderDto,
     @Headers('idempotency-key') key: string | undefined,
+    @Headers(INIT_DATA_HEADER) initData: string | undefined,
     @CurrentTenant() tenant: Tenant,
     @Req() req: Request,
   ) {
@@ -73,6 +82,7 @@ export class CustomerOrderController {
       key,
       resolveLang(req, tenant),
       tenant,
+      initData,
     );
   }
 

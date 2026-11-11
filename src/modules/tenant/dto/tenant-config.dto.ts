@@ -83,6 +83,23 @@ export class TenantDeliveryChannelDto {
       'Orders are open: enabled and published. false = never published or paused by the owner; POST /orders answers 422',
   })
   published: boolean;
+
+  @ApiProperty({
+    example: false,
+    description:
+      'The venue has a Mini App: mode miniapp or both and its Telegram bot works (channels.auth.telegram). ' +
+      'Mode miniapp takes sign-in and orders only inside it (X-Telegram-Init-Data)',
+  })
+  miniApp: boolean;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    example: 'mant_cafe_bot',
+    description:
+      'Username of the venue bot when miniApp, for the «Открыть в Telegram» link https://t.me/<botUsername>; null otherwise',
+  })
+  botUsername: string | null;
 }
 
 /**
