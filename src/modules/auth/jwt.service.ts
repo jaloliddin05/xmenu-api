@@ -6,7 +6,8 @@ import { JwtService } from '@nestjs/jwt';
 export class JwtTokenService {
   constructor(private jwtService: JwtService) {}
 
-  getJWT(type: 'access', sub: string, role: string) {
-    return this.jwtService.sign({ sub, role });
+  /** `sid` is the login (staff_session family) the token belongs to. */
+  getJWT(type: 'access', sub: string, role: string, sid: string) {
+    return this.jwtService.sign({ sub, role, sid });
   }
 }
