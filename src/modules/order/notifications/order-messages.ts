@@ -1,3 +1,5 @@
+import type { Lang } from 'src/infra/http/request-helpers';
+import { CUSTOMER_TEXTS } from './customer-messages';
 import type { OrderWithItems } from '../services/order-view';
 import {
   nextRestaurantStatus,
@@ -154,38 +156,39 @@ export function buildRestaurantKeyboard(
   return null;
 }
 
-/** Mijozga Telegram orqali yuboriladigan matn; null — yubormaymiz. */
+/** Mijozga Telegram orqali yuboriladigan matn (mijoz tilida); null — yubormaymiz. */
 export function buildCustomerText(
   order: Pick<
     OrderWithItems,
     'number' | 'status' | 'payment_method' | 'payment_status' | 'cancelled_by'
   >,
   from: OrderStatusName | null,
+  lang: Lang = 'ru',
 ): string | null {
+  const t = CUSTOMER_TEXTS[lang];
   const n = order.number;
   switch (order.status) {
     case 'pending_acceptance':
-      return from === 'awaiting_payment'
-        ? `💳 Оплата получена. Заказ №${n} отправлен в ресторан`
-        : null;
+      return from === 'awaiting_payment' ? t.paymentReceived(n) : null;
     case 'accepted':
-      return `✅ Ресторан принял заказ №${n}`;
+      return t.accepted(n);
     case 'preparing':
-      return `👨‍🍳 Заказ №${n} готовится`;
+      return t.preparing(n);
     case 'on_the_way':
-      return `🛵 Курьер везёт заказ №${n}`;
+      return t.onTheWay(n);
     case 'ready':
-      return `🛍 Заказ №${n} готов к выдаче`;
+      return t.ready(n);
     case 'completed':
-      return `🎉 Заказ №${n} выполнен. Приятного аппетита!`;
+      return t.completed(n);
     case 'cancelled': {
       if (order.cancelled_by === 'customer') return null; // сам отменил — он это видит в приложении
       const refund =
         order.payment_method !== 'cash' &&
         ['refund_pending', 'refunded'].includes(order.payment_status)
-          ? '\nДеньги за заказ вернутся на ваш счёт.'
+          ? `
+${t.refundNote}`
           : '';
-      return `😔 Заказ №${n} отменён рестораном.${refund}`;
+      return `${t.cancelledByVenue(n)}${refund}`;
     }
     default:
       return null;

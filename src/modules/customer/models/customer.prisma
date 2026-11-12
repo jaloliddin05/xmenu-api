@@ -20,6 +20,8 @@ model customer {
   phone           String         // E.164: +998XXXXXXXXX
   telegram_id     String?
   name            String
+  // ru | uz | en; null until the first sign-in, then the venue's default language applies
+  language        String?
   status          CustomerStatus @default(active)
 
   created_at      DateTime       @default(now())

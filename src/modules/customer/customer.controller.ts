@@ -14,6 +14,9 @@ import {
 } from '../auth/decorators/customer-route.decorator';
 import type { CustomerPrincipal } from '../auth/decorators/customer-route.decorator';
 
+import { CurrentTenant } from '../tenant/current-tenant.decorator';
+import type { Tenant } from '../tenant/tenant.service';
+
 @ApiTags('Customers')
 @ApiBearerAuth('access-token')
 @ApiHeader({
@@ -34,11 +37,19 @@ export class CustomerController {
   }
 
   @Patch('me')
-  @ApiOperation({ summary: 'Update current customer name' })
+  @ApiOperation({
+    summary: 'Update current customer name and/or preferred language',
+  })
   updateMe(
     @CurrentCustomer() me: CustomerPrincipal,
+    @CurrentTenant() tenant: Tenant,
     @Body() dto: UpdateCustomerDto,
   ) {
-    return this.customerService.updateMe(me.tenantId, me.customerId, dto);
+    return this.customerService.updateMe(
+      me.tenantId,
+      me.customerId,
+      dto,
+      tenant.languages,
+    );
   }
 }

@@ -1,4 +1,6 @@
 import { errorMessage } from 'src/infra/helper/error-text';
+import { customerLangFor } from 'src/modules/order/notifications/customer-language';
+import { CUSTOMER_TEXTS } from 'src/modules/order/notifications/customer-messages';
 import {
   Injectable,
   Logger,
@@ -71,7 +73,7 @@ export class RefundProcessor implements OnModuleInit, OnModuleDestroy {
       where: { id: job.data.orderId },
       include: {
         payments: { where: { status: 'paid' } },
-        customer: { select: { telegram_id: true } },
+        customer: { select: { telegram_id: true, language: true } },
       },
     });
     if (!order || order.payment_status !== 'refund_pending') return; // allaqachon hal bo'lgan
@@ -104,9 +106,14 @@ export class RefundProcessor implements OnModuleInit, OnModuleDestroy {
       data: { payment_status: 'refunded' },
     });
     if (order.customer.telegram_id) {
+      const lang = await customerLangFor(
+        this.prisma,
+        order.organization_id,
+        order.customer.language,
+      );
       await this.telegram.sendMessage(
         order.customer.telegram_id,
-        `💸 Деньги за заказ №${order.number} возвращены`,
+        CUSTOMER_TEXTS[lang].refunded(order.number),
       );
     }
   }

@@ -2118,7 +2118,7 @@
             "access-token": []
           }
         ],
-        "summary": "Update current customer name",
+        "summary": "Update current customer name and/or preferred language",
         "tags": [
           "Customers"
         ]
@@ -4918,6 +4918,7 @@
           "code_expired",
           "too_many_attempts",
           "invalid_name",
+          "language_not_supported",
           "registration_expired",
           "invalid_registration_token",
           "invalid_refresh_token",
@@ -5450,12 +5451,23 @@
           "name": {
             "type": "string",
             "example": "Ali"
+          },
+          "language": {
+            "type": "string",
+            "enum": [
+              "ru",
+              "uz",
+              "en"
+            ],
+            "nullable": true,
+            "description": "Preferred language; null until the first sign-in. SMS and order notifications use it (the venue default when null or no longer offered)"
           }
         },
         "required": [
           "id",
           "phone",
-          "name"
+          "name",
+          "language"
         ]
       },
       "CustomerSignedInDto": {
@@ -6715,11 +6727,17 @@
             "type": "string",
             "description": "name (2-50 belgi)",
             "example": "Ali"
+          },
+          "language": {
+            "type": "string",
+            "description": "Preferred language of SMS and order notifications: ru, uz or en, one of the venue languages (422 language_not_supported otherwise)",
+            "enum": [
+              "ru",
+              "uz",
+              "en"
+            ]
           }
-        },
-        "required": [
-          "name"
-        ]
+        }
       },
       "CreateAddressDto": {
         "type": "object",

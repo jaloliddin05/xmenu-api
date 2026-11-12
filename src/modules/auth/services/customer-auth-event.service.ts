@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client';
+import type { Lang } from 'src/infra/http/request-helpers';
 import { errorMessage } from 'src/infra/helper/error-text';
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
@@ -22,6 +23,8 @@ export type AuthEventType =
 export interface RequestCtx {
   ip: string;
   userAgent: string;
+  /** Language of the request (resolveLang); stored on the customer at registration and first sign-in. */
+  lang?: Lang;
 }
 
 /** Audit: DB'ga + strukturalangan log. Kod, token va to'liq telefon HECH QACHON yozilmaydi. */

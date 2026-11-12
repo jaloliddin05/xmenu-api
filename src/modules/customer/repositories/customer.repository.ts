@@ -37,6 +37,7 @@ export class CustomerRepository {
     data: {
       phone: string;
       name: string;
+      language?: string | null;
       telegram_id?: string | null;
       last_login_at?: Date;
     },

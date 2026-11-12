@@ -26,7 +26,6 @@ export interface CustomerAuthConfig {
   refreshReuseLeewaySeconds: number;
   maxActiveFamilies: number;
 
-  smsLocale: 'uz' | 'ru';
   telegramInitDataMaxAgeSeconds: number;
   /** Lifetime of a Telegram phone-verification session. */
   telegramVerifyTtlSeconds: number;
@@ -104,8 +103,6 @@ export function loadCustomerAuthConfig(): CustomerAuthConfig {
   const registrationSecret = process.env.JWT_CUSTOMER_REGISTRATION_SECRET!;
   const otpHmacSecret = process.env.OTP_HMAC_SECRET!;
 
-  const locale = process.env.SMS_LOCALE === 'ru' ? 'ru' : 'uz';
-
   return {
     accessSecret,
     registrationSecret,
@@ -121,7 +118,6 @@ export function loadCustomerAuthConfig(): CustomerAuthConfig {
     sessionAbsoluteDays: int('SESSION_ABSOLUTE_DAYS', 180),
     refreshReuseLeewaySeconds: int('REFRESH_REUSE_LEEWAY_SECONDS', 10),
     maxActiveFamilies: 10,
-    smsLocale: locale,
     ...loadInitDataConfig(),
     telegramVerifyTtlSeconds: int('TELEGRAM_VERIFY_TTL_SECONDS', 300),
   };

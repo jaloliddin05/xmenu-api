@@ -40,7 +40,6 @@ function makeConfig(
     sessionAbsoluteDays: 180,
     refreshReuseLeewaySeconds: 10,
     maxActiveFamilies: 10,
-    smsLocale: 'uz',
     telegramInitDataMaxAgeSeconds: 86400,
     telegramVerifyTtlSeconds: 300,
     ...overrides,
