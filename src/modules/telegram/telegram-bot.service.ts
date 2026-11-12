@@ -20,6 +20,8 @@ import {
 export interface TenantBot {
   botKey: string;
   organizationId: string;
+  /** Telegram's id of the bot (the number before ':' in the token) */
+  telegramBotId: string;
   username: string;
   token: string;
   /** sha256 hex of the webhook secret_token (domain/webhook-secret.ts) */
@@ -127,6 +129,7 @@ export class TelegramBotService {
     return {
       botKey: row.id,
       organizationId: row.organization_id,
+      telegramBotId: row.telegram_bot_id,
       username: row.username,
       token,
       webhookSecretHash: row.webhook_secret_hash,

@@ -1,4 +1,9 @@
-import { isLang, pickTranslation, resolveLang } from './request-helpers';
+import {
+  acceptedLanguages,
+  isLang,
+  pickTranslation,
+  resolveLang,
+} from './request-helpers';
 
 describe('resolveLang', () => {
   const all = {
@@ -26,6 +31,18 @@ describe('resolveLang', () => {
       resolveLang({ headers: { 'accept-language': 'de,en-US;q=0.9' } }, all),
     ).toBe('en');
   });
+  it('honours q-weights, not the order in the header', () => {
+    expect(
+      resolveLang(
+        { headers: { 'accept-language': 'ru;q=0.1, en;q=0.9' } },
+        all,
+      ),
+    ).toBe('en');
+    // q=0 means "not this one": the tenant default applies
+    expect(
+      resolveLang({ headers: { 'accept-language': 'uz;q=0, de' } }, uzOnly),
+    ).toBe('uz');
+  });
   it("falls back to the tenant's default language, not a platform one", () => {
     expect(resolveLang({}, uzOnly)).toBe('uz');
     expect(
@@ -49,6 +66,20 @@ describe('resolveLang', () => {
     expect(
       resolveLang({ headers: { 'accept-language': 'uz-UZ,ru;q=0.8' } }, ruEn),
     ).toBe('ru');
+  });
+});
+
+describe('acceptedLanguages', () => {
+  it('sorts by q, keeps the header order for equal q, drops q=0 and junk', () => {
+    expect(acceptedLanguages('ru;q=0.1, en;q=0.9')).toEqual(['en', 'ru']);
+    expect(acceptedLanguages('uz, ru;q=0.8, en;q=0.8, de;q=0')).toEqual([
+      'uz',
+      'ru',
+      'en',
+    ]);
+    expect(acceptedLanguages('en;Q=0.5,uz')).toEqual(['uz', 'en']);
+    expect(acceptedLanguages('fr;q=abc, ,ru')).toEqual(['ru']);
+    expect(acceptedLanguages('')).toEqual([]);
   });
 });
 

@@ -8,11 +8,9 @@ export interface TelegramMessageResult {
 }
 
 /**
- * Telegram Bot API (HTTP). otp-bot.ts polling'siz
- * ishlaydi, lekin callback_query / editMessageText / secret_token webhooks
- * uchun yupqa va tekshiriladigan klient qulayroq. Token: TELEGRAM_BOT_TOKEN
- * (Mini App bilan bir xil bot; alohida restoran boti kerak bo'lsa
- * TELEGRAM_ORDERS_BOT_TOKEN).
+ * The platform orders bot (TELEGRAM_ORDERS_BOT_TOKEN, else TELEGRAM_BOT_TOKEN): new orders and
+ * their buttons in the branch chats, ops alerts. Never used for guests: they hear only from the
+ * venue's own bot (notifications/customer-notifier.service.ts).
  *
  * Hech bir metod throw qilmaydi: xabarnoma yuborilmasa buyurtma jarayoni
  * to'xtamasligi kerak. Muvaffaqiyatsizlik null qaytaradi va log qilinadi.

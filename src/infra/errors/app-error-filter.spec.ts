@@ -152,6 +152,19 @@ describe('AppErrorFilter (HTTP)', () => {
     expect(lines).not.toContain('998901234567');
   });
 
+  it('unknown path: 404 logged with a fixed marker, never the raw path (it may carry tokens)', async () => {
+    await http()
+      .get(
+        '/no-such-route/eyJhbGciOiJIUzI1NiJ9.secret-token?phone=998901234567',
+      )
+      .set('X-Request-Id', 'support-code-0002')
+      .expect(404);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith(
+      '[support-code-0002] GET <unmatched route> 404 not_found',
+    );
+  });
+
   it('keeps a well-formed X-Request-Id from the proxy and replaces a bad one', async () => {
     const kept = await http()
       .get('/t/app')

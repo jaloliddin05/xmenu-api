@@ -1,10 +1,12 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../_prisma/prisma.module';
 import { SmsModule } from '../sms/sms.module';
+import { TelegramModule } from '../telegram/telegram.module';
 import { CustomerNotifierService } from './notifications/customer-notifier.service';
 import { OpsNotifierService } from './notifications/ops-notifier.service';
 import { RestaurantNotifierService } from './notifications/restaurant-notifier.service';
 import { EscalationProcessor } from './queue/escalation.processor';
+import { GuestNotificationProcessor } from './queue/guest-notification.processor';
 import { OrderQueueService } from './queue/order-queue.service';
 import { OrderSettingsService } from './services/order-settings.service';
 import { OrderTransitionService } from './services/order-transition.service';
@@ -16,7 +18,7 @@ import { TelegramApiService } from './services/telegram-api.service';
  * uchun OrderModule ham, PaymentModule ham uni sikllarsiz ishlata oladi.
  */
 @Module({
-  imports: [PrismaModule, SmsModule],
+  imports: [PrismaModule, SmsModule, TelegramModule],
   providers: [
     TelegramApiService,
     OrderSettingsService,
@@ -26,6 +28,7 @@ import { TelegramApiService } from './services/telegram-api.service';
     OpsNotifierService,
     OrderTransitionService,
     EscalationProcessor,
+    GuestNotificationProcessor,
   ],
   exports: [
     TelegramApiService,

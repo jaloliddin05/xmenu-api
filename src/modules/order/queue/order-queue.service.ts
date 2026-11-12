@@ -5,6 +5,9 @@ import { bullConnection } from 'src/infra/redis/bull-connection';
 
 export const ESCALATION_QUEUE = 'order-escalation';
 export const REFUND_QUEUE = 'order-refunds';
+export const GUEST_NOTIFICATION_QUEUE = 'guest-notifications';
+/** Temporary Telegram failures are retried: 10 s, 20 s, 40 s, 80 s after the first attempt. */
+export const GUEST_NOTIFICATION_ATTEMPTS = 5;
 
 /**
  * Eskalatsiya zanjiri (restoran buyurtmani qabul qilmasa), vaqt — buyurtma
@@ -36,6 +39,7 @@ export class OrderQueueService implements OnModuleDestroy {
   readonly enabled = process.env.ORDER_QUEUES !== 'off';
   private escalation?: Queue;
   private refunds?: Queue;
+  private guestNotifications?: Queue;
 
   private get escalationQueue(): Queue {
     return (this.escalation ??= new Queue(ESCALATION_QUEUE, {
@@ -57,6 +61,18 @@ export class OrderQueueService implements OnModuleDestroy {
         removeOnFail: false,
         attempts: 5,
         backoff: { type: 'exponential', delay: 60_000 },
+      },
+    }));
+  }
+
+  private get guestNotificationQueue(): Queue {
+    return (this.guestNotifications ??= new Queue(GUEST_NOTIFICATION_QUEUE, {
+      connection: bullConnection(),
+      defaultJobOptions: {
+        removeOnComplete: true,
+        removeOnFail: 100,
+        attempts: GUEST_NOTIFICATION_ATTEMPTS,
+        backoff: { type: 'exponential', delay: 10_000 },
       },
     }));
   }
@@ -116,7 +132,28 @@ export class OrderQueueService implements OnModuleDestroy {
     );
   }
 
+  /** False when there is no queue (ORDER_QUEUES=off) or it failed (logged): the caller sends at once. */
+  async enqueueGuestNotification(data: {
+    orderId: string;
+    text: string;
+  }): Promise<boolean> {
+    if (!this.enabled) return false;
+    try {
+      await this.guestNotificationQueue.add('notify', data);
+      return true;
+    } catch (e) {
+      this.logger.error(
+        `enqueueGuestNotification (order ${data.orderId}): ${errorMessage(e)}`,
+      );
+      return false;
+    }
+  }
+
   async onModuleDestroy() {
-    await Promise.all([this.escalation?.close(), this.refunds?.close()]);
+    await Promise.all([
+      this.escalation?.close(),
+      this.refunds?.close(),
+      this.guestNotifications?.close(),
+    ]);
   }
 }

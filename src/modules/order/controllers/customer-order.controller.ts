@@ -63,7 +63,8 @@ export class CustomerOrderController {
     name: 'X-Telegram-Init-Data',
     description:
       'Raw Telegram.WebApp.initData inside the venue Mini App. Mode miniapp: required (403 miniapp_required); ' +
-      'miniapp and both: checked against the venue bot (403 miniapp_init_data_invalid); site: ignored',
+      'miniapp and both: checked against the venue bot (403 miniapp_init_data_invalid); site: ignored. ' +
+      'A checked header makes it a Mini App order: only those get status notifications, from that bot',
     required: false,
   })
   @ApiOperation({ summary: 'Buyurtma yaratish' })

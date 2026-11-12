@@ -7,6 +7,7 @@ import { telegramUpdateJobId } from './telegram-update.queue';
 const BOT = {
   botKey: 'bot-1',
   organizationId: 'tenant-1',
+  telegramBotId: '111111',
   username: 'mant_bot',
   token: '111111:TOKEN',
   webhookSecretHash: 'h',

@@ -17,6 +17,7 @@ const TOKEN = '123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw0';
 const BOT = {
   botKey: BOT_KEY,
   organizationId: 'tenant-1',
+  telegramBotId: '111111',
   username: 'mant_bot',
   token: TOKEN,
   webhookSecretHash: hashWebhookSecret(SECRET),

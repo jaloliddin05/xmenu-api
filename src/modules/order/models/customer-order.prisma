@@ -51,6 +51,12 @@ model customer_order {
   accepted_at     DateTime?
   completed_at    DateTime?
 
+  channel         OrderChannel @default(site)
+  // Mini App orders only: the guest's Telegram id and the venue bot (Telegram bot id) that opened the
+  // Mini App. Status and refund notifications go there and nowhere else (notifications/guest-notification.ts)
+  guest_telegram_id     String?
+  guest_telegram_bot_id String?
+
   // Restoran guruhiga yuborilgan xabar (keyin tahrirlash uchun)
   tg_chat_id      String?
   tg_message_id   Int?

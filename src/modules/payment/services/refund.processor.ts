@@ -1,6 +1,5 @@
 import { errorMessage } from 'src/infra/helper/error-text';
-import { customerLangFor } from 'src/modules/order/notifications/customer-language';
-import { CUSTOMER_TEXTS } from 'src/modules/order/notifications/customer-messages';
+import { CustomerNotifierService } from 'src/modules/order/notifications/customer-notifier.service';
 import {
   Injectable,
   Logger,
@@ -12,7 +11,6 @@ import { bullConnection } from 'src/infra/redis/bull-connection';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
 import { OpsNotifierService } from 'src/modules/order/notifications/ops-notifier.service';
 import { REFUND_QUEUE } from 'src/modules/order/queue/order-queue.service';
-import { TelegramApiService } from 'src/modules/order/services/telegram-api.service';
 import { clickReversePayment } from './click-api';
 import { PaymentConfigService } from './payment-config.service';
 
@@ -36,7 +34,7 @@ export class RefundProcessor implements OnModuleInit, OnModuleDestroy {
     private readonly prisma: PrismaService,
     private readonly configs: PaymentConfigService,
     private readonly ops: OpsNotifierService,
-    private readonly telegram: TelegramApiService,
+    private readonly guest: CustomerNotifierService,
   ) {}
 
   onModuleInit() {
@@ -73,7 +71,6 @@ export class RefundProcessor implements OnModuleInit, OnModuleDestroy {
       where: { id: job.data.orderId },
       include: {
         payments: { where: { status: 'paid' } },
-        customer: { select: { telegram_id: true, language: true } },
       },
     });
     if (!order || order.payment_status !== 'refund_pending') return; // allaqachon hal bo'lgan
@@ -105,15 +102,12 @@ export class RefundProcessor implements OnModuleInit, OnModuleDestroy {
       where: { id: order.id },
       data: { payment_status: 'refunded' },
     });
-    if (order.customer.telegram_id) {
-      const lang = await customerLangFor(
-        this.prisma,
-        order.organization_id,
-        order.customer.language,
-      );
-      await this.telegram.sendMessage(
-        order.customer.telegram_id,
-        CUSTOMER_TEXTS[lang].refunded(order.number),
+    // The refund is done: a failed notification must not retry it (the order is no longer refund_pending)
+    try {
+      await this.guest.notifyRefunded(order.id);
+    } catch (e) {
+      this.logger.error(
+        `Order ${order.id}: refund notification failed: ${errorMessage(e)}`,
       );
     }
   }

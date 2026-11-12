@@ -10,8 +10,9 @@ export function isLang(value: unknown): value is Lang {
 }
 
 /**
- * ?lang=uz or Accept-Language: uz-UZ,ru;q=0.8 → the first requested language the tenant offers;
- * otherwise the tenant's default language (organization_settings).
+ * ?lang=uz, else Accept-Language: uz-UZ,ru;q=0.8 → the requested language with the highest q the
+ * tenant offers (equal q: the earlier one; q=0: not wanted); otherwise the tenant's default language
+ * (organization_settings).
  */
 export function resolveLang(
   req: { query?: Record<string, any>; headers?: Record<string, any> },
@@ -25,12 +26,30 @@ export function resolveLang(
   const fromQuery = pick(req.query?.lang);
   if (fromQuery) return fromQuery;
 
-  const header = String(req.headers?.['accept-language'] ?? '');
-  for (const part of header.split(',')) {
-    const lang = pick(part.split(';')[0]);
+  for (const tag of acceptedLanguages(
+    String(req.headers?.['accept-language'] ?? ''),
+  )) {
+    const lang = pick(tag);
     if (lang) return lang;
   }
   return tenant.defaultLanguage;
+}
+
+/** Language tags of an Accept-Language header by q (highest first, stable), without q=0 ones. */
+export function acceptedLanguages(header: string): string[] {
+  return header
+    .split(',')
+    .map((part, index) => {
+      const [tag, ...params] = part.split(';');
+      const qParam = params
+        .map((p) => p.trim().toLowerCase())
+        .find((p) => p.startsWith('q='));
+      const q = qParam === undefined ? 1 : Number(qParam.slice(2));
+      return { tag: tag.trim(), q: Number.isFinite(q) ? q : 0, index };
+    })
+    .filter((l) => l.tag && l.q > 0)
+    .sort((a, b) => b.q - a.q || a.index - b.index)
+    .map((l) => l.tag);
 }
 
 /** Client IP and user agent for rate limits and audit (IP honours `trust proxy` set in main.ts). */

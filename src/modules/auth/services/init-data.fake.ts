@@ -53,7 +53,13 @@ export function miniAppAccess(state: {
 }) {
   const bots = {
     forTenant: jest.fn(async () =>
-      state.hasBot() ? { token: VENUE_BOT_TOKEN, botKey: 'bot-1' } : null,
+      state.hasBot()
+        ? {
+            token: VENUE_BOT_TOKEN,
+            botKey: 'bot-1',
+            telegramBotId: VENUE_BOT_TOKEN.split(':')[0],
+          }
+        : null,
     ),
   };
   const prisma = {
