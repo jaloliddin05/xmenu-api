@@ -201,7 +201,17 @@ App (`instant`) нового номера кладёт Telegram-id в `registrat
 `staff_auth_event`).
 - Сессии: access JWT (`JWT_ACCESS_TOKEN_*`) и непрозрачный refresh-токен, хеш в `staff_session` (модель в
   `user/models/staff-session.prisma`). `POST /auth/refresh { refreshToken }` ротирует (повтор после 30 с отзывает
-  вход), `POST /auth/logout { refreshToken }` → 204 отзывает вход. Access живёт до своего срока (1 ч).
+  вход), `POST /auth/logout { refreshToken }` → 204 отзывает вход. Access-токен несёт `sid` (= `family_id` входа);
+  завершённый вход попадает в Redis-денилист `staff:sid:revoked:<sid>` на срок жизни access, стратегия
+  `AccessTokenUserStrategy` его проверяет, токен без `sid` не принимается. `req.user.sid` = текущий вход.
+- Сессии (`StaffSessionsController`, `StaffSessionService`): `GET /auth/sessions` (устройство и браузер из User-Agent,
+  `user-agent.ts`, IP с маской), `DELETE /auth/sessions/:id` (чужой → 404), `DELETE /auth/sessions` (все, кроме
+  текущей), `revokeAllForUser`. Столбца «последняя активность» нет: берётся `created_at` текущей строки входа.
+- Пароль (`StaffPasswordService`): `POST /auth/password/forgot` одинаков для известного и неизвестного номера (тот же
+  `otp.issue` и лимиты, у неизвестного пустая доставка, SMS у известного уходит без ожидания), код привязан к номеру
+  (`sotp:pwreset:<phone>`), `POST /auth/password/reset` отзывает все входы, `POST /auth/password/change` (текущий пароль,
+  лимит попыток) отзывает все, кроме текущего. Старого `PUT /user/change-password/:id` нет. Тесты на единообразие
+  ответа и отзыв сессий: `staff-password.service.spec.ts`.
 - `POST /auth/register` ничего не пишет в БД: заявка (с bcrypt-хешем пароля владельца, 8–72 символа) ждёт в Redis
   под случайным `registrationId` 30 минут. `check-code {registrationId, code}` создаёт user и organization в одной
   транзакции; «хвост» старой схемы (`isActive=false`) переиспользуется. Код привязан к заявке, а не к номеру: вторая
@@ -223,15 +233,13 @@ App (`instant`) нового номера кладёт Telegram-id в `registrat
 - Возврат после оплаты на сайт заведения: `MINIAPP_RETURN_URL`/`MINIAPP_URL` один на платформу
   (`payment/domain/payment-url.ts`), а не `https://{slug}.xmenu.uz`. Бэкенд адресов `{slug}.xmenu.uz` нигде не строит:
   slug только валидируется как поддомен (`organization/domain/slug.ts`).
-- Отзыв всех сессий владельца при смене пароля, восстановление пароля, выход «везде».
 - Роли сотрудников для отдельного приложения (курьеры, официанты, менеджеры). Таблица `employee` есть, не используется.
 - Позже: POS, Web Push/WebSocket для админки, фискальные чеки, промокоды (поле `discount` всегда 0), заказ ко
   времени, меню по филиалам, ротация `PAYMENT_CONFIG_KEY`, rate limit на
   `POST /orders`.
 
 ## Известные долги
-- Сессии владельцев: ротация и выход есть, но смена пароля сессии не отзывает, access-токен после выхода живёт до
-  часа (denylist нет), восстановления пароля нет.
+- Сессии владельцев: «последняя активность» в списке сессий = последний refresh (запросы между refresh не пишутся в БД).
 - Загрузки (`MulterStorage`) принимают только изображения (JPEG, PNG, GIF, WebP по содержимому, до `UPLOAD_MAX_BYTES`) и
   пишут на диск после проверки. Но при 404 владельца в `PUT /organization`, `POST/PATCH /product…` файл, уже записанный
   валидатором, остаётся на диске без записи в БД.  Отдача делает любой не-образ `attachment` + `sandbox`.
