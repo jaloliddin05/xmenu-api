@@ -131,3 +131,34 @@ export class StaffResendCodeResponseDto {
   @ApiProperty({ example: 60 }) resendAfter: number;
   @ApiProperty({ example: 300 }) expiresIn: number;
 }
+
+export class StaffForgotPasswordResponseDto {
+  @ApiProperty({
+    example: 60,
+    description: 'Seconds until a new code may be requested',
+  })
+  resendAfter: number;
+  @ApiProperty({ example: 6 }) codeLength: number;
+  @ApiProperty({ example: 300, description: 'Code lifetime in seconds' })
+  expiresIn: number;
+}
+
+export class StaffSessionDto {
+  @ApiProperty({ description: 'Pass to DELETE /auth/sessions/{id}' })
+  id: string;
+  @ApiProperty({ enum: ['desktop', 'mobile', 'tablet', 'unknown'] })
+  device: string;
+  @ApiProperty({ nullable: true, example: 'Chrome' }) browser: string | null;
+  @ApiProperty({ nullable: true, example: 'Windows' }) os: string | null;
+  @ApiProperty({
+    nullable: true,
+    example: '203.0.*.*',
+    description: 'Address of the last refresh with the host part masked',
+  })
+  ipMasked: string | null;
+  @ApiProperty({ description: 'Last refresh of this login' })
+  lastActiveAt: Date;
+  @ApiProperty({ description: 'When this login was made' }) createdAt: Date;
+  @ApiProperty({ description: 'The login the request was made from' })
+  current: boolean;
+}

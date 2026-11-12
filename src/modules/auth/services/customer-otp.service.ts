@@ -32,7 +32,7 @@ export type OtpScope = 'customer' | 'staff';
 
 const KEY_PREFIX: Record<OtpScope, string> = { customer: 'otp', staff: 'sotp' };
 
-const SMS_TEXT: Record<
+export const SMS_TEXT: Record<
   OtpScope,
   Record<Lang, (brand: string, code: string) => string>
 > = {

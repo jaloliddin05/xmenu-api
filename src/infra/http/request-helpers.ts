@@ -70,6 +70,11 @@ export function pickTranslation<T extends { lang: string }>(
   );
 }
 
+/** Staff request that came with an access token: `sid` is the login (session) it belongs to. */
+export interface StaffSessionRequest {
+  user: StaffRequest['user'] & { sid: string };
+}
+
 /** The request as seen by staff routes: the global guard puts the staff user on `req.user`. */
 export interface StaffRequest {
   user: {

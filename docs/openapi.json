@@ -304,6 +304,83 @@
         ]
       }
     },
+    "/auth/password/forgot": {
+      "post": {
+        "operationId": "AuthController_forgotPassword",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StaffForgotPasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffForgotPasswordResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Send a password reset code. The answer, limits and timing are the same for a known and an unknown phone",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/password/reset": {
+      "post": {
+        "operationId": "AuthController_resetPassword",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StaffResetPasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Set a new password with the code from the SMS; every login of the owner is revoked",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
     "/auth/logout": {
       "post": {
         "operationId": "AuthController_logout",
@@ -334,6 +411,133 @@
           }
         },
         "summary": "Revoke the login behind a refresh token (idempotent, always 204)",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/password/change": {
+      "post": {
+        "operationId": "StaffSessionsController_changePassword",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StaffChangePasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Change the password (needs the current one); every other login is revoked",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/sessions": {
+      "get": {
+        "operationId": "StaffSessionsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StaffSessionDto"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Active logins of the owner",
+        "tags": [
+          "Auth"
+        ]
+      },
+      "delete": {
+        "operationId": "StaffSessionsController_endOthers",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "End every login except the current one",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/sessions/{id}": {
+      "delete": {
+        "operationId": "StaffSessionsController_end",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "End one login; another owner’s or an unknown one is 404",
         "tags": [
           "Auth"
         ]
@@ -989,50 +1193,6 @@
           }
         },
         "summary": "Method: delete",
-        "tags": [
-          "User"
-        ]
-      }
-    },
-    "/user/change-password/{id}": {
-      "put": {
-        "operationId": "UserController_changePassword",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ChangePasswordDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": ""
-          },
-          "default": {
-            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Method: updating user password",
         "tags": [
           "User"
         ]
@@ -5430,6 +5590,68 @@
           "refreshToken"
         ]
       },
+      "StaffForgotPasswordDto": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "example": "+998901234567",
+            "description": "Owner phone"
+          }
+        },
+        "required": [
+          "phone"
+        ]
+      },
+      "StaffForgotPasswordResponseDto": {
+        "type": "object",
+        "properties": {
+          "resendAfter": {
+            "type": "number",
+            "example": 60,
+            "description": "Seconds until a new code may be requested"
+          },
+          "codeLength": {
+            "type": "number",
+            "example": 6
+          },
+          "expiresIn": {
+            "type": "number",
+            "example": 300,
+            "description": "Code lifetime in seconds"
+          }
+        },
+        "required": [
+          "resendAfter",
+          "codeLength",
+          "expiresIn"
+        ]
+      },
+      "StaffResetPasswordDto": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "example": "+998901234567"
+          },
+          "code": {
+            "type": "string",
+            "example": "123456",
+            "description": "Code from the SMS"
+          },
+          "newPassword": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 72,
+            "example": "correct horse battery"
+          }
+        },
+        "required": [
+          "phone",
+          "code",
+          "newPassword"
+        ]
+      },
       "StaffLogoutDto": {
         "type": "object",
         "properties": {
@@ -5437,6 +5659,83 @@
             "type": "string"
           }
         }
+      },
+      "StaffChangePasswordDto": {
+        "type": "object",
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "description": "Current password"
+          },
+          "newPassword": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 72,
+            "example": "correct horse battery"
+          }
+        },
+        "required": [
+          "currentPassword",
+          "newPassword"
+        ]
+      },
+      "StaffSessionDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Pass to DELETE /auth/sessions/{id}"
+          },
+          "device": {
+            "type": "string",
+            "enum": [
+              "desktop",
+              "mobile",
+              "tablet",
+              "unknown"
+            ]
+          },
+          "browser": {
+            "type": "object",
+            "nullable": true,
+            "example": "Chrome"
+          },
+          "os": {
+            "type": "object",
+            "nullable": true,
+            "example": "Windows"
+          },
+          "ipMasked": {
+            "type": "object",
+            "nullable": true,
+            "example": "203.0.*.*",
+            "description": "Address of the last refresh with the host part masked"
+          },
+          "lastActiveAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "Last refresh of this login"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "When this login was made"
+          },
+          "current": {
+            "type": "boolean",
+            "description": "The login the request was made from"
+          }
+        },
+        "required": [
+          "id",
+          "device",
+          "browser",
+          "os",
+          "ipMasked",
+          "lastActiveAt",
+          "createdAt",
+          "current"
+        ]
       },
       "CustomerUserDto": {
         "type": "object",
@@ -5839,27 +6138,6 @@
             "format": "binary"
           }
         }
-      },
-      "ChangePasswordDto": {
-        "type": "object",
-        "properties": {
-          "oldPassword": {
-            "type": "string",
-            "description": "old password",
-            "example": "12345"
-          },
-          "newPassword": {
-            "type": "string",
-            "description": "new password, 8-72 characters",
-            "example": "correct horse battery",
-            "minLength": 8,
-            "maxLength": 72
-          }
-        },
-        "required": [
-          "oldPassword",
-          "newPassword"
-        ]
       },
       "UpdateOrganizationDto": {
         "type": "object",

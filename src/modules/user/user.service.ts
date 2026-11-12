@@ -1,13 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import * as bcrypt from 'bcrypt';
 import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../_prisma/prisma.service';
-import { ChangePasswordDto, UpdateUserDto } from './dto';
+import { UpdateUserDto } from './dto';
 import { FileService } from '../file/file.service';
-import { hashPassword } from 'src/infra/helper/auth/hash-password';
 import { toStaffUser } from 'src/infra/helper/auth/staff-user';
-import { AppException } from 'src/infra/errors/app-exception';
 
 @Injectable()
 export class UserService {
@@ -68,41 +65,6 @@ export class UserService {
       include: { avatar: true }, // agar file ma'lumotini ham qaytarmoqchi bo'lsangiz
     });
     return toStaffUser(user);
-  }
-
-  async changePassword(data: ChangePasswordDto, id: string) {
-    const user = await this.prismaService.user
-      .findUnique({
-        where: { id },
-      })
-      .catch(() => {
-        throw new AppException('not_found', { message: 'data not found' });
-      });
-
-    const isSamePassword =
-      !!user?.password &&
-      (await bcrypt.compare(data.oldPassword, user.password));
-
-    if (!isSamePassword) {
-      throw new AppException('wrong_password');
-    }
-
-    return await this.updatePassword(id, data.newPassword);
-  }
-
-  async updatePassword(id: string, password: string) {
-    await this.prismaService.user.findUnique({ where: { id } }).catch(() => {
-      throw new AppException('not_found', { message: 'user not found' });
-    });
-
-    const newPassword = await hashPassword(password);
-
-    return toStaffUser(
-      await this.prismaService.user.update({
-        where: { id },
-        data: { password: newPassword },
-      }),
-    );
   }
 
   async delete(id: string) {

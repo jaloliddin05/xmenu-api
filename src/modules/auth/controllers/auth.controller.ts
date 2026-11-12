@@ -24,6 +24,12 @@ import {
 
 import { StaffAuthService } from '../services/staff-auth.service';
 import { StaffSessionService } from '../services/staff-session.service';
+import { StaffPasswordService } from '../services/staff-password.service';
+import {
+  StaffForgotPasswordDto,
+  StaffResetPasswordDto,
+} from '../dto/staff-password.dto';
+import { StaffForgotPasswordResponseDto } from '../dto/auth-response.dto';
 import { LoginDto } from '../dto';
 import {
   StaffCheckCodeDto,
@@ -40,6 +46,7 @@ export class AuthController {
   constructor(
     private readonly staffAuth: StaffAuthService,
     private readonly sessions: StaffSessionService,
+    private readonly passwords: StaffPasswordService,
   ) {}
 
   @Public()
@@ -102,6 +109,36 @@ export class AuthController {
   @HttpCode(200)
   refresh(@Body() dto: StaffRefreshDto, @Req() req: express.Request) {
     return this.sessions.refresh(dto.refreshToken, requestCtx(req));
+  }
+
+  @Public()
+  @Post('/password/forgot')
+  @ApiOperation({
+    summary:
+      'Send a password reset code. The answer, limits and timing are the same for a known and an unknown phone',
+  })
+  @ApiOkResponse({ type: StaffForgotPasswordResponseDto })
+  @HttpCode(200)
+  forgotPassword(
+    @Body() dto: StaffForgotPasswordDto,
+    @Req() req: express.Request,
+  ) {
+    return this.passwords.forgot(dto, requestCtx(req));
+  }
+
+  @Public()
+  @Post('/password/reset')
+  @ApiOperation({
+    summary:
+      'Set a new password with the code from the SMS; every login of the owner is revoked',
+  })
+  @ApiNoContentResponse()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async resetPassword(
+    @Body() dto: StaffResetPasswordDto,
+    @Req() req: express.Request,
+  ): Promise<void> {
+    await this.passwords.reset(dto, requestCtx(req));
   }
 
   @Public()

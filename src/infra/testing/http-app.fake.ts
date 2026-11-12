@@ -8,6 +8,7 @@ import { configureErrorHandling } from 'src/infra/errors/configure';
 import { AccessTokenUserGuard } from 'src/modules/auth/passport-strategies/access-token-user/access-token-user.guard';
 import { AccessTokenUserStrategy } from 'src/modules/auth/passport-strategies/access-token-user/access-token-user.strategy';
 import { AuthService } from 'src/modules/auth/services/auth.service';
+import { StaffSessionService } from 'src/modules/auth/services/staff-session.service';
 
 const SECRET = 'http-spec-access-secret';
 
@@ -18,8 +19,12 @@ export interface FakeStaffUser {
 }
 
 /** Bearer access token for a staff user of createHttpApp(). */
-export function staffToken(userId: string, secret = SECRET): string {
-  return sign({ sub: userId, role: 'user' }, secret, { expiresIn: 60 });
+export function staffToken(
+  userId: string,
+  secret = SECRET,
+  sid = `sid-${userId}`,
+): string {
+  return sign({ sub: userId, role: 'user', sid }, secret, { expiresIn: 60 });
 }
 
 /**
@@ -30,7 +35,14 @@ export function staffToken(userId: string, secret = SECRET): string {
 export async function createHttpApp(
   meta: ModuleMetadata,
   staffUsers: FakeStaffUser[] = [],
+  revokedSids: Set<string> = new Set(),
 ): Promise<INestApplication> {
+  // A spec that brings its own StaffSessionService keeps it
+  const ownsSessions = (meta.providers ?? []).some(
+    (p) =>
+      p === StaffSessionService ||
+      (p as { provide?: unknown }).provide === StaffSessionService,
+  );
   const auth = {
     validateUserById: async (id: string) => {
       const user = staffUsers.find((u) => u.id === id);
@@ -47,6 +59,16 @@ export async function createHttpApp(
       ...(meta.providers ?? []),
       AccessTokenUserStrategy,
       { provide: AuthService, useValue: auth },
+      ...(ownsSessions
+        ? []
+        : [
+            {
+              provide: StaffSessionService,
+              useValue: {
+                isSidRevoked: async (sid: string) => revokedSids.has(sid),
+              },
+            },
+          ]),
       {
         provide: ConfigService,
         useValue: { getOrThrow: () => ({ accessTokenSecret: SECRET }) },
