@@ -1,7 +1,8 @@
 name: e2e
 
-# Full end-to-end set (without maps) on every PR: this branch plus main of the other three applications.
-# The logic lives in xmenu-e2e (.github/actions), this file only wires it up.
+# Full end-to-end set (without maps) on every PR: this branch plus, for each other repository (xmenu-e2e included),
+# its branch of the same name if there is one, otherwise main. The logic lives in xmenu-e2e (.github/actions), this file
+# only wires it up.
 on:
   pull_request:
 
@@ -9,28 +10,49 @@ concurrency:
   group: e2e-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  E2E_REF: ci/e2e-on-app-prs
-
 jobs:
+  # xmenu-e2e itself has to be picked before its actions exist here; its refs action picks the applications.
+  ref:
+    name: e2e ref
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      e2e: ${{ steps.pick.outputs.ref }}
+    steps:
+      - id: pick
+        env:
+          TOKEN: ${{ secrets.E2E_REPOS_TOKEN }}
+          BRANCH: ${{ github.head_ref }}
+        run: |
+          ref=main
+          if git ls-remote --exit-code --heads "https://x-access-token:${TOKEN}@github.com/Muxammadaziz04/xmenu-e2e.git" \
+            "refs/heads/${BRANCH}" > /dev/null; then
+            ref=$BRANCH
+          fi
+          echo "xmenu-e2e: $ref"
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
   contract:
     name: e2e contract
+    needs: ref
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
           repository: Muxammadaziz04/xmenu-e2e
-          ref: ${{ env.E2E_REF }}
+          ref: ${{ needs.ref.outputs.e2e }}
           token: ${{ secrets.E2E_REPOS_TOKEN }}
       - uses: ./.github/actions/contract
         with:
           token: ${{ secrets.E2E_REPOS_TOKEN }}
           backend_ref: ${{ github.event.pull_request.head.sha }}
           backend_repo: ${{ github.repository }}
+          branch: ${{ github.head_ref }}
 
   e2e:
     name: e2e
+    needs: ref
     runs-on: ubuntu-latest
     timeout-minutes: 45
     services:
@@ -62,10 +84,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: Muxammadaziz04/xmenu-e2e
-          ref: ${{ env.E2E_REF }}
+          ref: ${{ needs.ref.outputs.e2e }}
           token: ${{ secrets.E2E_REPOS_TOKEN }}
       - uses: ./.github/actions/run
         with:
           token: ${{ secrets.E2E_REPOS_TOKEN }}
           backend_ref: ${{ github.event.pull_request.head.sha }}
           backend_repo: ${{ github.repository }}
+          branch: ${{ github.head_ref }}
