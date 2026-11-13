@@ -1,6 +1,7 @@
 import type Redis from 'ioredis';
 import { FakeRedis } from 'src/infra/redis/redis.fake';
 import type { SmsProvider } from 'src/modules/sms/providers/sms-provider.interface';
+import { DEFAULT_OTP_RATE_LIMITS } from '../customer-auth.config';
 import type { CustomerAuthConfig } from '../customer-auth.config';
 import { CustomerOtpService } from './customer-otp.service';
 import { RateLimitService } from './rate-limit.service';
@@ -13,13 +14,18 @@ export const staffTestConfig = {
   otpTtlSeconds: 300,
   otpMaxAttempts: 5,
   otpCooldownSeconds: 60,
+  otpRateLimits: DEFAULT_OTP_RATE_LIMITS,
   otpDevMode: false,
 } as CustomerAuthConfig;
 
 export class FakeSms implements SmsProvider {
   sent: { phone: string; text: string }[] = [];
   failNext = false;
+  /** Pretend the provider takes this long, so a send that is not awaited shows in response time. */
+  delayMs = 0;
   async send(phone: string, text: string) {
+    if (this.delayMs)
+      await new Promise((resolve) => setTimeout(resolve, this.delayMs));
     if (this.failNext) {
       this.failNext = false;
       throw new Error('provider down');
@@ -165,13 +171,13 @@ export class FakeStaffSessions {
   }
 }
 
-export function makeStaffAuthDeps() {
+export function makeStaffAuthDeps(cfg: CustomerAuthConfig = staffTestConfig) {
   const redis = new FakeRedis();
   const sms = new FakeSms();
   const db = new FakeStaffPrisma();
   const r = redis as unknown as Redis;
   const rateLimit = new RateLimitService(r);
-  const otp = new CustomerOtpService(r, staffTestConfig, sms, rateLimit);
+  const otp = new CustomerOtpService(r, cfg, sms, rateLimit);
   const events = new StaffAuthEventService(db as any);
   const throttle = new StaffLoginThrottleService(r);
   return {

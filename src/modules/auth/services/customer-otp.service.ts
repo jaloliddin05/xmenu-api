@@ -102,6 +102,36 @@ export class CustomerOtpService {
     ip: string,
     scope: OtpScope = 'customer',
     lang: Lang = tenant.defaultLanguage ?? 'ru',
+    purpose?: string,
+  ): Promise<number> {
+    return this.requestWith(tenant, phone, ip, scope, purpose, (code) =>
+      SMS_TEXT[scope][lang](tenant.brandName, code),
+    );
+  }
+
+  /**
+   * Same pause, limits, stored code and delivery as `request`, but the SMS carries `text` instead of the code: the
+   * code is kept (hashed) and never sent, so nobody can enter it. Lets a flow treat a phone it must not reveal like
+   * any other one.
+   */
+  async requestNotice(
+    tenant: { id: string; brandName: string },
+    phone: string,
+    ip: string,
+    scope: OtpScope,
+    purpose: string,
+    text: string,
+  ): Promise<number> {
+    return this.requestWith(tenant, phone, ip, scope, purpose, () => text);
+  }
+
+  private async requestWith(
+    tenant: { id: string; brandName: string },
+    phone: string,
+    ip: string,
+    scope: OtpScope,
+    purpose: string | undefined,
+    textFor: (code: string) => string,
   ): Promise<number> {
     if (!this.cfg.otpDevMode && !isSmsConfigured())
       throw platformMisconfigured(
@@ -111,8 +141,8 @@ export class CustomerOtpService {
     return this.issue(tenant, phone, {
       ip,
       scope,
-      deliver: (code) =>
-        this.sms.send(phone, SMS_TEXT[scope][lang](tenant.brandName, code)),
+      purpose,
+      deliver: (code) => this.sms.send(phone, textFor(code)),
     });
   }
 
@@ -127,6 +157,8 @@ export class CustomerOtpService {
     opts: {
       ip?: string;
       scope?: OtpScope;
+      /** Which flow asks for the code; its pause and per-phone limits are separate from the other flows. */
+      purpose?: string;
       deliver: (code: string) => Promise<void>;
       /** Deliver even in OTP_DEV_MODE (the fixed dev code is otherwise never sent). */
       alwaysDeliver?: boolean;
@@ -136,17 +168,32 @@ export class CustomerOtpService {
     const scope = opts.scope ?? 'customer';
     // Telefon bo'yicha kalitlarda tenant YO'Q (tenant klientdan keladi — aylanib o'tib bo'lmasin)
     const p = KEY_PREFIX[scope];
+    // Pause and per-phone limits are counted per purpose (sign-up, password reset) and never look at the account
+    const phoneKey = opts.purpose ? `${opts.purpose}:${phone}` : phone;
+    const limits = this.cfg.otpRateLimits;
     const rules: RateRule[] = [
       {
-        key: `${p}:cd:${phone}`,
+        key: `${p}:cd:${phoneKey}`,
         limit: 1,
         ttlSeconds: this.cfg.otpCooldownSeconds,
       },
-      { key: `${p}:rl:phone:h:${phone}`, limit: 5, ttlSeconds: 3600 },
-      { key: `${p}:rl:phone:d:${phone}`, limit: 10, ttlSeconds: 86400 },
+      {
+        key: `${p}:rl:phone:h:${phoneKey}`,
+        limit: limits.phoneHourly,
+        ttlSeconds: 3600,
+      },
+      {
+        key: `${p}:rl:phone:d:${phoneKey}`,
+        limit: limits.phoneDaily,
+        ttlSeconds: 86400,
+      },
     ];
     if (opts.ip !== undefined)
-      rules.push({ key: `${p}:rl:ip:${opts.ip}`, limit: 30, ttlSeconds: 3600 });
+      rules.push({
+        key: `${p}:rl:ip:${opts.ip}`,
+        limit: limits.ipHourly,
+        ttlSeconds: 3600,
+      });
     await this.rateLimit.hit(rules);
 
     const key = this.otpKey(scope, tenant.id, phone);

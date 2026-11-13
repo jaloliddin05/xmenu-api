@@ -6,6 +6,7 @@ import {
   AUD_CUSTOMER,
   AUD_REGISTRATION,
 } from './customer-token.service';
+import { DEFAULT_OTP_RATE_LIMITS } from '../customer-auth.config';
 import type { CustomerAuthConfig } from '../customer-auth.config';
 import { AppException } from 'src/infra/errors/app-exception';
 
@@ -33,6 +34,7 @@ function makeConfig(
     otpTtlSeconds: 300,
     otpMaxAttempts: 5,
     otpCooldownSeconds: 60,
+    otpRateLimits: DEFAULT_OTP_RATE_LIMITS,
     otpDevMode: false,
     accessTtlSeconds: 900,
     registrationTtlSeconds: 600,
