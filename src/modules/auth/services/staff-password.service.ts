@@ -78,6 +78,7 @@ export class StaffPasswordService {
       {
         ip: ctx.ip,
         scope: 'staff',
+        purpose: RESET_SUBJECT,
         deliver: (code) => {
           if (!known) return Promise.resolve();
           void this.sms

@@ -1,6 +1,7 @@
 import type Redis from 'ioredis';
 import { FakeRedis } from 'src/infra/redis/redis.fake';
 import type { SmsProvider } from 'src/modules/sms/providers/sms-provider.interface';
+import { DEFAULT_OTP_RATE_LIMITS } from '../customer-auth.config';
 import type { CustomerAuthConfig } from '../customer-auth.config';
 import { AppException } from 'src/infra/errors/app-exception';
 import { CustomerOtpService } from './customer-otp.service';
@@ -17,6 +18,7 @@ const cfg = {
   otpTtlSeconds: 300,
   otpMaxAttempts: 5,
   otpCooldownSeconds: 60,
+  otpRateLimits: DEFAULT_OTP_RATE_LIMITS,
   otpDevMode: false,
 } as CustomerAuthConfig;
 

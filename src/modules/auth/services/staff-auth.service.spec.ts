@@ -95,10 +95,12 @@ describe('StaffAuthService (signup)', () => {
       );
     });
 
-    it('refuses a phone that already has an active owner', async () => {
+    it('answers a phone that already has an active owner like a free one (see staff-enumeration.spec.ts)', async () => {
       await deps.db.user.create({ data: { phone: PHONE, isActive: true } });
-      await expectCode(service.register(SIGNUP, CTX), 'phone_taken');
-      expect(deps.sms.sent).toHaveLength(0);
+      await expect(service.register(SIGNUP, CTX)).resolves.toMatchObject({
+        resendAfter: 60,
+      });
+      expect(deps.db.users).toHaveLength(1);
     });
 
     it('rejects a malformed phone', async () => {

@@ -225,6 +225,12 @@ App (`instant`) нового номера кладёт Telegram-id в `registrat
   (`sotp:pwreset:<phone>`), `POST /auth/password/reset` отзывает все входы, `POST /auth/password/change` (текущий пароль,
   лимит попыток) отзывает все, кроме текущего. Старого `PUT /user/change-password/:id` нет. Тесты на единообразие
   ответа и отзыв сессий: `staff-password.service.spec.ts`.
+- Перебор номеров закрыт: `POST /auth/register` для зарегистрированного номера отвечает так же, как для свободного (тот же
+  ответ, лимиты и время). Заявка помечается `existing`, вместо кода уходит SMS «У вас уже есть аккаунт» (`requestNotice`),
+  `check-code` для неё всегда `invalid_code`. Пауза и лимиты по номеру ведутся по цели (`purpose`: `register`, `pwreset`)
+  и не смотрят на аккаунт. Тесты: `staff-enumeration.spec.ts`, `otp-rate-limits.spec.ts`. Значения лимитов
+  (`OTP_PHONE_HOURLY_LIMIT`, `OTP_PHONE_DAILY_LIMIT`, `OTP_IP_HOURLY_LIMIT`, `STAFF_REGISTER_IP_HOURLY_LIMIT`) из окружения,
+  по умолчанию боевые.
 - `POST /auth/register` ничего не пишет в БД: заявка (с bcrypt-хешем пароля владельца, 8–72 символа) ждёт в Redis
   под случайным `registrationId` 30 минут. `check-code {registrationId, code}` создаёт user и organization в одной
   транзакции; «хвост» старой схемы (`isActive=false`) переиспользуется. Код привязан к заявке, а не к номеру: вторая

@@ -8,6 +8,24 @@ export interface InitDataConfig {
   telegramInitDataMaxAgeSeconds: number;
 }
 
+/** Limits of code requests (customers and owners) and of owner sign-ups; the defaults are the production values. */
+export interface OtpRateLimits {
+  /** Codes to one phone per hour and per day, counted per purpose. */
+  phoneHourly: number;
+  phoneDaily: number;
+  /** Code requests per client IP per hour. */
+  ipHourly: number;
+  /** Owner sign-ups per client IP per hour. */
+  registerIpHourly: number;
+}
+
+export const DEFAULT_OTP_RATE_LIMITS: OtpRateLimits = {
+  phoneHourly: 5,
+  phoneDaily: 10,
+  ipHourly: 30,
+  registerIpHourly: 10,
+};
+
 export interface CustomerAuthConfig {
   accessSecret: string;
   registrationSecret: string;
@@ -18,6 +36,7 @@ export interface CustomerAuthConfig {
   otpMaxAttempts: number;
   otpCooldownSeconds: number;
   otpDevMode: boolean;
+  otpRateLimits: OtpRateLimits;
 
   accessTtlSeconds: number;
   registrationTtlSeconds: number;
@@ -112,6 +131,21 @@ export function loadCustomerAuthConfig(): CustomerAuthConfig {
     otpMaxAttempts: int('OTP_MAX_ATTEMPTS', 5),
     otpCooldownSeconds: int('OTP_COOLDOWN_SECONDS', 60),
     otpDevMode,
+    otpRateLimits: {
+      phoneHourly: int(
+        'OTP_PHONE_HOURLY_LIMIT',
+        DEFAULT_OTP_RATE_LIMITS.phoneHourly,
+      ),
+      phoneDaily: int(
+        'OTP_PHONE_DAILY_LIMIT',
+        DEFAULT_OTP_RATE_LIMITS.phoneDaily,
+      ),
+      ipHourly: int('OTP_IP_HOURLY_LIMIT', DEFAULT_OTP_RATE_LIMITS.ipHourly),
+      registerIpHourly: int(
+        'STAFF_REGISTER_IP_HOURLY_LIMIT',
+        DEFAULT_OTP_RATE_LIMITS.registerIpHourly,
+      ),
+    },
     accessTtlSeconds: int('ACCESS_TTL_SECONDS', 900),
     registrationTtlSeconds: 600,
     refreshTtlDays: int('REFRESH_TTL_DAYS', 30),

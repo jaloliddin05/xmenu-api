@@ -24,6 +24,10 @@ import { AppException } from 'src/infra/errors/app-exception';
 /** How long a signup waits for its phone code; every resend extends it. */
 export const PENDING_REGISTRATION_TTL_SECONDS = 1800;
 const OTP_BRAND = 'Xmenu';
+/** Subject of sign-up codes' pause and limits: counted per phone, apart from password recovery. */
+export const REGISTER_PURPOSE = 'register';
+/** Sent instead of a code when the phone already has an account; it holds no code. */
+export const ACCOUNT_EXISTS_TEXT = `У вас уже есть аккаунт ${OTP_BRAND}: войдите или восстановите пароль.`;
 const SLUG_RETRIES = 3;
 export const LOGIN_IP_LIMIT = 20;
 const LOGIN_IP_WINDOW_SECONDS = 900;
@@ -39,6 +43,8 @@ interface PendingRegistration {
   first_name: string;
   last_name?: string;
   passwordHash: string;
+  /** The phone already has an account: it gets a notice instead of a code, and no code is accepted. */
+  existing?: boolean;
 }
 
 const USER_WITH_ORGANIZATION = {
@@ -69,15 +75,19 @@ export class StaffAuthService {
   async register(dto: StaffRegisterDto, ctx: RequestCtx) {
     if (!isValidPhone(dto.phone)) throw new AppException('invalid_phone');
     await this.rateLimit.hit([
-      { key: `staff:reg:rl:ip:${ctx.ip}`, limit: 10, ttlSeconds: 3600 },
+      {
+        key: `staff:reg:rl:ip:${ctx.ip}`,
+        limit: this.cfg.otpRateLimits.registerIpHourly,
+        ttlSeconds: 3600,
+      },
     ]);
 
     const existing = await this.prisma.user.findUnique({
       where: { phone: dto.phone },
       select: { isActive: true },
     });
-    if (existing?.isActive) throw new AppException('phone_taken');
 
+    // A registered phone is answered like a free one: same work, same limits, same response. Its code is never sent.
     const registrationId = randomUUID();
     const pending: PendingRegistration = {
       phone: dto.phone,
@@ -86,6 +96,7 @@ export class StaffAuthService {
       first_name: dto.first_name,
       last_name: dto.last_name || undefined,
       passwordHash: await hashPassword(dto.password),
+      ...(existing?.isActive ? { existing: true } : {}),
     };
     const key = this.pendingKey(registrationId);
     await this.redis.set(
@@ -97,7 +108,7 @@ export class StaffAuthService {
 
     let resendAfter: number;
     try {
-      resendAfter = await this.sendCode(registrationId, pending.phone, ctx);
+      resendAfter = await this.sendCode(registrationId, pending, ctx);
     } catch (err) {
       await this.redis.del(key);
       throw err;
@@ -114,7 +125,7 @@ export class StaffAuthService {
 
   async resendCode(registrationId: string, ctx: RequestCtx) {
     const pending = await this.readPending(registrationId);
-    const resendAfter = await this.sendCode(registrationId, pending.phone, ctx);
+    const resendAfter = await this.sendCode(registrationId, pending, ctx);
     await this.redis.expire(
       this.pendingKey(registrationId),
       PENDING_REGISTRATION_TTL_SECONDS,
@@ -149,6 +160,8 @@ export class StaffAuthService {
       },
       'staff',
     );
+    // Reachable only by guessing the code that was never sent (or the fixed development code): a wrong code
+    if (pending.existing) throw new AppException('invalid_code');
 
     // Only the request that removes the pending signup may create the account
     if ((await this.redis.del(this.pendingKey(dto.registrationId))) !== 1) {
@@ -243,16 +256,28 @@ export class StaffAuthService {
 
   private async sendCode(
     registrationId: string,
-    phone: string,
+    { phone, existing }: PendingRegistration,
     ctx: RequestCtx,
   ): Promise<number> {
+    const tenant = { id: registrationId, brandName: OTP_BRAND };
     try {
-      const resendAfter = await this.otp.request(
-        { id: registrationId, brandName: OTP_BRAND },
-        phone,
-        ctx.ip,
-        'staff',
-      );
+      const resendAfter = existing
+        ? await this.otp.requestNotice(
+            tenant,
+            phone,
+            ctx.ip,
+            'staff',
+            REGISTER_PURPOSE,
+            ACCOUNT_EXISTS_TEXT,
+          )
+        : await this.otp.request(
+            tenant,
+            phone,
+            ctx.ip,
+            'staff',
+            'ru',
+            REGISTER_PURPOSE,
+          );
       await this.events.log('staff_otp_requested', ctx, { phone });
       return resendAfter;
     } catch (err) {
