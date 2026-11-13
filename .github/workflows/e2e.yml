@@ -1,0 +1,99 @@
+name: e2e
+
+# Full end-to-end set (without maps) on every PR: this branch plus, for each other repository (xmenu-e2e included),
+# its branch of the same name if there is one, otherwise main. The logic lives in xmenu-e2e (.github/actions), this file
+# only wires it up.
+on:
+  pull_request:
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # xmenu-e2e itself has to be picked before its actions exist here; its refs action picks the applications.
+  ref:
+    name: e2e ref
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      e2e: ${{ steps.pick.outputs.ref }}
+    steps:
+      - id: pick
+        env:
+          TOKEN: ${{ secrets.E2E_REPOS_TOKEN }}
+          BRANCH: ${{ github.head_ref }}
+        # Exit code 2 means "no such branch"; any other failure stops the check instead of silently taking main.
+        run: |
+          ref=main rc=0
+          git ls-remote --exit-code --heads "https://x-access-token:${TOKEN}@github.com/Muxammadaziz04/xmenu-e2e.git" \
+            "refs/heads/${BRANCH}" > /dev/null || rc=$?
+          if [ "$rc" = 0 ]; then
+            ref=$BRANCH
+          elif [ "$rc" != 2 ]; then
+            echo "::error title=e2e ref::cannot read xmenu-e2e (git ls-remote exit $rc)"
+            exit 1
+          fi
+          echo "xmenu-e2e: $ref"
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
+  contract:
+    name: e2e contract
+    needs: ref
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: Muxammadaziz04/xmenu-e2e
+          ref: ${{ needs.ref.outputs.e2e }}
+          token: ${{ secrets.E2E_REPOS_TOKEN }}
+      - uses: ./.github/actions/contract
+        with:
+          token: ${{ secrets.E2E_REPOS_TOKEN }}
+          backend_ref: ${{ github.event.pull_request.head.sha }}
+          backend_repo: ${{ github.repository }}
+          branch: ${{ github.head_ref }}
+
+  e2e:
+    name: e2e
+    needs: ref
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CI: 'true'
+      E2E_REPOS_DIR: repos
+      E2E_PG_ADMIN_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+      E2E_REDIS_URL: redis://127.0.0.1:6379/15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: Muxammadaziz04/xmenu-e2e
+          ref: ${{ needs.ref.outputs.e2e }}
+          token: ${{ secrets.E2E_REPOS_TOKEN }}
+      - uses: ./.github/actions/run
+        with:
+          token: ${{ secrets.E2E_REPOS_TOKEN }}
+          backend_ref: ${{ github.event.pull_request.head.sha }}
+          backend_repo: ${{ github.repository }}
+          branch: ${{ github.head_ref }}
