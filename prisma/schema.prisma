@@ -206,6 +206,10 @@ model customer {
   // ru | uz | en; null until the first sign-in, then the venue's default language applies
   language        String?
   status          CustomerStatus @default(active)
+  // Last time an order notification could not reach the guest in Telegram, and why
+  // (GuestUnreachableReason in order/notifications/guest-notification.ts); cleared by the next delivered one
+  telegram_unreachable_at     DateTime?
+  telegram_unreachable_reason String?
 
   created_at      DateTime       @default(now())
   updated_at      DateTime       @updatedAt
@@ -298,6 +302,12 @@ model customer_order {
   placed_at       DateTime?
   accepted_at     DateTime?
   completed_at    DateTime?
+
+  channel         OrderChannel @default(site)
+  // Mini App orders only: the guest's Telegram id and the venue bot (Telegram bot id) that opened the
+  // Mini App. Status and refund notifications go there and nowhere else (notifications/guest-notification.ts)
+  guest_telegram_id     String?
+  guest_telegram_bot_id String?
 
   // Restoran guruhiga yuborilgan xabar (keyin tahrirlash uchun)
   tg_chat_id      String?
@@ -409,6 +419,12 @@ enum OrderActor {
   restaurant
   system
   payment
+}
+
+// Where the guest placed the order: the venue site, or its Telegram Mini App (initData checked by the venue bot).
+enum OrderChannel {
+  site
+  miniapp
 }
 // Ordering settings of a tenant (one row per organization). The row is created at signup with the
 // platform defaults (organization/domain/platform-defaults.ts) and must exist: the code never

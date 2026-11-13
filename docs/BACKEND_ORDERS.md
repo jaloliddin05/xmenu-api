@@ -33,7 +33,7 @@ npx prisma migrate deploy   # 20261010090000_branches_orders_payments
 | Переменная | Обязательна | Назначение |
 |---|---|---|
 | `PAYMENT_CONFIG_KEY` | для онлайн-оплаты | 32 байта (64 hex или base64): ключ AES-256-GCM, которым шифруются ключи Click/Payme в БД. `openssl rand -hex 32`. **Потеря ключа = все тенанты вводят ключи заново** |
-| `TELEGRAM_BOT_TOKEN` | для уведомлений | бот: сообщения в группу филиала и клиенту. Для отдельного бота ресторанов — `TELEGRAM_ORDERS_BOT_TOKEN` |
+| `TELEGRAM_BOT_TOKEN` | для уведомлений | платформенный бот: сообщения в группу филиала и ops. Для отдельного бота ресторанов — `TELEGRAM_ORDERS_BOT_TOKEN`. Гостю пишет только бот заведения (`docs/API.md`, «Уведомления гостю о заказе») |
 | `TELEGRAM_WEBHOOK_SECRET` | для кнопок | `secret_token` webhook'а; без него эндпоинт отвечает `503 platform_misconfigured` (`feature: order_notifications`) |
 | `PUBLIC_API_URL` | да | публичный адрес API: абсолютные URL картинок меню, адреса вебхуков в `GET /payment-provider` |
 | `PUBLIC_FILES_URL` | нет | если картинки отдаются с другого домена/CDN |
@@ -115,7 +115,6 @@ Click — автоматически через Merchant API (reversal). Payme �
 * Web Push / WebSocket для браузерной админки (панель пока опрашивает `GET /order`).
 * Фискальные чеки Payme (`detail`) и онлайн-кассы.
 * Меню/остатки по филиалам; заказ ко времени; промокоды и скидки (поле `discount` есть, всегда 0).
-* Язык уведомлений клиенту — только русский (у `customer` нет поля языка).
 * Ротация `PAYMENT_CONFIG_KEY`.
 * Rate limit на `POST /orders` (есть только лимит активных заказов на клиента).
 * IP-allowlist для вебхуков Click/Payme (стоит настроить на уровне nginx/WAF).

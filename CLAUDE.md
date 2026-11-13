@@ -163,7 +163,19 @@ App (`instant`) нового номера кладёт Telegram-id в `registrat
 Язык клиента: `customer.language` (`ru|uz|en`, null до первого входа), задаётся из языка запроса (`RequestCtx.lang`,
 `resolveLang`) при регистрации и первом входе, меняется `PATCH /customers/me`. SMS-коды берут язык запроса
 (`SMS_TEXT` в `customer-otp.service.ts`), уведомления клиенту `customerLangFor` (язык клиента, если заведение его
-предлагает, иначе язык заведения) и `CUSTOMER_TEXTS` (`order/notifications/customer-messages.ts`).
+предлагает, иначе язык заведения) и `CUSTOMER_TEXTS` (`order/notifications/customer-messages.ts`). `Accept-Language`
+разбирается с q-весами (`acceptedLanguages` в `infra/http/request-helpers.ts`).
+
+## Уведомления гостю о заказе
+Контракт: `docs/API.md`, «Уведомления гостю о заказе». Правила в `order/notifications/guest-notification.ts`, отправка
+`CustomerNotifierService`, очередь `guest-notifications` (`GuestNotificationProcessor`, 5 попыток).
+- Только заказы из Mini App: `POST /orders` пишет `channel` (`site` | `miniapp`), `guest_telegram_id` и
+  `guest_telegram_bot_id` из проверенного `X-Telegram-Init-Data` (`MiniAppAccessService.check`). Заказ с сайта
+  уведомлений не получает, `customer.telegram_id` для них не используется. SMS о статусе нет.
+- Пишет бот заведения (`TelegramBotService.forTenant` + `TelegramClient`), только если это тот же бот
+  (`telegramBotId`); платформенный `TelegramApiService` только для персонала и ops.
+- Не доставлено (нет бота, бот сменён, 403, 400 chat not found, другой 4xx, повторы кончились): строка в лог с id
+  заказа и причиной, отметка `customer.telegram_unreachable_at`/`_reason`; доставленное снимает отметку.
 
 ## Боты заведений и подтверждение номера через Telegram
 Контракт и сценарии: `docs/TELEGRAM_VERIFICATION.md`.
@@ -193,7 +205,8 @@ App (`instant`) нового номера кладёт Telegram-id в `registrat
 - Код из бота выдаёт `CustomerOtpService.issue()` (тот же хеш, попытки и лимиты по телефону, что у SMS).
 - Вход завершает `CustomerAuthService.completeVerifiedPhone` (общий для SMS и Telegram). `telegram/status` с `code_sent`
   отдаёт `codeLength` (`cfg.otpLength`, как `otp/request`).
-- Уведомления о заказах по-прежнему идут через платформенного бота (`telegram-orders.controller.ts`).
+- Уведомления о заказах персоналу филиала по-прежнему идут через платформенного бота (`telegram-orders.controller.ts`);
+  гостю пишет бот заведения (раздел «Уведомления гостю о заказе»).
 
 ## Авторизация владельцев (staff)
 Контракт, ошибки и лимиты: `docs/API.md`. Код: `StaffAuthService` (регистрация и вход),
@@ -228,7 +241,7 @@ App (`instant`) нового номера кладёт Telegram-id в `registrat
 ## Что нужно построить
 - Интерфейс провайдера доставки (создать, отменить, статус, вебхук) и адаптер собственных курьеров; внешние сервисы
   (Noor, Yandex, Millennium) по мере доступа к API.
-- Уведомления о заказах через бота ресторана (пока идут через платформенного бота из env).
+- Уведомления о заказах персоналу через бота ресторана (пока идут через платформенного бота из env).
 - История старых slug с редиректом.
 - Возврат после оплаты на сайт заведения: `MINIAPP_RETURN_URL`/`MINIAPP_URL` один на платформу
   (`payment/domain/payment-url.ts`), а не `https://{slug}.xmenu.uz`. Бэкенд адресов `{slug}.xmenu.uz` нигде не строит:

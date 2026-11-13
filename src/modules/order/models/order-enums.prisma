@@ -39,3 +39,9 @@ enum OrderActor {
   system
   payment
 }
+
+// Where the guest placed the order: the venue site, or its Telegram Mini App (initData checked by the venue bot).
+enum OrderChannel {
+  site
+  miniapp
+}

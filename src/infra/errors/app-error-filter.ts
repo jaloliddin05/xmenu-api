@@ -142,6 +142,9 @@ export function describeError(exception: unknown): DescribedError {
  * Sets Retry-After and Cache-Control: no-store; logs every error response under the request id
  * (warn for 4xx, error with the stack for 5xx).
  */
+/** Logged instead of the path when no route matched. */
+export const UNMATCHED_ROUTE = '<unmatched route>';
+
 @Catch()
 export class AppErrorFilter implements ExceptionFilter {
   private static readonly logger = new Logger('HttpError');
@@ -154,9 +157,10 @@ export class AppErrorFilter implements ExceptionFilter {
     const { body, log } = describeError(exception);
 
     // One line per error response: request id, method, route pattern (no parameter values), status and
-    // the text. Never the body or the query; phone numbers in the text are masked.
+    // the text. Never the body, the query or a raw path (it may carry tokens): no matched route (404 of
+    // an unknown path, errors before routing) logs a fixed marker.
     const route = (req?.route as { path?: unknown } | undefined)?.path;
-    const where = typeof route === 'string' ? route : (req?.path ?? '');
+    const where = typeof route === 'string' ? route : UNMATCHED_ROUTE;
     const line = maskPhones(
       `[${requestId}] ${req?.method ?? ''} ${where} ${body.status} ${log.text}`,
     );

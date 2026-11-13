@@ -67,6 +67,17 @@ describe('MiniAppAccessService.assert', () => {
     expect(await outcome(INIT_DATA_CASES.valid())).toBe('ok');
   });
 
+  it('check(): which venue bot signed the initData (POST /orders keeps it for notifications)', async () => {
+    mode = 'both';
+    expect(await service.check('org-1', INIT_DATA_CASES.valid())).toEqual({
+      user: expect.objectContaining({ id: 555 }),
+      telegramBotId: '111111',
+    });
+    expect(await service.check('org-1', undefined)).toBeNull();
+    mode = 'site';
+    expect(await service.check('org-1', INIT_DATA_CASES.valid())).toBeNull();
+  });
+
   it('a blank header counts as absent', async () => {
     mode = 'both';
     expect(await outcome('   ')).toBe('ok');

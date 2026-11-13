@@ -23,6 +23,10 @@ model customer {
   // ru | uz | en; null until the first sign-in, then the venue's default language applies
   language        String?
   status          CustomerStatus @default(active)
+  // Last time an order notification could not reach the guest in Telegram, and why
+  // (GuestUnreachableReason in order/notifications/guest-notification.ts); cleared by the next delivered one
+  telegram_unreachable_at     DateTime?
+  telegram_unreachable_reason String?
 
   created_at      DateTime       @default(now())
   updated_at      DateTime       @updatedAt

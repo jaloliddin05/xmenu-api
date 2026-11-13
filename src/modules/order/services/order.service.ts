@@ -30,6 +30,7 @@ import {
   OrderTransitionService,
 } from './order-transition.service';
 import { OrderWithItems, toOrderView } from './order-view';
+import { orderSource } from '../notifications/guest-notification';
 import { AppException } from 'src/infra/errors/app-exception';
 
 export const ORDER_INCLUDE = {
@@ -93,7 +94,7 @@ export class OrderService {
       throw new AppException('customer_blocked');
 
     // Ordering channel, publication and delivery mode, read fresh (not from the tenant cache): a pause applies at once
-    await this.assertOrderingOpen(organizationId, initData);
+    const visit = await this.assertOrderingOpen(organizationId, initData);
 
     const settings = await this.settings.get(organizationId);
     const mode = dto.fulfillmentMode;
@@ -216,6 +217,7 @@ export class OrderService {
             fulfillment: mode,
             idempotency_key: idempotencyKey,
             request_hash: requestHash,
+            ...orderSource(visit),
             phone: dto.phone,
             comment: dto.comment?.trim() || null,
             address_snapshot: addressSnapshot,
@@ -529,8 +531,9 @@ export class OrderService {
       throw new AppException(problem, {
         message: 'The venue is not taking orders right now',
       });
-    // Mode miniapp: only from the venue Mini App (docs/TELEGRAM_VERIFICATION.md)
-    await this.miniApp.assert(organizationId, initData, org!.delivery_mode);
+    // Mode miniapp: only from the venue Mini App (docs/TELEGRAM_VERIFICATION.md). The checked visit
+    // decides whether the guest gets notifications (notifications/guest-notification.ts)
+    return this.miniApp.check(organizationId, initData, org!.delivery_mode);
   }
 
   private async chooseBranch(

@@ -14,6 +14,12 @@ import type { TelegramUser } from './telegram-init-data.service';
 /** Header with the raw `Telegram.WebApp.initData` of the venue's Mini App. */
 export const INIT_DATA_HEADER = 'x-telegram-init-data';
 
+/** A request that came from the venue's Mini App: the guest and the venue bot that signed the initData. */
+export interface MiniAppVisit {
+  user: TelegramUser;
+  telegramBotId: string;
+}
+
 /**
  * Applies the venue's delivery mode to a guest request (sign-in and POST /orders):
  * docs/TELEGRAM_VERIFICATION.md, "Mini App и режимы доставки". The initData is checked only
@@ -37,6 +43,15 @@ export class MiniAppAccessService {
     header: string | undefined,
     mode?: DeliveryMode,
   ): Promise<TelegramUser | null> {
+    return (await this.check(organizationId, header, mode))?.user ?? null;
+  }
+
+  /** Same as assert(), but also says which venue bot signed the initData (POST /orders keeps it). */
+  async check(
+    organizationId: string,
+    header: string | undefined,
+    mode?: DeliveryMode,
+  ): Promise<MiniAppVisit | null> {
     const deliveryMode = mode ?? (await this.mode(organizationId));
     const raw = header?.trim() || undefined;
     if (!initDataChecked(deliveryMode, raw)) return null;
@@ -72,7 +87,7 @@ export class MiniAppAccessService {
         message: 'Reopen the venue Mini App in Telegram',
       });
     }
-    return user;
+    return user ? { user, telegramBotId: bot.telegramBotId } : null;
   }
 
   private async mode(organizationId: string): Promise<DeliveryMode> {
