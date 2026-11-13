@@ -23,11 +23,16 @@ jobs:
         env:
           TOKEN: ${{ secrets.E2E_REPOS_TOKEN }}
           BRANCH: ${{ github.head_ref }}
+        # Exit code 2 means "no such branch"; any other failure stops the check instead of silently taking main.
         run: |
-          ref=main
-          if git ls-remote --exit-code --heads "https://x-access-token:${TOKEN}@github.com/Muxammadaziz04/xmenu-e2e.git" \
-            "refs/heads/${BRANCH}" > /dev/null; then
+          ref=main rc=0
+          git ls-remote --exit-code --heads "https://x-access-token:${TOKEN}@github.com/Muxammadaziz04/xmenu-e2e.git" \
+            "refs/heads/${BRANCH}" > /dev/null || rc=$?
+          if [ "$rc" = 0 ]; then
             ref=$BRANCH
+          elif [ "$rc" != 2 ]; then
+            echo "::error title=e2e ref::cannot read xmenu-e2e (git ls-remote exit $rc)"
+            exit 1
           fi
           echo "xmenu-e2e: $ref"
           echo "ref=$ref" >> "$GITHUB_OUTPUT"
