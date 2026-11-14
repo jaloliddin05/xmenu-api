@@ -1,0 +1,33 @@
+// Delivery pricing of a branch (docs/DELIVERY.md, "Стоимость доставки и выбор филиала"). A branch without
+// zones and without a distance rule does not deliver. Sums are whole UZS, distances in km in a straight line.
+
+// A polygon on the map with its own price. Overlapping zones of one branch: the lowest position wins.
+model branch_delivery_zone {
+  id        String @id @default(uuid())
+  branch_id String
+  branch    branch @relation(fields: [branch_id], references: [id], onDelete: Cascade)
+
+  position  Int
+  // [[lat, lng], ...], at least 3 points
+  polygon   Json
+  price     Int
+  min_order Int
+  // Order subtotal from which delivery is free; null = never free
+  free_from Int?
+
+  @@index([branch_id, position])
+}
+
+// Price by distance for addresses outside every zone, up to max_km.
+model branch_delivery_distance {
+  branch_id    String @id
+  branch       branch @relation(fields: [branch_id], references: [id], onDelete: Cascade)
+
+  base_price   Int
+  included_km  Float
+  // Added for every started kilometre over included_km
+  price_per_km Int
+  max_km       Float
+  min_order    Int
+  free_from    Int?
+}

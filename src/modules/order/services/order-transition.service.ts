@@ -35,8 +35,6 @@ export interface TransitionInput {
   note?: string;
   /** bekor qilish sababi (customer_order.cancel_reason) */
   reason?: string;
-  /** accepted: restoran ETA'ni o'zgartirishi mumkin */
-  eta?: { min: number; max: number };
   /** awaiting_payment (qayta urinish): yangi to'lov muddati */
   paymentExpiresAt?: Date;
 }
@@ -122,10 +120,6 @@ export class OrderTransitionService {
         break;
       case 'accepted':
         data.accepted_at = now;
-        if (input.eta) {
-          data.eta_min = input.eta.min;
-          data.eta_max = input.eta.max;
-        }
         break;
       case 'completed':
         data.completed_at = now;

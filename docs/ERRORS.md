@@ -49,9 +49,10 @@
 | `invalid_order` | 400 | Заказ не собирается (пустой, неверное количество, нет адреса или филиала); `details.items` по позициям | `details.items` |
 | `invalid_modifiers` | 422 | Неизвестная группа или вариант допа, повтор, не выбран обязательный | `details.items` |
 | `item_unavailable` | 409 | Блюда нет или оно скрыто; `details.items` | `details.items` |
-| `price_changed` | 409 | `expectedTotal` не совпал с суммой по ценам из базы; новые цены в `details` | `details.items`, `details.subtotal`, `details.serviceFee`, `details.total` |
-| `min_order_not_reached` | 422 | Сумма меньше минимальной; `details.minAmount` | `details.minAmount` |
-| `out_of_delivery_zone` | 422 | Адрес вне зоны доставки | — |
+| `price_changed` | 409 | `expectedTotal` не совпал с суммой по ценам из базы; новые цены в `details` | `details.items`, `details.subtotal`, `details.deliveryFee`, `details.total` |
+| `delivery_fee_changed` | 409 | `expectedDeliveryFee` не совпал с ценой доставки по текущим правилам филиала; новая цена в `details` | `details.deliveryFee`, `details.freeFrom`, `details.minOrder`, `details.total` |
+| `min_order_not_reached` | 422 | Сумма без доставки меньше минимальной; `details.minAmount`, `details.shortBy` (сколько не хватает) | `details.minAmount`, `details.shortBy` |
+| `out_of_delivery_zone` | 422 | Ни один филиал с правилами доставки не доставляет на этот адрес (вне зон и дальше максимального расстояния) или у адреса нет координат | — |
 | `fulfillment_unavailable` | 422 | Тип получения выключен у заведения | — |
 | `branch_closed` | 409 | Филиал закрыт сейчас; `details.opensAt`: ближайшее открытие, ISO 8601 с датой и поясом филиала (как в `GET /branches`), `null`, если в 7 дней открытий нет | `details.opensAt` |
 | `branch_hours_not_set` | 422 | У филиала нет расписания | — |
@@ -63,7 +64,8 @@
 | `payment_not_retryable` | 409 | Повтор оплаты для заказа не в том статусе | — |
 | `order_not_found` | 404 | Заказа нет у этого клиента или заведения | — |
 | `order_status_conflict` | 409 | Владелец: действие с заказом недоступно в его статусе; `details.status` | `details.status` |
-| `delivery_unavailable_no_zone` | 422 | У заведения не нарисована зона доставки | — |
+| ~~`delivery_unavailable_no_zone`~~ устарел → `delivery_not_configured` | 422 | У заведения не нарисована зона доставки | — |
+| `delivery_not_configured` | 422 | Ни у одного филиала с доставкой нет правил стоимости (зон или правила по расстоянию) | — |
 | `ordering_channel_disabled` | 422 | Канал «доставка» выключен | — |
 | `ordering_not_published` | 422 | Канал включён, но не опубликован | — |
 | `settings_missing` | 500 | Нет строки настроек заведения (ошибка данных, не клиента) | — |

@@ -11,6 +11,7 @@ import type {
 } from 'src/modules/organization/domain/organization-settings';
 
 import { MAP_CENTER_SOURCES } from '../map-view';
+import { COURIER_MODES } from 'src/modules/order/dto/order-settings.dto';
 import type { MapCenterSource } from '../map-view';
 
 export const FULFILLMENT_MODES = ['delivery', 'pickup'] as const;
@@ -20,7 +21,7 @@ export const DELIVERY_UNAVAILABLE_REASONS = [
   'not_offered',
   'channel_disabled',
   'not_published',
-  'no_zone',
+  'not_configured',
 ] as const;
 export type DeliveryUnavailableReason =
   (typeof DELIVERY_UNAVAILABLE_REASONS)[number];
@@ -145,7 +146,7 @@ export class TenantFulfillmentDto {
     enum: FULFILLMENT_MODES,
     isArray: true,
     description:
-      'Empty unless channels.delivery.published. pickup: an active branch accepts pickup. delivery: an active branch accepts delivery and a delivery zone is set. Empty without branches',
+      'Empty unless channels.delivery.published. pickup: an active branch accepts pickup. delivery: an active branch accepts delivery and has delivery pricing (a zone or the distance rule). Empty without branches',
   })
   modes: FulfillmentMode[];
 
@@ -159,7 +160,7 @@ export class TenantFulfillmentDto {
   @ApiProperty({
     example: true,
     description:
-      'An active branch accepts delivery. false = the venue has no delivery by choice (hide the delivery tab); independent of publication and the zone',
+      'An active branch accepts delivery. false = the venue has no delivery by choice (hide the delivery tab); independent of publication and pricing',
   })
   deliveryOffered: boolean;
 
@@ -174,9 +175,24 @@ export class TenantFulfillmentDto {
     nullable: true,
     example: null,
     description:
-      'null when deliveryAvailable. not_offered: no active branch takes delivery; channel_disabled: the owner turned ordering off; not_published: not published or paused; no_zone: the delivery zone is not set. The first that applies, in this order',
+      'null when deliveryAvailable. not_offered: no active branch takes delivery; channel_disabled: the owner turned ordering off; not_published: not published or paused; not_configured: no branch that takes delivery has delivery pricing. The first that applies, in this order. Whether a given address is served: GET /delivery/quote',
   })
   deliveryUnavailableReason: DeliveryUnavailableReason | null;
+
+  @ApiProperty({
+    enum: COURIER_MODES,
+    example: 'own',
+    description:
+      'Who delivers: own couriers, external services or both (order settings)',
+  })
+  courierMode: (typeof COURIER_MODES)[number];
+
+  @ApiProperty({
+    example: true,
+    description:
+      'Cash is accepted for delivery orders; false when only external services deliver. Pickup is always payable in cash',
+  })
+  cashOnDelivery: boolean;
 }
 
 export class TenantMapDto {
@@ -185,7 +201,7 @@ export class TenantMapDto {
     nullable: true,
     example: [41.311081, 69.240562],
     description:
-      '[lat, lng]. The saved view; without one, the middle of the delivery zone, else of the branches. null only when the venue has no zone and no branch with coordinates',
+      '[lat, lng]. The saved view; without one, the middle of the delivery zones, else of the branches. null only when the venue has no zone and no branch with coordinates',
   })
   center: LatLng | null;
 
@@ -194,7 +210,7 @@ export class TenantMapDto {
     nullable: true,
     example: 'saved',
     description:
-      'Where center comes from: saved (owner), zone (delivery zone bounding box), branches (branch coordinates); null when center is null',
+      'Where center comes from: saved (owner), zone (bounding box of the delivery zones), branches (branch coordinates); null when center is null',
   })
   centerSource: MapCenterSource | null;
 
@@ -224,17 +240,18 @@ export class TenantMapDto {
 
   @ApiProperty({
     type: 'array',
-    items: LAT_LNG,
-    nullable: true,
+    items: { type: 'array', items: LAT_LNG },
     example: [
-      [41.361, 69.201],
-      [41.37, 69.28],
-      [41.345, 69.33],
+      [
+        [41.361, 69.201],
+        [41.37, 69.28],
+        [41.345, 69.33],
+      ],
     ],
     description:
-      'Delivery polygon [[lat, lng], ...]; null = delivery unavailable',
+      'Delivery zones of the active branches that take delivery, [[[lat, lng], ...], ...], for drawing only: distance rules are not drawn, and the price and branch for an address come from GET /delivery/quote. Empty when no branch has zones',
   })
-  deliveryZone: LatLng[] | null;
+  deliveryZones: LatLng[][];
 }
 
 /** GET /tenant/config: everything a front-end needs to brand and set itself up for one venue. */

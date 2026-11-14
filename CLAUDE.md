@@ -40,7 +40,8 @@ Env: см. `.env.example` (полный; тест сверяет его со с�
 `auth` (два контура: staff и customer), `tenant` (`TenantGuard`, `TenantService`: тенант по id; `GET /tenant/by-slug`,
 `GET /tenant/config` в `TenantConfigModule`), `organization` (+ настройки заведения), `user`, `employee` (не
 используется), `branch`, `category`, `product` (+ группы допов), `menu` (публичный), `customer` (+ адреса),
-`order` (state machine, очереди, уведомления), `payment` (Click, Payme, ключи тенанта, возвраты),
+`order` (state machine, очереди, уведомления), `delivery` (правила цены доставки филиалов, расчёт для корзины и
+заказа), `payment` (Click, Payme, ключи тенанта, возвраты),
 `sms` (провайдеры eskiz, telegram, console), `telegram` (боты заведений: `TelegramBotService`, `TelegramClient`,
 `/telegram-bot`), `tenant-domain` (свои домены заведения, `/organization/:id/domains`), `file`, `translation`, `application`,
 `revalidate-queue` (`RevalidateModule`: ревалидация QR-меню и сайта доставки, `docs/REVALIDATE.md`), `guest-login` (способы входа
@@ -89,16 +90,15 @@ test, `npm run openapi` + `git diff --exit-code docs/`, `format:check`, `lint` �
 - Платёжные ключи и токены ботов шифруются AES-256-GCM (`PAYMENT_CONFIG_KEY`). Потеря ключа: все вводят заново.
 
 ## Настройки заведения
-- `organization_settings` (бренд, валюта, языки, контакты, карта) и `organization_order_settings` (сбор, минимумы,
-  ETA, тайм-ауты, зона): по одной строке на заведение, обе создаются в `OrganizationService.create` при регистрации
+- `organization_settings` (бренд, валюта, языки, контакты, карта) и `organization_order_settings` (минимум самовывоза,
+  шаг округления цены доставки, способ доставки `courier_mode`, тайм-ауты): по одной строке на заведение, обе создаются в `OrganizationService.create` при регистрации
   значениями из `organization/domain/platform-defaults.ts`. У колонок нет `DEFAULT` в БД.
 - Чтение не подставляет значения: нет строки → `settings_missing` (500) с логом. Исключение — тема:
   `PLATFORM_THEME` (`platform-defaults.ts`, 9 нейтральных цветов) и `resolveTheme()` дают полную `theme` в
   `GET /tenant/config` и `effectiveTheme` и `platformTheme` (чистые цвета платформы) в ответах `GET/PUT /organization/:id/settings` (хранимая `theme` не меняется).
 - Владелец: `GET/PUT /organization/:id/settings` (PUT заменяет документ целиком, проверки в
   `organization/domain/organization-settings.ts` и DTO), `GET/PUT /order-settings`.
-- Нет зоны доставки (`delivery_zone = null`) → доставка недоступна: `POST /orders` отвечает
-  `422 delivery_unavailable_no_zone`.
+- Примерного времени доставки нет нигде (ни в настройках, ни в заказе, ни в ответах).
 - Ошибки валидации: глобальный пайп `createValidationPipe()` (`infra/validators/validation-errors.ts`) отдаёт
   `400 validation_error` со списком `fields: [{ field, code, message }]` (`code` правило в snake_case, `fieldCode`);
   доменные проверки настроек тем же списком с кодом `invalid_settings` (`fieldErrorsException`), одиночное поле вне
@@ -142,7 +142,23 @@ test, `npm run openapi` + `git diff --exit-code docs/`, `format:check`, `lint` �
 - Часы считает `branch/domain/branch-hours.ts` (одна функция для `GET /branches` и `POST /orders`). Филиал без
   расписания закрыт: `isOpen: false`, `opensAt: null`, заказ → `422 branch_hours_not_set`. `GET /branches` и `details.opensAt` у `branch_closed` отдают `opensAt` как ISO
   8601 с датой и поясом филиала (`opensAtIso`); при доставке ближайшее открытие выбирается по моменту времени. Круглосуточно: `is24h`
-  на всех семи днях. Выбор филиала для заказа: `order/domain/branch-choice.ts`.
+  на всех семи днях. Выбор филиала для заказа: `order/domain/branch-choice.ts` (`choosePickupBranch`,
+  `chooseDeliveryBranch`).
+
+## Стоимость доставки
+Контракт: `docs/API.md`, «Стоимость доставки»; спецификация `../docs/DELIVERY.md`.
+- Правила у филиала: `branch_delivery_zone` (многоугольники по `position`, первая содержащая адрес побеждает) и
+  `branch_delivery_distance` (необязательное правило по расстоянию по прямой). Нет ни того, ни другого: филиал не
+  доставляет. Расчёт чистыми функциями `branch/domain/delivery-pricing.ts` (зона → расстояние до `max_km` включительно
+  → нет; начатый км сверх включённых; `free_from` → 0; округление вверх до `delivery_price_step` заведения).
+- Модуль `delivery`: `DeliveryPricingService` (`GET/PUT /branch/:id/delivery-pricing`, чужой филиал 404),
+  `DeliveryQuoteService` (`choose` для `POST /orders`, `quote` для `GET /delivery/quote`, `check` для владельца). Корзина
+  и заказ идут одним путём, цена фиксируется в `customer_order.delivery_fee`; клиент шлёт `expectedDeliveryFee`, при
+  расхождении `409 delivery_fee_changed`.
+- Филиал доставки: открытые, с `accepts_delivery`, покрывающие адрес по своим правилам; ближайший по прямой. `branchId`
+  в заказе доставки не учитывается.
+- `courier_mode = external`: наличные при доставке недоступны (`cashOnDelivery` в `order-settings.service.ts`;
+  `/tenant/config`, `/checkout-config`, `POST /orders`). `cash_change_from` в заказе: только наличные, не меньше `total`.
 
 ## Заказы
 `OrderTransitionService` единственный путь смены статуса (автомат, optimistic locking по `version`, журнал).
@@ -267,7 +283,7 @@ App (`instant`) нового номера кладёт Telegram-id в `registrat
   секрете production не стартует (`revalidate-config.ts`); без `CLIENT_REVALIDATE_URL` задания клиенту не ставятся. В
   `GET /application` читать могут только id из `PLATFORM_ADMIN_USER_IDS`.
 - Кэш тенанта и настроек заказа в памяти процесса (30 с): после `PUT` другие процессы pm2 видят старые имя, slug,
-  язык, валюту и зону до 30 с. `is_active` через API не меняется (только в БД), сброса для него нет.
+  язык, валюту, шаг цены доставки и `courier_mode` до 30 с. `is_active` через API не меняется (только в БД), сброса для него нет.
 - Форматирование и линт блокируют CI (`npm run format:check`, `npm run lint`; должны проходить без ошибок и предупреждений).
   Prettier по `.prettierrc`, `npm run format` перед коммитом; `lint:fix` только для автоисправляемого. `eslint-disable` на
   весь файл не используем; строчные исключения только с причиной в комментарии. Послабления правил лежат в

@@ -4,15 +4,15 @@ import {
   requireStaffOrganizationId,
   type StaffRequest,
 } from 'src/infra/http/request-helpers';
-import { Prisma } from '@prisma/client';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
-import { parseZone } from '../domain/order-money';
 import { UpdateOrderSettingsDto } from '../dto/order-settings.dto';
 import { OrderSettingsService } from '../services/order-settings.service';
 import { RevalidateService } from 'src/modules/revalidate-queue/revalidate.service';
-import { fieldError } from 'src/infra/validators/validation-errors';
 
-/** Restoran paneli: yetkazib berish narxi, minimal summa, zona, taymautlar. */
+/**
+ * Restoran paneli: minimal summa (olib ketish), yetkazib berish narxini yaxlitlash qadami, kim yetkazadi,
+ * taymautlar. Delivery prices and minimums are per branch: /branch/:id/delivery-pricing.
+ */
 @ApiTags('Order settings')
 @Controller('order-settings')
 export class OrderSettingsController {
@@ -36,33 +36,13 @@ export class OrderSettingsController {
   })
   async update(@Req() req: StaffRequest, @Body() dto: UpdateOrderSettingsDto) {
     const organizationId = requireStaffOrganizationId(req);
-
-    if (dto.deliveryZone != null && parseZone(dto.deliveryZone) === null) {
-      throw fieldError(
-        'deliveryZone',
-        'polygon',
-        'deliveryZone must be [[lat, lng], ...] with at least 3 points',
-      );
-    }
-    if (dto.etaMin != null && dto.etaMax != null && dto.etaMax < dto.etaMin) {
-      throw fieldError('etaMax', 'min', 'etaMax must be >= etaMin');
-    }
-
-    // deliveryZone: undefined — o'zgartirmaslik; null — zonani o'chirish (SQL NULL); massiv — saqlash
-    const zone =
-      dto.deliveryZone === null
-        ? Prisma.DbNull
-        : (dto.deliveryZone ?? undefined);
     const data = {
-      delivery_service_fee: dto.deliveryServiceFee,
-      min_order_delivery: dto.minOrderDelivery,
       min_order_pickup: dto.minOrderPickup,
-      eta_min: dto.etaMin,
-      eta_max: dto.etaMax,
+      delivery_price_step: dto.deliveryPriceStep,
+      courier_mode: dto.courierMode,
       acceptance_timeout_seconds: dto.acceptanceTimeoutSeconds,
       payment_timeout_seconds: dto.paymentTimeoutSeconds,
       max_active_orders: dto.maxActiveOrders,
-      delivery_zone: zone,
     };
     await this.settings.get(organizationId); // settings_missing instead of a Prisma "not found"
     await this.prisma.organization_order_settings.update({
@@ -70,7 +50,7 @@ export class OrderSettingsController {
       data,
     });
     this.settings.invalidate(organizationId);
-    // Fees, minimums, ETA and the zone are part of the delivery site's config
+    // The pickup minimum and cash on delivery (courier mode) are part of the delivery site's config
     await this.revalidate.addRevalidationJob({
       tenantId: organizationId,
       route: 'settings',

@@ -4,19 +4,12 @@ import { OrderSettingsService } from './order-settings.service';
 
 const ROW = {
   organization_id: 'org-1',
-  delivery_service_fee: 5000,
-  min_order_delivery: 40000,
   min_order_pickup: 0,
-  eta_min: 25,
-  eta_max: 40,
+  delivery_price_step: 500,
+  courier_mode: 'both',
   acceptance_timeout_seconds: 300,
   payment_timeout_seconds: 900,
   max_active_orders: 3,
-  delivery_zone: [
-    [41.3, 69.2],
-    [41.4, 69.2],
-    [41.4, 69.3],
-  ],
 };
 
 describe('OrderSettingsService.get', () => {
@@ -39,22 +32,12 @@ describe('OrderSettingsService.get', () => {
 
   it('maps the stored row', async () => {
     await expect(service.get('org-1')).resolves.toEqual({
-      deliveryServiceFee: 5000,
-      minOrderDelivery: 40000,
       minOrderPickup: 0,
-      etaMin: 25,
-      etaMax: 40,
+      deliveryPriceStep: 500,
+      courierMode: 'both',
       acceptanceTimeoutSeconds: 300,
       paymentTimeoutSeconds: 900,
       maxActiveOrders: 3,
-      deliveryZone: ROW.delivery_zone,
-    });
-  });
-
-  it('keeps an unset zone as null', async () => {
-    rows['org-1'] = { ...ROW, delivery_zone: null as any };
-    await expect(service.get('org-1')).resolves.toMatchObject({
-      deliveryZone: null,
     });
   });
 

@@ -1,28 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import {
-  IsIn,
-  IsInt,
-  IsOptional,
-  IsString,
-  Max,
-  MaxLength,
-  Min,
-} from 'class-validator';
-
-export class AcceptOrderDto {
-  @ApiPropertyOptional({ description: "ETA ni o'zgartirish (daqiqa)" })
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  @Max(600)
-  readonly etaMin?: number;
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  @Max(600)
-  readonly etaMax?: number;
-}
+import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class RejectOrderDto {
   @ApiPropertyOptional({ example: 'out_of_stock' })

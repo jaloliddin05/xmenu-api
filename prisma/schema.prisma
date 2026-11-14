@@ -23,6 +23,39 @@ model application {
   description String?          // qo‘shimcha maydon (agar kerak bo‘lsa)
   created_at DateTime          @default(now())
 }
+// Delivery pricing of a branch (docs/DELIVERY.md, "Стоимость доставки и выбор филиала"). A branch without
+// zones and without a distance rule does not deliver. Sums are whole UZS, distances in km in a straight line.
+
+// A polygon on the map with its own price. Overlapping zones of one branch: the lowest position wins.
+model branch_delivery_zone {
+  id        String @id @default(uuid())
+  branch_id String
+  branch    branch @relation(fields: [branch_id], references: [id], onDelete: Cascade)
+
+  position  Int
+  // [[lat, lng], ...], at least 3 points
+  polygon   Json
+  price     Int
+  min_order Int
+  // Order subtotal from which delivery is free; null = never free
+  free_from Int?
+
+  @@index([branch_id, position])
+}
+
+// Price by distance for addresses outside every zone, up to max_km.
+model branch_delivery_distance {
+  branch_id    String @id
+  branch       branch @relation(fields: [branch_id], references: [id], onDelete: Cascade)
+
+  base_price   Int
+  included_km  Float
+  // Added for every started kilometre over included_km
+  price_per_km Int
+  max_km       Float
+  min_order    Int
+  free_from    Int?
+}
 // Restoran filiallari. Mijoz ilovasida pickup tanlash, buyurtma qabul qilish
 // va buyurtma xabarnomalari (Telegram guruhi) shu yerdan.
 //
@@ -55,6 +88,8 @@ model branch {
   working_hours   branch_working_hours[]
   hours_exceptions branch_hours_exception[]
   orders          customer_order[]
+  delivery_zones    branch_delivery_zone[]
+  delivery_distance branch_delivery_distance?
 
   @@index([organization_id, is_active, sort_order])
 }
@@ -287,12 +322,13 @@ model customer_order {
 
   currency        String
   subtotal        Int
-  service_fee     Int      @default(0)
+  // Delivery fee fixed when the order was placed (0 for pickup and free delivery)
+  delivery_fee    Int      @default(0)
   discount        Int      @default(0)
   total           Int
 
-  eta_min         Int
-  eta_max         Int
+  // Cash orders: the banknote the guest pays with, so the courier brings change
+  cash_change_from Int?
 
   cancelled_by    OrderActor?
   cancel_reason   String?
@@ -426,6 +462,13 @@ enum OrderChannel {
   site
   miniapp
 }
+
+// Who delivers the venue's orders (organization_order_settings.courier_mode).
+enum CourierMode {
+  own
+  external
+  both
+}
 // Ordering settings of a tenant (one row per organization). The row is created at signup with the
 // platform defaults (organization/domain/platform-defaults.ts) and must exist: the code never
 // substitutes values for a missing row (order-settings.service.ts).
@@ -433,11 +476,11 @@ model organization_order_settings {
   organization_id String   @id
   organization    organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
 
-  delivery_service_fee Int
-  min_order_delivery   Int
   min_order_pickup     Int
-  eta_min              Int
-  eta_max              Int
+  // Delivery fees are rounded up to this step: 100, 500 or 1000
+  delivery_price_step  Int
+  // Who delivers: own couriers, external services or both; external only offers no cash on delivery
+  courier_mode         CourierMode
 
   // Restoran buyurtmani qabul qilmasa — shu vaqtdan keyin avtomatik bekor (soniya)
   acceptance_timeout_seconds Int
@@ -445,9 +488,6 @@ model organization_order_settings {
   payment_timeout_seconds    Int
   // Bir vaqtda faol buyurtmalar soni chegarasi (suiiste'moldan himoya)
   max_active_orders          Int
-
-  // Delivery zone: [[lat, lng], ...], at least 3 points. null = delivery is unavailable.
-  delivery_zone Json?
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt

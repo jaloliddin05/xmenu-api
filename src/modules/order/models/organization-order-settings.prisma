@@ -5,11 +5,11 @@ model organization_order_settings {
   organization_id String   @id
   organization    organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
 
-  delivery_service_fee Int
-  min_order_delivery   Int
   min_order_pickup     Int
-  eta_min              Int
-  eta_max              Int
+  // Delivery fees are rounded up to this step: 100, 500 or 1000
+  delivery_price_step  Int
+  // Who delivers: own couriers, external services or both; external only offers no cash on delivery
+  courier_mode         CourierMode
 
   // Restoran buyurtmani qabul qilmasa — shu vaqtdan keyin avtomatik bekor (soniya)
   acceptance_timeout_seconds Int
@@ -17,9 +17,6 @@ model organization_order_settings {
   payment_timeout_seconds    Int
   // Bir vaqtda faol buyurtmalar soni chegarasi (suiiste'moldan himoya)
   max_active_orders          Int
-
-  // Delivery zone: [[lat, lng], ...], at least 3 points. null = delivery is unavailable.
-  delivery_zone Json?
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt

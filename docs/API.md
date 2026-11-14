@@ -253,9 +253,9 @@ IP берётся из `X-Forwarded-For` только от локального 
   "contacts": { "phone": null, "telegramUsername": null, "workingHours": null, "address": null },
   "channels": { "qr": true, "auth": { "sms": true, "telegram": false }, "delivery": { "enabled": true, "mode": "site", "published": true, "miniApp": false, "botUsername": null } },
   "fulfillment": { "modes": ["pickup"], "defaultMode": "pickup", "deliveryOffered": true, "deliveryAvailable": false,
-                   "deliveryUnavailableReason": "no_zone" },
+                   "deliveryUnavailableReason": "not_configured", "courierMode": "own", "cashOnDelivery": true },
   "map": { "center": [41.311081, 69.240562], "centerSource": "saved", "zoom": 15, "city": "Ташкент",
-           "bounds": [[41.15, 69.0], [41.45, 69.45]], "deliveryZone": null }
+           "bounds": [[41.15, 69.0], [41.45, 69.45]], "deliveryZones": [] }
 }
 ```
 
@@ -286,22 +286,28 @@ IP берётся из `X-Forwarded-For` только от локального 
   `503 sms_unavailable`. Подключение и отключение бота ставит ревалидацию `route: 'channels'`. Источник истины остаются
   сами эндпоинты.
 - `fulfillment.modes`: пусто, пока `channels.delivery.published` не `true`. Иначе `pickup`, если есть активный филиал с
-  самовывозом; `delivery`, если есть активный филиал с доставкой **и** задана зона доставки. Нет филиалов: `[]`,
-  `defaultMode: null`. Деньги (сбор, минимум, ETA, способы оплаты) остаются в `GET /checkout-config`.
-- `fulfillment.deliveryOffered`: есть активный филиал с доставкой (не зависит от публикации и зоны); `false` значит,
+  самовывозом; `delivery`, если есть активный филиал с доставкой **и** правилами стоимости (зона или расстояние,
+  раздел «Стоимость доставки»). Нет филиалов: `[]`, `defaultMode: null`. Цена и минимум доставки зависят от адреса:
+  `GET /delivery/quote`; минимум самовывоза и способы оплаты в `GET /checkout-config`.
+- `fulfillment.deliveryOffered`: есть активный филиал с доставкой (не зависит от публикации и правил); `false` значит,
   что доставки у заведения нет по выбору, вкладку «Доставка» не показывать. `deliveryAvailable`: доставку можно
   заказать сейчас (`modes` содержит `delivery`). `deliveryUnavailableReason`: `null`, если доступна; иначе первая
   из причин в таком порядке: `not_offered` (нет филиала с доставкой), `channel_disabled` (владелец выключил заказы),
-  `not_published` (не опубликовано или пауза), `no_zone` (зона доставки не задана).
-- `map.center` `[lat, lng]`: сохранённый вид карты; если его нет, середина ограничивающего прямоугольника зоны
-  доставки, иначе филиалов с координатами ((0, 0) пропускается). `null` только у заведения без зоны и без филиалов с
+  `not_published` (не опубликовано или пауза), `not_configured` (ни у одного филиала с доставкой нет правил стоимости).
+  Доставляют ли на конкретный адрес, отвечает `GET /delivery/quote`.
+- `fulfillment.courierMode`: кто доставляет (`own` свои курьеры, `external` внешние службы, `both`), из
+  `PUT /order-settings`. `fulfillment.cashOnDelivery`: наличные при доставке принимаются; `false` при `external`
+  (самовывоз за наличные доступен всегда).
+- `map.center` `[lat, lng]`: сохранённый вид карты; если его нет, середина ограничивающего прямоугольника зон
+  доставки, иначе филиалов с координатами ((0, 0) пропускается). `null` только у заведения без зон и без филиалов с
   координатами. Источник в `map.centerSource`: `saved`, `zone`, `branches` (`null`, если центра нет). `map.zoom`:
   сохранённый; если центр вычислен, а zoom не сохранён, подбирается по размеру зоны или филиалов (10-17, один
   филиал 16); сохранённый центр без zoom остаётся с `zoom: null`. Чеклист публикации вид карты не требует.
 - В OpenAPI `theme` (всегда полный, не `null`), `platformTheme` и `effectiveTheme` описаны схемой `FullThemeDto`
   со всеми 9 ключами.
-- `map.bounds` `[[юго-запад], [северо-восток]]`, `map.deliveryZone` полигон
-  `[[lat, lng], ...]` или `null` (доставки нет).
+- `map.bounds` `[[юго-запад], [северо-восток]]`. `map.deliveryZones`: зоны активных филиалов с доставкой
+  `[[[lat, lng], ...], ...]` только для отрисовки (правило по расстоянию не рисуется, цену и филиал для адреса даёт
+  `GET /delivery/quote`); `[]`, если зон нет.
 - Поля `contacts.country` пока нет.
 
 **Язык и валюта клиентских ответов** (`/menu`, `/branches`, `/orders`, `/tenant/config`): `?lang=`, если он есть в
@@ -522,8 +528,88 @@ IP берётся из `X-Forwarded-For` только от локального 
 клиентских ответов (кэш заведения в процессе сбрасывается; в других процессах pm2 до 30 с) и ставит ревалидацию
 QR-меню и сайта доставки (`REVALIDATE.md`).
 
-Зона доставки, сбор, минимум, ETA и тайм-ауты правятся `PUT /order-settings` (строка тоже создаётся при
-регистрации; `deliveryZone: null` выключает доставку).
+Настройки заказов `GET/PUT /order-settings` (строка тоже создаётся при регистрации; `PUT` меняет только переданные
+поля): `minOrderPickup` (минимум самовывоза), `deliveryPriceStep` (`100`, `500` или `1000`: шаг округления цены
+доставки вверх, по умолчанию `100`), `courierMode` (`own`, `external`, `both`; по умолчанию `own`; при `external`
+наличные при доставке не принимаются), тайм-ауты и лимит активных заказов. Цены, минимумы и зоны доставки задаются у
+филиалов (раздел «Стоимость доставки»). Примерного времени доставки в API нет.
+
+## Стоимость доставки
+
+Правила цены у каждого филиала; гость видит цену и минимум для своего адреса в корзине, заказ создаётся с той же ценой.
+Спецификация: `../../docs/DELIVERY.md`, «Стоимость доставки и выбор филиала».
+
+**Правила филиала** (владелец, токен, только свои филиалы; чужой или несуществующий id → `404`):
+
+| Запрос | Что делает |
+|---|---|
+| `GET /branch/:id/delivery-pricing` | правила филиала |
+| `PUT /branch/:id/delivery-pricing` | заменяет правила целиком, отвечает тем же видом |
+| `GET /branch/:id/delivery-pricing/check?lat=&lng=&subtotal=` | цена от этого филиала до точки по сохранённым правилам и шагу заведения, без учёта часов и публикации |
+
+```json
+{
+  "zones": [
+    { "polygon": [[41.30, 69.20], [41.30, 69.30], [41.35, 69.25]], "price": 10000, "minOrder": 50000, "freeFrom": 150000 }
+  ],
+  "distance": { "basePrice": 8000, "includedKm": 2, "pricePerKm": 1500, "maxKm": 10, "minOrder": 50000, "freeFrom": null }
+}
+```
+
+- `zones`: до 20 многоугольников по 3–200 точек `[lat, lng]`, порядок массива — приоритет: где зоны пересекаются,
+  действует та, что выше. `price`, `minOrder` 0..10 млн / 0..100 млн сум, `freeFrom` (необязательно, `null`):
+  с этой суммы заказа без доставки доставка бесплатна.
+- `distance` (необязательно, `null`): для адресов вне всех зон. Цена `basePrice` до `includedKm` км, плюс `pricePerKm`
+  за каждый **начатый** км сверх них; дальше `maxKm` (включительно, 0,1..100, не меньше `includedKm`) не доставляет.
+  Расстояние по прямой от точки филиала.
+- Нет зон и `distance: null`: филиал не доставляет (как и филиал без `acceptsDelivery`).
+- Ошибки: `400 validation_error` (форма, `fields[]`: `zones[0].price`…), `400 invalid_settings` (`zones[1].polygon` /
+  `polygon`: точки не `[lat, lng]` на карте; `distance.maxKm` / `min`: меньше `includedKm`).
+- Сохранение ставит ревалидацию `route: 'branches'` (доступность доставки и зоны на карте в `/tenant/config`).
+- `check` → `{ covered, rule: "zone" | "distance" | null, zoneIndex, distanceKm, deliveryFee, freeFrom, minOrder, shortBy }`;
+  вне правил `covered: false`, цены `null`, `distanceKm` всё равно посчитан.
+
+**Как считается цена для адреса** (одна функция для корзины, заказа и проверки владельца,
+`branch/domain/delivery-pricing.ts`):
+
+1. адрес в зоне филиала: цена первой по порядку зоны, которая его содержит;
+2. вне всех зон, но не дальше `maxKm`: цена по расстоянию;
+3. иначе филиал на этот адрес не доставляет;
+4. сумма заказа без доставки `>= freeFrom` действующего правила: доставка бесплатна (`0`);
+5. сумма меньше `minOrder` действующего правила: заказать нельзя, `shortBy` — сколько не хватает.
+
+Итоговая цена округляется вверх до шага заведения (`deliveryPriceStep`); `0` остаётся `0`.
+
+**Выбор филиала**: из активных филиалов, которые сейчас открыты, принимают доставку и доставляют на адрес по своим
+правилам, ближайший по прямой (при равенстве — по порядку филиалов). `branchId` в заказе доставки не учитывается.
+Причины, по которым доставки нет, коды из реестра в таком порядке: `ordering_channel_disabled` /
+`ordering_not_published` → `fulfillment_unavailable` (нет филиала с доставкой) → `delivery_not_configured` (ни у
+одного нет правил) → `out_of_delivery_zone` (ни один не доставляет на адрес, или у адреса нет координат) →
+`branch_hours_not_set` (у покрывающих нет расписания) / `branch_closed` (`opensAt`: ближайшее открытие среди
+покрывающих).
+
+**Расчёт для корзины** `GET /delivery/quote?lat=&lng=&subtotal=` (гость, `X-Tenant-Id`, без токена клиента;
+`Cache-Control: no-store`; `subtotal` — сумма блюд без доставки, по умолчанию 0) → `200`:
+
+```json
+{
+  "available": true, "canOrder": false, "reason": "min_order_not_reached", "opensAt": null,
+  "branch": { "id": "uuid", "title": "Чиланзар", "address": "ул. Бунёдкор, 12" },
+  "rule": "zone", "distanceKm": 2.41, "deliveryFee": 10000, "freeFrom": 150000, "minOrder": 50000, "shortBy": 8000
+}
+```
+
+- `available`: какой-то филиал доставляет на адрес сейчас; `canOrder`: ещё и сумма не меньше минимума.
+- `reason`: `null`, если `canOrder`; иначе код из списка выше или `min_order_not_reached` (тогда цена и филиал есть).
+  При `available: false` `branch`, `rule`, `distanceKm`, `deliveryFee`, `freeFrom`, `minOrder` равны `null`,
+  `opensAt` задан только при `branch_closed`.
+- Клиент показывает `deliveryFee` в корзине и шлёт его в `POST /orders` как `expectedDeliveryFee`: если правила
+  изменились, заказ отвечает `409 delivery_fee_changed` с новой ценой (`docs/ORDERS_API.md`).
+
+**Способ доставки и наличные**: `courierMode` в `PUT /order-settings`. При `external` наличные при доставке не
+принимаются: `GET /tenant/config` (`fulfillment.cashOnDelivery: false`), `GET /checkout-config`
+(`paymentMethods.delivery` без `cash`) и `POST /orders` (`422 payment_method_unavailable`). Самовывоз за наличные
+доступен всегда. Гость при наличных может указать `cashChangeFrom` (с какой суммы сдача, не меньше суммы к оплате).
 
 ## Каналы и публикация (владелец)
 
@@ -556,7 +642,7 @@ QR-меню и сайта доставки (`REVALIDATE.md`).
     { "id": "menu_category", "status": "done", "hint": null },
     { "id": "menu_product", "status": "todo", "hint": "Добавьте хотя бы одно активное блюдо в активную категорию" },
     { "id": "branch", "status": "todo", "hint": "Укажите у филиала часы работы (или «круглосуточно»)" },
-    { "id": "delivery_zone", "status": "todo", "hint": "Нарисуйте зону доставки или отключите доставку в филиалах" },
+    { "id": "delivery_pricing", "status": "todo", "hint": "Задайте стоимость доставки (зону или расстояние) хотя бы у одного филиала с доставкой или отключите доставку в филиалах" },
     { "id": "telegram_bot", "status": "not_required", "hint": null }
   ],
   "warnings": [
@@ -566,9 +652,9 @@ QR-меню и сайта доставки (`REVALIDATE.md`).
 ```
 
 - `published`: заказы открыты. `publishedAt`: начало текущей публикации (ISO), `null` без публикации и на паузе.
-- `ready`: в чеклисте нет `todo`. Опубликованное заведение может стать неготовым (меню, филиал или зона изменены
-  позже): публикация не снимается, `ready: false` показывает, что исправить, а заказ упирается в обычные проверки
-  (`branch_hours_not_set`, `delivery_unavailable_no_zone` и т. д.).
+- `ready`: в чеклисте нет `todo`. Опубликованное заведение может стать неготовым (меню, филиал или правила доставки
+  изменены позже): публикация не снимается, `ready: false` показывает, что исправить, а заказ упирается в обычные
+  проверки (`branch_hours_not_set`, `delivery_not_configured` и т. д.).
 - `checklist`: всегда все пункты в одном порядке. `status`: `done`, `todo` (блокирует публикацию) или
   `not_required` (пункт не относится к заведению). `hint`: что исправить, по-русски, только при `todo`; дашборд может
   показывать свои тексты по `id`.
@@ -581,10 +667,11 @@ QR-меню и сайта доставки (`REVALIDATE.md`).
 | `menu_category` | есть активная категория |
 | `menu_product` | есть активное блюдо в активной категории |
 | `branch` | есть активный филиал, у которого одновременно: часы работы хотя бы в один день (`is24h` подходит, `isClosed` нет), точка на карте (не `0, 0`), самовывоз или доставка |
-| `delivery_zone` | задана зона (`PUT /order-settings`); `not_required`, если ни один активный филиал не принимает доставку |
+| `delivery_pricing` | у активного филиала с доставкой есть правила стоимости (зона или расстояние, `PUT /branch/:id/delivery-pricing`); `not_required`, если ни один активный филиал не принимает доставку |
 | `telegram_bot` | бот заведения подключён и включён (`/telegram-bot`); `not_required` в режиме `site` |
 
-Логотип, цвета, контакты и ключи Click/Payme публикацию не блокируют; наличные доступны всегда.
+Логотип, цвета, контакты и ключи Click/Payme публикацию не блокируют; наличные доступны всегда (при доставке, кроме
+`courierMode: external`).
 
 `warnings`: предупреждения отдельно от чеклиста, публикацию не блокируют (`publish` с ними проходит). Пусто, пока канал
 заказов выключен. Сейчас только о входе гостей: он зависит и от платформы (SMS), поэтому пунктом чеклиста не является.
@@ -747,6 +834,8 @@ miniapp_required` / `miniapp_init_data_invalid`, «Mini App и режимы до
 `GET /organization/slug/:slug` (прежнее публичное QR-меню) удалён: QR берёт заведение через `GET /tenant/by-slug/:slug`, `GET /tenant/config` и `GET /menu`; путь отвечает `404`.
 
 `GET /tenant/by-host/:host` (новый) отдаёт по списку полей `{ id, slug, name, primaryDomain }`.
+
+`GET /delivery/quote` (новый) отдаёт DTO `DeliveryQuoteDto`: филиал только `{ id, title, address }`.
 
 Уже были на мапперах и не менялись: `GET /tenant/by-slug/:slug`, `GET /tenant/config`, `GET /menu`, `GET /branches`,
 `GET /checkout-config`, `/orders*`, `/auth/customer/*`. Вебхуки Click, Payme и Telegram отвечают в формате

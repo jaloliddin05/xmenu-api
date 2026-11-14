@@ -8,6 +8,7 @@
 # 3. applies the remaining migrations (`prisma migrate deploy`),
 # 4. checks the existing row kept its data and got the column defaults,
 #    and the venue bot's webhook secret was replaced by its sha256 hash,
+#    the venue delivery zone, fee and minimum became a zone of each of its branches (delivery_pricing),
 # 5. checks the tenant_domain rules on that venue (one verified host per venue, pending claims by
 #    several venues, cascade on delete).
 #
@@ -55,8 +56,12 @@ values ('00000000-0000-4000-8000-000000000001', 'Mant', 'mant', 'restaurant', tr
 insert into organization_settings (organization_id, theme, currency, default_language, languages, support_phone, city, updated_at)
 values ('00000000-0000-4000-8000-000000000001', '{"brand":"#EE2E17"}', 'UZS', 'ru', '{ru,uz}', '+998711234567', 'Tashkent', now());
 insert into organization_order_settings (organization_id, delivery_service_fee, min_order_delivery, min_order_pickup,
-  eta_min, eta_max, acceptance_timeout_seconds, payment_timeout_seconds, max_active_orders, updated_at)
-values ('00000000-0000-4000-8000-000000000001', 10000, 50000, 0, 25, 40, 300, 900, 5, now());
+  eta_min, eta_max, acceptance_timeout_seconds, payment_timeout_seconds, max_active_orders, delivery_zone, updated_at)
+values ('00000000-0000-4000-8000-000000000001', 10000, 50000, 0, 25, 40, 300, 900, 5,
+  '[[41.30, 69.20], [41.30, 69.30], [41.35, 69.25]]', now());
+insert into branch (id, organization_id, title, address, latitude, longitude, updated_at)
+values ('00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-000000000001', 'Center', 'Tashkent', 41.31, 69.25, now()),
+       ('00000000-0000-4000-8000-0000000000a2', '00000000-0000-4000-8000-000000000001', 'North', 'Tashkent', 41.34, 69.26, now());
 insert into organization_telegram_bot (id, organization_id, telegram_bot_id, username, token_encrypted, webhook_secret, updated_at)
 values ('00000000-0000-4000-8000-0000000000b1', '00000000-0000-4000-8000-000000000001', '123456789', 'mant_bot',
   'encrypted', 'plain-webhook-secret', now());
@@ -78,9 +83,17 @@ if [ "$settings" != 'UZS|ru|Tashkent|#EE2E17' ]; then
   exit 1
 fi
 
-orders="$("${PSQL[@]}" -F '|' -c "select delivery_service_fee, min_order_delivery, eta_min, eta_max from organization_order_settings where organization_id = '00000000-0000-4000-8000-000000000001'")"
-if [ "$orders" != '10000|50000|25|40' ]; then
-  echo "FAIL: order settings row changed: '$orders'" >&2
+orders="$("${PSQL[@]}" -F '|' -c "select min_order_pickup, acceptance_timeout_seconds, delivery_price_step, courier_mode from organization_order_settings where organization_id = '00000000-0000-4000-8000-000000000001'")"
+if [ "$orders" != '0|300|100|own' ]; then
+  echo "FAIL: order settings row is '$orders', expected '0|300|100|own'" >&2
+  exit 1
+fi
+
+# The venue zone with its fee and minimum is now the first zone of every branch
+zones="$("${PSQL[@]}" -c "select string_agg(branch_id || ':' || position || ':' || price || ':' || min_order || ':' || coalesce(free_from::text, 'NULL') || ':' || jsonb_array_length(polygon), ',' order by branch_id) from branch_delivery_zone")"
+expected_zones='00000000-0000-4000-8000-0000000000a1:0:10000:50000:NULL:3,00000000-0000-4000-8000-0000000000a2:0:10000:50000:NULL:3'
+if [ "$zones" != "$expected_zones" ]; then
+  echo "FAIL: branch delivery zones are '$zones', expected '$expected_zones'" >&2
   exit 1
 fi
 

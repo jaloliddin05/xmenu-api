@@ -35,12 +35,13 @@ model customer_order {
 
   currency        String
   subtotal        Int
-  service_fee     Int      @default(0)
+  // Delivery fee fixed when the order was placed (0 for pickup and free delivery)
+  delivery_fee    Int      @default(0)
   discount        Int      @default(0)
   total           Int
 
-  eta_min         Int
-  eta_max         Int
+  // Cash orders: the banknote the guest pays with, so the courier brings change
+  cash_change_from Int?
 
   cancelled_by    OrderActor?
   cancel_reason   String?
