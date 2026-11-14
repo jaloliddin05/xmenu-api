@@ -1,29 +1,33 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-export class MinOrderDto {
-  @ApiProperty({ example: 40000 }) delivery: number;
-  @ApiProperty({ example: 0 }) pickup: number;
-}
+const METHODS = ['cash', 'click', 'payme'] as const;
+type Method = (typeof METHODS)[number];
 
-/** GET /checkout-config: the values the server prices an order with. */
-export class CheckoutConfigDto {
-  @ApiProperty({ example: 'UZS', description: "The venue's currency" })
-  currency: string;
-  @ApiProperty({ example: 5000, description: 'Added to delivery orders' })
-  deliveryServiceFee: number;
-  @ApiProperty({ type: MinOrderDto }) minOrder: MinOrderDto;
+export class CheckoutPaymentMethodsDto {
   @ApiProperty({
-    type: [Number],
-    minItems: 2,
-    maxItems: 2,
-    example: [20, 30],
-    description: '[min, max] minutes',
+    enum: METHODS,
+    isArray: true,
+    description:
+      'cash unless only external services deliver (courier mode external); click/payme when the venue set its keys',
   })
-  etaMinutes: [number, number];
+  delivery: Method[];
   @ApiProperty({
-    enum: ['cash', 'click', 'payme'],
+    enum: METHODS,
     isArray: true,
     description: 'cash always; click/payme when the venue set its keys',
   })
-  paymentMethods: ('cash' | 'click' | 'payme')[];
+  pickup: Method[];
+}
+
+/**
+ * GET /checkout-config: the values the server prices an order with that do not depend on the address. The
+ * delivery fee and minimum come from GET /delivery/quote.
+ */
+export class CheckoutConfigDto {
+  @ApiProperty({ example: 'UZS', description: "The venue's currency" })
+  currency: string;
+  @ApiProperty({ example: 0, description: 'Minimum pickup order (sum)' })
+  minOrderPickup: number;
+  @ApiProperty({ type: CheckoutPaymentMethodsDto })
+  paymentMethods: CheckoutPaymentMethodsDto;
 }

@@ -27,6 +27,8 @@ export interface BranchFacts {
   hasCoordinates: boolean;
   acceptsPickup: boolean;
   acceptsDelivery: boolean;
+  /** Delivery pricing set: at least one zone or the distance rule (docs/DELIVERY.md). */
+  hasDeliveryPricing: boolean;
 }
 
 /** What the checklist looks at; read fresh from the database (publication.service.ts). */
@@ -40,7 +42,6 @@ export interface PublicationFacts {
   hasActiveProduct: boolean;
   /** Active branches only. */
   branches: BranchFacts[];
-  hasDeliveryZone: boolean;
   /** The venue's bot is connected and enabled (organization_telegram_bot.is_enabled). */
   botConnected: boolean;
 }
@@ -52,7 +53,7 @@ export const CHECKLIST_IDS = [
   'menu_category',
   'menu_product',
   'branch',
-  'delivery_zone',
+  'delivery_pricing',
   'telegram_bot',
 ] as const;
 export type ChecklistId = (typeof CHECKLIST_IDS)[number];
@@ -128,11 +129,11 @@ export function evaluateChecklist(f: PublicationFacts): ChecklistItem[] {
     branchItem(f.branches),
     deliversSomewhere
       ? check(
-          'delivery_zone',
-          f.hasDeliveryZone,
-          'Нарисуйте зону доставки или отключите доставку в филиалах',
+          'delivery_pricing',
+          f.branches.some((b) => b.acceptsDelivery && b.hasDeliveryPricing),
+          'Задайте стоимость доставки (зону или расстояние) хотя бы у одного филиала с доставкой или отключите доставку в филиалах',
         )
-      : notRequired('delivery_zone'),
+      : notRequired('delivery_pricing'),
     modeNeedsBot(f.deliveryMode)
       ? check(
           'telegram_bot',

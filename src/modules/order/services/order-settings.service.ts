@@ -1,19 +1,27 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
-import { parseZone } from '../domain/order-money';
 import { AppException } from 'src/infra/errors/app-exception';
 
+export type CourierMode = 'own' | 'external' | 'both';
+
+/**
+ * Venue-wide ordering settings. Delivery prices and minimums are per branch (branch delivery pricing);
+ * the venue sets the rounding step of the delivery fee and who delivers.
+ */
 export interface OrderSettings {
-  deliveryServiceFee: number;
-  minOrderDelivery: number;
   minOrderPickup: number;
-  etaMin: number;
-  etaMax: number;
+  /** Delivery fees are rounded up to it: 100, 500 or 1000 */
+  deliveryPriceStep: number;
+  /** external: only external services deliver, so cash on delivery is not offered */
+  courierMode: CourierMode;
   acceptanceTimeoutSeconds: number;
   paymentTimeoutSeconds: number;
   maxActiveOrders: number;
-  deliveryZone: [number, number][] | null;
 }
+
+/** Cash on delivery needs own couriers: an external service does not collect cash for the venue. */
+export const cashOnDelivery = (mode: CourierMode): boolean =>
+  mode !== 'external';
 
 const TTL_MS = 30_000;
 
@@ -41,15 +49,12 @@ export class OrderSettingsService {
       });
     }
     const value: OrderSettings = {
-      deliveryServiceFee: row.delivery_service_fee,
-      minOrderDelivery: row.min_order_delivery,
       minOrderPickup: row.min_order_pickup,
-      etaMin: row.eta_min,
-      etaMax: row.eta_max,
+      deliveryPriceStep: row.delivery_price_step,
+      courierMode: row.courier_mode,
       acceptanceTimeoutSeconds: row.acceptance_timeout_seconds,
       paymentTimeoutSeconds: row.payment_timeout_seconds,
       maxActiveOrders: row.max_active_orders,
-      deliveryZone: parseZone(row.delivery_zone),
     };
 
     if (this.cache.size > 1000) this.cache.clear();

@@ -55,7 +55,8 @@
 
 ### Связь с заказами
 
-* `POST /orders` принимает `branchId` из этого списка. Закрытый филиал →
+* `POST /orders` самовывоза принимает `branchId` из этого списка; для доставки филиал выбирает сервер по адресу
+  (ближайший открытый, который доставляет на адрес, `API.md`, «Стоимость доставки»). Закрытый филиал →
   `409 branch_closed` с `details.opensAt` (код уже обрабатывается клиентом;
   он ещё и перезагрузит список, чтобы обновить `isOpen`). Филиал без
   расписания → `422 branch_hours_not_set`.
@@ -76,6 +77,12 @@ branch_working_hours            -- расписание по дням недел
 
 branch_hours_exceptions         -- праздники, ремонт
   branch_id, date, opens_at, closes_at, is_closed
+
+branch_delivery_zone            -- зоны доставки филиала, по порядку (position)
+  branch_id, position, polygon, price, min_order, free_from
+
+branch_delivery_distance        -- правило по расстоянию (одно на филиал, необязательное)
+  branch_id, base_price, included_km, price_per_km, max_km, min_order, free_from
 ```
 
 `hours` (строка) и `isOpen/opensAt` вычисляются из этих таблиц. Учесть
@@ -92,6 +99,10 @@ branch_hours_exceptions         -- праздники, ремонт
 | POST | `/branch/:id/exceptions` | исключение на дату `YYYY-MM-DD` (upsert) |
 | DELETE | `/branch/:id/exceptions/:exceptionId` | убрать исключение |
 | DELETE | `/branch/:id` | удалить; если есть заказы — только скрыть (`isActive=false`) |
+| GET/PUT | `/branch/:id/delivery-pricing` | правила цены доставки (зоны и расстояние), PUT заменяет целиком |
+| GET | `/branch/:id/delivery-pricing/check?lat=&lng=&subtotal=` | цена от филиала до точки (без учёта часов) |
+
+Правила, расчёт и ошибки: `API.md`, «Стоимость доставки».
 
 `telegramChatId` — группа, куда уходят заказы этого филиала (бот должен быть в ней).
 `phone` — номер для SMS-эскалации (`+998XXXXXXXXX`).

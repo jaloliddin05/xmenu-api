@@ -3560,16 +3560,6 @@
             }
           }
         ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AcceptOrderDto"
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
             "description": "",
@@ -3592,7 +3582,7 @@
             }
           }
         },
-        "summary": "Qabul qilish (ixtiyoriy: ETA)",
+        "summary": "Qabul qilish",
         "tags": [
           "Orders (staff)"
         ]
@@ -3835,7 +3825,7 @@
             }
           }
         },
-        "summary": "Savat sozlamalari: yetkazib berish narxi, minimal summa, ETA, to'lov usullari",
+        "summary": "Savat sozlamalari: olib ketish minimumi, to'lov usullari (yetkazish va olib ketish)",
         "tags": [
           "Checkout config (customer)"
         ]
@@ -3941,6 +3931,280 @@
         "summary": "Provayderni o'chirish (kalitlar saqlanadi)",
         "tags": [
           "Payment providers"
+        ]
+      }
+    },
+    "/branch/{id}/delivery-pricing": {
+      "get": {
+        "operationId": "BranchDeliveryPricingController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryPricingViewDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No or invalid owner token"
+          },
+          "403": {
+            "description": "The user has no organization"
+          },
+          "404": {
+            "description": "Not your branch (another venue’s branch looks missing)"
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Delivery pricing of the branch: zones and distance rule",
+        "tags": [
+          "Branch"
+        ]
+      },
+      "put": {
+        "operationId": "BranchDeliveryPricingController_replace",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeliveryPricingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryPricingViewDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "validation_error, or invalid_settings: a polygon is not [[lat, lng], ...] or maxKm < includedKm"
+          },
+          "401": {
+            "description": "No or invalid owner token"
+          },
+          "403": {
+            "description": "The user has no organization"
+          },
+          "404": {
+            "description": "Not your branch (another venue’s branch looks missing)"
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Replace the delivery pricing of the branch (zones in priority order, distance rule or null)",
+        "tags": [
+          "Branch"
+        ]
+      }
+    },
+    "/branch/{id}/delivery-pricing/check": {
+      "get": {
+        "operationId": "BranchDeliveryPricingController_check",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "lat",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": 41.31,
+              "type": "number"
+            }
+          },
+          {
+            "name": "lng",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": 69.25,
+              "type": "number"
+            }
+          },
+          {
+            "name": "subtotal",
+            "required": false,
+            "in": "query",
+            "description": "Order subtotal without delivery (sum); 0 when omitted",
+            "schema": {
+              "example": 60000,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryPriceCheckDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No or invalid owner token"
+          },
+          "403": {
+            "description": "The user has no organization"
+          },
+          "404": {
+            "description": "Not your branch (another venue’s branch looks missing)"
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Delivery price from this branch to a point by its saved rules and the venue step (hours not considered)",
+        "tags": [
+          "Branch"
+        ]
+      }
+    },
+    "/delivery/quote": {
+      "get": {
+        "operationId": "DeliveryQuoteController_quote",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "lat",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": 41.31,
+              "type": "number"
+            }
+          },
+          {
+            "name": "lng",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": 69.25,
+              "type": "number"
+            }
+          },
+          {
+            "name": "subtotal",
+            "required": false,
+            "in": "query",
+            "description": "Order subtotal without delivery (sum); 0 when omitted",
+            "schema": {
+              "example": 60000,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryQuoteDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Delivery quote for the cart: branch, fee, minimum, how much is missing, or why delivery is unavailable",
+        "tags": [
+          "Delivery (customer)"
         ]
       }
     },
@@ -5099,6 +5363,7 @@
           "invalid_modifiers",
           "item_unavailable",
           "price_changed",
+          "delivery_fee_changed",
           "min_order_not_reached",
           "out_of_delivery_zone",
           "fulfillment_unavailable",
@@ -5113,6 +5378,7 @@
           "order_not_found",
           "order_status_conflict",
           "delivery_unavailable_no_zone",
+          "delivery_not_configured",
           "ordering_channel_disabled",
           "ordering_not_published",
           "settings_missing",
@@ -6535,7 +6801,7 @@
               "menu_category",
               "menu_product",
               "branch",
-              "delivery_zone",
+              "delivery_pricing",
               "telegram_bot"
             ],
             "example": "branch"
@@ -7619,7 +7885,7 @@
           },
           "branchId": {
             "type": "string",
-            "description": "pickup: majburiy (olib ketish filiali). delivery: maslahat — server boshqa filialga yo'naltirishi mumkin"
+            "description": "pickup: required (the pickup branch). delivery: ignored, the server picks the nearest open branch that delivers to the address"
           },
           "addressId": {
             "type": "string",
@@ -7649,6 +7915,15 @@
           "expectedTotal": {
             "type": "number",
             "description": "Mijoz ko'rgan jami summa. Serverdagi bilan farq qilsa 409 price_changed"
+          },
+          "expectedDeliveryFee": {
+            "type": "number",
+            "description": "delivery: the fee the guest saw (GET /delivery/quote). Differs from the current rules → 409 delivery_fee_changed"
+          },
+          "cashChangeFrom": {
+            "type": "number",
+            "description": "cash only: the amount the guest pays with, so change can be brought; not less than the total",
+            "example": 200000
           }
         },
         "required": [
@@ -7804,8 +8079,9 @@
           "subtotal": {
             "type": "number"
           },
-          "serviceFee": {
-            "type": "number"
+          "deliveryFee": {
+            "type": "number",
+            "description": "Delivery fee fixed when the order was placed; 0 for pickup and free delivery"
           },
           "discount": {
             "type": "number"
@@ -7813,16 +8089,11 @@
           "total": {
             "type": "number"
           },
-          "etaMinutes": {
-            "example": [
-              30,
-              45
-            ],
-            "description": "[min, max] minutes",
-            "type": "array",
-            "items": {
-              "type": "number"
-            }
+          "cashChangeFrom": {
+            "type": "number",
+            "nullable": true,
+            "example": 200000,
+            "description": "Cash: the amount the guest pays with (change is due)"
           },
           "cancelledBy": {
             "type": "string",
@@ -7855,10 +8126,10 @@
           "items",
           "currency",
           "subtotal",
-          "serviceFee",
+          "deliveryFee",
           "discount",
           "total",
-          "etaMinutes",
+          "cashChangeFrom",
           "cancelledBy",
           "cancelReason"
         ]
@@ -8043,8 +8314,9 @@
           "subtotal": {
             "type": "number"
           },
-          "serviceFee": {
-            "type": "number"
+          "deliveryFee": {
+            "type": "number",
+            "description": "Delivery fee fixed when the order was placed; 0 for pickup and free delivery"
           },
           "discount": {
             "type": "number"
@@ -8052,16 +8324,11 @@
           "total": {
             "type": "number"
           },
-          "etaMinutes": {
-            "example": [
-              30,
-              45
-            ],
-            "description": "[min, max] minutes",
-            "type": "array",
-            "items": {
-              "type": "number"
-            }
+          "cashChangeFrom": {
+            "type": "number",
+            "nullable": true,
+            "example": 200000,
+            "description": "Cash: the amount the guest pays with (change is due)"
           },
           "cancelledBy": {
             "type": "string",
@@ -8103,10 +8370,10 @@
           "items",
           "currency",
           "subtotal",
-          "serviceFee",
+          "deliveryFee",
           "discount",
           "total",
-          "etaMinutes",
+          "cashChangeFrom",
           "cancelledBy",
           "cancelReason",
           "customer",
@@ -8132,18 +8399,6 @@
           "items",
           "nextCursor"
         ]
-      },
-      "AcceptOrderDto": {
-        "type": "object",
-        "properties": {
-          "etaMin": {
-            "type": "number",
-            "description": "ETA ni o'zgartirish (daqiqa)"
-          },
-          "etaMax": {
-            "type": "number"
-          }
-        }
       },
       "RejectOrderDto": {
         "type": "object",
@@ -8175,21 +8430,26 @@
       "UpdateOrderSettingsDto": {
         "type": "object",
         "properties": {
-          "deliveryServiceFee": {
-            "type": "number",
-            "description": "Yetkazib berish uchun xizmat to'lovi (so'm)"
-          },
-          "minOrderDelivery": {
-            "type": "number"
-          },
           "minOrderPickup": {
             "type": "number"
           },
-          "etaMin": {
-            "type": "number"
+          "deliveryPriceStep": {
+            "type": "number",
+            "enum": [
+              100,
+              500,
+              1000
+            ],
+            "description": "Delivery fees are rounded up to this step (sum)"
           },
-          "etaMax": {
-            "type": "number"
+          "courierMode": {
+            "type": "string",
+            "enum": [
+              "own",
+              "external",
+              "both"
+            ],
+            "description": "Who delivers: own couriers, external services or both. external: cash on delivery is not offered"
           },
           "acceptanceTimeoutSeconds": {
             "type": "number",
@@ -8201,24 +8461,35 @@
           },
           "maxActiveOrders": {
             "type": "number"
-          },
-          "deliveryZone": {
-            "type": "object",
-            "description": "[[lat, lng], ...] with at least 3 points; null removes the zone and makes delivery unavailable",
-            "nullable": true
           }
         }
       },
-      "MinOrderDto": {
+      "CheckoutPaymentMethodsDto": {
         "type": "object",
         "properties": {
           "delivery": {
-            "type": "number",
-            "example": 40000
+            "type": "array",
+            "description": "cash unless only external services deliver (courier mode external); click/payme when the venue set its keys",
+            "items": {
+              "type": "string",
+              "enum": [
+                "cash",
+                "click",
+                "payme"
+              ]
+            }
           },
           "pickup": {
-            "type": "number",
-            "example": 0
+            "type": "array",
+            "description": "cash always; click/payme when the venue set its keys",
+            "items": {
+              "type": "string",
+              "enum": [
+                "cash",
+                "click",
+                "payme"
+              ]
+            }
           }
         },
         "required": [
@@ -8234,45 +8505,18 @@
             "example": "UZS",
             "description": "The venue's currency"
           },
-          "deliveryServiceFee": {
+          "minOrderPickup": {
             "type": "number",
-            "example": 5000,
-            "description": "Added to delivery orders"
-          },
-          "minOrder": {
-            "$ref": "#/components/schemas/MinOrderDto"
-          },
-          "etaMinutes": {
-            "minItems": 2,
-            "maxItems": 2,
-            "example": [
-              20,
-              30
-            ],
-            "description": "[min, max] minutes",
-            "type": "array",
-            "items": {
-              "type": "number"
-            }
+            "example": 0,
+            "description": "Minimum pickup order (sum)"
           },
           "paymentMethods": {
-            "type": "array",
-            "description": "cash always; click/payme when the venue set its keys",
-            "items": {
-              "type": "string",
-              "enum": [
-                "cash",
-                "click",
-                "payme"
-              ]
-            }
+            "$ref": "#/components/schemas/CheckoutPaymentMethodsDto"
           }
         },
         "required": [
           "currency",
-          "deliveryServiceFee",
-          "minOrder",
-          "etaMinutes",
+          "minOrderPickup",
           "paymentMethods"
         ]
       },
@@ -8294,6 +8538,311 @@
         },
         "required": [
           "config"
+        ]
+      },
+      "DeliveryZoneDto": {
+        "type": "object",
+        "properties": {
+          "polygon": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "minItems": 3,
+            "maxItems": 200,
+            "example": [
+              [
+                41.3,
+                69.2
+              ],
+              [
+                41.3,
+                69.3
+              ],
+              [
+                41.35,
+                69.25
+              ]
+            ],
+            "description": "[[lat, lng], ...], 3 to 200 points"
+          },
+          "price": {
+            "type": "number",
+            "example": 10000,
+            "description": "Delivery fee (sum)"
+          },
+          "minOrder": {
+            "type": "number",
+            "example": 50000,
+            "description": "Minimum order subtotal without delivery (sum)"
+          },
+          "freeFrom": {
+            "type": "number",
+            "nullable": true,
+            "example": 150000,
+            "description": "Free delivery from this subtotal; null: never free"
+          }
+        },
+        "required": [
+          "polygon",
+          "price",
+          "minOrder"
+        ]
+      },
+      "DeliveryDistanceDto": {
+        "type": "object",
+        "properties": {
+          "basePrice": {
+            "type": "number",
+            "example": 8000,
+            "description": "Price up to includedKm (sum)"
+          },
+          "includedKm": {
+            "type": "number",
+            "example": 2,
+            "description": "Kilometres in the base price"
+          },
+          "pricePerKm": {
+            "type": "number",
+            "example": 1500,
+            "description": "Added for every started kilometre over includedKm (sum)"
+          },
+          "maxKm": {
+            "type": "number",
+            "example": 10,
+            "description": "Farthest delivery in a straight line (km), inclusive; not less than includedKm"
+          },
+          "minOrder": {
+            "type": "number",
+            "example": 50000
+          },
+          "freeFrom": {
+            "type": "number",
+            "nullable": true,
+            "example": null
+          }
+        },
+        "required": [
+          "basePrice",
+          "includedKm",
+          "pricePerKm",
+          "maxKm",
+          "minOrder"
+        ]
+      },
+      "DeliveryPricingViewDto": {
+        "type": "object",
+        "properties": {
+          "zones": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeliveryZoneDto"
+            }
+          },
+          "distance": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DeliveryDistanceDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "zones",
+          "distance"
+        ]
+      },
+      "DeliveryPricingDto": {
+        "type": "object",
+        "properties": {
+          "zones": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeliveryZoneDto"
+            }
+          },
+          "distance": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DeliveryDistanceDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "zones"
+        ]
+      },
+      "DeliveryPriceCheckDto": {
+        "type": "object",
+        "properties": {
+          "covered": {
+            "type": "boolean",
+            "description": "The branch delivers to the address"
+          },
+          "rule": {
+            "type": "string",
+            "enum": [
+              "zone",
+              "distance"
+            ],
+            "nullable": true
+          },
+          "zoneIndex": {
+            "type": "number",
+            "nullable": true,
+            "description": "Index in zones; null for the distance rule"
+          },
+          "distanceKm": {
+            "type": "number",
+            "example": 3.21,
+            "description": "Straight line, km (0.01)"
+          },
+          "deliveryFee": {
+            "type": "number",
+            "nullable": true,
+            "description": "Rounded up to the venue step; 0 when free"
+          },
+          "freeFrom": {
+            "type": "number",
+            "nullable": true
+          },
+          "minOrder": {
+            "type": "number",
+            "nullable": true
+          },
+          "shortBy": {
+            "type": "number",
+            "description": "How much the subtotal misses to minOrder"
+          }
+        },
+        "required": [
+          "covered",
+          "rule",
+          "zoneIndex",
+          "distanceKm",
+          "deliveryFee",
+          "freeFrom",
+          "minOrder",
+          "shortBy"
+        ]
+      },
+      "QuoteBranchDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "address"
+        ]
+      },
+      "DeliveryQuoteDto": {
+        "type": "object",
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "description": "A branch delivers to the address now (the minimum aside)"
+          },
+          "canOrder": {
+            "type": "boolean",
+            "description": "available and the subtotal reaches the minimum"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "ordering_channel_disabled",
+              "ordering_not_published",
+              "fulfillment_unavailable",
+              "delivery_not_configured",
+              "out_of_delivery_zone",
+              "branch_closed",
+              "branch_hours_not_set",
+              "min_order_not_reached"
+            ],
+            "nullable": true,
+            "description": "Error code (docs/ERRORS.md) explaining why the order cannot be placed; null when canOrder"
+          },
+          "opensAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "With branch_closed: the earliest opening, ISO 8601 with date and offset (null: none in 7 days)"
+          },
+          "branch": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/QuoteBranchDto"
+              }
+            ]
+          },
+          "rule": {
+            "type": "string",
+            "enum": [
+              "zone",
+              "distance"
+            ],
+            "nullable": true
+          },
+          "distanceKm": {
+            "type": "number",
+            "nullable": true,
+            "example": 3.21
+          },
+          "deliveryFee": {
+            "type": "number",
+            "nullable": true,
+            "example": 12000,
+            "description": "Rounded up to the venue step, 0 when free; send it as expectedDeliveryFee"
+          },
+          "freeFrom": {
+            "type": "number",
+            "nullable": true,
+            "example": 150000
+          },
+          "minOrder": {
+            "type": "number",
+            "nullable": true,
+            "example": 50000
+          },
+          "shortBy": {
+            "type": "number",
+            "example": 0,
+            "description": "How much the subtotal misses"
+          }
+        },
+        "required": [
+          "available",
+          "canOrder",
+          "reason",
+          "opensAt",
+          "branch",
+          "rule",
+          "distanceKm",
+          "deliveryFee",
+          "freeFrom",
+          "minOrder",
+          "shortBy"
         ]
       },
       "CreateProductDto": {
@@ -8813,7 +9362,7 @@
         "properties": {
           "modes": {
             "type": "array",
-            "description": "Empty unless channels.delivery.published. pickup: an active branch accepts pickup. delivery: an active branch accepts delivery and a delivery zone is set. Empty without branches",
+            "description": "Empty unless channels.delivery.published. pickup: an active branch accepts pickup. delivery: an active branch accepts delivery and has delivery pricing (a zone or the distance rule). Empty without branches",
             "items": {
               "type": "string",
               "enum": [
@@ -8834,7 +9383,7 @@
           "deliveryOffered": {
             "type": "boolean",
             "example": true,
-            "description": "An active branch accepts delivery. false = the venue has no delivery by choice (hide the delivery tab); independent of publication and the zone"
+            "description": "An active branch accepts delivery. false = the venue has no delivery by choice (hide the delivery tab); independent of publication and pricing"
           },
           "deliveryAvailable": {
             "type": "boolean",
@@ -8847,11 +9396,26 @@
               "not_offered",
               "channel_disabled",
               "not_published",
-              "no_zone"
+              "not_configured"
             ],
             "nullable": true,
             "example": null,
-            "description": "null when deliveryAvailable. not_offered: no active branch takes delivery; channel_disabled: the owner turned ordering off; not_published: not published or paused; no_zone: the delivery zone is not set. The first that applies, in this order"
+            "description": "null when deliveryAvailable. not_offered: no active branch takes delivery; channel_disabled: the owner turned ordering off; not_published: not published or paused; not_configured: no branch that takes delivery has delivery pricing. The first that applies, in this order. Whether a given address is served: GET /delivery/quote"
+          },
+          "courierMode": {
+            "type": "string",
+            "enum": [
+              "own",
+              "external",
+              "both"
+            ],
+            "example": "own",
+            "description": "Who delivers: own couriers, external services or both (order settings)"
+          },
+          "cashOnDelivery": {
+            "type": "boolean",
+            "example": true,
+            "description": "Cash is accepted for delivery orders; false when only external services deliver. Pickup is always payable in cash"
           }
         },
         "required": [
@@ -8859,7 +9423,9 @@
           "defaultMode",
           "deliveryOffered",
           "deliveryAvailable",
-          "deliveryUnavailableReason"
+          "deliveryUnavailableReason",
+          "courierMode",
+          "cashOnDelivery"
         ]
       },
       "TenantMapDto": {
@@ -8877,7 +9443,7 @@
               41.311081,
               69.240562
             ],
-            "description": "[lat, lng]. The saved view; without one, the middle of the delivery zone, else of the branches. null only when the venue has no zone and no branch with coordinates"
+            "description": "[lat, lng]. The saved view; without one, the middle of the delivery zones, else of the branches. null only when the venue has no zone and no branch with coordinates"
           },
           "centerSource": {
             "type": "string",
@@ -8888,7 +9454,7 @@
             ],
             "nullable": true,
             "example": "saved",
-            "description": "Where center comes from: saved (owner), zone (delivery zone bounding box), branches (branch coordinates); null when center is null"
+            "description": "Where center comes from: saved (owner), zone (bounding box of the delivery zones), branches (branch coordinates); null when center is null"
           },
           "zoom": {
             "type": "number",
@@ -8924,32 +9490,36 @@
             ],
             "description": "[[southWestLat, southWestLng], [northEastLat, northEastLng]]"
           },
-          "deliveryZone": {
+          "deliveryZones": {
             "type": "array",
             "items": {
               "type": "array",
               "items": {
-                "type": "number"
-              },
-              "minItems": 2,
-              "maxItems": 2
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              }
             },
-            "nullable": true,
             "example": [
               [
-                41.361,
-                69.201
-              ],
-              [
-                41.37,
-                69.28
-              ],
-              [
-                41.345,
-                69.33
+                [
+                  41.361,
+                  69.201
+                ],
+                [
+                  41.37,
+                  69.28
+                ],
+                [
+                  41.345,
+                  69.33
+                ]
               ]
             ],
-            "description": "Delivery polygon [[lat, lng], ...]; null = delivery unavailable"
+            "description": "Delivery zones of the active branches that take delivery, [[[lat, lng], ...], ...], for drawing only: distance rules are not drawn, and the price and branch for an address come from GET /delivery/quote. Empty when no branch has zones"
           }
         },
         "required": [
@@ -8958,7 +9528,7 @@
           "zoom",
           "city",
           "bounds",
-          "deliveryZone"
+          "deliveryZones"
         ]
       },
       "TenantConfigDto": {

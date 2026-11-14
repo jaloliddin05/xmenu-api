@@ -21,7 +21,7 @@ const INCLUDE = {
 } satisfies Prisma.customer_orderInclude;
 
 export type RestaurantAction =
-  | { type: 'accept'; eta?: { min: number; max: number } }
+  | { type: 'accept' }
   | { type: 'reject'; reason?: string }
   | { type: 'next' }
   | { type: 'set'; status: OrderStatusName };
@@ -151,7 +151,6 @@ export class OrderStaffService {
         actorId,
         reason:
           action.type === 'reject' ? (action.reason ?? 'declined') : undefined,
-        eta: action.type === 'accept' ? action.eta : undefined,
       });
       return { changed: true, status: to, conflict: false };
     } catch (e) {

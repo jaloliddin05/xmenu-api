@@ -45,3 +45,10 @@ enum OrderChannel {
   site
   miniapp
 }
+
+// Who delivers the venue's orders (organization_order_settings.courier_mode).
+enum CourierMode {
+  own
+  external
+  both
+}

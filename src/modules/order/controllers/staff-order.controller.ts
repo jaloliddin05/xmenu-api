@@ -22,11 +22,7 @@ import {
   type StaffRequest,
 } from 'src/infra/http/request-helpers';
 import { ORDER_STATUSES, OrderStatusName } from '../domain/order-state-machine';
-import {
-  AcceptOrderDto,
-  RejectOrderDto,
-  SetOrderStatusDto,
-} from '../dto/staff-order.dto';
+import { RejectOrderDto, SetOrderStatusDto } from '../dto/staff-order.dto';
 import { OrderStaffService } from '../services/order-staff.service';
 
 /** Restoran paneli: kelgan buyurtmalar va ularni boshqarish. Tenant — tokendagi organization. */
@@ -78,21 +74,13 @@ export class StaffOrderController {
 
   @Post(':id/accept')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Qabul qilish (ixtiyoriy: ETA)' })
+  @ApiOperation({ summary: 'Qabul qilish' })
   @ApiOkResponse({ type: StaffOrderViewDto })
-  accept(
-    @Req() req: StaffRequest,
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: AcceptOrderDto,
-  ) {
-    const eta =
-      dto.etaMin && dto.etaMax && dto.etaMax >= dto.etaMin
-        ? { min: dto.etaMin, max: dto.etaMax }
-        : undefined;
+  accept(@Req() req: StaffRequest, @Param('id', ParseUUIDPipe) id: string) {
     return this.staff.act(
       requireStaffOrganizationId(req),
       id,
-      { type: 'accept', eta },
+      { type: 'accept' },
       req.user.id,
     );
   }

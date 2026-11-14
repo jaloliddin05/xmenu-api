@@ -21,6 +21,8 @@ interface FakeBranch {
   accepts_pickup: boolean;
   accepts_delivery: boolean;
   working_hours: { is_closed: boolean }[];
+  delivery_zones: { id: string }[];
+  delivery_distance: { branch_id: string } | null;
 }
 
 interface Venue {
@@ -36,15 +38,9 @@ interface Venue {
   categories: { id: string; is_active: boolean | null }[];
   products: { category_id: string; is_active: boolean | null }[];
   branches: FakeBranch[];
-  zone: number[][] | null;
   bot: { is_enabled: boolean } | null;
 }
 
-const ZONE = [
-  [41.36, 69.2],
-  [41.37, 69.28],
-  [41.34, 69.33],
-];
 const HOURS = Array.from({ length: 7 }, () => ({ is_closed: false }));
 const BRANCH: FakeBranch = {
   is_active: true,
@@ -53,9 +49,12 @@ const BRANCH: FakeBranch = {
   accepts_pickup: true,
   accepts_delivery: true,
   working_hours: HOURS,
+  // Delivery pricing: one zone, no distance rule
+  delivery_zones: [{ id: 'z1' }],
+  delivery_distance: null,
 };
 
-/** As registered: platform channels, empty menu, no branches, no zone, no bot. */
+/** As registered: platform channels, empty menu, no branches, no bot. */
 const fresh = (id: string): Venue => ({
   org: {
     id,
@@ -69,7 +68,6 @@ const fresh = (id: string): Venue => ({
   categories: [],
   products: [],
   branches: [],
-  zone: null,
   bot: null,
 });
 
@@ -80,7 +78,6 @@ const ready = (id: string): Venue => ({
   categories: [{ id: 'c1', is_active: true }],
   products: [{ category_id: 'c1', is_active: true }],
   branches: [{ ...BRANCH }],
-  zone: ZONE,
 });
 
 const pick = (row: object, select?: Record<string, boolean>) =>
@@ -181,12 +178,6 @@ describe('Organization channels and publication (owner)', () => {
         );
       }),
     },
-    organization_order_settings: {
-      findUnique: jest.fn(async ({ where }) => {
-        await tick();
-        return { delivery_zone: venues[where.organization_id].zone };
-      }),
-    },
     organization_telegram_bot: {
       findUnique: jest.fn(async ({ where }) => {
         await tick();
@@ -270,7 +261,7 @@ describe('Organization channels and publication (owner)', () => {
         menu_category: 'todo',
         menu_product: 'todo',
         branch: 'todo',
-        delivery_zone: 'not_required',
+        delivery_pricing: 'not_required',
         telegram_bot: 'not_required',
       });
       for (const item of res.body.checklist) {
@@ -362,9 +353,9 @@ describe('Organization channels and publication (owner)', () => {
         'branch',
       ],
       [
-        'delivering branch without a zone',
-        (v) => (v.zone = null),
-        'delivery_zone',
+        'delivering branch without pricing',
+        (v) => (v.branches[0].delivery_zones = []),
+        'delivery_pricing',
       ],
       [
         'Mini App without a bot',
@@ -389,12 +380,20 @@ describe('Organization channels and publication (owner)', () => {
       expect(res.body.ready).toBe(false);
     });
 
-    it('pickup-only branches need no zone', async () => {
+    it('a distance rule alone prices delivery', async () => {
+      venues[ORG_A] = ready(ORG_A);
+      venues[ORG_A].branches[0].delivery_zones = [];
+      venues[ORG_A].branches[0].delivery_distance = { branch_id: 'b1' };
+      const res = await get().expect(200);
+      expect(status(res.body).delivery_pricing).toBe('done');
+    });
+
+    it('pickup-only branches need no delivery pricing', async () => {
       venues[ORG_A] = ready(ORG_A);
       venues[ORG_A].branches[0].accepts_delivery = false;
-      venues[ORG_A].zone = null;
+      venues[ORG_A].branches[0].delivery_zones = [];
       const res = await get().expect(200);
-      expect(status(res.body).delivery_zone).toBe('not_required');
+      expect(status(res.body).delivery_pricing).toBe('not_required');
       expect(res.body.ready).toBe(true);
     });
 

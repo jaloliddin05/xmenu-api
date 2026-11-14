@@ -57,7 +57,7 @@ export class CreateOrderDto {
 
   @ApiPropertyOptional({
     description:
-      "pickup: majburiy (olib ketish filiali). delivery: maslahat — server boshqa filialga yo'naltirishi mumkin",
+      'pickup: required (the pickup branch). delivery: ignored, the server picks the nearest open branch that delivers to the address',
   })
   @IsOptional()
   @IsString()
@@ -102,4 +102,24 @@ export class CreateOrderDto {
   @IsInt()
   @Min(0)
   readonly expectedTotal?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'delivery: the fee the guest saw (GET /delivery/quote). Differs from the current rules → 409 delivery_fee_changed',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  readonly expectedDeliveryFee?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'cash only: the amount the guest pays with, so change can be brought; not less than the total',
+    example: 200000,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(100_000_000)
+  readonly cashChangeFrom?: number;
 }

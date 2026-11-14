@@ -19,6 +19,7 @@ import { RedisModule } from './infra/redis/redis.module';
 import { BranchModule } from './modules/branch/branch.module';
 import { MenuModule } from './modules/menu/menu.module';
 import { OrderModule } from './modules/order/order.module';
+import { DeliveryModule } from './modules/delivery/delivery.module';
 import { PaymentModule } from './modules/payment/payment.module';
 import { TenantConfigModule } from './modules/tenant/tenant-config.module';
 import { TelegramModule } from './modules/telegram/telegram.module';
@@ -39,6 +40,7 @@ import { TenantDomainModule } from './modules/tenant-domain/tenant-domain.module
     FileModule,
     MenuModule,
     OrderModule,
+    DeliveryModule,
     OrganizationModule,
     PaymentModule,
     ProductModule,

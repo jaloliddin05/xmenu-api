@@ -46,7 +46,8 @@ npx prisma migrate deploy   # 20261010090000_branches_orders_payments
 
 1. `POST /branch` — филиал (адрес, координаты, `phone` для SMS, `telegramChatId`).
 2. `PUT /branch/:id/working-hours` — расписание.
-3. `PUT /order-settings` — цена доставки, минимум, ETA, таймауты, `deliveryZone` ([[lat,lng],…]).
+3. `PUT /order-settings` — минимум самовывоза, шаг округления цены доставки, способ доставки (`courierMode`), таймауты;
+   `PUT /branch/:id/delivery-pricing` — зоны и правило по расстоянию филиала (`API.md`, «Стоимость доставки»).
 4. Telegram: бот добавить в группу филиала, id группы → `telegramChatId`. Один раз на платформу:
    ```
    POST https://api.telegram.org/bot<TOKEN>/setWebhook
