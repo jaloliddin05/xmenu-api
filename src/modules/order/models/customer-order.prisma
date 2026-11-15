@@ -51,6 +51,21 @@ model customer_order {
   courier_shift       courier_shift? @relation(fields: [courier_shift_id], references: [id], onDelete: SetNull)
   door_problem        DoorProblem?
   door_problem_reason String?
+  // Delivery timers start at these moments (docs/DELIVERY.md, "Напоминания")
+  ready_at            DateTime?
+  picked_up_at        DateTime?
+  door_problem_at     DateTime?
+  // Cash orders delivered by a courier: banknotes or a card to the courier
+  cash_collected      CashCollection?
+  // Courier pay accrued at delivery: straight-line km from the branch and the amount (null: no rate set)
+  courier_distance_km Float?
+  courier_pay         Int?
+  // Handed to an external service (handed_to_external): its name, what the venue paid it, when; for a cash
+  // order the operator marks later whether the venue got the money (null: not marked yet)
+  external_service       String?
+  external_cost          Int?
+  external_handed_at     DateTime?
+  external_cash_received Boolean?
 
   cancelled_by    OrderActor?
   cancel_reason   String?
@@ -85,6 +100,8 @@ model customer_order {
   @@index([customer_id, created_at])
   @@index([branch_id, status])
   @@index([courier_id, status])
+  @@index([courier_shift_id, status])
+  @@index([organization_id, external_handed_at])
 }
 
 model customer_order_item {

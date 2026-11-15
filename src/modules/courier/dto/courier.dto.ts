@@ -1,14 +1,20 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
+  IsBoolean,
   IsIn,
+  IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
   IsUUID,
   Matches,
+  Max,
   MaxLength,
+  Min,
+  ValidateNested,
 } from 'class-validator';
+import { PayRateDto } from 'src/modules/order/dto/order-settings.dto';
 import { CourierShiftStatus } from '@prisma/client';
 import formatPhoneNumber from 'src/infra/helper/auth/format-phone';
 import { PHONE_REGEX } from 'src/infra/helper/auth/customer-validators';
@@ -108,6 +114,33 @@ class ShiftCourierDto {
   @ApiProperty() name: string;
 }
 
+export class ShiftCashDto {
+  @ApiProperty({ description: 'Orders the courier delivered in the shift' })
+  deliveries: number;
+  @ApiProperty({
+    description:
+      'Cash to hand in: delivered cash orders paid in banknotes; live until the reconciliation, then fixed',
+  })
+  due: number;
+  @ApiProperty({
+    description: 'Cash orders paid to the courier by card (not reconciled)',
+  })
+  card: number;
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description: 'What the operator got (reconciled only)',
+  })
+  received: number | null;
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description:
+      'received - due: negative when the courier handed in less (reconciled only)',
+  })
+  discrepancy: number | null;
+}
+
 export class ShiftViewDto {
   @ApiProperty() id: string;
   @ApiProperty({ type: ShiftCourierDto }) courier: ShiftCourierDto;
@@ -125,4 +158,73 @@ export class ShiftViewDto {
     description: 'Unfinished orders on the courier (open shifts only)',
   })
   activeOrders: number;
+  @ApiProperty({ type: ShiftCashDto }) cash: ShiftCashDto;
+  @ApiProperty({ type: String, nullable: true, format: 'date-time' })
+  reconciledAt: string | null;
+}
+
+export class ReconcileShiftDto {
+  @ApiProperty({
+    description: 'Cash the operator got from the courier',
+    example: 250000,
+  })
+  @IsInt()
+  @Min(0)
+  @Max(1_000_000_000)
+  readonly received: number;
+}
+
+export class CourierPayRateDto {
+  @ApiProperty({
+    type: PayRateDto,
+    nullable: true,
+    description: "The courier's own rate; null: the venue's rate applies",
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => PayRateDto)
+  readonly rate: PayRateDto | null;
+}
+
+export class CourierPayRateRowDto {
+  @ApiProperty() courierId: string;
+  @ApiProperty() name: string;
+  @ApiProperty() isActive: boolean;
+  @ApiProperty({ type: PayRateDto, nullable: true }) rate: PayRateDto | null;
+}
+
+export class CourierPayRatesDto {
+  @ApiProperty({
+    type: PayRateDto,
+    nullable: true,
+    description:
+      'The venue rate (PUT /order-settings courierPay); null: no pay accrued',
+  })
+  venue: PayRateDto | null;
+  @ApiProperty({ type: [CourierPayRateRowDto] })
+  couriers: CourierPayRateRowDto[];
+}
+
+export class HandToExternalDto {
+  @ApiProperty({ example: 'Yandex Go', maxLength: 100 })
+  @Transform(trim)
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(100)
+  readonly service: string;
+
+  @ApiProperty({
+    description: 'What the venue paid the service',
+    example: 25000,
+  })
+  @IsInt()
+  @Min(0)
+  @Max(100_000_000)
+  readonly cost: number;
+}
+
+export class ExternalPaymentDto {
+  @ApiProperty({ description: 'Did the venue get the cash of the order?' })
+  @IsBoolean()
+  readonly received: boolean;
 }

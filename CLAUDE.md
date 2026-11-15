@@ -42,7 +42,8 @@ Env: см. `.env.example` (полный; тест сверяет его со с�
 `GET /tenant/config` в `TenantConfigModule`), `organization` (+ настройки заведения), `user`, `employee` (не
 используется), `branch`, `category`, `product` (+ группы допов), `menu` (публичный), `customer` (+ адреса),
 `order` (state machine, очереди, уведомления), `delivery` (правила цены доставки филиалов, расчёт для корзины и
-заказа), `courier` (свои курьеры: смены, назначение, бот курьера, провайдер доставки), `payment` (Click, Payme, ключи тенанта, возвраты),
+заказа), `courier` (свои курьеры: смены и сверка наличных, назначение, бот курьера, таймеры доставки, оплата курьерам,
+провайдеры доставки), `report` (отчёты доставки для владельца), `payment` (Click, Payme, ключи тенанта, возвраты),
 `sms` (провайдеры eskiz, telegram, console), `telegram` (боты заведений: `TelegramBotService`, `TelegramClient`,
 `/telegram-bot`), `tenant-domain` (свои домены заведения, `/organization/:id/domains`), `file`, `translation`, `application`,
 `revalidate-queue` (`RevalidateModule`: ревалидация QR-меню и сайта доставки, `docs/REVALIDATE.md`), `guest-login` (способы входа
@@ -189,7 +190,22 @@ Payme вручную через ops-чат.
 - Карточка: чистая `courier/domain/courier-card.ts` (тексты и кнопки, данные кнопок `cr:<действие>:<uuid>`), отправка и
   правка `CourierCardService` (не правится → новая карточка). Тексты бота: `courier/domain/courier-texts.ts` (в
   `BOT_TEXT_FILES`).
-- Тесты сервисов на фейке `courier/courier-prisma.fake.ts` с настоящим `OrderTransitionService`.
+- Внешняя служба: адаптер `ExternalServiceProvider` (`handed_to_external` от `restaurant`, только без своего курьера:
+  `order_courier_assigned`), поля `external_*` в заказе; отметка оплаты заказа с наличными и подсказки названий в
+  `ExternalDeliveryService`.
+- Таймеры доставки (`order/domain/delivery-timers.ts`): эффект `delivery_timers` после каждой смены статуса доставки
+  удаляет задания заказа в очереди `delivery-timers` и ставит таймер нового статуса (`ready_at`, `picked_up_at`,
+  `door_problem_at`; минуты из `organization_order_settings`); `DeliveryTimerProcessor` проверяет, что заказ ещё в том же
+  эпизоде (`timerStillDue`), и пишет в чат филиала и курьеру.
+- Наличные смены: `courier/domain/shift-cash.ts` (к сдаче = доставленные заказы смены с наличными купюрами,
+  `cash_collected`), сверка один раз условным `updateMany` (`CourierShiftService.reconcile`).
+- Оплата курьерам: `courier/domain/courier-pay.ts`, считается в `OrderTransitionService` при `completed` от курьера
+  (`courier_distance_km`, `courier_pay`); ставка заведения в `organization_order_settings.courier_pay_*`, своя в
+  `courier.pay_*`, маршруты ставок и отчёты только у владельца (`venue`, `reports`).
+- Отчёты (`modules/report`): чистые сборщики `report/domain/*`, CSV `report-csv.ts` (в `BOT_TEXT_FILES`), период
+  `[from, to)` до 366 дней (`report-period.ts`).
+- Тесты сервисов на фейке `courier/courier-prisma.fake.ts` с настоящим `OrderTransitionService`; общий сетап
+  `courier/courier-setup.fake.ts`.
 
 ## Авторизация клиентов
 Телефон + OTP (HMAC-хеш кода, TTL, лимит попыток, cooldown) через `SmsProvider`; refresh-токены с ротацией и
@@ -305,8 +321,8 @@ App (`instant`) нового номера кладёт Telegram-id в `registrat
   `revokeAllForUser`; владельца отключить нельзя.
 
 ## Что нужно построить
-- Сверка наличных за смену, таймер ожидания у двери, передача внешней службе (`handed_to_external`) и её адаптер,
-  способ оплаты «карта курьеру»; адаптеры внешних служб (Noor, Yandex, Millennium) по мере доступа к API.
+- Способ оплаты «карта курьеру» при оформлении (сейчас курьер отмечает карту у заказа с наличными); адаптеры внешних
+  служб (Noor, Yandex, Millennium) по мере доступа к API.
 - Уведомления о заказах персоналу через бота ресторана (пока идут через платформенного бота из env).
 - История старых slug с редиректом.
 - Возврат после оплаты на сайт заведения: `MINIAPP_RETURN_URL`/`MINIAPP_URL` один на платформу

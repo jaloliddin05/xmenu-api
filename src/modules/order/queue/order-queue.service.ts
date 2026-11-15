@@ -2,6 +2,11 @@ import { errorMessage } from 'src/infra/helper/error-text';
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { Queue } from 'bullmq';
 import { bullConnection } from 'src/infra/redis/bull-connection';
+import {
+  DELIVERY_TIMER_KINDS,
+  DeliveryTimer,
+  DeliveryTimerKind,
+} from '../domain/delivery-timers';
 
 export const ESCALATION_QUEUE = 'order-escalation';
 export const REFUND_QUEUE = 'order-refunds';
@@ -12,6 +17,16 @@ export interface CourierCardJob {
   orderId: string;
   courierId: string;
 }
+/** Delivery reminders and the door timer (worker: courier module, DeliveryTimerProcessor). */
+export const DELIVERY_TIMER_QUEUE = 'delivery-timers';
+export interface DeliveryTimerJob {
+  orderId: string;
+  kind: DeliveryTimerKind;
+  /** Start of the status episode, ms (domain/delivery-timers.ts, timerStillDue) */
+  since: number;
+}
+const deliveryTimerJobId = (orderId: string, kind: DeliveryTimerKind) =>
+  `dlv-${kind}-${orderId}`;
 /** Temporary Telegram failures are retried: 10 s, 20 s, 40 s, 80 s after the first attempt. */
 export const GUEST_NOTIFICATION_ATTEMPTS = 5;
 
@@ -47,6 +62,7 @@ export class OrderQueueService implements OnModuleDestroy {
   private refunds?: Queue;
   private guestNotifications?: Queue;
   private courierCards?: Queue;
+  private deliveryTimers?: Queue;
 
   private get escalationQueue(): Queue {
     return (this.escalation ??= new Queue(ESCALATION_QUEUE, {
@@ -92,6 +108,18 @@ export class OrderQueueService implements OnModuleDestroy {
         removeOnFail: 100,
         attempts: 5,
         backoff: { type: 'exponential', delay: 3000 },
+      },
+    }));
+  }
+
+  private get deliveryTimerQueue(): Queue {
+    return (this.deliveryTimers ??= new Queue(DELIVERY_TIMER_QUEUE, {
+      connection: bullConnection(),
+      defaultJobOptions: {
+        removeOnComplete: true,
+        removeOnFail: 100,
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 5000 },
       },
     }));
   }
@@ -165,6 +193,31 @@ export class OrderQueueService implements OnModuleDestroy {
     );
   }
 
+  /**
+   * The order changed status: the pending delivery timers of the order are removed (that is how a reminder is
+   * cancelled), and the timer of the new status, if any, is scheduled.
+   */
+  resetDeliveryTimers(orderId: string, next: DeliveryTimer | null) {
+    return this.safe('resetDeliveryTimers', async () => {
+      const queue = this.deliveryTimerQueue;
+      for (const kind of DELIVERY_TIMER_KINDS)
+        await queue.remove(deliveryTimerJobId(orderId, kind));
+      if (!next) return;
+      await queue.add(
+        next.kind,
+        {
+          orderId,
+          kind: next.kind,
+          since: next.since.getTime(),
+        } satisfies DeliveryTimerJob,
+        {
+          jobId: deliveryTimerJobId(orderId, next.kind),
+          delay: Math.max(0, next.dueAt.getTime() - Date.now()),
+        },
+      );
+    });
+  }
+
   /** False when there is no queue (ORDER_QUEUES=off) or it failed (logged): the caller sends at once. */
   async enqueueGuestNotification(data: {
     orderId: string;
@@ -188,6 +241,7 @@ export class OrderQueueService implements OnModuleDestroy {
       this.refunds?.close(),
       this.guestNotifications?.close(),
       this.courierCards?.close(),
+      this.deliveryTimers?.close(),
     ]);
   }
 }

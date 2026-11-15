@@ -1,8 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
 import { TelegramApiService } from '../services/telegram-api.service';
+import type { DeliveryTimerKind } from '../domain/delivery-timers';
 import {
   buildDeliveryAlertText,
+  buildDeliveryTimerText,
   buildRestaurantKeyboard,
   buildRestaurantText,
 } from './order-messages';
@@ -100,9 +102,25 @@ export class RestaurantNotifierService {
    * Urgent message about a delivery problem ("no answer", "refused", "cannot deliver"), as a reply to the order
    * message in the branch chat. Without a chat the operator sees it in the dashboard only.
    */
-  async alertDeliveryProblem(
+  alertDeliveryProblem(
     orderId: string,
     kind: 'no_answer' | 'refused' | 'cannot_deliver',
+  ): Promise<void> {
+    return this.alertDelivery(orderId, (number, courierName) =>
+      buildDeliveryAlertText(number, kind, courierName),
+    );
+  }
+
+  /** A delivery timer ran out (docs/DELIVERY.md, "Напоминания"): a message to the branch chat. */
+  alertDeliveryTimer(orderId: string, kind: DeliveryTimerKind): Promise<void> {
+    return this.alertDelivery(orderId, (number, courierName) =>
+      buildDeliveryTimerText(number, kind, courierName),
+    );
+  }
+
+  private async alertDelivery(
+    orderId: string,
+    text: (number: number, courierName: string | null) => string,
   ): Promise<void> {
     const order = await this.prisma.customer_order.findUnique({
       where: { id: orderId },
@@ -134,7 +152,7 @@ export class RestaurantNotifierService {
     }
     await this.telegram.sendMessage(
       chatId,
-      buildDeliveryAlertText(order.number, kind, courierName),
+      text(order.number, courierName),
       order.tg_message_id && order.tg_chat_id
         ? { reply_to_message_id: order.tg_message_id }
         : {},

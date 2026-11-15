@@ -6,7 +6,13 @@ import type { OrderStatusName } from 'src/modules/order/domain/order-state-machi
  * later as more adapters, when their APIs are available. Order statuses still move only through
  * OrderTransitionService; a provider reports and reacts, it never writes a status itself.
  */
-export type DeliveryProviderKind = 'own_couriers';
+export type DeliveryProviderKind = 'own_couriers' | 'external_service';
+
+/** Who asks for the delivery and, for an external service, which one and what the venue paid it. */
+export interface DeliveryRequest {
+  actorId: string;
+  external?: { service: string; cost: number };
+}
 
 export interface DeliveryProviderStatus {
   provider: DeliveryProviderKind;
@@ -19,13 +25,22 @@ export interface DeliveryProviderStatus {
     | 'delivered'
     | 'closed';
   courier: { id: string; name: string } | null;
+  /** The external service the order was handed to */
+  externalService: string | null;
   orderStatus: OrderStatusName;
 }
 
 export interface DeliveryProvider {
   readonly kind: DeliveryProviderKind;
-  /** The order needs delivery (it was accepted): own couriers wait for the operator to assign one. */
-  create(organizationId: string, orderId: string): Promise<void>;
+  /**
+   * The order needs delivery: own couriers wait for the operator to assign one (after "accepted"); an external
+   * service gets the order handed over at once.
+   */
+  create(
+    organizationId: string,
+    orderId: string,
+    request?: DeliveryRequest,
+  ): Promise<void>;
   /** The order no longer needs this provider (cancelled, returned, handed over): free the courier. */
   cancel(
     organizationId: string,

@@ -79,9 +79,10 @@ describe('courier card', () => {
     });
   });
 
-  it('on the way, cash: "delivered, cash received" and the three problem buttons', () => {
+  it('on the way, cash: "delivered, cash received", "delivered, paid by card" and the three problem buttons', () => {
     expect(buttons(card({ status: 'on_the_way' }))).toEqual([
       '✅ Доставил, деньги получены',
+      '💳 Доставил, оплачено картой',
       '📵 Не дозвонился',
       '🚫 Отказ гостя',
       '⚠️ Не могу доставить',
@@ -94,7 +95,7 @@ describe('courier card', () => {
       paymentMethod: 'click',
       cashChangeFrom: null,
     });
-    expect(buttons(c)[0]).toBe('✅ Доставил');
+    expect(buttons(c).slice(0, 2)).toEqual(['✅ Доставил', '📵 Не дозвонился']);
     expect(c.text).toContain('0 сум (оплачен онлайн)');
     expect(c.text).not.toContain('Сдача');
   });
@@ -125,7 +126,7 @@ describe('courier card', () => {
   it('no answer: only "delivered" (the guest may still answer); refused: no buttons, the reason shown', () => {
     expect(
       buttons(card({ status: 'problem_at_door', doorProblem: 'no_answer' })),
-    ).toEqual(['✅ Доставил, деньги получены']);
+    ).toEqual(['✅ Доставил, деньги получены', '💳 Доставил, оплачено картой']);
     const refused = card({
       status: 'problem_at_door',
       doorProblem: 'refused',
@@ -182,6 +183,7 @@ describe('courier button data', () => {
       { a: 'refused', orderId: ORDER_ID, reason: 'changed_mind' },
       { a: 'back', orderId: ORDER_ID },
       { a: 'cannot_deliver', orderId: ORDER_ID },
+      { a: 'delivered_card', orderId: ORDER_ID },
     ] as const;
     for (const action of actions) {
       const data = encodeCourierAction(action);

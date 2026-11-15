@@ -132,6 +132,30 @@ export class OrderViewDto {
       'problem_at_door: no_answer — the courier cannot reach the guest; refused — the guest refused',
   })
   doorProblem: 'no_answer' | 'refused' | null;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description:
+      'handed_to_external: the name of the external delivery service',
+  })
+  externalService: string | null;
+}
+
+class OrderExternalDto {
+  @ApiProperty() service: string;
+  @ApiProperty({ description: 'What the venue paid the service' }) cost: number;
+  @ApiProperty({ format: 'date-time' }) handedAt: string;
+  @ApiProperty({
+    type: Boolean,
+    nullable: true,
+    description:
+      'Cash orders: whether the venue got the money (POST /order/:id/external-payment); null: not marked yet, or not a cash order',
+  })
+  cashReceived: boolean | null;
+  @ApiProperty({
+    description: 'A cash order still waits for the payment mark',
+  })
+  paymentMarkPending: boolean;
 }
 
 class OrderCustomerDto {
@@ -181,6 +205,32 @@ export class StaffOrderViewDto extends OrderViewDto {
     description: 'refused: changed_mind | wrong_order | quality | other',
   })
   doorProblemReason: string | null;
+  @ApiProperty({ type: String, nullable: true, format: 'date-time' })
+  readyAt: string | null;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    format: 'date-time',
+    description: '"Picked up" pressed',
+  })
+  pickedUpAt: string | null;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    format: 'date-time',
+    description:
+      'problem_at_door after "no answer": when the wait at the door is over (then the operator decides)',
+  })
+  doorWaitEndsAt: string | null;
+  @ApiProperty({
+    enum: ['cash', 'card'],
+    nullable: true,
+    description:
+      'Delivered cash orders: banknotes (handed in at the shift end) or a card to the courier',
+  })
+  cashCollected: 'cash' | 'card' | null;
+  @ApiProperty({ type: OrderExternalDto, nullable: true })
+  external: OrderExternalDto | null;
   @ApiProperty({ type: [OrderEventDto] }) events: OrderEventDto[];
 }
 

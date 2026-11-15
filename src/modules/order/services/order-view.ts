@@ -90,6 +90,9 @@ export function toOrderView(
         : null,
     // At the door: no_answer is shown to the guest ("the courier cannot reach you"); refused goes to the operator
     doorProblem: order.door_problem,
+    // "Handed to the delivery service <name>" (the cost is for the staff only)
+    externalService:
+      order.status === 'handed_to_external' ? order.external_service : null,
   };
 }
 

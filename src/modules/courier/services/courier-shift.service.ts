@@ -6,6 +6,12 @@ import { COURIER_HELD_STATUSES } from 'src/modules/order/domain/order-state-mach
 import { TelegramBotService } from 'src/modules/telegram/telegram-bot.service';
 import { telegramErrorText } from 'src/modules/telegram/telegram-client';
 import { COURIER_TEXTS, courierLang } from '../domain/courier-texts';
+import {
+  ShiftCash,
+  ShiftOrder,
+  cashDiscrepancy,
+  shiftCash,
+} from '../domain/shift-cash';
 import { CourierCardService } from './courier-card.service';
 
 export interface ShiftView {
@@ -17,6 +23,9 @@ export interface ShiftView {
   /** courier (the bot button) or staff (closed in the dashboard, or the courier was disabled) */
   endedBy: 'courier' | 'staff' | null;
   activeOrders: number;
+  /** Cash of the shift: live until the reconciliation, fixed by it */
+  cash: ShiftCash & { received: number | null; discrepancy: number | null };
+  reconciledAt: string | null;
 }
 
 export type ShiftStart =
@@ -34,7 +43,8 @@ const INCLUDE = {
 /**
  * Courier shifts (docs/DELIVERY.md, "Смена"): the courier starts and ends one in the bot, the operator may
  * close it in the dashboard; a shift with unfinished orders cannot end. An ended shift waits for the cash
- * reconciliation (awaiting_reconciliation); the reconciliation itself is a later task.
+ * reconciliation (awaiting_reconciliation): the operator enters what they got once, the shift keeps the sum
+ * due, the sum received and the discrepancy (reconciled).
  */
 @Injectable()
 export class CourierShiftService {
@@ -112,7 +122,82 @@ export class CourierShiftService {
         r.status === 'open' ? this.activeOrders(r.courier_id) : 0,
       ),
     );
-    return rows.map((r, i) => toShiftView(r, counts[i]));
+    const cash = await this.cashOf(rows.map((r) => r.id));
+    return rows.map((r, i) => toShiftView(r, counts[i], cash.get(r.id)));
+  }
+
+  async get(organizationId: string, shiftId: string): Promise<ShiftView> {
+    const shift = await this.prisma.courier_shift.findFirst({
+      where: { id: shiftId, organization_id: organizationId },
+      include: INCLUDE,
+    });
+    if (!shift)
+      throw new AppException('not_found', { message: 'Shift not found' });
+    const active =
+      shift.status === 'open' ? await this.activeOrders(shift.courier_id) : 0;
+    const cash = await this.cashOf([shift.id]);
+    return toShiftView(shift, active, cash.get(shift.id));
+  }
+
+  /**
+   * The operator enters the cash they got from the courier, once per ended shift. "Due" is fixed at this
+   * moment; the discrepancy (received - due) stays in the shift and goes to the reports.
+   */
+  async reconcile(
+    organizationId: string,
+    shiftId: string,
+    received: number,
+    staffUserId: string,
+  ): Promise<ShiftView> {
+    const shift = await this.prisma.courier_shift.findFirst({
+      where: { id: shiftId, organization_id: organizationId },
+    });
+    if (!shift)
+      throw new AppException('not_found', { message: 'Shift not found' });
+    const { due } =
+      (await this.cashOf([shiftId])).get(shiftId) ?? shiftCash([]);
+    // Conditional: a second reconciliation (or two operators at once) changes nothing
+    const updated = await this.prisma.courier_shift.updateMany({
+      where: { id: shiftId, status: 'awaiting_reconciliation' },
+      data: {
+        status: 'reconciled',
+        cash_due: due,
+        cash_received: received,
+        cash_discrepancy: cashDiscrepancy(received, due),
+        reconciled_at: new Date(),
+        reconciled_by_user_id: staffUserId,
+      },
+    });
+    if (updated.count === 0)
+      throw new AppException('shift_not_awaiting_reconciliation', {
+        details: { status: shift.status },
+      });
+    return this.get(organizationId, shiftId);
+  }
+
+  /** Deliveries, cash due and card per shift, from the delivered orders of the shifts. */
+  private async cashOf(shiftIds: string[]): Promise<Map<string, ShiftCash>> {
+    const orders = shiftIds.length
+      ? await this.prisma.customer_order.findMany({
+          where: { courier_shift_id: { in: shiftIds }, status: 'completed' },
+          select: {
+            courier_shift_id: true,
+            status: true,
+            payment_method: true,
+            cash_collected: true,
+            total: true,
+          },
+        })
+      : [];
+    const byShift = new Map<string, ShiftOrder[]>();
+    for (const o of orders) {
+      const list = byShift.get(o.courier_shift_id!) ?? [];
+      list.push(o);
+      byShift.set(o.courier_shift_id!, list);
+    }
+    return new Map(
+      shiftIds.map((id) => [id, shiftCash(byShift.get(id) ?? [])]),
+    );
   }
 
   /** The operator closes a courier's shift in the dashboard. */
@@ -138,11 +223,7 @@ export class CourierShiftService {
       if (result.kind === 'ended')
         await this.tellClosedByStaff(organizationId, shift.courier_id);
     }
-    const fresh = await this.prisma.courier_shift.findUniqueOrThrow({
-      where: { id: shiftId },
-      include: INCLUDE,
-    });
-    return toShiftView(fresh, 0);
+    return this.get(organizationId, shiftId);
   }
 
   private async tellClosedByStaff(organizationId: string, courierId: string) {
@@ -182,7 +263,9 @@ export class CourierShiftService {
 function toShiftView(
   r: Prisma.courier_shiftGetPayload<{ include: typeof INCLUDE }>,
   activeOrders: number,
+  live: ShiftCash = shiftCash([]),
 ): ShiftView {
+  const reconciled = r.status === 'reconciled';
   return {
     id: r.id,
     courier: r.courier,
@@ -191,5 +274,12 @@ function toShiftView(
     endedAt: r.ended_at?.toISOString() ?? null,
     endedBy: (r.ended_by as 'courier' | 'staff' | null) ?? null,
     activeOrders,
+    cash: {
+      ...live,
+      due: reconciled ? (r.cash_due ?? live.due) : live.due,
+      received: reconciled ? r.cash_received : null,
+      discrepancy: reconciled ? r.cash_discrepancy : null,
+    },
+    reconciledAt: r.reconciled_at?.toISOString() ?? null,
   };
 }

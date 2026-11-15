@@ -338,6 +338,21 @@ model customer_order {
   courier_shift       courier_shift? @relation(fields: [courier_shift_id], references: [id], onDelete: SetNull)
   door_problem        DoorProblem?
   door_problem_reason String?
+  // Delivery timers start at these moments (docs/DELIVERY.md, "Напоминания")
+  ready_at            DateTime?
+  picked_up_at        DateTime?
+  door_problem_at     DateTime?
+  // Cash orders delivered by a courier: banknotes or a card to the courier
+  cash_collected      CashCollection?
+  // Courier pay accrued at delivery: straight-line km from the branch and the amount (null: no rate set)
+  courier_distance_km Float?
+  courier_pay         Int?
+  // Handed to an external service (handed_to_external): its name, what the venue paid it, when; for a cash
+  // order the operator marks later whether the venue got the money (null: not marked yet)
+  external_service       String?
+  external_cost          Int?
+  external_handed_at     DateTime?
+  external_cash_received Boolean?
 
   cancelled_by    OrderActor?
   cancel_reason   String?
@@ -372,6 +387,8 @@ model customer_order {
   @@index([customer_id, created_at])
   @@index([branch_id, status])
   @@index([courier_id, status])
+  @@index([courier_shift_id, status])
+  @@index([organization_id, external_handed_at])
 }
 
 model customer_order_item {
@@ -488,6 +505,12 @@ enum CourierMode {
   both
 }
 
+// How the guest paid a cash order at the door: banknotes (handed in at the shift end) or a card to the courier
+enum CashCollection {
+  cash
+  card
+}
+
 // Why a courier could not hand over at the door (problem_at_door)
 enum DoorProblem {
   no_answer
@@ -512,6 +535,18 @@ model organization_order_settings {
   payment_timeout_seconds    Int
   // Bir vaqtda faol buyurtmalar soni chegarasi (suiiste'moldan himoya)
   max_active_orders          Int
+
+  // Delivery timers (docs/DELIVERY.md): remind the courier and the operator when "picked up" is not pressed
+  // this long after "ready"; alert the operator when an order is on the way longer; wait at the door after
+  // "no answer", then the operator decides
+  pickup_reminder_minutes    Int
+  on_the_way_alert_minutes   Int
+  door_wait_minutes          Int
+  // Courier pay per delivery plus per started kilometre (straight line) over the included distance.
+  // All three null: no pay is accrued. A courier may have an own rate (courier.pay_*).
+  courier_pay_per_delivery   Int?
+  courier_pay_included_km    Float?
+  courier_pay_per_km         Int?
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -942,6 +977,10 @@ model courier {
   // Telegram language_code of the courier, for the bot texts (ru, uz, en)
   language_code   String?
   linked_at       DateTime?
+  // Own pay rate of the courier (all three set) instead of the venue's; null: the venue's rate
+  pay_per_delivery Int?
+  pay_included_km  Float?
+  pay_per_km       Int?
   disabled_at     DateTime?
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
@@ -991,6 +1030,13 @@ model courier_shift {
   // courier (the bot button) or staff (closed in the dashboard)
   ended_by        String?
   ended_by_user_id String?
+  // Cash reconciliation, once, by the operator: due = cash of the orders the courier delivered in the
+  // shift (fixed at reconciliation), received = what the operator got, discrepancy = received - due
+  cash_due         Int?
+  cash_received    Int?
+  cash_discrepancy Int?
+  reconciled_at    DateTime?
+  reconciled_by_user_id String?
   orders          customer_order[]
 
   @@index([organization_id, status])

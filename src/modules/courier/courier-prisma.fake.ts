@@ -3,8 +3,9 @@ import { Prisma } from '@prisma/client';
 
 /**
  * In-memory stand-in for the Prisma tables the courier services and OrderTransitionService use: couriers,
- * invitations, shifts, cards, orders and the order journal. `where` supports equality, null, `in`, `gt`
- * and `NOT`; `select` and most `include` return the whole row (the services read what they need).
+ * invitations, shifts, cards, orders, branches and the order journal. `where` supports equality, null, `in`,
+ * `not`, `gt`, `gte`, `lt` and `NOT`; `select` and most `include` return the whole row (the services read
+ * what they need).
  */
 type Row = Record<string, any>;
 
@@ -19,6 +20,11 @@ function matches(row: Row, where: Row = {}): boolean {
     if (cond !== null && typeof cond === 'object' && !(cond instanceof Date)) {
       if ('in' in cond && !cond.in.includes(value)) return false;
       if ('gt' in cond && !(value > cond.gt)) return false;
+      if ('gte' in cond && !(value >= cond.gte)) return false;
+      if ('lt' in cond && !(value < cond.lt)) return false;
+      if ('not' in cond)
+        if (cond.not === null ? value == null : value === cond.not)
+          return false;
       continue;
     }
     if (cond === null ? value != null : value !== cond) return false;
@@ -110,12 +116,34 @@ class Table {
       return this.update({ where: { id: existing.id }, data: args.update });
     return this.create({ data: args.create });
   };
+  /** groupBy over one field with _max of another, ordered by that _max (as the services use it). */
+  groupBy = async (args: Row) => {
+    const [by] = args.by as string[];
+    const [maxOf] = Object.keys(args._max ?? {});
+    const groups = new Map<unknown, Row>();
+    for (const r of this.rows.filter((row) => matches(row, args.where))) {
+      const g = groups.get(r[by]) ?? { [by]: r[by], _max: { [maxOf]: null } };
+      if (g._max[maxOf] === null || r[maxOf] > g._max[maxOf])
+        g._max[maxOf] = r[maxOf];
+      groups.set(r[by], g);
+    }
+    const out = [...groups.values()].sort((a, b) =>
+      a._max[maxOf] < b._max[maxOf]
+        ? 1
+        : a._max[maxOf] > b._max[maxOf]
+          ? -1
+          : 0,
+    );
+    return args.take ? out.slice(0, args.take) : out;
+  };
   get(id: string) {
     return this.rows.find((r) => r.id === id)!;
   }
 }
 
 export const FAKE_BRANCH_ID = '44444444-4444-4444-8444-444444444444';
+/** Where the fake branch stands (Tashkent): courier pay counts km from here */
+export const FAKE_BRANCH_POINT = { latitude: 41.311, longitude: 69.279 };
 
 export function makeCourierDb() {
   const organization = new Table();
@@ -155,6 +183,7 @@ export function makeCourierDb() {
       rows.some((r) => r.courier_id === row.courier_id && r.status === 'open'),
   );
   const courier_card = new Table(() => ({ updated_at: new Date() }));
+  const branch = new Table();
   const customer_order = new Table(() => ({
     version: 0,
     courier_id: null,
@@ -165,6 +194,17 @@ export function makeCourierDb() {
     payment_status: 'not_required',
     payment_method: 'cash',
     fulfillment: 'delivery',
+    total: 100_000,
+    cash_collected: null,
+    courier_pay: null,
+    courier_distance_km: null,
+    ready_at: null,
+    picked_up_at: null,
+    door_problem_at: null,
+    external_service: null,
+    external_cost: null,
+    external_handed_at: null,
+    external_cash_received: null,
   }));
   let eventId = 0;
   const order_status_event = new Table(() => ({ id: ++eventId }));
@@ -175,6 +215,7 @@ export function makeCourierDb() {
     courier_invitation,
     courier_shift,
     courier_card,
+    branch,
     customer_order,
     order_status_event,
     $transaction: async (arg: any) =>
@@ -226,6 +267,14 @@ export type CourierDb = ReturnType<typeof makeCourierDb>;
 /** A venue, a branch-less delivery order factory and couriers, ready for the bot and assignment specs. */
 export async function seedVenue(db: CourierDb, name = 'Mant') {
   const org = await db.organization.create({ data: { name } });
+  if (!db.branch.rows.some((b) => b.id === FAKE_BRANCH_ID))
+    await db.branch.create({
+      data: {
+        id: FAKE_BRANCH_ID,
+        organization_id: org.id,
+        ...FAKE_BRANCH_POINT,
+      },
+    });
   let number = 100;
   const order = (data: Row = {}) =>
     db.customer_order.create({

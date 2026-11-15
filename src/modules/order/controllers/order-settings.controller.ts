@@ -1,11 +1,14 @@
 import { Body, Controller, Get, Put, Req } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   requireStaffOrganizationId,
   type StaffRequest,
 } from 'src/infra/http/request-helpers';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
-import { UpdateOrderSettingsDto } from '../dto/order-settings.dto';
+import {
+  OrderSettingsViewDto,
+  UpdateOrderSettingsDto,
+} from '../dto/order-settings.dto';
 import { OrderSettingsService } from '../services/order-settings.service';
 import { RevalidateService } from 'src/modules/revalidate-queue/revalidate.service';
 import { StaffAccess } from 'src/modules/auth/access/staff-access.decorator';
@@ -28,6 +31,7 @@ export class OrderSettingsController {
   @ApiOperation({
     summary: 'Current ordering settings (the row is created at signup)',
   })
+  @ApiOkResponse({ type: OrderSettingsViewDto })
   get(@Req() req: StaffRequest) {
     return this.settings.get(requireStaffOrganizationId(req));
   }
@@ -37,6 +41,7 @@ export class OrderSettingsController {
   @ApiOperation({
     summary: "Sozlamalarni saqlash (faqat yuborilgan maydonlar o'zgaradi)",
   })
+  @ApiOkResponse({ type: OrderSettingsViewDto })
   async update(@Req() req: StaffRequest, @Body() dto: UpdateOrderSettingsDto) {
     const organizationId = requireStaffOrganizationId(req);
     const data = {
@@ -46,6 +51,15 @@ export class OrderSettingsController {
       acceptance_timeout_seconds: dto.acceptanceTimeoutSeconds,
       payment_timeout_seconds: dto.paymentTimeoutSeconds,
       max_active_orders: dto.maxActiveOrders,
+      pickup_reminder_minutes: dto.pickupReminderMinutes,
+      on_the_way_alert_minutes: dto.onTheWayAlertMinutes,
+      door_wait_minutes: dto.doorWaitMinutes,
+      // undefined: unchanged; null: no rate
+      ...(dto.courierPay !== undefined && {
+        courier_pay_per_delivery: dto.courierPay?.perDelivery ?? null,
+        courier_pay_included_km: dto.courierPay?.includedKm ?? null,
+        courier_pay_per_km: dto.courierPay?.perKm ?? null,
+      }),
     };
     await this.settings.get(organizationId); // settings_missing instead of a Prisma "not found"
     await this.prisma.organization_order_settings.update({

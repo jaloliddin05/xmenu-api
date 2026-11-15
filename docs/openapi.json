@@ -2662,6 +2662,101 @@
         "x-permission": "couriers"
       }
     },
+    "/couriers/pay-rates": {
+      "get": {
+        "operationId": "CourierController_payRates",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CourierPayRatesDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Courier pay rates (owner only): the venue's and each courier's own one",
+        "tags": [
+          "Couriers (staff)"
+        ],
+        "x-permission": "venue"
+      }
+    },
+    "/couriers/{id}/pay-rate": {
+      "put": {
+        "operationId": "CourierController_setPayRate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CourierPayRateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CourierPayRatesDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Set or remove (rate: null) the courier's own pay rate; later deliveries only",
+        "tags": [
+          "Couriers (staff)"
+        ],
+        "x-permission": "venue"
+      }
+    },
     "/couriers/{id}": {
       "patch": {
         "operationId": "CourierController_update",
@@ -2868,6 +2963,110 @@
         "x-permission": "shifts"
       }
     },
+    "/shifts/{id}": {
+      "get": {
+        "operationId": "CourierShiftController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShiftViewDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "One shift with its cash (the reconciliation screen)",
+        "tags": [
+          "Couriers (staff)"
+        ],
+        "x-permission": "shifts"
+      }
+    },
+    "/shifts/{id}/reconcile": {
+      "post": {
+        "operationId": "CourierShiftController_reconcile",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReconcileShiftDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShiftViewDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Enter the cash got from the courier, once per ended shift; 409 shift_not_awaiting_reconciliation",
+        "tags": [
+          "Couriers (staff)"
+        ],
+        "x-permission": "shifts"
+      }
+    },
     "/shifts/{id}/close": {
       "post": {
         "operationId": "CourierShiftController_close",
@@ -2913,6 +3112,120 @@
           "Couriers (staff)"
         ],
         "x-permission": "shifts"
+      }
+    },
+    "/order/{id}/external": {
+      "post": {
+        "operationId": "OrderCourierController_handToExternal",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HandToExternalDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffOrderViewDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Hand the order to an external service (accepted or ready, no own courier); the order closes as handed_to_external. 409 order_courier_assigned, order_status_conflict",
+        "tags": [
+          "Orders (staff)"
+        ],
+        "x-permission": "orders"
+      }
+    },
+    "/order/{id}/external-payment": {
+      "post": {
+        "operationId": "OrderCourierController_externalPayment",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExternalPaymentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffOrderViewDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "A cash order handed to an external service: did the venue get the money? Once; 409 external_payment_not_pending",
+        "tags": [
+          "Orders (staff)"
+        ],
+        "x-permission": "orders"
       }
     },
     "/order/{id}/courier": {
@@ -3011,6 +3324,47 @@
           }
         ],
         "summary": "Take the courier off the order until \"picked up\"",
+        "tags": [
+          "Orders (staff)"
+        ],
+        "x-permission": "orders"
+      }
+    },
+    "/external-services": {
+      "get": {
+        "operationId": "ExternalServiceController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Service names for the handover form, the most recent first (up to 20)",
         "tags": [
           "Orders (staff)"
         ],
@@ -3625,7 +3979,14 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderSettingsViewDto"
+                }
+              }
+            }
           },
           "default": {
             "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
@@ -3659,7 +4020,14 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderSettingsViewDto"
+                }
+              }
+            }
           },
           "default": {
             "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
@@ -6118,6 +6486,276 @@
         "x-permission": "staff"
       }
     },
+    "/reports/couriers": {
+      "get": {
+        "operationId": "ReportController_couriers",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "description": "Start of the period, inclusive (ISO 8601; the dashboard sends the local midnight)",
+            "schema": {
+              "example": "2026-11-01T00:00:00+05:00",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "description": "End of the period, exclusive; after from, at most 366 days later",
+            "schema": {
+              "example": "2026-12-01T00:00:00+05:00",
+              "type": "string"
+            }
+          },
+          {
+            "name": "format",
+            "required": false,
+            "in": "query",
+            "description": "csv: a file (UTF-8 with BOM, comma), column names in the request language (?lang or Accept-Language)",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "json",
+                "csv"
+              ]
+            }
+          },
+          {
+            "name": "lang",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ru",
+                "uz",
+                "en"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CourierReportDto"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "$ref": "#/components/schemas/CourierReportDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Couriers: deliveries, cash due, received, discrepancy, card, shift hours, accrued pay",
+        "tags": [
+          "Reports"
+        ],
+        "x-permission": "reports"
+      }
+    },
+    "/reports/external": {
+      "get": {
+        "operationId": "ReportController_external",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "description": "Start of the period, inclusive (ISO 8601; the dashboard sends the local midnight)",
+            "schema": {
+              "example": "2026-11-01T00:00:00+05:00",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "description": "End of the period, exclusive; after from, at most 366 days later",
+            "schema": {
+              "example": "2026-12-01T00:00:00+05:00",
+              "type": "string"
+            }
+          },
+          {
+            "name": "format",
+            "required": false,
+            "in": "query",
+            "description": "csv: a file (UTF-8 with BOM, comma), column names in the request language (?lang or Accept-Language)",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "json",
+                "csv"
+              ]
+            }
+          },
+          {
+            "name": "lang",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ru",
+                "uz",
+                "en"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExternalReportDto"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExternalReportDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "External services: orders handed over and costs per service",
+        "tags": [
+          "Reports"
+        ],
+        "x-permission": "reports"
+      }
+    },
+    "/reports/problems": {
+      "get": {
+        "operationId": "ReportController_problems",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "description": "Start of the period, inclusive (ISO 8601; the dashboard sends the local midnight)",
+            "schema": {
+              "example": "2026-11-01T00:00:00+05:00",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "description": "End of the period, exclusive; after from, at most 366 days later",
+            "schema": {
+              "example": "2026-12-01T00:00:00+05:00",
+              "type": "string"
+            }
+          },
+          {
+            "name": "format",
+            "required": false,
+            "in": "query",
+            "description": "csv: a file (UTF-8 with BOM, comma), column names in the request language (?lang or Accept-Language)",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "json",
+                "csv"
+              ]
+            }
+          },
+          {
+            "name": "lang",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ru",
+                "uz",
+                "en"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemReportDto"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemReportDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Problems of delivery orders: no answer, refusals, cannot deliver, returns, cancellations with reasons",
+        "tags": [
+          "Reports"
+        ],
+        "x-permission": "reports"
+      }
+    },
     "/translation": {
       "post": {
         "operationId": "TranslationController_create",
@@ -6270,6 +6908,9 @@
           "courier_phone_taken",
           "courier_inactive",
           "courier_not_on_shift",
+          "order_courier_assigned",
+          "shift_not_awaiting_reconciliation",
+          "external_payment_not_pending",
           "courier_has_active_orders",
           "delivery_unavailable_no_zone",
           "delivery_not_configured",
@@ -6548,7 +7189,8 @@
                 "branches.read",
                 "menu.read",
                 "venue",
-                "staff"
+                "staff",
+                "reports"
               ]
             }
           },
@@ -8374,6 +9016,103 @@
           "disabledAt"
         ]
       },
+      "PayRateDto": {
+        "type": "object",
+        "properties": {
+          "perDelivery": {
+            "type": "number",
+            "description": "Sum per delivery",
+            "example": 10000
+          },
+          "includedKm": {
+            "type": "number",
+            "description": "Km included in the rate",
+            "example": 3
+          },
+          "perKm": {
+            "type": "number",
+            "description": "Sum per started km over includedKm",
+            "example": 2000
+          }
+        },
+        "required": [
+          "perDelivery",
+          "includedKm",
+          "perKm"
+        ]
+      },
+      "CourierPayRateRowDto": {
+        "type": "object",
+        "properties": {
+          "courierId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "rate": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PayRateDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "courierId",
+          "name",
+          "isActive",
+          "rate"
+        ]
+      },
+      "CourierPayRatesDto": {
+        "type": "object",
+        "properties": {
+          "venue": {
+            "nullable": true,
+            "description": "The venue rate (PUT /order-settings courierPay); null: no pay accrued",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PayRateDto"
+              }
+            ]
+          },
+          "couriers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CourierPayRateRowDto"
+            }
+          }
+        },
+        "required": [
+          "venue",
+          "couriers"
+        ]
+      },
+      "CourierPayRateDto": {
+        "type": "object",
+        "properties": {
+          "rate": {
+            "nullable": true,
+            "description": "The courier's own rate; null: the venue's rate applies",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PayRateDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "rate"
+        ]
+      },
       "CreateCourierDto": {
         "type": "object",
         "properties": {
@@ -8438,6 +9177,40 @@
           "name"
         ]
       },
+      "ShiftCashDto": {
+        "type": "object",
+        "properties": {
+          "deliveries": {
+            "type": "number",
+            "description": "Orders the courier delivered in the shift"
+          },
+          "due": {
+            "type": "number",
+            "description": "Cash to hand in: delivered cash orders paid in banknotes; live until the reconciliation, then fixed"
+          },
+          "card": {
+            "type": "number",
+            "description": "Cash orders paid to the courier by card (not reconciled)"
+          },
+          "received": {
+            "type": "number",
+            "nullable": true,
+            "description": "What the operator got (reconciled only)"
+          },
+          "discrepancy": {
+            "type": "number",
+            "nullable": true,
+            "description": "received - due: negative when the courier handed in less (reconciled only)"
+          }
+        },
+        "required": [
+          "deliveries",
+          "due",
+          "card",
+          "received",
+          "discrepancy"
+        ]
+      },
       "ShiftViewDto": {
         "type": "object",
         "properties": {
@@ -8474,6 +9247,14 @@
           "activeOrders": {
             "type": "number",
             "description": "Unfinished orders on the courier (open shifts only)"
+          },
+          "cash": {
+            "$ref": "#/components/schemas/ShiftCashDto"
+          },
+          "reconciledAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
           }
         },
         "required": [
@@ -8483,19 +9264,41 @@
           "startedAt",
           "endedAt",
           "endedBy",
-          "activeOrders"
+          "activeOrders",
+          "cash",
+          "reconciledAt"
         ]
       },
-      "AssignCourierDto": {
+      "ReconcileShiftDto": {
         "type": "object",
         "properties": {
-          "courierId": {
-            "type": "string",
-            "description": "A courier of the venue who is on shift"
+          "received": {
+            "type": "number",
+            "description": "Cash the operator got from the courier",
+            "example": 250000
           }
         },
         "required": [
-          "courierId"
+          "received"
+        ]
+      },
+      "HandToExternalDto": {
+        "type": "object",
+        "properties": {
+          "service": {
+            "type": "string",
+            "example": "Yandex Go",
+            "maxLength": 100
+          },
+          "cost": {
+            "type": "number",
+            "description": "What the venue paid the service",
+            "example": 25000
+          }
+        },
+        "required": [
+          "service",
+          "cost"
         ]
       },
       "OrderBranchDto": {
@@ -8672,6 +9475,38 @@
           "id",
           "name",
           "phone"
+        ]
+      },
+      "OrderExternalDto": {
+        "type": "object",
+        "properties": {
+          "service": {
+            "type": "string"
+          },
+          "cost": {
+            "type": "number",
+            "description": "What the venue paid the service"
+          },
+          "handedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "cashReceived": {
+            "type": "boolean",
+            "nullable": true,
+            "description": "Cash orders: whether the venue got the money (POST /order/:id/external-payment); null: not marked yet, or not a cash order"
+          },
+          "paymentMarkPending": {
+            "type": "boolean",
+            "description": "A cash order still waits for the payment mark"
+          }
+        },
+        "required": [
+          "service",
+          "cost",
+          "handedAt",
+          "cashReceived",
+          "paymentMarkPending"
         ]
       },
       "OrderEventDto": {
@@ -8894,6 +9729,11 @@
             "nullable": true,
             "description": "problem_at_door: no_answer — the courier cannot reach the guest; refused — the guest refused"
           },
+          "externalService": {
+            "type": "string",
+            "nullable": true,
+            "description": "handed_to_external: the name of the external delivery service"
+          },
           "customer": {
             "$ref": "#/components/schemas/OrderCustomerDto"
           },
@@ -8906,6 +9746,41 @@
             "type": "string",
             "nullable": true,
             "description": "refused: changed_mind | wrong_order | quality | other"
+          },
+          "readyAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "pickedUpAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "\"Picked up\" pressed"
+          },
+          "doorWaitEndsAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "problem_at_door after \"no answer\": when the wait at the door is over (then the operator decides)"
+          },
+          "cashCollected": {
+            "type": "string",
+            "enum": [
+              "cash",
+              "card"
+            ],
+            "nullable": true,
+            "description": "Delivered cash orders: banknotes (handed in at the shift end) or a card to the courier"
+          },
+          "external": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OrderExternalDto"
+              }
+            ]
           },
           "events": {
             "type": "array",
@@ -8939,10 +9814,40 @@
           "cancelReason",
           "courier",
           "doorProblem",
+          "externalService",
           "customer",
           "courierAssignedAt",
           "doorProblemReason",
+          "readyAt",
+          "pickedUpAt",
+          "doorWaitEndsAt",
+          "cashCollected",
+          "external",
           "events"
+        ]
+      },
+      "ExternalPaymentDto": {
+        "type": "object",
+        "properties": {
+          "received": {
+            "type": "boolean",
+            "description": "Did the venue get the cash of the order?"
+          }
+        },
+        "required": [
+          "received"
+        ]
+      },
+      "AssignCourierDto": {
+        "type": "object",
+        "properties": {
+          "courierId": {
+            "type": "string",
+            "description": "A courier of the venue who is on shift"
+          }
+        },
+        "required": [
+          "courierId"
         ]
       },
       "OrderModifierDto": {
@@ -9204,6 +10109,11 @@
             ],
             "nullable": true,
             "description": "problem_at_door: no_answer — the courier cannot reach the guest; refused — the guest refused"
+          },
+          "externalService": {
+            "type": "string",
+            "nullable": true,
+            "description": "handed_to_external: the name of the external delivery service"
           }
         },
         "required": [
@@ -9230,7 +10140,8 @@
           "cancelledBy",
           "cancelReason",
           "courier",
-          "doorProblem"
+          "doorProblem",
+          "externalService"
         ]
       },
       "StaffOrderListDto": {
@@ -9280,6 +10191,69 @@
           "status"
         ]
       },
+      "OrderSettingsViewDto": {
+        "type": "object",
+        "properties": {
+          "minOrderPickup": {
+            "type": "number"
+          },
+          "deliveryPriceStep": {
+            "type": "number",
+            "enum": [
+              100,
+              500,
+              1000
+            ]
+          },
+          "courierMode": {
+            "type": "string",
+            "enum": [
+              "own",
+              "external",
+              "both"
+            ]
+          },
+          "acceptanceTimeoutSeconds": {
+            "type": "number"
+          },
+          "paymentTimeoutSeconds": {
+            "type": "number"
+          },
+          "maxActiveOrders": {
+            "type": "number"
+          },
+          "pickupReminderMinutes": {
+            "type": "number"
+          },
+          "onTheWayAlertMinutes": {
+            "type": "number"
+          },
+          "doorWaitMinutes": {
+            "type": "number"
+          },
+          "courierPay": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PayRateDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "minOrderPickup",
+          "deliveryPriceStep",
+          "courierMode",
+          "acceptanceTimeoutSeconds",
+          "paymentTimeoutSeconds",
+          "maxActiveOrders",
+          "pickupReminderMinutes",
+          "onTheWayAlertMinutes",
+          "doorWaitMinutes",
+          "courierPay"
+        ]
+      },
       "UpdateOrderSettingsDto": {
         "type": "object",
         "properties": {
@@ -9314,6 +10288,28 @@
           },
           "maxActiveOrders": {
             "type": "number"
+          },
+          "pickupReminderMinutes": {
+            "type": "number",
+            "description": "Remind the courier and the operator when \"picked up\" is not pressed this long after \"ready\" (minutes), 1..60"
+          },
+          "onTheWayAlertMinutes": {
+            "type": "number",
+            "description": "Alert the operator when an order is on the way longer (minutes), 10..480"
+          },
+          "doorWaitMinutes": {
+            "type": "number",
+            "description": "Wait at the door after \"no answer\", then the operator decides (minutes), 1..60"
+          },
+          "courierPay": {
+            "nullable": true,
+            "description": "Courier pay rate of the venue; null removes it (no pay accrued)",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PayRateDto"
+              }
+            ]
           }
         }
       },
@@ -11213,6 +12209,348 @@
         "required": [
           "phone",
           "first_name"
+        ]
+      },
+      "CourierReportRowDto": {
+        "type": "object",
+        "properties": {
+          "shifts": {
+            "type": "number",
+            "description": "Shifts started in the period"
+          },
+          "hours": {
+            "type": "number",
+            "description": "Shift hours; an open shift counts until now"
+          },
+          "deliveries": {
+            "type": "number"
+          },
+          "cashDue": {
+            "type": "number",
+            "description": "Cash to hand in: delivered cash orders paid in banknotes (fixed at the reconciliation)"
+          },
+          "cashReceived": {
+            "type": "number",
+            "description": "Received by the operator (reconciled shifts)"
+          },
+          "discrepancy": {
+            "type": "number",
+            "description": "received - due of reconciled shifts; negative: handed in less"
+          },
+          "card": {
+            "type": "number",
+            "description": "Cash orders paid to the courier by card"
+          },
+          "pay": {
+            "type": "number",
+            "description": "Accrued courier pay (fixed in each order)"
+          },
+          "unreconciledShifts": {
+            "type": "number",
+            "description": "Ended shifts waiting for the reconciliation"
+          },
+          "courierId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "shifts",
+          "hours",
+          "deliveries",
+          "cashDue",
+          "cashReceived",
+          "discrepancy",
+          "card",
+          "pay",
+          "unreconciledShifts",
+          "courierId",
+          "name"
+        ]
+      },
+      "CourierReportTotalsDto": {
+        "type": "object",
+        "properties": {
+          "shifts": {
+            "type": "number",
+            "description": "Shifts started in the period"
+          },
+          "hours": {
+            "type": "number",
+            "description": "Shift hours; an open shift counts until now"
+          },
+          "deliveries": {
+            "type": "number"
+          },
+          "cashDue": {
+            "type": "number",
+            "description": "Cash to hand in: delivered cash orders paid in banknotes (fixed at the reconciliation)"
+          },
+          "cashReceived": {
+            "type": "number",
+            "description": "Received by the operator (reconciled shifts)"
+          },
+          "discrepancy": {
+            "type": "number",
+            "description": "received - due of reconciled shifts; negative: handed in less"
+          },
+          "card": {
+            "type": "number",
+            "description": "Cash orders paid to the courier by card"
+          },
+          "pay": {
+            "type": "number",
+            "description": "Accrued courier pay (fixed in each order)"
+          },
+          "unreconciledShifts": {
+            "type": "number",
+            "description": "Ended shifts waiting for the reconciliation"
+          }
+        },
+        "required": [
+          "shifts",
+          "hours",
+          "deliveries",
+          "cashDue",
+          "cashReceived",
+          "discrepancy",
+          "card",
+          "pay",
+          "unreconciledShifts"
+        ]
+      },
+      "CourierReportDto": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "to": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CourierReportRowDto"
+            }
+          },
+          "total": {
+            "$ref": "#/components/schemas/CourierReportTotalsDto"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "rows",
+          "total"
+        ]
+      },
+      "ExternalReportRowDto": {
+        "type": "object",
+        "properties": {
+          "orders": {
+            "type": "number"
+          },
+          "cost": {
+            "type": "number",
+            "description": "What the venue paid the services"
+          },
+          "cashReceived": {
+            "type": "number",
+            "description": "Cash orders: the venue got the money (sum)"
+          },
+          "cashNotReceived": {
+            "type": "number",
+            "description": "Cash orders: the venue did not get it (sum)"
+          },
+          "cashUnmarked": {
+            "type": "number",
+            "description": "Cash orders not marked yet (sum)"
+          },
+          "service": {
+            "type": "string",
+            "description": "The latest spelling of the name"
+          }
+        },
+        "required": [
+          "orders",
+          "cost",
+          "cashReceived",
+          "cashNotReceived",
+          "cashUnmarked",
+          "service"
+        ]
+      },
+      "ExternalReportTotalsDto": {
+        "type": "object",
+        "properties": {
+          "orders": {
+            "type": "number"
+          },
+          "cost": {
+            "type": "number",
+            "description": "What the venue paid the services"
+          },
+          "cashReceived": {
+            "type": "number",
+            "description": "Cash orders: the venue got the money (sum)"
+          },
+          "cashNotReceived": {
+            "type": "number",
+            "description": "Cash orders: the venue did not get it (sum)"
+          },
+          "cashUnmarked": {
+            "type": "number",
+            "description": "Cash orders not marked yet (sum)"
+          }
+        },
+        "required": [
+          "orders",
+          "cost",
+          "cashReceived",
+          "cashNotReceived",
+          "cashUnmarked"
+        ]
+      },
+      "ExternalReportDto": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "to": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExternalReportRowDto"
+            }
+          },
+          "total": {
+            "$ref": "#/components/schemas/ExternalReportTotalsDto"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "rows",
+          "total"
+        ]
+      },
+      "ProblemCountsDto": {
+        "type": "object",
+        "properties": {
+          "noAnswer": {
+            "type": "number"
+          },
+          "refused": {
+            "type": "number"
+          },
+          "cannotDeliver": {
+            "type": "number"
+          },
+          "returned": {
+            "type": "number"
+          },
+          "cancelled": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "noAnswer",
+          "refused",
+          "cannotDeliver",
+          "returned",
+          "cancelled"
+        ]
+      },
+      "RefusedReasonDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "enum": [
+              "changed_mind",
+              "wrong_order",
+              "quality",
+              "other"
+            ]
+          },
+          "count": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "reason",
+          "count"
+        ]
+      },
+      "CancelReasonDto": {
+        "type": "object",
+        "properties": {
+          "by": {
+            "type": "string",
+            "enum": [
+              "customer",
+              "restaurant",
+              "system"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true,
+            "description": "As entered by the operator, or a system code (no_response)"
+          },
+          "count": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "by",
+          "reason",
+          "count"
+        ]
+      },
+      "ProblemReportDto": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "to": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/ProblemCountsDto"
+          },
+          "refusedReasons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RefusedReasonDto"
+            }
+          },
+          "cancelReasons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CancelReasonDto"
+            }
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "counts",
+          "refusedReasons",
+          "cancelReasons"
         ]
       },
       "TranslationDto": {

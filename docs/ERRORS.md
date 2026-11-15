@@ -68,6 +68,9 @@
 | `courier_phone_taken` | 409 | У заведения уже есть курьер с этим телефоном | — |
 | `courier_inactive` | 409 | Курьер отключён: назначить, пригласить или изменить его нельзя | — |
 | `courier_not_on_shift` | 409 | Назначить заказ можно только курьеру на смене | — |
+| `order_courier_assigned` | 409 | Передать заказ внешней службе можно только без своего курьера: сначала снять его | — |
+| `shift_not_awaiting_reconciliation` | 409 | Сверить наличные можно один раз и только у закончившейся смены (`awaiting_reconciliation`); `details.status` — статус смены сейчас | `details.status` |
+| `external_payment_not_pending` | 409 | Отметить оплату можно один раз и только у переданного внешней службе заказа с наличными | — |
 | `courier_has_active_orders` | 409 | Закрыть смену нельзя, пока на курьере есть незавершённые заказы; `details.activeOrders` | `details.activeOrders` |
 | ~~`delivery_unavailable_no_zone`~~ устарел → `delivery_not_configured` | 422 | У заведения не нарисована зона доставки | — |
 | `delivery_not_configured` | 422 | Ни у одного филиала с доставкой нет правил стоимости (зон или правила по расстоянию) | — |

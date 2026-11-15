@@ -18,6 +18,18 @@ model organization_order_settings {
   // Bir vaqtda faol buyurtmalar soni chegarasi (suiiste'moldan himoya)
   max_active_orders          Int
 
+  // Delivery timers (docs/DELIVERY.md): remind the courier and the operator when "picked up" is not pressed
+  // this long after "ready"; alert the operator when an order is on the way longer; wait at the door after
+  // "no answer", then the operator decides
+  pickup_reminder_minutes    Int
+  on_the_way_alert_minutes   Int
+  door_wait_minutes          Int
+  // Courier pay per delivery plus per started kilometre (straight line) over the included distance.
+  // All three null: no pay is accrued. A courier may have an own rate (courier.pay_*).
+  courier_pay_per_delivery   Int?
+  courier_pay_included_km    Float?
+  courier_pay_per_km         Int?
+
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 }

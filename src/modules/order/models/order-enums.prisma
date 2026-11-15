@@ -60,6 +60,12 @@ enum CourierMode {
   both
 }
 
+// How the guest paid a cash order at the door: banknotes (handed in at the shift end) or a card to the courier
+enum CashCollection {
+  cash
+  card
+}
+
 // Why a courier could not hand over at the door (problem_at_door)
 enum DoorProblem {
   no_answer

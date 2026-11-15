@@ -347,6 +347,12 @@ export class CourierBotService {
         return this.move(c, order.id, { to: 'on_the_way' });
       case 'delivered':
         return this.move(c, order.id, { to: 'completed', note: 'delivered' });
+      case 'delivered_card':
+        return this.move(c, order.id, {
+          to: 'completed',
+          note: 'delivered_card',
+          cashCollected: 'card',
+        });
       case 'no_answer':
         return this.move(c, order.id, {
           to: 'problem_at_door',
@@ -379,7 +385,10 @@ export class CourierBotService {
   private async move(
     c: courier,
     orderId: string,
-    step: Pick<TransitionInput, 'to' | 'doorProblem' | 'note'>,
+    step: Pick<
+      TransitionInput,
+      'to' | 'doorProblem' | 'note' | 'cashCollected'
+    >,
   ): Promise<Answer> {
     try {
       await this.transitions.transition({

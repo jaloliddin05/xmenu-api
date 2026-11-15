@@ -44,6 +44,7 @@ export interface CourierTexts {
   pickedUp: string;
   pickedUpAll: (n: number) => string;
   deliveredCash: string;
+  deliveredCard: string;
   delivered: string;
   noAnswer: string;
   refused: string;
@@ -58,6 +59,9 @@ export interface CourierTexts {
   notAvailable: string;
   // short events
   unassigned: (n: number) => string;
+  // delivery timers
+  pickupReminder: (n: number) => string;
+  doorWaitOver: (n: number) => string;
 }
 
 export type CourierCardStatus =
@@ -132,6 +136,7 @@ export const COURIER_TEXTS: Record<CourierLang, CourierTexts> = {
     pickedUp: '📦 Забрал',
     pickedUpAll: (n) => `📦 Забрал все (${n})`,
     deliveredCash: '✅ Доставил, деньги получены',
+    deliveredCard: '💳 Доставил, оплачено картой',
     delivered: '✅ Доставил',
     noAnswer: '📵 Не дозвонился',
     refused: '🚫 Отказ гостя',
@@ -149,6 +154,10 @@ export const COURIER_TEXTS: Record<CourierLang, CourierTexts> = {
     notYours: 'Это не ваш заказ',
     notAvailable: 'Сейчас это действие недоступно',
     unassigned: (n) => `Заказ №${n} снят с вас`,
+    pickupReminder: (n) =>
+      `⏰ Заказ №${n} готов и ждёт вас. Заберите его и нажмите «Забрал».`,
+    doorWaitOver: (n) =>
+      `⌛ Заказ №${n}: время ожидания у двери вышло. Оператор решит, вернуть заказ или отменить; если гость ответил, нажмите «Доставил».`,
   },
   uz: {
     startShift: '▶️ Smenani boshlash',
@@ -201,6 +210,7 @@ export const COURIER_TEXTS: Record<CourierLang, CourierTexts> = {
     pickedUp: '📦 Oldim',
     pickedUpAll: (n) => `📦 Hammasini oldim (${n})`,
     deliveredCash: '✅ Yetkazdim, pul olindi',
+    deliveredCard: '💳 Yetkazdim, karta bilan to‘landi',
     delivered: '✅ Yetkazdim',
     noAnswer: '📵 Javob bermadi',
     refused: '🚫 Mijoz rad etdi',
@@ -218,6 +228,10 @@ export const COURIER_TEXTS: Record<CourierLang, CourierTexts> = {
     notYours: 'Bu sizning buyurtmangiz emas',
     notAvailable: 'Hozir bu amal mavjud emas',
     unassigned: (n) => `№${n} buyurtma sizdan olindi`,
+    pickupReminder: (n) =>
+      `⏰ №${n} buyurtma tayyor va sizni kutmoqda. Uni olib, «Oldim» tugmasini bosing.`,
+    doorWaitOver: (n) =>
+      `⌛ №${n} buyurtma: eshik oldida kutish vaqti tugadi. Operator buyurtmani qaytarish yoki bekor qilishni hal qiladi; mehmon javob bersa, «Yetkazdim» tugmasini bosing.`,
   },
   en: {
     startShift: '▶️ Start shift',
@@ -270,6 +284,7 @@ export const COURIER_TEXTS: Record<CourierLang, CourierTexts> = {
     pickedUp: '📦 Picked up',
     pickedUpAll: (n) => `📦 Picked up all (${n})`,
     deliveredCash: '✅ Delivered, cash received',
+    deliveredCard: '💳 Delivered, paid by card',
     delivered: '✅ Delivered',
     noAnswer: '📵 No answer',
     refused: '🚫 Guest refused',
@@ -287,6 +302,10 @@ export const COURIER_TEXTS: Record<CourierLang, CourierTexts> = {
     notYours: 'This is not your order',
     notAvailable: 'This action is not available now',
     unassigned: (n) => `Order #${n} was taken off you`,
+    pickupReminder: (n) =>
+      `⏰ Order #${n} is ready and waiting for you. Pick it up and press "Picked up".`,
+    doorWaitOver: (n) =>
+      `⌛ Order #${n}: the waiting time at the door is over. The operator will decide to return or cancel it; if the guest answered, press "Delivered".`,
   },
 };
 

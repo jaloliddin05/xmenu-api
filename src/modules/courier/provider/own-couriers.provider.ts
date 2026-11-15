@@ -71,7 +71,11 @@ export class OwnCouriersProvider implements DeliveryProvider {
         organization_id: organizationId,
         fulfillment: 'delivery',
       },
-      select: { status: true, courier: { select: { id: true, name: true } } },
+      select: {
+        status: true,
+        external_service: true,
+        courier: { select: { id: true, name: true } },
+      },
     });
     if (!order) throw new AppException('order_not_found');
     const status = order.status as OrderStatusName;
@@ -79,6 +83,7 @@ export class OwnCouriersProvider implements DeliveryProvider {
       provider: this.kind,
       stage: stageOf(status, Boolean(order.courier)),
       courier: order.courier,
+      externalService: order.external_service,
       orderStatus: status,
     };
   }

@@ -10,6 +10,12 @@ const ROW = {
   acceptance_timeout_seconds: 300,
   payment_timeout_seconds: 900,
   max_active_orders: 3,
+  pickup_reminder_minutes: 5,
+  on_the_way_alert_minutes: 60,
+  door_wait_minutes: 10,
+  courier_pay_per_delivery: 10000 as number | null,
+  courier_pay_included_km: 3 as number | null,
+  courier_pay_per_km: 2000 as number | null,
 };
 
 describe('OrderSettingsService.get', () => {
@@ -38,7 +44,16 @@ describe('OrderSettingsService.get', () => {
       acceptanceTimeoutSeconds: 300,
       paymentTimeoutSeconds: 900,
       maxActiveOrders: 3,
+      pickupReminderMinutes: 5,
+      onTheWayAlertMinutes: 60,
+      doorWaitMinutes: 10,
+      courierPay: { perDelivery: 10000, includedKm: 3, perKm: 2000 },
     });
+  });
+
+  it('a courier pay rate with any part missing is no rate', async () => {
+    rows['org-1'].courier_pay_per_km = null;
+    expect((await service.get('org-1')).courierPay).toBeNull();
   });
 
   it('refuses a venue without its settings row instead of substituting defaults', async () => {

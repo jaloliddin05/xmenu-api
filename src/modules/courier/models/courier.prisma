@@ -15,6 +15,10 @@ model courier {
   // Telegram language_code of the courier, for the bot texts (ru, uz, en)
   language_code   String?
   linked_at       DateTime?
+  // Own pay rate of the courier (all three set) instead of the venue's; null: the venue's rate
+  pay_per_delivery Int?
+  pay_included_km  Float?
+  pay_per_km       Int?
   disabled_at     DateTime?
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
@@ -64,6 +68,13 @@ model courier_shift {
   // courier (the bot button) or staff (closed in the dashboard)
   ended_by        String?
   ended_by_user_id String?
+  // Cash reconciliation, once, by the operator: due = cash of the orders the courier delivered in the
+  // shift (fixed at reconciliation), received = what the operator got, discrepancy = received - due
+  cash_due         Int?
+  cash_received    Int?
+  cash_discrepancy Int?
+  reconciled_at    DateTime?
+  reconciled_by_user_id String?
   orders          customer_order[]
 
   @@index([organization_id, status])

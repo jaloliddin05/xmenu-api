@@ -350,6 +350,22 @@ export const ERROR_CODES = spec({
     message: 'The courier is not on shift',
     when: 'Назначить заказ можно только курьеру на смене',
   },
+  order_courier_assigned: {
+    status: 409,
+    message: 'A courier is assigned to the order',
+    when: 'Передать заказ внешней службе можно только без своего курьера: сначала снять его',
+  },
+  shift_not_awaiting_reconciliation: {
+    status: 409,
+    message: 'The shift does not wait for reconciliation',
+    when: 'Сверить наличные можно один раз и только у закончившейся смены (`awaiting_reconciliation`); `details.status` — статус смены сейчас',
+    details: ['status'],
+  },
+  external_payment_not_pending: {
+    status: 409,
+    message: 'No payment mark is pending for the order',
+    when: 'Отметить оплату можно один раз и только у переданного внешней службе заказа с наличными',
+  },
   courier_has_active_orders: {
     status: 409,
     message: 'The courier has unfinished orders',

@@ -126,13 +126,15 @@ Webhook'и Click/Payme переводят заказ `awaiting_payment → pendi
   "currency": "UZS", "subtotal": 97000, "deliveryFee": 16000, "discount": 0, "total": 113000,
   "cashChangeFrom": null,
   "cancelledBy": null, "cancelReason": null,
-  "courier": null, "doorProblem": null
+  "courier": null, "doorProblem": null, "externalService": null
 }
 ```
 
 `courier`: `{ "name": "Bekzod" }`, пока свой курьер везёт заказ (`on_the_way`, `problem_at_door`), иначе `null`;
 телефона курьера гость не получает. `doorProblem`: `no_answer` (курьер у двери и не может дозвониться; таймлайн:
 «Курьер у двери и не может до вас дозвониться») или `refused` (гость отказался; решает оператор), иначе `null`.
+`externalService`: название службы у заказа `handed_to_external` («Передан в службу доставки <название>»), иначе
+`null`.
 
 Позиции, адрес, `branch`, названия и цены — **снимок на момент заказа**: заказ не
 должен меняться, если меню или адрес потом отредактируют.
@@ -233,7 +235,7 @@ cash ─────────────────────▶ pending_
 | POST | `/order/:id/status` `{status}` | `accepted`, `preparing`, `ready`, `completed` (самовывоз), `returned_to_restaurant` (решение по проблеме у двери), если машина состояний разрешает |
 | PUT | `/order/:id/courier` `{courierId}` | назначить или переназначить курьера на смене до «Забрал» (`docs/API.md`, «Курьеры») |
 | DELETE | `/order/:id/courier` | снять курьера до «Забрал» |
-| GET/PUT | `/order-settings` | минимум самовывоза, шаг округления цены доставки, способ доставки, таймауты |
+| GET/PUT | `/order-settings` | минимум самовывоза, шаг округления цены доставки, способ доставки, таймауты, напоминания доставки, ставка курьерам |
 | GET/PUT | `/branch/:id/delivery-pricing` | правила цены доставки филиала (`API.md`, «Стоимость доставки») |
 | GET/PUT | `/payment-provider[/:provider]` | ключи Click/Payme (хранятся зашифрованно) |
 
@@ -241,10 +243,12 @@ cash ─────────────────────▶ pending_
 филиала (`POST /telegram/orders/webhook`); у доставки там одна кнопка «Готов».
 
 В ответе персоналу дополнительно: `courier` `{ id, name, phone } | null` (назначенный сейчас, в любом статусе),
-`courierAssignedAt`, `doorProblemReason` (`changed_mind | wrong_order | quality | other` при `refused`) и в журнале
+`courierAssignedAt`, `doorProblemReason` (`changed_mind | wrong_order | quality | other` при `refused`), `readyAt`,
+`pickedUpAt`, `doorWaitEndsAt`, `cashCollected` (`cash | card`), `external` (передача службе; `API.md`, «Курьеры») и в журнале
 `events[]` исполнитель `courier` (с `actorId` = id курьера) и записи без смены статуса (`from = to`, `note`:
-`courier_assigned:<id>`, `courier_reassigned:<id>`, `courier_unassigned:<id>`; `courier_disabled:<id>` у перехода
-`on_the_way → ready` от `system`).
+`courier_assigned:<id>`, `courier_reassigned:<id>`, `courier_unassigned:<id>`, `external_cash_received`,
+`external_cash_not_received`; `courier_disabled:<id>` у перехода `on_the_way → ready` от `system`; `delivered_card` у
+доставки, оплаченной курьеру картой).
 
 ## Проверка сценариев без бэкенда
 

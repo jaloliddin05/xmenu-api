@@ -20,6 +20,8 @@ export type CourierAction =
   | { a: 'pick'; orderId: string }
   | { a: 'pick_all'; branchId: string }
   | { a: 'delivered'; orderId: string }
+  /** Delivered a cash order, the guest paid the courier by card */
+  | { a: 'delivered_card'; orderId: string }
   | { a: 'no_answer'; orderId: string }
   | { a: 'refuse_menu'; orderId: string }
   | { a: 'refused'; orderId: string; reason: RefuseReason }
@@ -30,6 +32,7 @@ const CODES = {
   pick: 'pk',
   pick_all: 'pa',
   delivered: 'dl',
+  delivered_card: 'dc',
   no_answer: 'na',
   refuse_menu: 'rm',
   refused: 'rf',
@@ -238,10 +241,19 @@ function keyboardFor(
     callback_data: encodeCourierAction(action),
   });
   const id = order.id;
-  const deliveredBtn = btn(
-    order.paymentMethod === 'cash' ? t.deliveredCash : t.delivered,
-    { a: 'delivered', orderId: id },
-  );
+  const cash = order.paymentMethod === 'cash';
+  // A cash order: banknotes (handed in at the shift end) or a card to the courier
+  const deliveredRows: InlineButton[][] = [
+    [
+      btn(cash ? t.deliveredCash : t.delivered, {
+        a: 'delivered',
+        orderId: id,
+      }),
+    ],
+    ...(cash
+      ? [[btn(t.deliveredCard, { a: 'delivered_card', orderId: id })]]
+      : []),
+  ];
 
   if (status === 'ready') {
     const rows = [[btn(t.pickedUp, { a: 'pick', orderId: id })]];
@@ -267,7 +279,7 @@ function keyboardFor(
   if (status === 'on_the_way') {
     return {
       inline_keyboard: [
-        [deliveredBtn],
+        ...deliveredRows,
         [
           btn(t.noAnswer, { a: 'no_answer', orderId: id }),
           btn(t.refused, { a: 'refuse_menu', orderId: id }),
@@ -277,6 +289,6 @@ function keyboardFor(
     };
   }
   // "No answer": the guest may still answer; "refused" waits for the operator only
-  if (status === 'no_answer') return { inline_keyboard: [[deliveredBtn]] };
+  if (status === 'no_answer') return { inline_keyboard: deliveredRows };
   return null;
 }

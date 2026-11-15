@@ -14,6 +14,7 @@ export interface CustomerTexts {
   readyForCourier: (n: number) => string;
   courierAtDoor: (n: number) => string;
   returned: (n: number) => string;
+  handedToExternal: (n: number, service: string) => string;
   completed: (n: number) => string;
   cancelledByVenue: (n: number) => string;
   refundNote: string;
@@ -33,6 +34,7 @@ export const CUSTOMER_TEXTS: Record<Lang, CustomerTexts> = {
     courierAtDoor: (n) =>
       `📵 Курьер у двери с заказом №${n} и не может до вас дозвониться`,
     returned: (n) => `↩️ Заказ №${n} возвращён в ресторан`,
+    handedToExternal: (n, s) => `🚕 Заказ №${n} передан в службу доставки ${s}`,
     completed: (n) => `🎉 Заказ №${n} выполнен. Приятного аппетита!`,
     cancelledByVenue: (n) => `😔 Заказ №${n} отменён рестораном.`,
     refundNote: 'Деньги за заказ вернутся на ваш счёт.',
@@ -50,6 +52,8 @@ export const CUSTOMER_TEXTS: Record<Lang, CustomerTexts> = {
     courierAtDoor: (n) =>
       `📵 Kuryer №${n} buyurtma bilan eshik oldida, sizga qo'ng'iroq qila olmayapti`,
     returned: (n) => `↩️ №${n} buyurtma restoranga qaytarildi`,
+    handedToExternal: (n, s) =>
+      `🚕 №${n} buyurtma ${s} yetkazib berish xizmatiga topshirildi`,
     completed: (n) => `🎉 №${n} buyurtma bajarildi. Yoqimli ishtaha!`,
     cancelledByVenue: (n) =>
       `😔 №${n} buyurtma restoran tomonidan bekor qilindi.`,
@@ -69,6 +73,8 @@ export const CUSTOMER_TEXTS: Record<Lang, CustomerTexts> = {
     courierAtDoor: (n) =>
       `📵 The courier is at your door with order #${n} and cannot reach you`,
     returned: (n) => `↩️ Order #${n} was returned to the restaurant`,
+    handedToExternal: (n, s) =>
+      `🚕 Order #${n} was handed to the delivery service ${s}`,
     completed: (n) => `🎉 Order #${n} is completed. Enjoy your meal!`,
     cancelledByVenue: (n) => `😔 Order #${n} was cancelled by the restaurant.`,
     refundNote: 'The money for the order will be returned to your account.',

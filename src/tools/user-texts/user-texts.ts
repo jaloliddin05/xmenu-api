@@ -26,6 +26,7 @@ export const BOT_TEXT_FILES = [
   'src/modules/telegram/domain/bot-profile.ts',
   'src/modules/auth/services/customer-otp.service.ts',
   'src/modules/courier/domain/courier-texts.ts',
+  'src/modules/report/domain/report-csv.ts',
 ];
 
 /**

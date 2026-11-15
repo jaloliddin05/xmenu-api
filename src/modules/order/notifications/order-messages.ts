@@ -164,7 +164,9 @@ export function buildCustomerText(
     OrderWithItems,
     'number' | 'status' | 'payment_method' | 'payment_status' | 'cancelled_by'
   > &
-    Partial<Pick<OrderWithItems, 'fulfillment' | 'door_problem'>>,
+    Partial<
+      Pick<OrderWithItems, 'fulfillment' | 'door_problem' | 'external_service'>
+    >,
   from: OrderStatusName | null,
   lang: Lang = 'ru',
   courierName: string | null = null,
@@ -179,7 +181,7 @@ export function buildCustomerText(
     case 'preparing':
       return t.preparing(n);
     case 'on_the_way':
-      return courierName ? t.onTheWayWith(n, courierName) : t.onTheWay(n);
+      return courierName ? t.onTheWayWith(n, esc(courierName)) : t.onTheWay(n);
     case 'ready':
       if (order.fulfillment !== 'delivery') return t.ready(n);
       // "Cannot deliver" puts the order back to ready: the guest does not need that step again
@@ -188,6 +190,8 @@ export function buildCustomerText(
       return order.door_problem === 'no_answer' ? t.courierAtDoor(n) : null;
     case 'returned_to_restaurant':
       return t.returned(n);
+    case 'handed_to_external':
+      return t.handedToExternal(n, esc(order.external_service ?? ''));
     case 'completed':
       return t.completed(n);
     case 'cancelled': {
@@ -219,5 +223,27 @@ export function buildDeliveryAlertText(
       return `🚫 <b>Заказ №${number}: гость отказался от заказа${who}.</b>\nВерните заказ в ресторан или отмените его.`;
     case 'cannot_deliver':
       return `⚠️ <b>Срочно: заказ №${number} снова готов и без курьера${who}.</b>\nНазначьте другого курьера.`;
+  }
+}
+
+/** A delivery timer ran out (domain/delivery-timers.ts): what the branch chat is told. */
+export function buildDeliveryTimerText(
+  number: number,
+  kind: 'pickup' | 'road' | 'door',
+  courierName: string | null,
+): string {
+  const who = courierName ? ` (курьер ${esc(courierName)})` : '';
+  switch (kind) {
+    case 'pickup':
+      return courierName
+        ? `⏰ <b>Заказ №${number} готов, но курьер его ещё не забрал${who}.</b>`
+        : `⏰ <b>Заказ №${number} готов и ждёт курьера.</b>
+Назначьте курьера или передайте заказ внешней службе.`;
+    case 'road':
+      return `🕐 <b>Заказ №${number} долго в пути${who}.</b>
+Свяжитесь с курьером.`;
+    case 'door':
+      return `⌛ <b>Заказ №${number}: время ожидания у двери вышло${who}.</b>
+Верните заказ в ресторан или отмените его.`;
   }
 }

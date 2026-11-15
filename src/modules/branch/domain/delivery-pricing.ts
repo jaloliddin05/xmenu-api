@@ -91,7 +91,7 @@ export function distanceKm(a: LatLng, b: LatLng): number {
 }
 
 // Float noise must not start a kilometre or push an address over max_km (2.0000000001 km is 2 km)
-const KM_EPSILON = 1e-9;
+export const KM_EPSILON = 1e-9;
 
 /** The rule that prices this address, or null when the branch does not deliver there. */
 export type DeliveryRate =
