@@ -19,6 +19,14 @@ import {
 import { parseTenantId } from 'src/modules/tenant/tenant-key';
 import { AppException } from 'src/infra/errors/app-exception';
 
+/** The user who signs the venue up and becomes its owner. */
+export interface StaffOwner {
+  id: string;
+  phone: string;
+  first_name: string | null;
+  last_name: string | null;
+}
+
 const slugTaken = () =>
   new AppException('slug_taken', { message: 'Slug is already taken' });
 
@@ -32,15 +40,19 @@ export class OrganizationService {
     private readonly botProfile: TelegramBotProfileService,
   ) {}
 
+  /** Creates the venue with its owner row in organization_member (role owner, active). */
   async create(
     data: CreateOrganizationDto,
-    owner_id: string,
+    owner: StaffOwner,
     tx?: Prisma.TransactionClient,
   ) {
     const db = tx ?? this.prismaService;
-    const existingOrg = await db.organization.findUnique({
-      where: { owner_id },
-    });
+    const existingOrg = (
+      await db.organization_member.findUnique({
+        where: { user_id: owner.id },
+        include: { organization: true },
+      })
+    )?.organization;
 
     const type = parseOrganizationType(data.type as string);
     const slug = await this.generateUniqueSlug(data.name, existingOrg?.id, tx);
@@ -71,7 +83,17 @@ export class OrganizationService {
         ...data,
         slug,
         type,
-        owner_id,
+        members: {
+          create: {
+            user_id: owner.id,
+            role: 'owner',
+            status: 'active',
+            phone: owner.phone,
+            first_name: owner.first_name ?? '',
+            last_name: owner.last_name,
+            activated_at: new Date(),
+          },
+        },
         ...PLATFORM_CHANNELS,
         // Settings rows always exist; readers never substitute missing values (platform-defaults.ts)
         settings: { create: { ...PLATFORM_SETTINGS } },

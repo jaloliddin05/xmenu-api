@@ -11,6 +11,7 @@ import { UpdateOrderSettingsDto } from '../dto/order-settings.dto';
 import { OrderSettingsService } from '../services/order-settings.service';
 import { RevalidateService } from 'src/modules/revalidate-queue/revalidate.service';
 import { fieldError } from 'src/infra/validators/validation-errors';
+import { StaffAccess } from 'src/modules/auth/access/staff-access.decorator';
 
 /** Restoran paneli: yetkazib berish narxi, minimal summa, zona, taymautlar. */
 @ApiTags('Order settings')
@@ -22,6 +23,7 @@ export class OrderSettingsController {
     private readonly revalidate: RevalidateService,
   ) {}
 
+  @StaffAccess('venue')
   @Get()
   @ApiOperation({
     summary: 'Current ordering settings (the row is created at signup)',
@@ -30,6 +32,7 @@ export class OrderSettingsController {
     return this.settings.get(requireStaffOrganizationId(req));
   }
 
+  @StaffAccess('venue')
   @Put()
   @ApiOperation({
     summary: "Sozlamalarni saqlash (faqat yuborilgan maydonlar o'zgaradi)",

@@ -8,7 +8,10 @@ import { REDIS } from 'src/infra/redis/redis.module';
 import { isValidPhone } from 'src/infra/helper/auth/customer-validators';
 import formatPhoneNumber from 'src/infra/helper/auth/format-phone';
 import { hashPassword } from 'src/infra/helper/auth/hash-password';
-import { toStaffUser } from 'src/infra/helper/auth/staff-user';
+import {
+  STAFF_USER_INCLUDE,
+  toStaffUser,
+} from 'src/infra/helper/auth/staff-user';
 import { OrganizationService } from 'src/modules/organization/services/organization.service';
 import { CUSTOMER_AUTH_CONFIG } from '../customer-auth.config';
 import type { CustomerAuthConfig } from '../customer-auth.config';
@@ -47,9 +50,17 @@ interface PendingRegistration {
   existing?: boolean;
 }
 
-const USER_WITH_ORGANIZATION = {
-  organization: { include: { logo: true, banner: true, translations: true } },
-} satisfies Prisma.userInclude;
+const USER_WITH_ORGANIZATION = STAFF_USER_INCLUDE satisfies Prisma.userInclude;
+
+/**
+ * A phone that cannot sign up again: a confirmed user, or a staff user of a venue (a disabled operator
+ * included). Only an unconfirmed owner row left by the old signup flow is reused.
+ */
+function isTakenPhone(
+  user: { isActive: boolean; membership?: { role: string } | null } | null,
+): boolean {
+  return !!user && (user.isActive || user.membership?.role === 'operator');
+}
 
 /**
  * Owner signup. Nothing is written to Postgres until the phone is confirmed: the signup waits in Redis
@@ -84,7 +95,7 @@ export class StaffAuthService {
 
     const existing = await this.prisma.user.findUnique({
       where: { phone: dto.phone },
-      select: { isActive: true },
+      select: { isActive: true, membership: { select: { role: true } } },
     });
 
     // A registered phone is answered like a free one: same work, same limits, same response. Its code is never sent.
@@ -96,7 +107,7 @@ export class StaffAuthService {
       first_name: dto.first_name,
       last_name: dto.last_name || undefined,
       passwordHash: await hashPassword(dto.password),
-      ...(existing?.isActive ? { existing: true } : {}),
+      ...(isTakenPhone(existing) ? { existing: true } : {}),
     };
     const key = this.pendingKey(registrationId);
     await this.redis.set(
@@ -171,7 +182,7 @@ export class StaffAuthService {
     const user = await this.createAccount(pending);
     await this.events.log('staff_registered', ctx, {
       userId: user.id,
-      organizationId: user.organization?.id,
+      organizationId: user.membership?.organization_id,
       phone,
     });
     return {
@@ -231,7 +242,7 @@ export class StaffAuthService {
     await this.throttle.reset(phone);
     await this.events.log('staff_login', ctx, {
       userId: user!.id,
-      organizationId: user!.organization?.id,
+      organizationId: user!.membership?.organization_id,
       phone,
     });
     return {
@@ -295,8 +306,9 @@ export class StaffAuthService {
         const userId = await this.prisma.$transaction(async (tx) => {
           const existing = await tx.user.findUnique({
             where: { phone: p.phone },
+            include: { membership: { select: { role: true } } },
           });
-          if (existing?.isActive) throw new AppException('phone_taken');
+          if (isTakenPhone(existing)) throw new AppException('phone_taken');
 
           const data = {
             first_name: p.first_name,
@@ -310,7 +322,7 @@ export class StaffAuthService {
 
           const org = await this.organizations.create(
             { name: p.name, type: p.type },
-            user.id,
+            user,
             tx,
           );
           await tx.organization.update({

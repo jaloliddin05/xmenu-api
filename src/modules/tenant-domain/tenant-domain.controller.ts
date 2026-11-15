@@ -33,6 +33,7 @@ import {
 } from './dto/tenant-domain.dto';
 import { TenantDomainService } from './tenant-domain.service';
 import { AppException } from 'src/infra/errors/app-exception';
+import { StaffAccess } from 'src/modules/auth/access/staff-access.decorator';
 
 /** Owner (dashboard): the venue's own domains for the delivery site. */
 @ApiTags('Organization domains')
@@ -64,6 +65,7 @@ export class TenantDomainController {
     return organizationId;
   }
 
+  @StaffAccess('venue', { orgParam: 'id' })
   @Get(':id/domains')
   @ApiOperation({
     summary:
@@ -74,6 +76,7 @@ export class TenantDomainController {
     return this.domains.list(this.own(id, req));
   }
 
+  @StaffAccess('venue', { orgParam: 'id' })
   @Post(':id/domains')
   @ApiOperation({
     summary:
@@ -102,6 +105,7 @@ export class TenantDomainController {
     return this.domains.add(this.own(id, req), dto.host);
   }
 
+  @StaffAccess('venue', { orgParam: 'id' })
   @Post(':id/domains/:domainId/verify')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -126,6 +130,7 @@ export class TenantDomainController {
     return this.domains.verify(this.own(id, req), domainId);
   }
 
+  @StaffAccess('venue', { orgParam: 'id' })
   @Delete(':id/domains/:domainId')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Remove a domain' })

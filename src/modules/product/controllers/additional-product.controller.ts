@@ -23,6 +23,7 @@ import {
   requireStaffOrganizationId,
   type StaffRequest,
 } from 'src/infra/http/request-helpers';
+import { StaffAccess } from 'src/modules/auth/access/staff-access.decorator';
 
 @ApiTags('Additional-Product')
 @Controller('additional-product')
@@ -31,6 +32,7 @@ export class AdditionalProductController {
     private readonly additionalProductService: AdditionalProductService,
   ) {}
 
+  @StaffAccess('venue')
   @Post('/group')
   @ApiOperation({ summary: 'Create new additional product group' })
   @HttpCode(HttpStatus.CREATED)
@@ -45,6 +47,7 @@ export class AdditionalProductController {
     );
   }
 
+  @StaffAccess('venue')
   @Post('/')
   @ApiOperation({ summary: 'Create new additional product' })
   @HttpCode(HttpStatus.CREATED)
@@ -59,6 +62,7 @@ export class AdditionalProductController {
     );
   }
 
+  @StaffAccess('venue')
   @Put('group/:id')
   @ApiOperation({ summary: 'Update additional product group' })
   async updateGroup(
@@ -75,6 +79,7 @@ export class AdditionalProductController {
   }
 
   // ✅ UPDATE ADDITIONAL PRODUCT
+  @StaffAccess('venue')
   @Put(':id')
   @ApiOperation({ summary: 'Update additional product' })
   async updateAdditionalProduct(
@@ -90,6 +95,7 @@ export class AdditionalProductController {
     );
   }
 
+  @StaffAccess('venue')
   @Delete('/group/:id')
   @ApiOperation({ summary: 'Method: delete' })
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -101,6 +107,7 @@ export class AdditionalProductController {
     );
   }
 
+  @StaffAccess('venue')
   @Delete(':id')
   @ApiOperation({ summary: 'Method: delete' })
   @HttpCode(HttpStatus.NO_CONTENT)

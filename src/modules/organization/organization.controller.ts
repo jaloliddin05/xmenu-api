@@ -30,12 +30,14 @@ import {
 } from 'src/infra/http/request-helpers';
 import { isValidSlug, SLUG_RULE } from './domain/slug';
 import { AppException } from 'src/infra/errors/app-exception';
+import { StaffAccess } from 'src/modules/auth/access/staff-access.decorator';
 
 @ApiTags('Organization')
 @Controller('organization')
 export class OrganizationController {
   constructor(private readonly organizationService: OrganizationService) {}
 
+  @StaffAccess('venue', { orgParam: 'id' })
   @Get(':id')
   @ApiOperation({ summary: 'Method: get one (your own organization only)' })
   @HttpCode(HttpStatus.OK)
@@ -65,6 +67,7 @@ export class OrganizationController {
     return slug;
   }
 
+  @StaffAccess('venue')
   @Post('check-slug')
   @ApiOperation({ summary: 'Slug mavjudligini tekshirish' })
   @ApiBody({
@@ -87,6 +90,7 @@ export class OrganizationController {
     return { exists };
   }
 
+  @StaffAccess('venue', { orgParam: 'id' })
   @Put('/:id')
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Method: updating organization' })
@@ -120,6 +124,7 @@ export class OrganizationController {
     );
   }
 
+  @StaffAccess('venue', { orgParam: 'id' })
   @Delete(':id')
   @ApiOperation({ summary: 'Method: delete' })
   @HttpCode(HttpStatus.NO_CONTENT)

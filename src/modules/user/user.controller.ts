@@ -19,6 +19,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { MulterStorage } from 'src/infra/helper/upload/multer-upload';
 import { FileUploadValidationForOptional } from 'src/infra/validators/file-upload-validation-update';
 import { AppException } from 'src/infra/errors/app-exception';
+import { StaffAccess } from 'src/modules/auth/access/staff-access.decorator';
 
 /** An owner may only act on their own account; anyone else's id looks like it does not exist. */
 export function assertSelf(
@@ -35,6 +36,7 @@ export function assertSelf(
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
+  @StaffAccess('account')
   @Get('/me')
   @ApiOperation({ summary: 'Method: returns user' })
   @HttpCode(HttpStatus.OK)
@@ -42,6 +44,7 @@ export class UserController {
     return await this.userService.findOne(req.user.id);
   }
 
+  @StaffAccess('profile')
   @Put('/:id')
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Method: updating user' })
@@ -60,6 +63,7 @@ export class UserController {
     return this.userService.update(assertSelf(req, id), data, file);
   }
 
+  @StaffAccess('venue')
   @Delete(':id')
   @ApiOperation({ summary: 'Method: delete' })
   @HttpCode(HttpStatus.NO_CONTENT)

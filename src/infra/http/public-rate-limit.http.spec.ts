@@ -16,6 +16,7 @@ import {
   publicPostRate,
   SkipPublicRateLimit,
 } from './public-rate-limit';
+import { StaffAccess } from 'src/modules/auth/access/staff-access.decorator';
 
 @Controller('t')
 class ProbeController {
@@ -38,7 +39,8 @@ class ProbeController {
     return { ok: true };
   }
 
-  // No @Public(): the staff guard answers first; the limiter ignores it
+  // No @Public(): the staff guards answer first; the limiter ignores it
+  @StaffAccess('venue')
   @Post('private')
   secret() {
     return { ok: true };

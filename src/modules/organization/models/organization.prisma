@@ -46,8 +46,8 @@ model organization {
   // Tenant ichidagi buyurtma raqami hisoblagichi (atomik UPDATE ... RETURNING)
   order_seq    Int               @default(1000)
 
-  owner_id     String?           @unique
-  owner        user?             @relation(fields: [owner_id], references: [id])
+  // Owner and operators (organization-member.prisma); the owner is the row with role = owner
+  members      organization_member[]
 
   logo_id      String?           @unique
   logo         file?             @relation("OrganizationLogo", fields: [logo_id], references: [id])

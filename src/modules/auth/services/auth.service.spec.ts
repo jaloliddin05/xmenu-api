@@ -5,8 +5,8 @@ function serviceWith(findOne: (id: string) => Promise<unknown>) {
 }
 
 describe('AuthService.validateUserById', () => {
-  it('returns an active user', async () => {
-    const user = { id: 'u1', isActive: true };
+  it('returns an active user with a role in a venue', async () => {
+    const user = { id: 'u1', isActive: true, role: 'operator' };
     await expect(
       serviceWith(async () => user).validateUserById('u1'),
     ).resolves.toBe(user);
@@ -15,6 +15,10 @@ describe('AuthService.validateUserById', () => {
   it.each([
     ['a deleted user', async () => null],
     ['an unconfirmed user', async () => ({ id: 'u1', isActive: false })],
+    [
+      'a user without an active membership (disabled operator)',
+      async () => ({ id: 'u1', isActive: true, role: null }),
+    ],
     [
       'a lookup error (e.g. no sub in the token)',
       async () => Promise.reject(new Error('bad id')),

@@ -33,12 +33,14 @@ import {
   requireStaffOrganizationId,
   type StaffRequest,
 } from 'src/infra/http/request-helpers';
+import { StaffAccess } from 'src/modules/auth/access/staff-access.decorator';
 
 @ApiTags('Product')
 @Controller('product')
 export class ProductController {
   constructor(private readonly productService: ProductService) {}
 
+  @StaffAccess('menu.read')
   @Get()
   @ApiOperation({ summary: 'Method: get all' })
   @ApiQuery({ name: 'categoryId', required: false, description: 'uuid' })
@@ -67,6 +69,7 @@ export class ProductController {
     );
   }
 
+  @StaffAccess('menu.read')
   @Get('/:id')
   @ApiOperation({ summary: 'Method: get one' })
   @HttpCode(HttpStatus.OK)
@@ -77,6 +80,7 @@ export class ProductController {
     );
   }
 
+  @StaffAccess('venue')
   @Post()
   @ApiOperation({ summary: 'Create new product with translations and options' })
   async create(@Body() dto: CreateProductDto, @Req() req: StaffRequest) {
@@ -87,6 +91,7 @@ export class ProductController {
     );
   }
 
+  @StaffAccess('venue')
   @Put('/:id')
   @ApiOperation({ summary: 'Update existing product' })
   async update(
@@ -102,6 +107,7 @@ export class ProductController {
     );
   }
 
+  @StaffAccess('venue')
   @Patch('/index')
   @ApiOperation({ summary: 'Method: update index' })
   @HttpCode(HttpStatus.OK)
@@ -113,6 +119,7 @@ export class ProductController {
     );
   }
 
+  @StaffAccess('venue')
   @Patch(':id/activate')
   @ApiOperation({ summary: 'Method: activate/deactivate product' })
   @ApiBody({
@@ -142,6 +149,7 @@ export class ProductController {
     );
   }
 
+  @StaffAccess('venue')
   @Patch('/:id/images')
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Upload images for a product' })
@@ -164,6 +172,7 @@ export class ProductController {
     );
   }
 
+  @StaffAccess('venue')
   @Delete(':id')
   @ApiOperation({ summary: 'Method: delete' })
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -175,6 +184,7 @@ export class ProductController {
     );
   }
 
+  @StaffAccess('venue')
   @Delete('/image/:id')
   @ApiOperation({ summary: 'Method: delete image' })
   @HttpCode(HttpStatus.NO_CONTENT)

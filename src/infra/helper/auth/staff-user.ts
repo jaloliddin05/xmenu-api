@@ -1,3 +1,9 @@
+import { permissionsOf } from 'src/modules/auth/access/permissions';
+import type {
+  Permission,
+  StaffRole,
+} from 'src/modules/auth/access/permissions';
+
 interface FileLike {
   id: string;
   url: string;
@@ -25,7 +31,11 @@ interface UserLike {
   created_at: Date;
   avatar_id: string | null;
   avatar?: FileLike | null;
-  organization?: OrganizationLike | null;
+  membership?: {
+    role: StaffRole;
+    status: string;
+    organization: OrganizationLike;
+  } | null;
 }
 
 export interface StaffUser {
@@ -39,6 +49,10 @@ export interface StaffUser {
   created_at: Date;
   avatar_id: string | null;
   avatar?: FileLike | null;
+  /** The role in the venue (null: no venue); present when the membership was loaded. */
+  role?: StaffRole | null;
+  /** What the role may do (auth/access/permissions.ts); the dashboard shows screens by it. */
+  permissions?: Permission[];
   organization?: {
     id: string;
     name: string;
@@ -51,13 +65,24 @@ export interface StaffUser {
   } | null;
 }
 
+/** What toStaffUser needs from Prisma: the membership with its venue. */
+export const STAFF_USER_INCLUDE = {
+  membership: {
+    include: {
+      organization: {
+        include: { logo: true, banner: true, translations: true },
+      },
+    },
+  },
+} as const;
+
 const file = (f: FileLike | null | undefined) =>
   f ? { id: f.id, url: f.url } : f;
 
 /**
  * The staff user as it leaves the API (and as req.user): an explicit list of fields, so the password
- * hash, the organization's owner_id, order_seq and int_id and file paths on disk never go out.
- * Relations are kept only when the query included them.
+ * hash, the organization's order_seq and int_id and file paths on disk never go out.
+ * Relations are kept only when the query included them; the organization and the role come from the membership.
  */
 export function toStaffUser(user: UserLike): StaffUser {
   const out: StaffUser = {
@@ -72,8 +97,12 @@ export function toStaffUser(user: UserLike): StaffUser {
     avatar_id: user.avatar_id,
   };
   if (user.avatar !== undefined) out.avatar = file(user.avatar);
-  const o = user.organization;
-  if (o !== undefined) {
+  if (user.membership !== undefined) {
+    // A disabled membership grants nothing (the user is switched off with it, see StaffService.disable)
+    const m = user.membership?.status === 'active' ? user.membership : null;
+    out.role = m?.role ?? null;
+    out.permissions = permissionsOf(m?.role);
+    const o = m?.organization ?? null;
     out.organization = o && {
       id: o.id,
       name: o.name,

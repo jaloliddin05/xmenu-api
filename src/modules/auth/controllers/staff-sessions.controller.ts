@@ -23,6 +23,7 @@ import { StaffSessionDto } from '../dto/auth-response.dto';
 import { StaffChangePasswordDto } from '../dto/staff-password.dto';
 import { StaffPasswordService } from '../services/staff-password.service';
 import { StaffSessionService } from '../services/staff-session.service';
+import { StaffAccess } from 'src/modules/auth/access/staff-access.decorator';
 
 type Req = express.Request & StaffSessionRequest;
 
@@ -35,6 +36,7 @@ export class StaffSessionsController {
     private readonly sessions: StaffSessionService,
   ) {}
 
+  @StaffAccess('account')
   @Post('/password/change')
   @ApiOperation({
     summary:
@@ -54,6 +56,7 @@ export class StaffSessionsController {
     );
   }
 
+  @StaffAccess('account')
   @Get('/sessions')
   @ApiOperation({ summary: 'Active logins of the owner' })
   @ApiOkResponse({ type: StaffSessionDto, isArray: true })
@@ -61,6 +64,7 @@ export class StaffSessionsController {
     return this.sessions.listActive(req.user.id, req.user.sid);
   }
 
+  @StaffAccess('account')
   @Delete('/sessions/:id')
   @ApiOperation({
     summary: 'End one login; another owner’s or an unknown one is 404',
@@ -74,6 +78,7 @@ export class StaffSessionsController {
     await this.sessions.end(req.user.id, id, requestCtx(req));
   }
 
+  @StaffAccess('account')
   @Delete('/sessions')
   @ApiOperation({ summary: 'End every login except the current one' })
   @ApiNoContentResponse()

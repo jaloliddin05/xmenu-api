@@ -23,6 +23,7 @@ import { PaymentModule } from './modules/payment/payment.module';
 import { TenantConfigModule } from './modules/tenant/tenant-config.module';
 import { TelegramModule } from './modules/telegram/telegram.module';
 import { TenantDomainModule } from './modules/tenant-domain/tenant-domain.module';
+import { StaffModule } from './modules/staff/staff.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -47,6 +48,7 @@ import { TenantDomainModule } from './modules/tenant-domain/tenant-domain.module
     TelegramModule,
     TenantConfigModule,
     TenantDomainModule,
+    StaffModule,
     TranslationModule,
     UserModule,
   ],
