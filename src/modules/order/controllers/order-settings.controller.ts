@@ -8,6 +8,7 @@ import { PrismaService } from 'src/modules/_prisma/prisma.service';
 import { UpdateOrderSettingsDto } from '../dto/order-settings.dto';
 import { OrderSettingsService } from '../services/order-settings.service';
 import { RevalidateService } from 'src/modules/revalidate-queue/revalidate.service';
+import { StaffAccess } from 'src/modules/auth/access/staff-access.decorator';
 
 /**
  * Restoran paneli: minimal summa (olib ketish), yetkazib berish narxini yaxlitlash qadami, kim yetkazadi,
@@ -22,6 +23,7 @@ export class OrderSettingsController {
     private readonly revalidate: RevalidateService,
   ) {}
 
+  @StaffAccess('venue')
   @Get()
   @ApiOperation({
     summary: 'Current ordering settings (the row is created at signup)',
@@ -30,6 +32,7 @@ export class OrderSettingsController {
     return this.settings.get(requireStaffOrganizationId(req));
   }
 
+  @StaffAccess('venue')
   @Put()
   @ApiOperation({
     summary: "Sozlamalarni saqlash (faqat yuborilgan maydonlar o'zgaradi)",

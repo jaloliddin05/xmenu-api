@@ -578,8 +578,8 @@ model organization {
   // Tenant ichidagi buyurtma raqami hisoblagichi (atomik UPDATE ... RETURNING)
   order_seq    Int               @default(1000)
 
-  owner_id     String?           @unique
-  owner        user?             @relation(fields: [owner_id], references: [id])
+  // Owner and operators (organization-member.prisma); the owner is the row with role = owner
+  members      organization_member[]
 
   logo_id      String?           @unique
   logo         file?             @relation("OrganizationLogo", fields: [logo_id], references: [id])
@@ -849,6 +849,41 @@ model staff_auth_event {
   @@index([created_at])
   @@index([user_id])
 }
+// Staff of a venue: the owner and the operators. Access rules per role: auth/access/permissions.ts.
+enum StaffRole {
+  owner     @map("owner")
+  operator  @map("operator")
+}
+
+enum StaffStatus {
+  // Invited by the owner, the phone is not confirmed yet (user_id is NULL)
+  invited   @map("invited")
+  active    @map("active")
+  // Disabled by the owner: the user cannot sign in, an open invitation is cancelled
+  disabled  @map("disabled")
+}
+
+model organization_member {
+  id                String        @id @default(uuid())
+  organization_id   String
+  organization      organization  @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  // NULL until the invitation is accepted. Unique: one venue per staff user for now.
+  user_id           String?       @unique
+  user              user?         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  role              StaffRole
+  status            StaffStatus
+  phone             String
+  first_name        String
+  last_name         String?
+  invited_by_id     String?
+  invite_expires_at DateTime?
+  created_at        DateTime      @default(now())
+  activated_at      DateTime?
+  disabled_at       DateTime?
+
+  @@unique([organization_id, phone])
+  @@index([phone])
+}
 model user {
   id          String      @id @default(uuid())
   phone       String      @unique
@@ -859,7 +894,8 @@ model user {
   url         String?
   isActive  Boolean @default(false) 
   created_at  DateTime    @default(now())
-  organization organization?
+  // The venue this staff user works in, with the role (one venue per user for now)
+  membership   organization_member?
   sessions     staff_session[]
   avatar_id    String?      @unique
   avatar       file?        @relation(fields: [avatar_id], references: [id])

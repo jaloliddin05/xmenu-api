@@ -11,6 +11,7 @@ import {
 import { ErrorResponse } from 'src/infra/errors/error-response.dto';
 import { Public } from '../auth/decorators/public.decorator';
 import { PlatformAdminGuard } from '../auth/guards/platform-admin.guard';
+import { PlatformAdminRoute } from '../auth/access/staff-access.decorator';
 import {
   applicationRate,
   PublicRateLimit,
@@ -48,6 +49,7 @@ export class ApplicationController {
     return this.applicationService.create(dto);
   }
 
+  @PlatformAdminRoute()
   @Get()
   @UseGuards(PlatformAdminGuard)
   @ApiOperation({ summary: 'Platform admins only (PLATFORM_ADMIN_USER_IDS)' })

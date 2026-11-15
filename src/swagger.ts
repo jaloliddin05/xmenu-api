@@ -4,6 +4,7 @@ import {
   ErrorResponse,
   FieldErrorDto,
 } from './infra/errors/error-response.dto';
+import { collectRoutes, openApiPath } from './modules/auth/access/route-rules';
 
 const ERROR_RESPONSE = {
   description: 'Error: one shape for every endpoint (docs/ERRORS.md)',
@@ -25,6 +26,24 @@ function addDefaultErrorResponse(document: OpenAPIObject): OpenAPIObject {
   return document;
 }
 
+/**
+ * `x-permission` on every staff operation: the permission its StaffAccess rule needs
+ * (docs/API.md, "Сотрудники и права"); `platform-admin` for platform endpoints.
+ */
+function addPermissions(
+  document: OpenAPIObject,
+  app: INestApplication,
+): OpenAPIObject {
+  for (const route of collectRoutes(app)) {
+    if (route.rule === 'public' || route.rule === null) continue;
+    const op = document.paths[openApiPath(route.path)]?.[
+      route.method.toLowerCase() as 'get'
+    ] as Record<string, unknown> | undefined;
+    if (op) op['x-permission'] = route.rule.permission;
+  }
+  return document;
+}
+
 /** One source for the served /docs and the generated docs/openapi.json (npm run openapi). */
 export function createOpenApiDocument(app: INestApplication): OpenAPIObject {
   const config = new DocumentBuilder()
@@ -38,9 +57,12 @@ export function createOpenApiDocument(app: INestApplication): OpenAPIObject {
     .addSecurityRequirements('access-token')
     .build();
 
-  return addDefaultErrorResponse(
-    SwaggerModule.createDocument(app, config, {
-      extraModels: [ErrorResponse, FieldErrorDto],
-    }),
+  return addPermissions(
+    addDefaultErrorResponse(
+      SwaggerModule.createDocument(app, config, {
+        extraModels: [ErrorResponse, FieldErrorDto],
+      }),
+    ),
+    app,
   );
 }

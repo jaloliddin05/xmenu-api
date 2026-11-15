@@ -30,6 +30,7 @@ import {
 import { ErrorResponse } from 'src/infra/errors/error-response.dto';
 import { OrganizationService } from './services/organization.service';
 import { PublicationService } from './services/publication.service';
+import { StaffAccess } from 'src/modules/auth/access/staff-access.decorator';
 
 type StaffRequest = Parameters<typeof requireStaffOrganizationId>[0];
 
@@ -61,6 +62,7 @@ export class OrganizationPublicationController {
     return organizationId;
   }
 
+  @StaffAccess('venue', { orgParam: 'id' })
   @Get(':id/publication')
   @ApiOperation({
     summary: 'Publication state, channels and the readiness checklist',
@@ -70,6 +72,7 @@ export class OrganizationPublicationController {
     return this.publication.view(this.own(id, req));
   }
 
+  @StaffAccess('venue', { orgParam: 'id' })
   @Put(':id/channels')
   @ApiOperation({
     summary:
@@ -94,6 +97,7 @@ export class OrganizationPublicationController {
     return this.publication.setChannels(this.own(id, req), dto);
   }
 
+  @StaffAccess('venue', { orgParam: 'id' })
   @Post(':id/publish')
   @HttpCode(200)
   @ApiOperation({
@@ -109,6 +113,7 @@ export class OrganizationPublicationController {
     return this.publication.publish(this.own(id, req));
   }
 
+  @StaffAccess('venue', { orgParam: 'id' })
   @Post(':id/unpublish')
   @HttpCode(200)
   @ApiOperation({

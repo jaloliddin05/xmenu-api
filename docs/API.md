@@ -10,10 +10,11 @@
 
 ## Два контура авторизации
 
-| | Владельцы (staff, админка) | Клиенты (доставка) |
+| | Сотрудники (staff: владелец и операторы, админка) | Клиенты (доставка) |
 |---|---|---|
 | Пути | `/auth/*` и все прочие эндпоинты админки | `/auth/customer/*`, `/customers/*`, `/orders/*` |
-| Тенант | организация владельца из access-токена | заголовок `X-Tenant-Id: <organization.id>` (UUID; slug не принимается) |
+| Тенант | заведение сотрудника из access-токена | заголовок `X-Tenant-Id: <organization.id>` (UUID; slug не принимается) |
+| Права | роль сотрудника, правило у каждого маршрута (см. «Сотрудники и права») | только свои данные клиента |
 
 ## Ошибки
 
@@ -114,7 +115,8 @@
 
 `{ "login": "+998901234567", "password": "..." }` → `{ "accessToken", "refreshToken", "user" }`.
 Телефон можно прислать с пробелами, без `+`. Неизвестный номер, неподтверждённый аккаунт и неверный пароль дают
-одинаковый ответ `401 invalid_credentials` за одинаковое время.
+одинаковый ответ `401 invalid_credentials` за одинаковое время. Оператор входит так же; отключённый оператор
+отвечает как неизвестный номер. В `user` приходят `role` и `permissions` (раздел «Сотрудники и права»).
 
 ### 5. `POST /auth/refresh` → 200
 
@@ -218,6 +220,149 @@ translations [{ id, lang, description }] }`. Хеша пароля, `owner_id`, 
 
 Счётчики входа ведутся и для несуществующих номеров: блокировка не выдаёт, есть ли аккаунт.
 IP берётся из `X-Forwarded-For` только от локального прокси (`trust proxy = loopback`).
+
+## Сотрудники и права
+
+В заведении две роли: **владелец** (регистрирует заведение, может всё) и **оператор** (заказы, курьеры, смены; без
+настроек, денег и сотрудников). Оператор входит в админку своим аккаунтом: тот же `POST /auth/login`, `refresh`,
+`logout`, восстановление и смена пароля, сессии, что у владельца (раздел выше). Один пользователь работает в одном
+заведении. Связь «пользователь → заведение, роль» хранит `organization_member` (у владельца строка `role = owner`).
+
+### Права и правило «запрещено всё, что не разрешено»
+
+Ответы входа (`login`, `check-code`, `invitation/accept`) и `GET /user/me` несут в `user` поля `role` (`owner` |
+`operator`) и `permissions` (список прав роли); дашборд показывает экраны по `permissions`, проверка всё равно на сервере.
+
+| Право | Что открывает | Владелец | Оператор |
+|---|---|---|---|
+| `account` | свой вход: `GET /user/me`, смена пароля, сессии | ✓ | ✓ |
+| `profile` | свой профиль: `PUT /user/:id` (только свой id), `POST /file/upload` | ✓ | ✓ |
+| `orders` | заказы: список, карточка, принять, отклонить, статусы, отмена с причиной | ✓ | ✓ |
+| `couriers`, `shifts` | курьеры и смены, сверка наличных (маршруты появятся с доставкой) | ✓ | ✓ |
+| `branches.read` | список филиалов (фильтр заказов) | ✓ | ✓ |
+| `menu.read` | чтение меню: категории и блюда | ✓ | ✓ |
+| `venue` | заведение и его настройки, изменение филиалов и меню, настройки заказов и цены доставки, платёжные ключи, домены, бот, публикация, перевод, удаление аккаунта | ✓ | — |
+| `staff` | сотрудники: список, приглашение, отключение | ✓ | — |
+
+- У каждого маршрута контура сотрудников явное правило (`@StaffAccess(право)` в коде; в OpenAPI поле `x-permission`
+  у операции). Маршрут без правила отвечает `403 forbidden` и роняет тест `staff-access.matrix.spec.ts`.
+- Нет права у роли → `403 forbidden` до обработчика (ничего не читается и не пишется).
+- Путь с id заведения (`/organization/{id}/…`, `/category/for-select/{organizationId}`): чужой id → `404 not_found`.
+  Чужие сущности (филиал, блюдо, заказ другого заведения) → `404`, как и раньше (раздел «Доступ к данным админки»).
+- Отключённый оператор: любой запрос с его токеном → `401 unauthorized` сразу (роль читается из БД на каждом запросе,
+  входы отозваны).
+- `GET /application`: только администратор платформы (`PLATFORM_ADMIN_USER_IDS`), роль в заведении не даёт доступа.
+
+### Приглашение оператора
+
+1. Владелец: `POST /organization/{id}/staff` `{ "phone": "+998901234567", "first_name": "Dilshod", "last_name"?: "…" }`
+   → `201` строка сотрудника. Приглашение действует 72 часа; повторное приглашение того же номера своим заведением
+   (открытого, истёкшего или отменённого) продлевает его. Ничего не отправляется: владелец сам говорит оператору
+   открыть дашборд. Номер с аккаунтом (любой сотрудник, в том числе отключённый) или с открытым приглашением другого
+   заведения → `409 phone_taken`. Лимит: 20 приглашений в час на заведение (`429 rate_limited`).
+2. Оператор: `POST /auth/invitation/code` `{ "phone" }` → `200 { resendAfter, codeLength, expiresIn }`. Ответ, лимиты и
+   время одинаковы для любого номера (как `password/forgot`): код уходит по SMS, только если у номера есть открытое
+   приглашение и нет аккаунта. Лимиты отправки те же, что у регистрации (на номер и цель `invite`).
+3. Оператор: `POST /auth/invitation/accept` `{ "phone", "code", "password" }` (пароль 8–72) → `200` как `check-code`:
+   `{ success, user (role: operator), accessToken, refreshToken }`. Имя берётся из приглашения. Нет открытого
+   приглашения, его отменили или приняли → `400 code_expired`; неверный код → `400 invalid_code`, 5 промахов →
+   `429 too_many_attempts`. Проверка кода: 10 за 15 мин на номер+IP, 60 на IP.
+
+### Сотрудники заведения (владелец)
+
+- `GET /organization/{id}/staff` → список: владелец первым, затем операторы по дате добавления.
+  `{ id, role, status, phone, firstName, lastName, invitedAt, inviteExpiresAt, activatedAt, disabledAt }`;
+  `status`: `invited` (ждёт оператора), `expired` (срок вышел, пригласите снова), `active`, `disabled`.
+- `POST /organization/{id}/staff/{memberId}/disable` → `204`. Оператор отключается: аккаунт выключен, все его входы
+  завершаются сразу, вход и восстановление пароля отвечают как для неизвестного номера. Приглашение отменяется.
+  Повтор ничего не меняет (`204`). Владельца отключить нельзя: `403 forbidden`. Чужой `memberId` → `404`.
+  Включения обратно нет: номер отключённого оператора занят (`409 phone_taken` при новом приглашении).
+
+### Матрица маршрутов
+
+Генерируется `npm run openapi` из правил в коде; CI проверяет, что она не устарела. «Заведение в пути»: параметр,
+который должен быть id своего заведения.
+
+<!-- access-matrix:start (npm run openapi) -->
+| Метод | Путь | Право | Заведение в пути | Владелец | Оператор |
+|---|---|---|---|---|---|
+| POST | `/additional-product` | `venue` |  | ✓ | — |
+| DELETE | `/additional-product/{id}` | `venue` |  | ✓ | — |
+| PUT | `/additional-product/{id}` | `venue` |  | ✓ | — |
+| POST | `/additional-product/group` | `venue` |  | ✓ | — |
+| DELETE | `/additional-product/group/{id}` | `venue` |  | ✓ | — |
+| PUT | `/additional-product/group/{id}` | `venue` |  | ✓ | — |
+| GET | `/application` | администратор платформы |  | — | — |
+| POST | `/auth/password/change` | `account` |  | ✓ | ✓ |
+| DELETE | `/auth/sessions` | `account` |  | ✓ | ✓ |
+| GET | `/auth/sessions` | `account` |  | ✓ | ✓ |
+| DELETE | `/auth/sessions/{id}` | `account` |  | ✓ | ✓ |
+| GET | `/branch` | `branches.read` |  | ✓ | ✓ |
+| POST | `/branch` | `venue` |  | ✓ | — |
+| DELETE | `/branch/{id}` | `venue` |  | ✓ | — |
+| PATCH | `/branch/{id}` | `venue` |  | ✓ | — |
+| GET | `/branch/{id}/delivery-pricing` | `venue` |  | ✓ | — |
+| PUT | `/branch/{id}/delivery-pricing` | `venue` |  | ✓ | — |
+| GET | `/branch/{id}/delivery-pricing/check` | `venue` |  | ✓ | — |
+| POST | `/branch/{id}/exceptions` | `venue` |  | ✓ | — |
+| DELETE | `/branch/{id}/exceptions/{exceptionId}` | `venue` |  | ✓ | — |
+| PUT | `/branch/{id}/working-hours` | `venue` |  | ✓ | — |
+| GET | `/category` | `menu.read` |  | ✓ | ✓ |
+| POST | `/category` | `venue` |  | ✓ | — |
+| DELETE | `/category/{id}` | `venue` |  | ✓ | — |
+| GET | `/category/{id}` | `menu.read` |  | ✓ | ✓ |
+| PUT | `/category/{id}` | `venue` |  | ✓ | — |
+| PATCH | `/category/{id}/activate` | `venue` |  | ✓ | — |
+| GET | `/category/for-select/{organizationId}` | `menu.read` | `organizationId` | ✓ | ✓ |
+| PATCH | `/category/index` | `venue` |  | ✓ | — |
+| POST | `/file/upload` | `profile` |  | ✓ | ✓ |
+| GET | `/order` | `orders` |  | ✓ | ✓ |
+| GET | `/order-settings` | `venue` |  | ✓ | — |
+| PUT | `/order-settings` | `venue` |  | ✓ | — |
+| GET | `/order/{id}` | `orders` |  | ✓ | ✓ |
+| POST | `/order/{id}/accept` | `orders` |  | ✓ | ✓ |
+| POST | `/order/{id}/advance` | `orders` |  | ✓ | ✓ |
+| POST | `/order/{id}/reject` | `orders` |  | ✓ | ✓ |
+| POST | `/order/{id}/status` | `orders` |  | ✓ | ✓ |
+| DELETE | `/organization/{id}` | `venue` | `id` | ✓ | — |
+| GET | `/organization/{id}` | `venue` | `id` | ✓ | — |
+| PUT | `/organization/{id}` | `venue` | `id` | ✓ | — |
+| PUT | `/organization/{id}/channels` | `venue` | `id` | ✓ | — |
+| GET | `/organization/{id}/domains` | `venue` | `id` | ✓ | — |
+| POST | `/organization/{id}/domains` | `venue` | `id` | ✓ | — |
+| DELETE | `/organization/{id}/domains/{domainId}` | `venue` | `id` | ✓ | — |
+| POST | `/organization/{id}/domains/{domainId}/verify` | `venue` | `id` | ✓ | — |
+| GET | `/organization/{id}/publication` | `venue` | `id` | ✓ | — |
+| POST | `/organization/{id}/publish` | `venue` | `id` | ✓ | — |
+| GET | `/organization/{id}/settings` | `venue` | `id` | ✓ | — |
+| PUT | `/organization/{id}/settings` | `venue` | `id` | ✓ | — |
+| GET | `/organization/{id}/staff` | `staff` | `id` | ✓ | — |
+| POST | `/organization/{id}/staff` | `staff` | `id` | ✓ | — |
+| POST | `/organization/{id}/staff/{memberId}/disable` | `staff` | `id` | ✓ | — |
+| POST | `/organization/{id}/unpublish` | `venue` | `id` | ✓ | — |
+| POST | `/organization/check-slug` | `venue` |  | ✓ | — |
+| GET | `/payment-provider` | `venue` |  | ✓ | — |
+| PUT | `/payment-provider/{provider}` | `venue` |  | ✓ | — |
+| POST | `/payment-provider/{provider}/disable` | `venue` |  | ✓ | — |
+| GET | `/product` | `menu.read` |  | ✓ | ✓ |
+| POST | `/product` | `venue` |  | ✓ | — |
+| DELETE | `/product/{id}` | `venue` |  | ✓ | — |
+| GET | `/product/{id}` | `menu.read` |  | ✓ | ✓ |
+| PUT | `/product/{id}` | `venue` |  | ✓ | — |
+| PATCH | `/product/{id}/activate` | `venue` |  | ✓ | — |
+| PATCH | `/product/{id}/images` | `venue` |  | ✓ | — |
+| DELETE | `/product/image/{id}` | `venue` |  | ✓ | — |
+| PATCH | `/product/index` | `venue` |  | ✓ | — |
+| DELETE | `/telegram-bot` | `venue` |  | ✓ | — |
+| GET | `/telegram-bot` | `venue` |  | ✓ | — |
+| PUT | `/telegram-bot` | `venue` |  | ✓ | — |
+| PUT | `/telegram-bot/profile` | `venue` |  | ✓ | — |
+| POST | `/telegram-bot/sync` | `venue` |  | ✓ | — |
+| POST | `/translation` | `venue` |  | ✓ | — |
+| DELETE | `/user/{id}` | `venue` |  | ✓ | — |
+| PUT | `/user/{id}` | `profile` |  | ✓ | ✓ |
+| GET | `/user/me` | `account` |  | ✓ | ✓ |
+<!-- access-matrix:end -->
 
 ## Тенант: адрес → id → конфиг
 
@@ -776,7 +921,8 @@ miniapp_required` / `miniapp_init_data_invalid`, «Mini App и режимы до
 
 ## Доступ к данным админки
 
-Владелец видит и меняет только свою организацию. Любой id чужой организации (в пути или в теле: `category_id`,
+Сотрудник (владелец или оператор) видит только своё заведение, а что в нём можно, решает роль (раздел «Сотрудники и
+права»). Любой id чужой организации (в пути или в теле: `category_id`,
 `product_id`, `additional_product_group_id`, id переводов, `organizationId`...) отвечает `404`, как несуществующий.
 
 - `/user/:id`: только свой id. Пароль меняется через `POST /auth/password/change` (8–72 символа).

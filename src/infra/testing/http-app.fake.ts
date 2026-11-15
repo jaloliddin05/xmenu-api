@@ -6,6 +6,8 @@ import { sign } from 'jsonwebtoken';
 import { AppException } from 'src/infra/errors/app-exception';
 import { configureErrorHandling } from 'src/infra/errors/configure';
 import { AccessTokenUserGuard } from 'src/modules/auth/passport-strategies/access-token-user/access-token-user.guard';
+import { StaffAccessGuard } from 'src/modules/auth/access/staff-access.guard';
+import type { StaffRole } from 'src/modules/auth/access/permissions';
 import { AccessTokenUserStrategy } from 'src/modules/auth/passport-strategies/access-token-user/access-token-user.strategy';
 import { AuthService } from 'src/modules/auth/services/auth.service';
 import { StaffSessionService } from 'src/modules/auth/services/staff-session.service';
@@ -15,6 +17,8 @@ const SECRET = 'http-spec-access-secret';
 export interface FakeStaffUser {
   id: string;
   isActive?: boolean;
+  /** owner unless given; null = no venue role (rejected like a disabled user) */
+  role?: StaffRole | null;
   organization: { id: string; slug?: string } | null;
 }
 
@@ -29,13 +33,15 @@ export function staffToken(
 
 /**
  * The app as main.ts wires it (request ids, AppErrorFilter, ValidationPipe, global staff AccessTokenUserGuard with the
- * real passport strategy), around the given controllers and providers. Staff users come from
+ * real passport strategy, then StaffAccessGuard), around the given controllers and providers. Staff users come from
  * `staffUsers` instead of the database, with the same rule as AuthService: missing or inactive is 401.
  */
 export async function createHttpApp(
   meta: ModuleMetadata,
   staffUsers: FakeStaffUser[] = [],
   revokedSids: Set<string> = new Set(),
+  /** Builds any provider nobody gave (Test.createTestingModule().useMocker). */
+  mocker?: (token: unknown) => unknown,
 ): Promise<INestApplication> {
   // A spec that brings its own StaffSessionService keeps it
   const ownsSessions = (meta.providers ?? []).some(
@@ -45,15 +51,19 @@ export async function createHttpApp(
   );
   const auth = {
     validateUserById: async (id: string) => {
-      const user = staffUsers.find((u) => u.id === id);
-      if (!user || user.isActive === false)
+      const found = staffUsers.find((u) => u.id === id);
+      const user = found && {
+        ...found,
+        role: found.role === undefined ? 'owner' : found.role,
+      };
+      if (!user || user.isActive === false || !user.role)
         throw new AppException('unauthorized', {
           message: 'Valid token with non-existent or inactive user.',
         });
       return user;
     },
   };
-  const moduleRef = await Test.createTestingModule({
+  const builder = Test.createTestingModule({
     ...meta,
     providers: [
       ...(meta.providers ?? []),
@@ -74,11 +84,17 @@ export async function createHttpApp(
         useValue: { getOrThrow: () => ({ accessTokenSecret: SECRET }) },
       },
     ],
-  }).compile();
+  });
+  if (mocker) builder.useMocker(mocker as never);
+  const moduleRef = await builder.compile();
 
   const app = moduleRef.createNestApplication({ logger: false });
   configureErrorHandling(app);
-  app.useGlobalGuards(new AccessTokenUserGuard(app.get(Reflector)));
+  const reflector = app.get(Reflector);
+  app.useGlobalGuards(
+    new AccessTokenUserGuard(reflector),
+    new StaffAccessGuard(reflector),
+  );
   await app.init();
   // One listening server per app: otherwise supertest opens a new ephemeral server for every request, and
   // parallel requests race for connections (ECONNRESET on slow runners).

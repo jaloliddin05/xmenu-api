@@ -91,7 +91,8 @@
         "summary": "Platform admins only (PLATFORM_ADMIN_USER_IDS)",
         "tags": [
           "Application"
-        ]
+        ],
+        "x-permission": "platform-admin"
       }
     },
     "/auth/login": {
@@ -381,6 +382,90 @@
         ]
       }
     },
+    "/auth/invitation/code": {
+      "post": {
+        "operationId": "AuthController_invitationCode",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StaffInvitationCodeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffForgotPasswordResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Invited operator: send a code to the phone. The answer, limits and timing are the same for any phone; the code goes out only with an open invitation",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/invitation/accept": {
+      "post": {
+        "operationId": "AuthController_acceptInvitation",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StaffInvitationAcceptDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffCheckCodeResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Invited operator: confirm the phone with the code and set the password; signs the operator in",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
     "/auth/logout": {
       "post": {
         "operationId": "AuthController_logout",
@@ -448,7 +533,8 @@
         "summary": "Change the password (needs the current one); every other login is revoked",
         "tags": [
           "Auth"
-        ]
+        ],
+        "x-permission": "account"
       }
     },
     "/auth/sessions": {
@@ -483,7 +569,8 @@
         "summary": "Active logins of the owner",
         "tags": [
           "Auth"
-        ]
+        ],
+        "x-permission": "account"
       },
       "delete": {
         "operationId": "StaffSessionsController_endOthers",
@@ -506,7 +593,8 @@
         "summary": "End every login except the current one",
         "tags": [
           "Auth"
-        ]
+        ],
+        "x-permission": "account"
       }
     },
     "/auth/sessions/{id}": {
@@ -540,7 +628,8 @@
         "summary": "End one login; another owner’s or an unknown one is 404",
         "tags": [
           "Auth"
-        ]
+        ],
+        "x-permission": "account"
       }
     },
     "/auth/customer/methods": {
@@ -1119,7 +1208,8 @@
         "summary": "Method: returns user",
         "tags": [
           "User"
-        ]
+        ],
+        "x-permission": "account"
       }
     },
     "/user/{id}": {
@@ -1163,7 +1253,8 @@
         "summary": "Method: updating user",
         "tags": [
           "User"
-        ]
+        ],
+        "x-permission": "profile"
       },
       "delete": {
         "operationId": "UserController_remove",
@@ -1195,7 +1286,8 @@
         "summary": "Method: delete",
         "tags": [
           "User"
-        ]
+        ],
+        "x-permission": "venue"
       }
     },
     "/organization/{id}": {
@@ -1229,7 +1321,8 @@
         "summary": "Method: get one (your own organization only)",
         "tags": [
           "Organization"
-        ]
+        ],
+        "x-permission": "venue"
       },
       "put": {
         "operationId": "OrganizationController_update",
@@ -1271,7 +1364,8 @@
         "summary": "Method: updating organization",
         "tags": [
           "Organization"
-        ]
+        ],
+        "x-permission": "venue"
       },
       "delete": {
         "operationId": "OrganizationController_remove",
@@ -1303,7 +1397,8 @@
         "summary": "Method: delete",
         "tags": [
           "Organization"
-        ]
+        ],
+        "x-permission": "venue"
       }
     },
     "/organization/return-slug/{id}": {
@@ -1390,7 +1485,8 @@
         "summary": "Slug mavjudligini tekshirish",
         "tags": [
           "Organization"
-        ]
+        ],
+        "x-permission": "venue"
       }
     },
     "/organization/{id}/settings": {
@@ -1445,7 +1541,8 @@
         "summary": "Venue settings (your own organization only)",
         "tags": [
           "Organization"
-        ]
+        ],
+        "x-permission": "venue"
       },
       "put": {
         "operationId": "OrganizationSettingsController_replace",
@@ -1511,7 +1608,8 @@
         "summary": "Replace venue settings: send every field, null clears it",
         "tags": [
           "Organization"
-        ]
+        ],
+        "x-permission": "venue"
       }
     },
     "/organization/{id}/publication": {
@@ -1587,7 +1685,8 @@
         "summary": "Publication state, channels and the readiness checklist",
         "tags": [
           "Organization"
-        ]
+        ],
+        "x-permission": "venue"
       }
     },
     "/organization/{id}/channels": {
@@ -1693,7 +1792,8 @@
         "summary": "Replace channels: QR menu and ordering (enabled, mode). Turning ordering off also unpublishes",
         "tags": [
           "Organization"
-        ]
+        ],
+        "x-permission": "venue"
       }
     },
     "/organization/{id}/publish": {
@@ -1779,7 +1879,8 @@
         "summary": "Publish: checks the checklist and opens orders. Already published: 200, publishedAt unchanged",
         "tags": [
           "Organization"
-        ]
+        ],
+        "x-permission": "venue"
       }
     },
     "/organization/{id}/unpublish": {
@@ -1855,7 +1956,8 @@
         "summary": "Pause: orders close, the QR menu keeps working, channels stay as they are. Repeating is fine",
         "tags": [
           "Organization"
-        ]
+        ],
+        "x-permission": "venue"
       }
     },
     "/tenant/by-slug/{slug}": {
@@ -1986,7 +2088,8 @@
         "summary": "Connection status of the venue bot and the profile pushed to it",
         "tags": [
           "Telegram bot"
-        ]
+        ],
+        "x-permission": "venue"
       },
       "put": {
         "operationId": "TelegramBotController_connect",
@@ -2046,7 +2149,8 @@
         "summary": "Connect or replace the bot: checks the token with Telegram, registers the webhook, stores the token encrypted, then pushes the profile (name, descriptions, /start command, menu button). A failed profile push does not fail the connection: see lastSync",
         "tags": [
           "Telegram bot"
-        ]
+        ],
+        "x-permission": "venue"
       },
       "delete": {
         "description": "The menu button returns to Telegram default. Name, descriptions and commands set by autoconfiguration stay on the bot (listed in leftOnBot): it is the owner bot, they change them in @BotFather.",
@@ -2088,7 +2192,8 @@
         "summary": "Disconnect the bot and remove its webhook",
         "tags": [
           "Telegram bot"
-        ]
+        ],
+        "x-permission": "venue"
       }
     },
     "/telegram-bot/profile": {
@@ -2147,7 +2252,8 @@
         "summary": "Save the bot profile (per language) and push it to Telegram",
         "tags": [
           "Telegram bot"
-        ]
+        ],
+        "x-permission": "venue"
       }
     },
     "/telegram-bot/sync": {
@@ -2193,7 +2299,8 @@
         "summary": "Push the saved profile to Telegram again (e.g. after a failed item)",
         "tags": [
           "Telegram bot"
-        ]
+        ],
+        "x-permission": "venue"
       }
     },
     "/customers/me": {
@@ -2535,7 +2642,8 @@
         "summary": "Barcha filiallar (yashirinlari ham) jadvali bilan",
         "tags": [
           "Branch"
-        ]
+        ],
+        "x-permission": "branches.read"
       },
       "post": {
         "operationId": "BranchAdminController_create",
@@ -2568,7 +2676,8 @@
         "summary": "Filial yaratish",
         "tags": [
           "Branch"
-        ]
+        ],
+        "x-permission": "venue"
       }
     },
     "/branch/{id}": {
@@ -2612,7 +2721,8 @@
         "summary": "Filial maydonlarini o'zgartirish (isActive=false — yashirish)",
         "tags": [
           "Branch"
-        ]
+        ],
+        "x-permission": "venue"
       },
       "delete": {
         "operationId": "BranchAdminController_remove",
@@ -2644,7 +2754,8 @@
         "summary": "O'chirish (buyurtmasi bor filial faqat yashiriladi)",
         "tags": [
           "Branch"
-        ]
+        ],
+        "x-permission": "venue"
       }
     },
     "/branch/{id}/working-hours": {
@@ -2688,7 +2799,8 @@
         "summary": "Haftalik ish jadvalini to'liq almashtirish",
         "tags": [
           "Branch"
-        ]
+        ],
+        "x-permission": "venue"
       }
     },
     "/branch/{id}/exceptions": {
@@ -2732,7 +2844,8 @@
         "summary": "Sana uchun istisno (bayram, ta'mir) qo'shish/yangilash",
         "tags": [
           "Branch"
-        ]
+        ],
+        "x-permission": "venue"
       }
     },
     "/branch/{id}/exceptions/{exceptionId}": {
@@ -2774,7 +2887,8 @@
         "summary": "Istisnoni o'chirish",
         "tags": [
           "Branch"
-        ]
+        ],
+        "x-permission": "venue"
       }
     },
     "/category": {
@@ -2808,7 +2922,8 @@
         "summary": "Method: get all",
         "tags": [
           "Category"
-        ]
+        ],
+        "x-permission": "menu.read"
       },
       "post": {
         "operationId": "CategoryController_create",
@@ -2841,7 +2956,8 @@
         "summary": "Method: create",
         "tags": [
           "Category"
-        ]
+        ],
+        "x-permission": "venue"
       }
     },
     "/category/for-select/{organizationId}": {
@@ -2883,7 +2999,8 @@
         "summary": "Method: get all for select (only your own organization id)",
         "tags": [
           "Category"
-        ]
+        ],
+        "x-permission": "menu.read"
       }
     },
     "/category/{id}": {
@@ -2917,7 +3034,8 @@
         "summary": "Method: get one",
         "tags": [
           "Category"
-        ]
+        ],
+        "x-permission": "menu.read"
       },
       "put": {
         "operationId": "CategoryController_update",
@@ -2959,7 +3077,8 @@
         "summary": "Method: update",
         "tags": [
           "Category"
-        ]
+        ],
+        "x-permission": "venue"
       },
       "delete": {
         "operationId": "CategoryController_remove",
@@ -2991,7 +3110,8 @@
         "summary": "Method: delete",
         "tags": [
           "Category"
-        ]
+        ],
+        "x-permission": "venue"
       }
     },
     "/category/{id}/activate": {
@@ -3045,7 +3165,8 @@
         "summary": "Method: activate/deactivate category",
         "tags": [
           "Category"
-        ]
+        ],
+        "x-permission": "venue"
       }
     },
     "/category/index": {
@@ -3080,7 +3201,8 @@
         "summary": "Method: update index",
         "tags": [
           "Category"
-        ]
+        ],
+        "x-permission": "venue"
       }
     },
     "/file/upload": {
@@ -3104,7 +3226,8 @@
         },
         "tags": [
           "File"
-        ]
+        ],
+        "x-permission": "profile"
       }
     },
     "/menu": {
@@ -3503,7 +3626,8 @@
         "summary": "Buyurtmalar ro'yxati (yangilari birinchi, cursor pagination)",
         "tags": [
           "Orders (staff)"
-        ]
+        ],
+        "x-permission": "orders"
       }
     },
     "/order/{id}": {
@@ -3544,7 +3668,8 @@
         "summary": "Buyurtma tafsiloti (mijoz, status tarixi bilan)",
         "tags": [
           "Orders (staff)"
-        ]
+        ],
+        "x-permission": "orders"
       }
     },
     "/order/{id}/accept": {
@@ -3585,7 +3710,8 @@
         "summary": "Qabul qilish",
         "tags": [
           "Orders (staff)"
-        ]
+        ],
+        "x-permission": "orders"
       }
     },
     "/order/{id}/reject": {
@@ -3636,7 +3762,8 @@
         "summary": "Rad etish (to'langan bo'lsa pul qaytariladi)",
         "tags": [
           "Orders (staff)"
-        ]
+        ],
+        "x-permission": "orders"
       }
     },
     "/order/{id}/advance": {
@@ -3677,7 +3804,8 @@
         "summary": "Keyingi bosqichga o'tkazish (tayyorlanmoqda → yo'lda/tayyor → yakunlandi)",
         "tags": [
           "Orders (staff)"
-        ]
+        ],
+        "x-permission": "orders"
       }
     },
     "/order/{id}/status": {
@@ -3728,7 +3856,8 @@
         "summary": "Aniq holatga o'tkazish (holatlar mashinasi ruxsat bergan taqdirda)",
         "tags": [
           "Orders (staff)"
-        ]
+        ],
+        "x-permission": "orders"
       }
     },
     "/order-settings": {
@@ -3753,7 +3882,8 @@
         "summary": "Current ordering settings (the row is created at signup)",
         "tags": [
           "Order settings"
-        ]
+        ],
+        "x-permission": "venue"
       },
       "put": {
         "operationId": "OrderSettingsController_update",
@@ -3786,7 +3916,8 @@
         "summary": "Sozlamalarni saqlash (faqat yuborilgan maydonlar o'zgaradi)",
         "tags": [
           "Order settings"
-        ]
+        ],
+        "x-permission": "venue"
       }
     },
     "/checkout-config": {
@@ -3853,7 +3984,8 @@
         "summary": "Yoqilgan/sozlangan provayderlar + kabinetga kiritiladigan webhook manzillari",
         "tags": [
           "Payment providers"
-        ]
+        ],
+        "x-permission": "venue"
       }
     },
     "/payment-provider/{provider}": {
@@ -3897,7 +4029,8 @@
         "summary": "Provayder kalitlarini saqlash (shifrlanadi) va yoqish",
         "tags": [
           "Payment providers"
-        ]
+        ],
+        "x-permission": "venue"
       }
     },
     "/payment-provider/{provider}/disable": {
@@ -3931,7 +4064,8 @@
         "summary": "Provayderni o'chirish (kalitlar saqlanadi)",
         "tags": [
           "Payment providers"
-        ]
+        ],
+        "x-permission": "venue"
       }
     },
     "/branch/{id}/delivery-pricing": {
@@ -3962,7 +4096,7 @@
             "description": "No or invalid owner token"
           },
           "403": {
-            "description": "The user has no organization"
+            "description": "The user has no organization, or the role lacks the venue permission"
           },
           "404": {
             "description": "Not your branch (another venue’s branch looks missing)"
@@ -3986,7 +4120,8 @@
         "summary": "Delivery pricing of the branch: zones and distance rule",
         "tags": [
           "Branch"
-        ]
+        ],
+        "x-permission": "venue"
       },
       "put": {
         "operationId": "BranchDeliveryPricingController_replace",
@@ -4028,7 +4163,7 @@
             "description": "No or invalid owner token"
           },
           "403": {
-            "description": "The user has no organization"
+            "description": "The user has no organization, or the role lacks the venue permission"
           },
           "404": {
             "description": "Not your branch (another venue’s branch looks missing)"
@@ -4052,7 +4187,8 @@
         "summary": "Replace the delivery pricing of the branch (zones in priority order, distance rule or null)",
         "tags": [
           "Branch"
-        ]
+        ],
+        "x-permission": "venue"
       }
     },
     "/branch/{id}/delivery-pricing/check": {
@@ -4111,7 +4247,7 @@
             "description": "No or invalid owner token"
           },
           "403": {
-            "description": "The user has no organization"
+            "description": "The user has no organization, or the role lacks the venue permission"
           },
           "404": {
             "description": "Not your branch (another venue’s branch looks missing)"
@@ -4135,7 +4271,8 @@
         "summary": "Delivery price from this branch to a point by its saved rules and the venue step (hours not considered)",
         "tags": [
           "Branch"
-        ]
+        ],
+        "x-permission": "venue"
       }
     },
     "/delivery/quote": {
@@ -4266,7 +4403,8 @@
         "summary": "Method: get all",
         "tags": [
           "Product"
-        ]
+        ],
+        "x-permission": "menu.read"
       },
       "post": {
         "operationId": "ProductController_create",
@@ -4299,7 +4437,8 @@
         "summary": "Create new product with translations and options",
         "tags": [
           "Product"
-        ]
+        ],
+        "x-permission": "venue"
       }
     },
     "/product/{id}": {
@@ -4333,7 +4472,8 @@
         "summary": "Method: get one",
         "tags": [
           "Product"
-        ]
+        ],
+        "x-permission": "menu.read"
       },
       "put": {
         "operationId": "ProductController_update",
@@ -4375,7 +4515,8 @@
         "summary": "Update existing product",
         "tags": [
           "Product"
-        ]
+        ],
+        "x-permission": "venue"
       },
       "delete": {
         "operationId": "ProductController_remove",
@@ -4407,7 +4548,8 @@
         "summary": "Method: delete",
         "tags": [
           "Product"
-        ]
+        ],
+        "x-permission": "venue"
       }
     },
     "/product/index": {
@@ -4442,7 +4584,8 @@
         "summary": "Method: update index",
         "tags": [
           "Product"
-        ]
+        ],
+        "x-permission": "venue"
       }
     },
     "/product/{id}/activate": {
@@ -4496,7 +4639,8 @@
         "summary": "Method: activate/deactivate product",
         "tags": [
           "Product"
-        ]
+        ],
+        "x-permission": "venue"
       }
     },
     "/product/{id}/images": {
@@ -4540,7 +4684,8 @@
         "summary": "Upload images for a product",
         "tags": [
           "Product"
-        ]
+        ],
+        "x-permission": "venue"
       }
     },
     "/product/image/{id}": {
@@ -4574,7 +4719,8 @@
         "summary": "Method: delete image",
         "tags": [
           "Product"
-        ]
+        ],
+        "x-permission": "venue"
       }
     },
     "/additional-product/group": {
@@ -4609,7 +4755,8 @@
         "summary": "Create new additional product group",
         "tags": [
           "Additional-Product"
-        ]
+        ],
+        "x-permission": "venue"
       }
     },
     "/additional-product": {
@@ -4644,7 +4791,8 @@
         "summary": "Create new additional product",
         "tags": [
           "Additional-Product"
-        ]
+        ],
+        "x-permission": "venue"
       }
     },
     "/additional-product/group/{id}": {
@@ -4688,7 +4836,8 @@
         "summary": "Update additional product group",
         "tags": [
           "Additional-Product"
-        ]
+        ],
+        "x-permission": "venue"
       },
       "delete": {
         "operationId": "AdditionalProductController_deleteGroup",
@@ -4720,7 +4869,8 @@
         "summary": "Method: delete",
         "tags": [
           "Additional-Product"
-        ]
+        ],
+        "x-permission": "venue"
       }
     },
     "/additional-product/{id}": {
@@ -4764,7 +4914,8 @@
         "summary": "Update additional product",
         "tags": [
           "Additional-Product"
-        ]
+        ],
+        "x-permission": "venue"
       },
       "delete": {
         "operationId": "AdditionalProductController_remove",
@@ -4796,7 +4947,8 @@
         "summary": "Method: delete",
         "tags": [
           "Additional-Product"
-        ]
+        ],
+        "x-permission": "venue"
       }
     },
     "/tenant/config": {
@@ -4932,7 +5084,8 @@
         "summary": "Own domains of the venue, its platform address and the primary domain",
         "tags": [
           "Organization domains"
-        ]
+        ],
+        "x-permission": "venue"
       },
       "post": {
         "operationId": "TenantDomainController_add",
@@ -5046,7 +5199,8 @@
         "summary": "Add a domain. It stays pending (resolves to nobody) until the TXT record check passes; with DOMAIN_VERIFY_SKIP=true (development) it is verified at once",
         "tags": [
           "Organization domains"
-        ]
+        ],
+        "x-permission": "venue"
       }
     },
     "/organization/{id}/domains/{domainId}/verify": {
@@ -5150,7 +5304,8 @@
         "summary": "Check the TXT record _xmenu-verify.<host> = xmenu-verify=<token>. A verified domain answers as is",
         "tags": [
           "Organization domains"
-        ]
+        ],
+        "x-permission": "venue"
       }
     },
     "/organization/{id}/domains/{domainId}": {
@@ -5227,7 +5382,281 @@
         "summary": "Remove a domain",
         "tags": [
           "Organization domains"
-        ]
+        ],
+        "x-permission": "venue"
+      }
+    },
+    "/organization/{id}/staff": {
+      "get": {
+        "operationId": "StaffController_list",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StaffMemberDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No or invalid staff token, or the user is disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "forbidden: not the owner (operators have no `staff` permission)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not your organization (any other id looks missing), or no such staff member in it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Staff of the venue: the owner first, then operators and invitations",
+        "tags": [
+          "Organization staff"
+        ],
+        "x-permission": "staff"
+      },
+      "post": {
+        "operationId": "StaffController_invite",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteStaffDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffMemberDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid_phone, validation_error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No or invalid staff token, or the user is disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "forbidden: not the owner (operators have no `staff` permission)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not your organization (any other id looks missing), or no such staff member in it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "phone_taken: the phone has a staff account, or an open invitation of another venue",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate_limited: too many invitations from this venue",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Invite an operator by phone (valid 72 h; inviting the phone again restarts it). Nothing is sent: the operator opens the dashboard, gets a code (POST /auth/invitation/code) and sets a password",
+        "tags": [
+          "Organization staff"
+        ],
+        "x-permission": "staff"
+      }
+    },
+    "/organization/{id}/staff/{memberId}/disable": {
+      "post": {
+        "operationId": "StaffController_disable",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "memberId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "401": {
+            "description": "No or invalid staff token, or the user is disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "forbidden: not the owner (operators have no `staff` permission)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not your organization (any other id looks missing), or no such staff member in it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Disable an operator (every login ends at once) or cancel an invitation; idempotent. The owner: 403 forbidden",
+        "tags": [
+          "Organization staff"
+        ],
+        "x-permission": "staff"
       }
     },
     "/translation": {
@@ -5262,7 +5691,8 @@
         "summary": "Translate menu text (owner token required; rate limited per owner, 429 rate_limited)",
         "tags": [
           "Translation"
-        ]
+        ],
+        "x-permission": "venue"
       }
     }
   },
@@ -5631,6 +6061,33 @@
             "type": "string",
             "nullable": true
           },
+          "role": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "operator"
+            ],
+            "nullable": true,
+            "description": "Role in the venue"
+          },
+          "permissions": {
+            "type": "array",
+            "description": "What the role may do; the dashboard shows screens by it (docs/API.md, \"Сотрудники и права\")",
+            "items": {
+              "type": "string",
+              "enum": [
+                "account",
+                "profile",
+                "orders",
+                "couriers",
+                "shifts",
+                "branches.read",
+                "menu.read",
+                "venue",
+                "staff"
+              ]
+            }
+          },
           "organization": {
             "nullable": true,
             "type": "object",
@@ -5916,6 +6373,44 @@
           "phone",
           "code",
           "newPassword"
+        ]
+      },
+      "StaffInvitationCodeDto": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "example": "+998901234567",
+            "description": "The invited phone"
+          }
+        },
+        "required": [
+          "phone"
+        ]
+      },
+      "StaffInvitationAcceptDto": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "example": "+998901234567"
+          },
+          "code": {
+            "type": "string",
+            "example": "123456",
+            "description": "Code from the SMS"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 72,
+            "example": "correct horse battery"
+          }
+        },
+        "required": [
+          "phone",
+          "code",
+          "password"
         ]
       },
       "StaffLogoutDto": {
@@ -9770,6 +10265,100 @@
         },
         "required": [
           "host"
+        ]
+      },
+      "StaffMemberDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Pass to POST …/staff/{memberId}/disable"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "operator"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "invited",
+              "expired",
+              "active",
+              "disabled"
+            ],
+            "description": "invited: waits for the operator; expired: the invitation ran out (invite again); active; disabled"
+          },
+          "phone": {
+            "type": "string",
+            "example": "+998901234567"
+          },
+          "firstName": {
+            "type": "string"
+          },
+          "lastName": {
+            "type": "string",
+            "nullable": true
+          },
+          "invitedAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "When the row was created (invited)"
+          },
+          "inviteExpiresAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "Until when an open invitation can be accepted"
+          },
+          "activatedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "disabledAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "role",
+          "status",
+          "phone",
+          "firstName",
+          "lastName",
+          "invitedAt",
+          "inviteExpiresAt",
+          "activatedAt",
+          "disabledAt"
+        ]
+      },
+      "InviteStaffDto": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "example": "+998901234567",
+            "description": "Operator phone"
+          },
+          "first_name": {
+            "type": "string",
+            "example": "Dilshod",
+            "maxLength": 64
+          },
+          "last_name": {
+            "type": "string",
+            "example": "Karimov",
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "phone",
+          "first_name"
         ]
       },
       "TranslationDto": {

@@ -24,6 +24,7 @@ import {
   UpdateBranchDto,
 } from './dto/branch.dto';
 import { BranchService } from './services/branch.service';
+import { StaffAccess } from 'src/modules/auth/access/staff-access.decorator';
 
 /**
  * Restoran paneli uchun filial boshqaruvi. Xodim tokeni (global guard); tenant
@@ -34,6 +35,7 @@ import { BranchService } from './services/branch.service';
 export class BranchAdminController {
   constructor(private readonly branches: BranchService) {}
 
+  @StaffAccess('branches.read')
   @Get()
   @ApiOperation({
     summary: 'Barcha filiallar (yashirinlari ham) jadvali bilan',
@@ -42,12 +44,14 @@ export class BranchAdminController {
     return this.branches.listAdmin(requireStaffOrganizationId(req));
   }
 
+  @StaffAccess('venue')
   @Post()
   @ApiOperation({ summary: 'Filial yaratish' })
   create(@Body() dto: CreateBranchDto, @Req() req: StaffRequest) {
     return this.branches.create(requireStaffOrganizationId(req), dto);
   }
 
+  @StaffAccess('venue')
   @Patch(':id')
   @ApiOperation({
     summary: "Filial maydonlarini o'zgartirish (isActive=false — yashirish)",
@@ -60,6 +64,7 @@ export class BranchAdminController {
     return this.branches.update(requireStaffOrganizationId(req), id, dto);
   }
 
+  @StaffAccess('venue')
   @Put(':id/working-hours')
   @ApiOperation({ summary: "Haftalik ish jadvalini to'liq almashtirish" })
   setWorkingHours(
@@ -74,6 +79,7 @@ export class BranchAdminController {
     );
   }
 
+  @StaffAccess('venue')
   @Post(':id/exceptions')
   @ApiOperation({
     summary: "Sana uchun istisno (bayram, ta'mir) qo'shish/yangilash",
@@ -86,6 +92,7 @@ export class BranchAdminController {
     return this.branches.addException(requireStaffOrganizationId(req), id, dto);
   }
 
+  @StaffAccess('venue')
   @Delete(':id/exceptions/:exceptionId')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: "Istisnoni o'chirish" })
@@ -101,6 +108,7 @@ export class BranchAdminController {
     );
   }
 
+  @StaffAccess('venue')
   @Delete(':id')
   @ApiOperation({
     summary: "O'chirish (buyurtmasi bor filial faqat yashiriladi)",

@@ -18,6 +18,7 @@ import {
 import { PLATFORM_THEME } from './domain/platform-defaults';
 import { OrganizationService } from './services/organization.service';
 import { OrganizationSettingsService } from './services/organization-settings.service';
+import { StaffAccess } from 'src/modules/auth/access/staff-access.decorator';
 
 type StaffRequest = Parameters<typeof requireStaffOrganizationId>[0];
 
@@ -46,6 +47,7 @@ export class OrganizationSettingsController {
     private readonly settings: OrganizationSettingsService,
   ) {}
 
+  @StaffAccess('venue', { orgParam: 'id' })
   @Get(':id/settings')
   @ApiOperation({ summary: 'Venue settings (your own organization only)' })
   @ApiOkResponse({ type: OrganizationSettingsDto })
@@ -55,6 +57,7 @@ export class OrganizationSettingsController {
     return this.settings.get(organizationId).then(withEffectiveTheme);
   }
 
+  @StaffAccess('venue', { orgParam: 'id' })
   @Put(':id/settings')
   @ApiOperation({
     summary: 'Replace venue settings: send every field, null clears it',

@@ -19,12 +19,14 @@ import {
   requireStaffOrganizationId,
   type StaffRequest,
 } from 'src/infra/http/request-helpers';
+import { StaffAccess } from 'src/modules/auth/access/staff-access.decorator';
 
 @ApiTags('Category')
 @Controller('category')
 export class CategoryController {
   constructor(private readonly categoryService: CategoryService) {}
 
+  @StaffAccess('menu.read')
   @Get()
   @ApiOperation({ summary: 'Method: get all' })
   @HttpCode(HttpStatus.OK)
@@ -35,6 +37,7 @@ export class CategoryController {
     );
   }
 
+  @StaffAccess('menu.read', { orgParam: 'organizationId' })
   @Get('/for-select/:organizationId')
   @ApiOperation({
     summary: 'Method: get all for select (only your own organization id)',
@@ -52,6 +55,7 @@ export class CategoryController {
     );
   }
 
+  @StaffAccess('menu.read')
   @Get('/:id')
   @ApiOperation({ summary: 'Method: get one' })
   @HttpCode(HttpStatus.OK)
@@ -62,6 +66,7 @@ export class CategoryController {
     );
   }
 
+  @StaffAccess('venue')
   @Post()
   @ApiOperation({ summary: 'Method: create' })
   @HttpCode(HttpStatus.CREATED)
@@ -73,6 +78,7 @@ export class CategoryController {
     );
   }
 
+  @StaffAccess('venue')
   @Put(':id')
   @ApiOperation({ summary: 'Method: update' })
   @HttpCode(HttpStatus.OK)
@@ -89,6 +95,7 @@ export class CategoryController {
     );
   }
 
+  @StaffAccess('venue')
   @Patch(':id/activate')
   @ApiOperation({ summary: 'Method: activate/deactivate category' })
   @ApiBody({
@@ -118,6 +125,7 @@ export class CategoryController {
     );
   }
 
+  @StaffAccess('venue')
   @Patch('/index')
   @ApiOperation({ summary: 'Method: update index' })
   @HttpCode(HttpStatus.OK)
@@ -129,6 +137,7 @@ export class CategoryController {
     );
   }
 
+  @StaffAccess('venue')
   @Delete(':id')
   @ApiOperation({ summary: 'Method: delete' })
   @HttpCode(HttpStatus.NO_CONTENT)

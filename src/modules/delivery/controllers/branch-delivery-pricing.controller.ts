@@ -30,12 +30,16 @@ import {
 } from '../dto/delivery-pricing.dto';
 import { DeliveryPricingService } from '../services/delivery-pricing.service';
 import { DeliveryQuoteService } from '../services/delivery-quote.service';
+import { StaffAccess } from 'src/modules/auth/access/staff-access.decorator';
 
 /** Owner (dashboard): delivery pricing of a branch and "what does delivery to this address cost". */
 @ApiTags('Branch')
 @ApiBearerAuth('access-token')
 @ApiUnauthorizedResponse({ description: 'No or invalid owner token' })
-@ApiForbiddenResponse({ description: 'The user has no organization' })
+@ApiForbiddenResponse({
+  description:
+    'The user has no organization, or the role lacks the venue permission',
+})
 @ApiNotFoundResponse({
   description: 'Not your branch (another venue’s branch looks missing)',
 })
@@ -46,6 +50,7 @@ export class BranchDeliveryPricingController {
     private readonly quotes: DeliveryQuoteService,
   ) {}
 
+  @StaffAccess('venue')
   @Get(':id/delivery-pricing')
   @ApiOperation({
     summary: 'Delivery pricing of the branch: zones and distance rule',
@@ -55,6 +60,7 @@ export class BranchDeliveryPricingController {
     return this.pricing.get(requireStaffOrganizationId(req), id);
   }
 
+  @StaffAccess('venue')
   @Put(':id/delivery-pricing')
   @ApiOperation({
     summary:
@@ -73,6 +79,7 @@ export class BranchDeliveryPricingController {
     return this.pricing.replace(requireStaffOrganizationId(req), id, dto);
   }
 
+  @StaffAccess('venue')
   @Get(':id/delivery-pricing/check')
   @ApiOperation({
     summary:

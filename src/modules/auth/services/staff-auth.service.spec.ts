@@ -155,10 +155,13 @@ describe('StaffAuthService (signup)', () => {
       });
       expect(await bcrypt.compare(SIGNUP.password, user.password!)).toBe(true);
       expect(deps.db.orgs[0]).toMatchObject({
-        owner_id: user.id,
         name: 'Mant',
         type: 'cafe',
         is_active: true,
+      });
+      expect(deps.db.ownerOf(deps.db.orgs[0].id)).toMatchObject({
+        user_id: user.id,
+        status: 'active',
       });
 
       expect(res.success).toBe(true);
@@ -166,6 +169,8 @@ describe('StaffAuthService (signup)', () => {
       expect(res.refreshToken).toBe(`refresh:${user.id}`);
       expect(res.user).not.toHaveProperty('password');
       expect(res.user.organization?.id).toBe(deps.db.orgs[0].id);
+      expect(res.user.role).toBe('owner');
+      expect(res.user.permissions).toContain('staff');
       expect(deps.db.events.map((e) => e.type)).toContain('staff_registered');
     });
 
@@ -277,7 +282,7 @@ describe('StaffAuthService (signup)', () => {
       });
       await deps.organizations.create(
         { name: 'Old name', type: 'other' },
-        legacy.id,
+        legacy,
       );
 
       const { registrationId } = await service.register(SIGNUP, CTX);
@@ -293,11 +298,8 @@ describe('StaffAuthService (signup)', () => {
         isActive: true,
       });
       expect(deps.db.orgs).toHaveLength(1);
-      expect(deps.db.orgs[0]).toMatchObject({
-        owner_id: legacy.id,
-        name: 'Mant',
-        is_active: true,
-      });
+      expect(deps.db.orgs[0]).toMatchObject({ name: 'Mant', is_active: true });
+      expect(deps.db.ownerOf(deps.db.orgs[0].id)?.user_id).toBe(legacy.id);
     });
   });
 
@@ -365,7 +367,7 @@ describe('StaffAuthService (signup)', () => {
           ...over,
         },
       });
-      await deps.organizations.create({ name: 'Mant', type: 'cafe' }, user.id);
+      await deps.organizations.create({ name: 'Mant', type: 'cafe' }, user);
       return user;
     }
 
@@ -493,6 +495,77 @@ describe('StaffAuthService (signup)', () => {
         'invalid_credentials',
       );
     }
+  });
+
+  describe('operator', () => {
+    const OP_PHONE = '+998907654321';
+    const OP_PASSWORD = 'operator-password-1';
+
+    /** An owner's venue with an operator who accepted the invitation. */
+    async function seedOperator(status: 'active' | 'disabled' = 'active') {
+      const owner = await deps.db.user.create({
+        data: { phone: PHONE, first_name: 'Aziz', isActive: true },
+      });
+      const org = await deps.organizations.create(
+        { name: 'Mant', type: 'cafe' },
+        owner,
+      );
+      const op = await deps.db.user.create({
+        data: {
+          phone: OP_PHONE,
+          first_name: 'Dilshod',
+          isActive: status === 'active',
+          password: await bcrypt.hash(OP_PASSWORD, 4),
+        },
+      });
+      deps.db.members.push({
+        id: 'member-op',
+        organization_id: org.id,
+        user_id: op.id,
+        role: 'operator',
+        status,
+        phone: OP_PHONE,
+        first_name: 'Dilshod',
+        last_name: null,
+      });
+      return { org, op };
+    }
+
+    it('signs in with the operator role, its permissions and the venue', async () => {
+      const { org } = await seedOperator();
+      const res = await service.login(
+        { login: OP_PHONE, password: OP_PASSWORD },
+        CTX,
+      );
+      expect(res.user.role).toBe('operator');
+      expect(res.user.organization?.id).toBe(org.id);
+      expect(res.user.permissions).toContain('orders');
+      expect(res.user.permissions).not.toContain('venue');
+      expect(res.user.permissions).not.toContain('staff');
+    });
+
+    it('a disabled operator is answered like an unknown phone', async () => {
+      await seedOperator('disabled');
+      const err = await expectCode(
+        service.login({ login: OP_PHONE, password: OP_PASSWORD }, CTX),
+        'invalid_credentials',
+      );
+      expect(err.getStatus()).toBe(401);
+    });
+
+    it("signing up with a disabled operator's phone gets the account notice, never a code", async () => {
+      await seedOperator('disabled');
+      const { registrationId } = await service.register(
+        { ...SIGNUP, phone: OP_PHONE },
+        CTX,
+      );
+      expect(() => deps.sms.lastCode()).toThrow();
+      await expectCode(
+        service.checkCode({ registrationId, code: '123456' }, CTX),
+        'invalid_code',
+      );
+      expect(deps.db.orgs).toHaveLength(1);
+    });
   });
 
   it('never writes codes, passwords or full phones to the audit log', async () => {
