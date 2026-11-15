@@ -13,7 +13,8 @@ import { computeTotals, hashOrderRequest } from '../domain/order-money';
 import { priceLines, PricingProduct } from '../domain/order-pricing';
 import {
   ACTIVE_STATUSES,
-  CUSTOMER_CANCELLABLE,
+  customerCanCancel,
+  FulfillmentName,
   OrderStatusName,
 } from '../domain/order-state-machine';
 import type { Tenant } from 'src/modules/tenant/tenant.service';
@@ -34,6 +35,7 @@ import { AppException } from 'src/infra/errors/app-exception';
 export const ORDER_INCLUDE = {
   items: { include: { options: true } },
   branch: { select: { id: true, title: true, address: true } },
+  courier: { select: { id: true, name: true, phone: true } },
 } satisfies Prisma.customer_orderInclude;
 
 const IDEMPOTENCY_KEY = /^[A-Za-z0-9_-]{8,128}$/;
@@ -392,7 +394,12 @@ export class OrderService {
     const order = await this.findOwn(principal, id);
     if (order.status === 'cancelled') return this.view(order, lang); // ikki marta bekor qilish xato emas
 
-    if (!CUSTOMER_CANCELLABLE.has(order.status as OrderStatusName)) {
+    if (
+      !customerCanCancel(
+        order.status as OrderStatusName,
+        order.fulfillment as FulfillmentName,
+      )
+    ) {
       throw new AppException('cancel_not_allowed', {
         message: 'The order can no longer be cancelled',
       });

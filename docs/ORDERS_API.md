@@ -125,9 +125,14 @@ Webhook'и Click/Payme переводят заказ `awaiting_payment → pendi
   ],
   "currency": "UZS", "subtotal": 97000, "deliveryFee": 16000, "discount": 0, "total": 113000,
   "cashChangeFrom": null,
-  "cancelledBy": null, "cancelReason": null
+  "cancelledBy": null, "cancelReason": null,
+  "courier": null, "doorProblem": null
 }
 ```
+
+`courier`: `{ "name": "Bekzod" }`, пока свой курьер везёт заказ (`on_the_way`, `problem_at_door`), иначе `null`;
+телефона курьера гость не получает. `doorProblem`: `no_answer` (курьер у двери и не может дозвониться; таймлайн:
+«Курьер у двери и не может до вас дозвониться») или `refused` (гость отказался; решает оператор), иначе `null`.
 
 Позиции, адрес, `branch`, названия и цены — **снимок на момент заказа**: заказ не
 должен меняться, если меню или адрес потом отредактируют.
@@ -137,17 +142,30 @@ Webhook'и Click/Payme переводят заказ `awaiting_payment → pendi
 ### Статусы (`status`)
 
 ```
-awaiting_payment ──оплата──▶ pending_acceptance ▶ accepted ▶ preparing ▶ on_the_way (delivery) / ready (pickup) ▶ completed
+awaiting_payment ──оплата──▶ pending_acceptance ▶ accepted
       │  └─отказ/истёк срок─▶ payment_failed ──retry──▶ awaiting_payment
 cash ─────────────────────▶ pending_acceptance
-любой из awaiting_payment / payment_failed / pending_acceptance / accepted ──▶ cancelled
+
+самовывоз: accepted ▶ preparing ▶ ready ▶ completed                    (всё делает ресторан)
+доставка:  accepted ─оператор─▶ ready ─курьер «Забрал»─▶ on_the_way ─курьер «Доставил»─▶ completed
+           on_the_way ─курьер «Не могу доставить»─▶ ready (без курьера)
+           on_the_way ─курьер «Не дозвонился» / «Отказ гостя»─▶ problem_at_door
+           problem_at_door ─курьер «Доставил» (только не дозвонился)─▶ completed
+           problem_at_door ─оператор─▶ returned_to_restaurant | cancelled
+           accepted | ready ─оператор─▶ handed_to_external        (передача внешней службе, следующая задача)
+отмена рестораном с причиной: на любом шаге до конечного
 ```
+
+Конечные статусы: `completed`, `cancelled`, `returned_to_restaurant`, `handed_to_external`. У доставки нет шага
+`preparing`; «В пути» и «Доставлен» отмечает только назначенный заказу курьер в боте заведения (`docs/API.md`,
+«Курьеры»). Полная таблица переходов: `src/modules/order/domain/order-state-machine.ts` (тест сверяет её со схемой
+`../docs/DELIVERY.md`).
 
 `cancelled`: `cancelledBy` = `customer | restaurant | system`;
 `cancelReason`, напр. `declined`, `no_response` (авто-отмена, если ресторан
 не принял за 5 мин — по ранее спроектированной эскалации).
-Клиент может отменить только из `awaiting_payment`, `payment_failed`,
-`pending_acceptance`, `accepted`; иначе `409 cancel_not_allowed`.
+Клиент может отменить доставку только из `awaiting_payment`, `payment_failed`, `pending_acceptance` (до принятия
+рестораном), самовывоз ещё и из `accepted`; иначе `409 cancel_not_allowed`.
 Повторная отмена уже отменённого — не ошибка.
 
 ### `paymentStatus`
@@ -207,18 +225,26 @@ cash ─────────────────────▶ pending_
 
 | Метод | Путь | |
 |---|---|---|
-| GET | `/order?status=a,b&branchId=&cursor=&limit=` | список, новые первыми |
-| GET | `/order/:id` | детали + клиент + журнал статусов |
+| GET | `/order?status=a,b&branchId=&courierId=&unassigned=true&cursor=&limit=` | список, новые первыми; `unassigned=true`: доставка в `accepted`/`ready` без курьера |
+| GET | `/order/:id` | детали + клиент + курьер + журнал статусов |
 | POST | `/order/:id/accept` | принять |
-| POST | `/order/:id/reject` `{reason?}` | отклонить (оплаченный — возврат) |
-| POST | `/order/:id/advance` | следующий этап по типу заказа |
-| POST | `/order/:id/status` `{status}` | конкретный статус, если машина состояний разрешает |
+| POST | `/order/:id/reject` `{reason?}` | отменить с причиной на любом шаге до конечного (оплаченный — возврат) |
+| POST | `/order/:id/advance` | следующий этап по типу заказа; доставка: `accepted` → `ready`, дальше двигает курьер |
+| POST | `/order/:id/status` `{status}` | `accepted`, `preparing`, `ready`, `completed` (самовывоз), `returned_to_restaurant` (решение по проблеме у двери), если машина состояний разрешает |
+| PUT | `/order/:id/courier` `{courierId}` | назначить или переназначить курьера на смене до «Забрал» (`docs/API.md`, «Курьеры») |
+| DELETE | `/order/:id/courier` | снять курьера до «Забрал» |
 | GET/PUT | `/order-settings` | минимум самовывоза, шаг округления цены доставки, способ доставки, таймауты |
 | GET/PUT | `/branch/:id/delivery-pricing` | правила цены доставки филиала (`API.md`, «Стоимость доставки») |
 | GET/PUT | `/payment-provider[/:provider]` | ключи Click/Payme (хранятся зашифрованно) |
 
 Запрещённый переход → `409`. Тот же путь используют кнопки в Telegram-группе
-филиала (`POST /telegram/orders/webhook`).
+филиала (`POST /telegram/orders/webhook`); у доставки там одна кнопка «Готов».
+
+В ответе персоналу дополнительно: `courier` `{ id, name, phone } | null` (назначенный сейчас, в любом статусе),
+`courierAssignedAt`, `doorProblemReason` (`changed_mind | wrong_order | quality | other` при `refused`) и в журнале
+`events[]` исполнитель `courier` (с `actorId` = id курьера) и записи без смены статуса (`from = to`, `note`:
+`courier_assigned:<id>`, `courier_reassigned:<id>`, `courier_unassigned:<id>`; `courier_disabled:<id>` у перехода
+`on_the_way → ready` от `system`).
 
 ## Проверка сценариев без бэкенда
 

@@ -7,7 +7,11 @@ import type {
 export type OrderWithItems = customer_order & {
   items: (customer_order_item & { options: customer_order_item_option[] })[];
   branch: { id: string; title: string; address: string };
+  courier?: { id: string; name: string; phone: string } | null;
 };
+
+/** The guest sees the courier's name (never the phone) while the courier has the order. */
+const GUEST_SEES_COURIER = new Set(['on_the_way', 'problem_at_door']);
 
 export interface OrderViewOptions {
   /** Faqat awaiting_payment holatida beriladi (to'lov havolasi) */
@@ -80,6 +84,12 @@ export function toOrderView(
         ? order.cancelled_by
         : null,
     cancelReason: order.cancel_reason,
+    courier:
+      order.courier && GUEST_SEES_COURIER.has(order.status)
+        ? { name: order.courier.name }
+        : null,
+    // At the door: no_answer is shown to the guest ("the courier cannot reach you"); refused goes to the operator
+    doorProblem: order.door_problem,
   };
 }
 

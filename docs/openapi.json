@@ -2575,6 +2575,1152 @@
         ]
       }
     },
+    "/couriers": {
+      "get": {
+        "operationId": "CourierController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CourierViewDto"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Couriers with their state: off shift, free, busy with N orders",
+        "tags": [
+          "Couriers (staff)"
+        ],
+        "x-permission": "couriers"
+      },
+      "post": {
+        "operationId": "CourierController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCourierDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CourierViewDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Add a courier (name, phone); 409 courier_phone_taken",
+        "tags": [
+          "Couriers (staff)"
+        ],
+        "x-permission": "couriers"
+      }
+    },
+    "/couriers/{id}": {
+      "patch": {
+        "operationId": "CourierController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCourierDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CourierViewDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Change the name or phone of an active courier",
+        "tags": [
+          "Couriers (staff)"
+        ],
+        "x-permission": "couriers"
+      }
+    },
+    "/couriers/{id}/invitation": {
+      "post": {
+        "operationId": "CourierController_invite",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CourierInvitationDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "One-time link to the venue bot, 24 hours; older links stop working. 422 telegram_bot_required without a working bot",
+        "tags": [
+          "Couriers (staff)"
+        ],
+        "x-permission": "couriers"
+      }
+    },
+    "/couriers/{id}/disable": {
+      "post": {
+        "operationId": "CourierController_disable",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CourierViewDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Disable at once: the bot refuses the courier, unfinished orders are taken off, an open shift ends",
+        "tags": [
+          "Couriers (staff)"
+        ],
+        "x-permission": "couriers"
+      }
+    },
+    "/shifts": {
+      "get": {
+        "operationId": "CourierShiftController_list",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "open",
+                "awaiting_reconciliation",
+                "reconciled"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ShiftViewDto"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Shifts, newest first; filter by status",
+        "tags": [
+          "Couriers (staff)"
+        ],
+        "x-permission": "shifts"
+      }
+    },
+    "/shifts/{id}/close": {
+      "post": {
+        "operationId": "CourierShiftController_close",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShiftViewDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Close a courier shift for them; 409 courier_has_active_orders while orders are on the courier",
+        "tags": [
+          "Couriers (staff)"
+        ],
+        "x-permission": "shifts"
+      }
+    },
+    "/order/{id}/courier": {
+      "put": {
+        "operationId": "OrderCourierController_assign",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignCourierDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffOrderViewDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Assign or reassign the courier (on shift only) until \"picked up\"; then 409 order_courier_locked",
+        "tags": [
+          "Orders (staff)"
+        ],
+        "x-permission": "orders"
+      },
+      "delete": {
+        "operationId": "OrderCourierController_unassign",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffOrderViewDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Take the courier off the order until \"picked up\"",
+        "tags": [
+          "Orders (staff)"
+        ],
+        "x-permission": "orders"
+      }
+    },
+    "/orders": {
+      "post": {
+        "operationId": "CustomerOrderController_create",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Telegram-Init-Data",
+            "in": "header",
+            "description": "Raw Telegram.WebApp.initData inside the venue Mini App. Mode miniapp: required (403 miniapp_required); miniapp and both: checked against the venue bot (403 miniapp_init_data_invalid); site: ignored. A checked header makes it a Mini App order: only those get status notifications, from that bot",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Har bir buyurtma urinishi uchun noyob kalit (8-128 belgi). Takrorda o'sha buyurtma qaytadi.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOrderDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderViewDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Buyurtma yaratish",
+        "tags": [
+          "Orders (customer)"
+        ]
+      },
+      "get": {
+        "operationId": "CustomerOrderController_list",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OrderViewDto"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Mijoz buyurtmalari (yangilari birinchi, 50 tagacha). ?status=active — tugallanmaganlari",
+        "tags": [
+          "Orders (customer)"
+        ]
+      }
+    },
+    "/orders/{id}": {
+      "get": {
+        "operationId": "CustomerOrderController_get",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderViewDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Bitta buyurtma (ekran shuni so'rab turadi)",
+        "tags": [
+          "Orders (customer)"
+        ]
+      }
+    },
+    "/orders/{id}/cancel": {
+      "post": {
+        "operationId": "CustomerOrderController_cancel",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderViewDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Bekor qilish (faqat tayyorlash boshlanguncha)",
+        "tags": [
+          "Orders (customer)"
+        ]
+      }
+    },
+    "/orders/{id}/payment/retry": {
+      "post": {
+        "operationId": "CustomerOrderController_retryPayment",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderViewDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "To'lov muvaffaqiyatsiz bo'lgan buyurtma uchun yangi to'lov havolasi",
+        "tags": [
+          "Orders (customer)"
+        ]
+      }
+    },
+    "/order": {
+      "get": {
+        "operationId": "StaffOrderController_list",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Vergul bilan: pending_acceptance,accepted",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "courierId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unassigned",
+            "required": false,
+            "in": "query",
+            "description": "true: delivery orders accepted or ready without a courier",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffOrderListDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Buyurtmalar ro'yxati (yangilari birinchi, cursor pagination)",
+        "tags": [
+          "Orders (staff)"
+        ],
+        "x-permission": "orders"
+      }
+    },
+    "/order/{id}": {
+      "get": {
+        "operationId": "StaffOrderController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffOrderViewDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Buyurtma tafsiloti (mijoz, status tarixi bilan)",
+        "tags": [
+          "Orders (staff)"
+        ],
+        "x-permission": "orders"
+      }
+    },
+    "/order/{id}/accept": {
+      "post": {
+        "operationId": "StaffOrderController_accept",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffOrderViewDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Qabul qilish",
+        "tags": [
+          "Orders (staff)"
+        ],
+        "x-permission": "orders"
+      }
+    },
+    "/order/{id}/reject": {
+      "post": {
+        "operationId": "StaffOrderController_reject",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectOrderDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffOrderViewDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Rad etish (to'langan bo'lsa pul qaytariladi)",
+        "tags": [
+          "Orders (staff)"
+        ],
+        "x-permission": "orders"
+      }
+    },
+    "/order/{id}/advance": {
+      "post": {
+        "operationId": "StaffOrderController_advance",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffOrderViewDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Keyingi bosqichga o'tkazish (tayyorlanmoqda → yo'lda/tayyor → yakunlandi)",
+        "tags": [
+          "Orders (staff)"
+        ],
+        "x-permission": "orders"
+      }
+    },
+    "/order/{id}/status": {
+      "post": {
+        "operationId": "StaffOrderController_setStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetOrderStatusDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffOrderViewDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Aniq holatga o'tkazish (holatlar mashinasi ruxsat bergan taqdirda)",
+        "tags": [
+          "Orders (staff)"
+        ],
+        "x-permission": "orders"
+      }
+    },
+    "/order-settings": {
+      "get": {
+        "operationId": "OrderSettingsController_get",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Current ordering settings (the row is created at signup)",
+        "tags": [
+          "Order settings"
+        ],
+        "x-permission": "venue"
+      },
+      "put": {
+        "operationId": "OrderSettingsController_update",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOrderSettingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Sozlamalarni saqlash (faqat yuborilgan maydonlar o'zgaradi)",
+        "tags": [
+          "Order settings"
+        ],
+        "x-permission": "venue"
+      }
+    },
+    "/checkout-config": {
+      "get": {
+        "operationId": "CheckoutConfigController_get",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutConfigDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Savat sozlamalari: olib ketish minimumi, to'lov usullari (yetkazish va olib ketish)",
+        "tags": [
+          "Checkout config (customer)"
+        ]
+      }
+    },
     "/branches": {
       "get": {
         "operationId": "BranchController_list",
@@ -2889,6 +4035,389 @@
           "Branch"
         ],
         "x-permission": "venue"
+      }
+    },
+    "/payment-provider": {
+      "get": {
+        "operationId": "PaymentProviderController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Yoqilgan/sozlangan provayderlar + kabinetga kiritiladigan webhook manzillari",
+        "tags": [
+          "Payment providers"
+        ],
+        "x-permission": "venue"
+      }
+    },
+    "/payment-provider/{provider}": {
+      "put": {
+        "operationId": "PaymentProviderController_upsert",
+        "parameters": [
+          {
+            "name": "provider",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertPaymentProviderDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Provayder kalitlarini saqlash (shifrlanadi) va yoqish",
+        "tags": [
+          "Payment providers"
+        ],
+        "x-permission": "venue"
+      }
+    },
+    "/payment-provider/{provider}/disable": {
+      "post": {
+        "operationId": "PaymentProviderController_disable",
+        "parameters": [
+          {
+            "name": "provider",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Provayderni o'chirish (kalitlar saqlanadi)",
+        "tags": [
+          "Payment providers"
+        ],
+        "x-permission": "venue"
+      }
+    },
+    "/branch/{id}/delivery-pricing": {
+      "get": {
+        "operationId": "BranchDeliveryPricingController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryPricingViewDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No or invalid owner token"
+          },
+          "403": {
+            "description": "The user has no organization, or the role lacks the venue permission"
+          },
+          "404": {
+            "description": "Not your branch (another venue’s branch looks missing)"
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Delivery pricing of the branch: zones and distance rule",
+        "tags": [
+          "Branch"
+        ],
+        "x-permission": "venue"
+      },
+      "put": {
+        "operationId": "BranchDeliveryPricingController_replace",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeliveryPricingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryPricingViewDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "validation_error, or invalid_settings: a polygon is not [[lat, lng], ...] or maxKm < includedKm"
+          },
+          "401": {
+            "description": "No or invalid owner token"
+          },
+          "403": {
+            "description": "The user has no organization, or the role lacks the venue permission"
+          },
+          "404": {
+            "description": "Not your branch (another venue’s branch looks missing)"
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Replace the delivery pricing of the branch (zones in priority order, distance rule or null)",
+        "tags": [
+          "Branch"
+        ],
+        "x-permission": "venue"
+      }
+    },
+    "/branch/{id}/delivery-pricing/check": {
+      "get": {
+        "operationId": "BranchDeliveryPricingController_check",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "lat",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": 41.31,
+              "type": "number"
+            }
+          },
+          {
+            "name": "lng",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": 69.25,
+              "type": "number"
+            }
+          },
+          {
+            "name": "subtotal",
+            "required": false,
+            "in": "query",
+            "description": "Order subtotal without delivery (sum); 0 when omitted",
+            "schema": {
+              "example": 60000,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryPriceCheckDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No or invalid owner token"
+          },
+          "403": {
+            "description": "The user has no organization, or the role lacks the venue permission"
+          },
+          "404": {
+            "description": "Not your branch (another venue’s branch looks missing)"
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Delivery price from this branch to a point by its saved rules and the venue step (hours not considered)",
+        "tags": [
+          "Branch"
+        ],
+        "x-permission": "venue"
+      }
+    },
+    "/delivery/quote": {
+      "get": {
+        "operationId": "DeliveryQuoteController_quote",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "lat",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": 41.31,
+              "type": "number"
+            }
+          },
+          {
+            "name": "lng",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": 69.25,
+              "type": "number"
+            }
+          },
+          {
+            "name": "subtotal",
+            "required": false,
+            "in": "query",
+            "description": "Order subtotal without delivery (sum); 0 when omitted",
+            "schema": {
+              "example": 60000,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryQuoteDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Delivery quote for the cart: branch, fee, minimum, how much is missing, or why delivery is unavailable",
+        "tags": [
+          "Delivery (customer)"
+        ]
       }
     },
     "/category": {
@@ -3272,1076 +4801,6 @@
         "summary": "Menyu: kategoriyalar → taomlar → modifikator guruhlari",
         "tags": [
           "Menu (customer)"
-        ]
-      }
-    },
-    "/orders": {
-      "post": {
-        "operationId": "CustomerOrderController_create",
-        "parameters": [
-          {
-            "name": "X-Tenant-Id",
-            "in": "header",
-            "description": "Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "X-Telegram-Init-Data",
-            "in": "header",
-            "description": "Raw Telegram.WebApp.initData inside the venue Mini App. Mode miniapp: required (403 miniapp_required); miniapp and both: checked against the venue bot (403 miniapp_init_data_invalid); site: ignored. A checked header makes it a Mini App order: only those get status notifications, from that bot",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "description": "Har bir buyurtma urinishi uchun noyob kalit (8-128 belgi). Takrorda o'sha buyurtma qaytadi.",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateOrderDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OrderViewDto"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "access-token": []
-          }
-        ],
-        "summary": "Buyurtma yaratish",
-        "tags": [
-          "Orders (customer)"
-        ]
-      },
-      "get": {
-        "operationId": "CustomerOrderController_list",
-        "parameters": [
-          {
-            "name": "X-Tenant-Id",
-            "in": "header",
-            "description": "Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/OrderViewDto"
-                  }
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "access-token": []
-          }
-        ],
-        "summary": "Mijoz buyurtmalari (yangilari birinchi, 50 tagacha). ?status=active — tugallanmaganlari",
-        "tags": [
-          "Orders (customer)"
-        ]
-      }
-    },
-    "/orders/{id}": {
-      "get": {
-        "operationId": "CustomerOrderController_get",
-        "parameters": [
-          {
-            "name": "X-Tenant-Id",
-            "in": "header",
-            "description": "Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OrderViewDto"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "access-token": []
-          }
-        ],
-        "summary": "Bitta buyurtma (ekran shuni so'rab turadi)",
-        "tags": [
-          "Orders (customer)"
-        ]
-      }
-    },
-    "/orders/{id}/cancel": {
-      "post": {
-        "operationId": "CustomerOrderController_cancel",
-        "parameters": [
-          {
-            "name": "X-Tenant-Id",
-            "in": "header",
-            "description": "Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OrderViewDto"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "access-token": []
-          }
-        ],
-        "summary": "Bekor qilish (faqat tayyorlash boshlanguncha)",
-        "tags": [
-          "Orders (customer)"
-        ]
-      }
-    },
-    "/orders/{id}/payment/retry": {
-      "post": {
-        "operationId": "CustomerOrderController_retryPayment",
-        "parameters": [
-          {
-            "name": "X-Tenant-Id",
-            "in": "header",
-            "description": "Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OrderViewDto"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "access-token": []
-          }
-        ],
-        "summary": "To'lov muvaffaqiyatsiz bo'lgan buyurtma uchun yangi to'lov havolasi",
-        "tags": [
-          "Orders (customer)"
-        ]
-      }
-    },
-    "/order": {
-      "get": {
-        "operationId": "StaffOrderController_list",
-        "parameters": [
-          {
-            "name": "status",
-            "required": false,
-            "in": "query",
-            "description": "Vergul bilan: pending_acceptance,accepted",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "branchId",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "cursor",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StaffOrderListDto"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Buyurtmalar ro'yxati (yangilari birinchi, cursor pagination)",
-        "tags": [
-          "Orders (staff)"
-        ],
-        "x-permission": "orders"
-      }
-    },
-    "/order/{id}": {
-      "get": {
-        "operationId": "StaffOrderController_get",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StaffOrderViewDto"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Buyurtma tafsiloti (mijoz, status tarixi bilan)",
-        "tags": [
-          "Orders (staff)"
-        ],
-        "x-permission": "orders"
-      }
-    },
-    "/order/{id}/accept": {
-      "post": {
-        "operationId": "StaffOrderController_accept",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StaffOrderViewDto"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Qabul qilish",
-        "tags": [
-          "Orders (staff)"
-        ],
-        "x-permission": "orders"
-      }
-    },
-    "/order/{id}/reject": {
-      "post": {
-        "operationId": "StaffOrderController_reject",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RejectOrderDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StaffOrderViewDto"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Rad etish (to'langan bo'lsa pul qaytariladi)",
-        "tags": [
-          "Orders (staff)"
-        ],
-        "x-permission": "orders"
-      }
-    },
-    "/order/{id}/advance": {
-      "post": {
-        "operationId": "StaffOrderController_advance",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StaffOrderViewDto"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Keyingi bosqichga o'tkazish (tayyorlanmoqda → yo'lda/tayyor → yakunlandi)",
-        "tags": [
-          "Orders (staff)"
-        ],
-        "x-permission": "orders"
-      }
-    },
-    "/order/{id}/status": {
-      "post": {
-        "operationId": "StaffOrderController_setStatus",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SetOrderStatusDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StaffOrderViewDto"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Aniq holatga o'tkazish (holatlar mashinasi ruxsat bergan taqdirda)",
-        "tags": [
-          "Orders (staff)"
-        ],
-        "x-permission": "orders"
-      }
-    },
-    "/order-settings": {
-      "get": {
-        "operationId": "OrderSettingsController_get",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          },
-          "default": {
-            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Current ordering settings (the row is created at signup)",
-        "tags": [
-          "Order settings"
-        ],
-        "x-permission": "venue"
-      },
-      "put": {
-        "operationId": "OrderSettingsController_update",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateOrderSettingsDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": ""
-          },
-          "default": {
-            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Sozlamalarni saqlash (faqat yuborilgan maydonlar o'zgaradi)",
-        "tags": [
-          "Order settings"
-        ],
-        "x-permission": "venue"
-      }
-    },
-    "/checkout-config": {
-      "get": {
-        "operationId": "CheckoutConfigController_get",
-        "parameters": [
-          {
-            "name": "X-Tenant-Id",
-            "in": "header",
-            "description": "Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CheckoutConfigDto"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Savat sozlamalari: olib ketish minimumi, to'lov usullari (yetkazish va olib ketish)",
-        "tags": [
-          "Checkout config (customer)"
-        ]
-      }
-    },
-    "/payment-provider": {
-      "get": {
-        "operationId": "PaymentProviderController_list",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          },
-          "default": {
-            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Yoqilgan/sozlangan provayderlar + kabinetga kiritiladigan webhook manzillari",
-        "tags": [
-          "Payment providers"
-        ],
-        "x-permission": "venue"
-      }
-    },
-    "/payment-provider/{provider}": {
-      "put": {
-        "operationId": "PaymentProviderController_upsert",
-        "parameters": [
-          {
-            "name": "provider",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpsertPaymentProviderDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": ""
-          },
-          "default": {
-            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Provayder kalitlarini saqlash (shifrlanadi) va yoqish",
-        "tags": [
-          "Payment providers"
-        ],
-        "x-permission": "venue"
-      }
-    },
-    "/payment-provider/{provider}/disable": {
-      "post": {
-        "operationId": "PaymentProviderController_disable",
-        "parameters": [
-          {
-            "name": "provider",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": ""
-          },
-          "default": {
-            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Provayderni o'chirish (kalitlar saqlanadi)",
-        "tags": [
-          "Payment providers"
-        ],
-        "x-permission": "venue"
-      }
-    },
-    "/branch/{id}/delivery-pricing": {
-      "get": {
-        "operationId": "BranchDeliveryPricingController_get",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DeliveryPricingViewDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "No or invalid owner token"
-          },
-          "403": {
-            "description": "The user has no organization, or the role lacks the venue permission"
-          },
-          "404": {
-            "description": "Not your branch (another venue’s branch looks missing)"
-          },
-          "default": {
-            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "access-token": []
-          }
-        ],
-        "summary": "Delivery pricing of the branch: zones and distance rule",
-        "tags": [
-          "Branch"
-        ],
-        "x-permission": "venue"
-      },
-      "put": {
-        "operationId": "BranchDeliveryPricingController_replace",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DeliveryPricingDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DeliveryPricingViewDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "validation_error, or invalid_settings: a polygon is not [[lat, lng], ...] or maxKm < includedKm"
-          },
-          "401": {
-            "description": "No or invalid owner token"
-          },
-          "403": {
-            "description": "The user has no organization, or the role lacks the venue permission"
-          },
-          "404": {
-            "description": "Not your branch (another venue’s branch looks missing)"
-          },
-          "default": {
-            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "access-token": []
-          }
-        ],
-        "summary": "Replace the delivery pricing of the branch (zones in priority order, distance rule or null)",
-        "tags": [
-          "Branch"
-        ],
-        "x-permission": "venue"
-      }
-    },
-    "/branch/{id}/delivery-pricing/check": {
-      "get": {
-        "operationId": "BranchDeliveryPricingController_check",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "lat",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "example": 41.31,
-              "type": "number"
-            }
-          },
-          {
-            "name": "lng",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "example": 69.25,
-              "type": "number"
-            }
-          },
-          {
-            "name": "subtotal",
-            "required": false,
-            "in": "query",
-            "description": "Order subtotal without delivery (sum); 0 when omitted",
-            "schema": {
-              "example": 60000,
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DeliveryPriceCheckDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "No or invalid owner token"
-          },
-          "403": {
-            "description": "The user has no organization, or the role lacks the venue permission"
-          },
-          "404": {
-            "description": "Not your branch (another venue’s branch looks missing)"
-          },
-          "default": {
-            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "access-token": []
-          }
-        ],
-        "summary": "Delivery price from this branch to a point by its saved rules and the venue step (hours not considered)",
-        "tags": [
-          "Branch"
-        ],
-        "x-permission": "venue"
-      }
-    },
-    "/delivery/quote": {
-      "get": {
-        "operationId": "DeliveryQuoteController_quote",
-        "parameters": [
-          {
-            "name": "X-Tenant-Id",
-            "in": "header",
-            "description": "Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "lat",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "example": 41.31,
-              "type": "number"
-            }
-          },
-          {
-            "name": "lng",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "example": 69.25,
-              "type": "number"
-            }
-          },
-          {
-            "name": "subtotal",
-            "required": false,
-            "in": "query",
-            "description": "Order subtotal without delivery (sum); 0 when omitted",
-            "schema": {
-              "example": 60000,
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DeliveryQuoteDto"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Delivery quote for the cart: branch, fee, minimum, how much is missing, or why delivery is unavailable",
-        "tags": [
-          "Delivery (customer)"
         ]
       }
     },
@@ -5807,6 +6266,11 @@
           "payment_not_retryable",
           "order_not_found",
           "order_status_conflict",
+          "order_courier_locked",
+          "courier_phone_taken",
+          "courier_inactive",
+          "courier_not_on_shift",
+          "courier_has_active_orders",
           "delivery_unavailable_no_zone",
           "delivery_not_configured",
           "ordering_channel_disabled",
@@ -7831,6 +8295,1084 @@
           "address"
         ]
       },
+      "CourierShiftRefDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "startedAt"
+        ]
+      },
+      "CourierViewDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "example": "+998901234567"
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "false: disabled, no access to the bot"
+          },
+          "linked": {
+            "type": "boolean",
+            "description": "The courier opened the invitation in Telegram"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "off_shift",
+              "free",
+              "busy"
+            ],
+            "description": "off_shift; free: on shift without orders; busy: on shift with activeOrders"
+          },
+          "activeOrders": {
+            "type": "number",
+            "description": "Unfinished orders on the courier"
+          },
+          "shift": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CourierShiftRefDto"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "disabledAt": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "phone",
+          "isActive",
+          "linked",
+          "state",
+          "activeOrders",
+          "shift",
+          "createdAt",
+          "disabledAt"
+        ]
+      },
+      "CreateCourierDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Bekzod",
+            "maxLength": 64
+          },
+          "phone": {
+            "type": "string",
+            "example": "+998901234567"
+          }
+        },
+        "required": [
+          "name",
+          "phone"
+        ]
+      },
+      "UpdateCourierDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "phone": {
+            "type": "string",
+            "example": "+998901234567"
+          }
+        }
+      },
+      "CourierInvitationDto": {
+        "type": "object",
+        "properties": {
+          "link": {
+            "type": "string",
+            "example": "https://t.me/venue_bot?start=c_…",
+            "description": "One-time link to the venue bot; a newer link voids the older ones"
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "The link works until then (24 hours)"
+          }
+        },
+        "required": [
+          "link",
+          "expiresAt"
+        ]
+      },
+      "ShiftCourierDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "ShiftViewDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "courier": {
+            "$ref": "#/components/schemas/ShiftCourierDto"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "awaiting_reconciliation",
+              "reconciled"
+            ],
+            "description": "open; awaiting_reconciliation: ended, the cash is not reconciled yet; reconciled"
+          },
+          "startedAt": {
+            "type": "string"
+          },
+          "endedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "endedBy": {
+            "type": "string",
+            "enum": [
+              "courier",
+              "staff"
+            ],
+            "nullable": true
+          },
+          "activeOrders": {
+            "type": "number",
+            "description": "Unfinished orders on the courier (open shifts only)"
+          }
+        },
+        "required": [
+          "id",
+          "courier",
+          "status",
+          "startedAt",
+          "endedAt",
+          "endedBy",
+          "activeOrders"
+        ]
+      },
+      "AssignCourierDto": {
+        "type": "object",
+        "properties": {
+          "courierId": {
+            "type": "string",
+            "description": "A courier of the venue who is on shift"
+          }
+        },
+        "required": [
+          "courierId"
+        ]
+      },
+      "OrderBranchDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "address"
+        ]
+      },
+      "OrderPaymentDto": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "nullable": true,
+            "description": "Payment link, only in awaiting_payment"
+          },
+          "expiresAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "failReason": {
+            "type": "string",
+            "enum": [
+              "declined",
+              "expired",
+              "cancelled"
+            ],
+            "nullable": true,
+            "description": "Only in payment_failed"
+          }
+        },
+        "required": [
+          "url",
+          "expiresAt",
+          "failReason"
+        ]
+      },
+      "OrderModifierOptionDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "price": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "price"
+        ]
+      },
+      "OrderModifierGroupDto": {
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": "string"
+          },
+          "groupTitle": {
+            "type": "string"
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderModifierOptionDto"
+            }
+          }
+        },
+        "required": [
+          "groupId",
+          "groupTitle",
+          "options"
+        ]
+      },
+      "OrderViewItemDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "description": "Menu item id (snapshot)"
+          },
+          "name": {
+            "type": "string"
+          },
+          "image": {
+            "type": "string",
+            "nullable": true
+          },
+          "weight": {
+            "type": "string",
+            "example": "300 g"
+          },
+          "currency": {
+            "type": "string",
+            "example": "UZS"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "unitPrice": {
+            "type": "number"
+          },
+          "modifiers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderModifierGroupDto"
+            }
+          }
+        },
+        "required": [
+          "itemId",
+          "name",
+          "image",
+          "weight",
+          "currency",
+          "quantity",
+          "unitPrice",
+          "modifiers"
+        ]
+      },
+      "OrderCourierDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "example": "+998901234567"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "phone"
+        ]
+      },
+      "OrderCustomerDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "example": "+998901234567"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "phone"
+        ]
+      },
+      "OrderEventDto": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "enum": [
+              "awaiting_payment",
+              "payment_failed",
+              "pending_acceptance",
+              "accepted",
+              "preparing",
+              "on_the_way",
+              "ready",
+              "problem_at_door",
+              "completed",
+              "cancelled",
+              "returned_to_restaurant",
+              "handed_to_external"
+            ],
+            "nullable": true
+          },
+          "to": {
+            "type": "string",
+            "enum": [
+              "awaiting_payment",
+              "payment_failed",
+              "pending_acceptance",
+              "accepted",
+              "preparing",
+              "on_the_way",
+              "ready",
+              "problem_at_door",
+              "completed",
+              "cancelled",
+              "returned_to_restaurant",
+              "handed_to_external"
+            ]
+          },
+          "actor": {
+            "type": "string",
+            "enum": [
+              "customer",
+              "restaurant",
+              "courier",
+              "system",
+              "payment"
+            ]
+          },
+          "actorId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Staff user id, courier id (actor courier) or customer id"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "description": "With from = to the entry is not a status change: courier_assigned:<id>, courier_reassigned:<id>, courier_unassigned:<id>"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "actor",
+          "actorId",
+          "note",
+          "at"
+        ]
+      },
+      "StaffOrderViewDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "number": {
+            "type": "number",
+            "example": 1001
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "awaiting_payment",
+              "payment_failed",
+              "pending_acceptance",
+              "accepted",
+              "preparing",
+              "on_the_way",
+              "ready",
+              "problem_at_door",
+              "completed",
+              "cancelled",
+              "returned_to_restaurant",
+              "handed_to_external"
+            ]
+          },
+          "fulfillmentMode": {
+            "type": "string",
+            "enum": [
+              "delivery",
+              "pickup"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "branchId": {
+            "type": "string"
+          },
+          "branch": {
+            "$ref": "#/components/schemas/OrderBranchDto"
+          },
+          "address": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true,
+            "description": "Delivery address snapshot (null for pickup)"
+          },
+          "phone": {
+            "type": "string",
+            "example": "+998901234567"
+          },
+          "comment": {
+            "type": "string"
+          },
+          "paymentMethod": {
+            "type": "string",
+            "enum": [
+              "cash",
+              "click",
+              "payme"
+            ]
+          },
+          "paymentStatus": {
+            "type": "string",
+            "enum": [
+              "not_required",
+              "pending",
+              "paid",
+              "failed",
+              "cancelled",
+              "refund_pending",
+              "refunded"
+            ]
+          },
+          "payment": {
+            "nullable": true,
+            "description": "null for cash",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OrderPaymentDto"
+              }
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderViewItemDto"
+            }
+          },
+          "currency": {
+            "type": "string",
+            "example": "UZS"
+          },
+          "subtotal": {
+            "type": "number"
+          },
+          "deliveryFee": {
+            "type": "number",
+            "description": "Delivery fee fixed when the order was placed; 0 for pickup and free delivery"
+          },
+          "discount": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          },
+          "cashChangeFrom": {
+            "type": "number",
+            "nullable": true,
+            "example": 200000,
+            "description": "Cash: the amount the guest pays with (change is due)"
+          },
+          "cancelledBy": {
+            "type": "string",
+            "enum": [
+              "customer",
+              "restaurant",
+              "system"
+            ],
+            "nullable": true
+          },
+          "cancelReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "courier": {
+            "nullable": true,
+            "description": "The courier assigned now (any status); the staff view only",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OrderCourierDto"
+              }
+            ]
+          },
+          "doorProblem": {
+            "type": "string",
+            "enum": [
+              "no_answer",
+              "refused"
+            ],
+            "nullable": true,
+            "description": "problem_at_door: no_answer — the courier cannot reach the guest; refused — the guest refused"
+          },
+          "customer": {
+            "$ref": "#/components/schemas/OrderCustomerDto"
+          },
+          "courierAssignedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "doorProblemReason": {
+            "type": "string",
+            "nullable": true,
+            "description": "refused: changed_mind | wrong_order | quality | other"
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderEventDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "status",
+          "fulfillmentMode",
+          "createdAt",
+          "branchId",
+          "branch",
+          "address",
+          "phone",
+          "comment",
+          "paymentMethod",
+          "paymentStatus",
+          "payment",
+          "items",
+          "currency",
+          "subtotal",
+          "deliveryFee",
+          "discount",
+          "total",
+          "cashChangeFrom",
+          "cancelledBy",
+          "cancelReason",
+          "courier",
+          "doorProblem",
+          "customer",
+          "courierAssignedAt",
+          "doorProblemReason",
+          "events"
+        ]
+      },
+      "OrderModifierDto": {
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": "string"
+          },
+          "optionIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "groupId",
+          "optionIds"
+        ]
+      },
+      "OrderItemDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 50
+          },
+          "modifiers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderModifierDto"
+            }
+          }
+        },
+        "required": [
+          "itemId",
+          "quantity"
+        ]
+      },
+      "CreateOrderDto": {
+        "type": "object",
+        "properties": {
+          "fulfillmentMode": {
+            "type": "string",
+            "enum": [
+              "delivery",
+              "pickup"
+            ]
+          },
+          "branchId": {
+            "type": "string",
+            "description": "pickup: required (the pickup branch). delivery: ignored, the server picks the nearest open branch that delivers to the address"
+          },
+          "addressId": {
+            "type": "string",
+            "description": "delivery uchun majburiy: mijozning saqlangan manzili"
+          },
+          "phone": {
+            "type": "string",
+            "example": "+998901234567"
+          },
+          "comment": {
+            "type": "string"
+          },
+          "paymentMethod": {
+            "type": "string",
+            "enum": [
+              "cash",
+              "click",
+              "payme"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderItemDto"
+            }
+          },
+          "expectedTotal": {
+            "type": "number",
+            "description": "Mijoz ko'rgan jami summa. Serverdagi bilan farq qilsa 409 price_changed"
+          },
+          "expectedDeliveryFee": {
+            "type": "number",
+            "description": "delivery: the fee the guest saw (GET /delivery/quote). Differs from the current rules → 409 delivery_fee_changed"
+          },
+          "cashChangeFrom": {
+            "type": "number",
+            "description": "cash only: the amount the guest pays with, so change can be brought; not less than the total",
+            "example": 200000
+          }
+        },
+        "required": [
+          "fulfillmentMode",
+          "phone",
+          "paymentMethod",
+          "items"
+        ]
+      },
+      "OrderCourierNameDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "OrderViewDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "number": {
+            "type": "number",
+            "example": 1001
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "awaiting_payment",
+              "payment_failed",
+              "pending_acceptance",
+              "accepted",
+              "preparing",
+              "on_the_way",
+              "ready",
+              "problem_at_door",
+              "completed",
+              "cancelled",
+              "returned_to_restaurant",
+              "handed_to_external"
+            ]
+          },
+          "fulfillmentMode": {
+            "type": "string",
+            "enum": [
+              "delivery",
+              "pickup"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "branchId": {
+            "type": "string"
+          },
+          "branch": {
+            "$ref": "#/components/schemas/OrderBranchDto"
+          },
+          "address": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true,
+            "description": "Delivery address snapshot (null for pickup)"
+          },
+          "phone": {
+            "type": "string",
+            "example": "+998901234567"
+          },
+          "comment": {
+            "type": "string"
+          },
+          "paymentMethod": {
+            "type": "string",
+            "enum": [
+              "cash",
+              "click",
+              "payme"
+            ]
+          },
+          "paymentStatus": {
+            "type": "string",
+            "enum": [
+              "not_required",
+              "pending",
+              "paid",
+              "failed",
+              "cancelled",
+              "refund_pending",
+              "refunded"
+            ]
+          },
+          "payment": {
+            "nullable": true,
+            "description": "null for cash",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OrderPaymentDto"
+              }
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderViewItemDto"
+            }
+          },
+          "currency": {
+            "type": "string",
+            "example": "UZS"
+          },
+          "subtotal": {
+            "type": "number"
+          },
+          "deliveryFee": {
+            "type": "number",
+            "description": "Delivery fee fixed when the order was placed; 0 for pickup and free delivery"
+          },
+          "discount": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          },
+          "cashChangeFrom": {
+            "type": "number",
+            "nullable": true,
+            "example": 200000,
+            "description": "Cash: the amount the guest pays with (change is due)"
+          },
+          "cancelledBy": {
+            "type": "string",
+            "enum": [
+              "customer",
+              "restaurant",
+              "system"
+            ],
+            "nullable": true
+          },
+          "cancelReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "courier": {
+            "nullable": true,
+            "description": "The courier while on the way or at the door (name only); null otherwise",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OrderCourierNameDto"
+              }
+            ]
+          },
+          "doorProblem": {
+            "type": "string",
+            "enum": [
+              "no_answer",
+              "refused"
+            ],
+            "nullable": true,
+            "description": "problem_at_door: no_answer — the courier cannot reach the guest; refused — the guest refused"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "status",
+          "fulfillmentMode",
+          "createdAt",
+          "branchId",
+          "branch",
+          "address",
+          "phone",
+          "comment",
+          "paymentMethod",
+          "paymentStatus",
+          "payment",
+          "items",
+          "currency",
+          "subtotal",
+          "deliveryFee",
+          "discount",
+          "total",
+          "cashChangeFrom",
+          "cancelledBy",
+          "cancelReason",
+          "courier",
+          "doorProblem"
+        ]
+      },
+      "StaffOrderListDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StaffOrderViewDto"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true,
+            "description": "Pass as ?cursor= for the next page"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ]
+      },
+      "RejectOrderDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "example": "out_of_stock"
+          }
+        }
+      },
+      "SetOrderStatusDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "accepted",
+              "preparing",
+              "ready",
+              "completed",
+              "returned_to_restaurant"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "UpdateOrderSettingsDto": {
+        "type": "object",
+        "properties": {
+          "minOrderPickup": {
+            "type": "number"
+          },
+          "deliveryPriceStep": {
+            "type": "number",
+            "enum": [
+              100,
+              500,
+              1000
+            ],
+            "description": "Delivery fees are rounded up to this step (sum)"
+          },
+          "courierMode": {
+            "type": "string",
+            "enum": [
+              "own",
+              "external",
+              "both"
+            ],
+            "description": "Who delivers: own couriers, external services or both. external: cash on delivery is not offered"
+          },
+          "acceptanceTimeoutSeconds": {
+            "type": "number",
+            "description": "Restoran qabul qilmasa avto-bekor (soniya), 60..3600"
+          },
+          "paymentTimeoutSeconds": {
+            "type": "number",
+            "description": "Onlayn to'lov oynasi (soniya), 120..7200"
+          },
+          "maxActiveOrders": {
+            "type": "number"
+          }
+        }
+      },
+      "CheckoutPaymentMethodsDto": {
+        "type": "object",
+        "properties": {
+          "delivery": {
+            "type": "array",
+            "description": "cash unless only external services deliver (courier mode external); click/payme when the venue set its keys",
+            "items": {
+              "type": "string",
+              "enum": [
+                "cash",
+                "click",
+                "payme"
+              ]
+            }
+          },
+          "pickup": {
+            "type": "array",
+            "description": "cash always; click/payme when the venue set its keys",
+            "items": {
+              "type": "string",
+              "enum": [
+                "cash",
+                "click",
+                "payme"
+              ]
+            }
+          }
+        },
+        "required": [
+          "delivery",
+          "pickup"
+        ]
+      },
+      "CheckoutConfigDto": {
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string",
+            "example": "UZS",
+            "description": "The venue's currency"
+          },
+          "minOrderPickup": {
+            "type": "number",
+            "example": 0,
+            "description": "Minimum pickup order (sum)"
+          },
+          "paymentMethods": {
+            "$ref": "#/components/schemas/CheckoutPaymentMethodsDto"
+          }
+        },
+        "required": [
+          "currency",
+          "minOrderPickup",
+          "paymentMethods"
+        ]
+      },
       "BranchViewDto": {
         "type": "object",
         "properties": {
@@ -8055,964 +9597,6 @@
         },
         "required": [
           "date"
-        ]
-      },
-      "CreateCategoryDto": {
-        "type": "object",
-        "properties": {
-          "translations": {
-            "description": "title",
-            "example": [
-              {
-                "title": "string",
-                "lang": "en"
-              },
-              {
-                "title": "string",
-                "lang": "ru"
-              },
-              {
-                "title": "string",
-                "lang": "uz"
-              }
-            ],
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "organization_id": {
-            "type": "string",
-            "description": "Deprecated: the category always goes to your own organization; another id is 404",
-            "example": ""
-          }
-        }
-      },
-      "UpdateCategoryDto": {
-        "type": "object",
-        "properties": {
-          "translations": {
-            "description": "title",
-            "example": [
-              {
-                "id": "string",
-                "title": "string",
-                "lang": "en"
-              },
-              {
-                "id": "string",
-                "title": "string",
-                "lang": "ru"
-              },
-              {
-                "id": "string",
-                "title": "string",
-                "lang": "uz"
-              }
-            ],
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        }
-      },
-      "MoveCategoryDto": {
-        "type": "object",
-        "properties": {
-          "categoryId": {
-            "type": "string",
-            "description": "categoryId",
-            "example": ""
-          },
-          "organizationId": {
-            "type": "string",
-            "description": "Deprecated: always your own organization; another id is 404",
-            "example": ""
-          },
-          "newIndex": {
-            "type": "number",
-            "description": "title",
-            "example": ""
-          }
-        }
-      },
-      "MenuNutritionDto": {
-        "type": "object",
-        "properties": {
-          "kcal": {
-            "type": "number",
-            "example": 325
-          },
-          "protein": {
-            "type": "string",
-            "example": "70 g"
-          },
-          "fat": {
-            "type": "string",
-            "example": "12 g"
-          },
-          "carbs": {
-            "type": "string",
-            "example": "24 g"
-          }
-        }
-      },
-      "MenuOptionDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string",
-            "example": "Extra cheese"
-          },
-          "price": {
-            "type": "number",
-            "example": 3500,
-            "description": "Whole sums, rounded"
-          }
-        },
-        "required": [
-          "id",
-          "name",
-          "price"
-        ]
-      },
-      "MenuOptionGroupDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "title": {
-            "type": "string",
-            "example": "Toppings"
-          },
-          "selectionType": {
-            "type": "string",
-            "enum": [
-              "single",
-              "multi"
-            ]
-          },
-          "required": {
-            "type": "boolean"
-          },
-          "min": {
-            "type": "number",
-            "nullable": true,
-            "description": "Minimum choices; null = none"
-          },
-          "max": {
-            "type": "number",
-            "description": "Maximum choices, never above the option count"
-          },
-          "currency": {
-            "type": "string",
-            "example": "UZS",
-            "description": "The venue's currency"
-          },
-          "options": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/MenuOptionDto"
-            }
-          }
-        },
-        "required": [
-          "id",
-          "title",
-          "selectionType",
-          "required",
-          "min",
-          "max",
-          "currency",
-          "options"
-        ]
-      },
-      "MenuItemDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string",
-            "example": "Lamb manti"
-          },
-          "description": {
-            "type": "string",
-            "description": "Empty string when missing"
-          },
-          "image": {
-            "type": "string",
-            "nullable": true,
-            "description": "Absolute URL of the first image"
-          },
-          "images": {
-            "description": "Absolute URLs",
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "price": {
-            "type": "number",
-            "example": 45000,
-            "description": "Whole sums, rounded"
-          },
-          "currency": {
-            "type": "string",
-            "example": "UZS",
-            "description": "The venue's currency"
-          },
-          "weight": {
-            "type": "string",
-            "example": "800 g",
-            "description": "Empty string when unknown"
-          },
-          "nutrition": {
-            "nullable": true,
-            "type": "object",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/MenuNutritionDto"
-              }
-            ]
-          },
-          "optionGroups": {
-            "description": "Groups without options are left out",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/MenuOptionGroupDto"
-            }
-          }
-        },
-        "required": [
-          "id",
-          "name",
-          "description",
-          "image",
-          "images",
-          "price",
-          "currency",
-          "weight",
-          "nutrition",
-          "optionGroups"
-        ]
-      },
-      "MenuCategoryDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "title": {
-            "type": "string",
-            "example": "Main dishes"
-          },
-          "items": {
-            "description": "Never empty: categories without active items are left out",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/MenuItemDto"
-            }
-          }
-        },
-        "required": [
-          "id",
-          "title",
-          "items"
-        ]
-      },
-      "OrderModifierDto": {
-        "type": "object",
-        "properties": {
-          "groupId": {
-            "type": "string"
-          },
-          "optionIds": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        },
-        "required": [
-          "groupId",
-          "optionIds"
-        ]
-      },
-      "OrderItemDto": {
-        "type": "object",
-        "properties": {
-          "itemId": {
-            "type": "string"
-          },
-          "quantity": {
-            "type": "number",
-            "minimum": 1,
-            "maximum": 50
-          },
-          "modifiers": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/OrderModifierDto"
-            }
-          }
-        },
-        "required": [
-          "itemId",
-          "quantity"
-        ]
-      },
-      "CreateOrderDto": {
-        "type": "object",
-        "properties": {
-          "fulfillmentMode": {
-            "type": "string",
-            "enum": [
-              "delivery",
-              "pickup"
-            ]
-          },
-          "branchId": {
-            "type": "string",
-            "description": "pickup: required (the pickup branch). delivery: ignored, the server picks the nearest open branch that delivers to the address"
-          },
-          "addressId": {
-            "type": "string",
-            "description": "delivery uchun majburiy: mijozning saqlangan manzili"
-          },
-          "phone": {
-            "type": "string",
-            "example": "+998901234567"
-          },
-          "comment": {
-            "type": "string"
-          },
-          "paymentMethod": {
-            "type": "string",
-            "enum": [
-              "cash",
-              "click",
-              "payme"
-            ]
-          },
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/OrderItemDto"
-            }
-          },
-          "expectedTotal": {
-            "type": "number",
-            "description": "Mijoz ko'rgan jami summa. Serverdagi bilan farq qilsa 409 price_changed"
-          },
-          "expectedDeliveryFee": {
-            "type": "number",
-            "description": "delivery: the fee the guest saw (GET /delivery/quote). Differs from the current rules → 409 delivery_fee_changed"
-          },
-          "cashChangeFrom": {
-            "type": "number",
-            "description": "cash only: the amount the guest pays with, so change can be brought; not less than the total",
-            "example": 200000
-          }
-        },
-        "required": [
-          "fulfillmentMode",
-          "phone",
-          "paymentMethod",
-          "items"
-        ]
-      },
-      "OrderBranchDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "title": {
-            "type": "string"
-          },
-          "address": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "title",
-          "address"
-        ]
-      },
-      "OrderPaymentDto": {
-        "type": "object",
-        "properties": {
-          "url": {
-            "type": "string",
-            "nullable": true,
-            "description": "Payment link, only in awaiting_payment"
-          },
-          "expiresAt": {
-            "type": "string",
-            "nullable": true,
-            "format": "date-time"
-          },
-          "failReason": {
-            "type": "string",
-            "enum": [
-              "declined",
-              "expired",
-              "cancelled"
-            ],
-            "nullable": true,
-            "description": "Only in payment_failed"
-          }
-        },
-        "required": [
-          "url",
-          "expiresAt",
-          "failReason"
-        ]
-      },
-      "OrderViewDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "number": {
-            "type": "number",
-            "example": 1001
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "awaiting_payment",
-              "payment_failed",
-              "pending_acceptance",
-              "accepted",
-              "preparing",
-              "on_the_way",
-              "ready",
-              "completed",
-              "cancelled"
-            ]
-          },
-          "fulfillmentMode": {
-            "type": "string",
-            "enum": [
-              "delivery",
-              "pickup"
-            ]
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "branchId": {
-            "type": "string"
-          },
-          "branch": {
-            "$ref": "#/components/schemas/OrderBranchDto"
-          },
-          "address": {
-            "type": "object",
-            "additionalProperties": true,
-            "nullable": true,
-            "description": "Delivery address snapshot (null for pickup)"
-          },
-          "phone": {
-            "type": "string",
-            "example": "+998901234567"
-          },
-          "comment": {
-            "type": "string"
-          },
-          "paymentMethod": {
-            "type": "string",
-            "enum": [
-              "cash",
-              "click",
-              "payme"
-            ]
-          },
-          "paymentStatus": {
-            "type": "string",
-            "enum": [
-              "not_required",
-              "pending",
-              "paid",
-              "failed",
-              "cancelled",
-              "refund_pending",
-              "refunded"
-            ]
-          },
-          "payment": {
-            "nullable": true,
-            "description": "null for cash",
-            "type": "object",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/OrderPaymentDto"
-              }
-            ]
-          },
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/OrderItemDto"
-            }
-          },
-          "currency": {
-            "type": "string",
-            "example": "UZS"
-          },
-          "subtotal": {
-            "type": "number"
-          },
-          "deliveryFee": {
-            "type": "number",
-            "description": "Delivery fee fixed when the order was placed; 0 for pickup and free delivery"
-          },
-          "discount": {
-            "type": "number"
-          },
-          "total": {
-            "type": "number"
-          },
-          "cashChangeFrom": {
-            "type": "number",
-            "nullable": true,
-            "example": 200000,
-            "description": "Cash: the amount the guest pays with (change is due)"
-          },
-          "cancelledBy": {
-            "type": "string",
-            "enum": [
-              "customer",
-              "restaurant",
-              "system"
-            ],
-            "nullable": true
-          },
-          "cancelReason": {
-            "type": "string",
-            "nullable": true
-          }
-        },
-        "required": [
-          "id",
-          "number",
-          "status",
-          "fulfillmentMode",
-          "createdAt",
-          "branchId",
-          "branch",
-          "address",
-          "phone",
-          "comment",
-          "paymentMethod",
-          "paymentStatus",
-          "payment",
-          "items",
-          "currency",
-          "subtotal",
-          "deliveryFee",
-          "discount",
-          "total",
-          "cashChangeFrom",
-          "cancelledBy",
-          "cancelReason"
-        ]
-      },
-      "OrderCustomerDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "phone": {
-            "type": "string",
-            "example": "+998901234567"
-          }
-        },
-        "required": [
-          "id",
-          "name",
-          "phone"
-        ]
-      },
-      "OrderEventDto": {
-        "type": "object",
-        "properties": {
-          "from": {
-            "type": "string",
-            "enum": [
-              "awaiting_payment",
-              "payment_failed",
-              "pending_acceptance",
-              "accepted",
-              "preparing",
-              "on_the_way",
-              "ready",
-              "completed",
-              "cancelled"
-            ],
-            "nullable": true
-          },
-          "to": {
-            "type": "string",
-            "enum": [
-              "awaiting_payment",
-              "payment_failed",
-              "pending_acceptance",
-              "accepted",
-              "preparing",
-              "on_the_way",
-              "ready",
-              "completed",
-              "cancelled"
-            ]
-          },
-          "actor": {
-            "type": "string",
-            "enum": [
-              "customer",
-              "restaurant",
-              "system",
-              "payment"
-            ]
-          },
-          "actorId": {
-            "type": "string",
-            "nullable": true
-          },
-          "note": {
-            "type": "string",
-            "nullable": true
-          },
-          "at": {
-            "type": "string",
-            "format": "date-time"
-          }
-        },
-        "required": [
-          "from",
-          "to",
-          "actor",
-          "actorId",
-          "note",
-          "at"
-        ]
-      },
-      "StaffOrderViewDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "number": {
-            "type": "number",
-            "example": 1001
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "awaiting_payment",
-              "payment_failed",
-              "pending_acceptance",
-              "accepted",
-              "preparing",
-              "on_the_way",
-              "ready",
-              "completed",
-              "cancelled"
-            ]
-          },
-          "fulfillmentMode": {
-            "type": "string",
-            "enum": [
-              "delivery",
-              "pickup"
-            ]
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "branchId": {
-            "type": "string"
-          },
-          "branch": {
-            "$ref": "#/components/schemas/OrderBranchDto"
-          },
-          "address": {
-            "type": "object",
-            "additionalProperties": true,
-            "nullable": true,
-            "description": "Delivery address snapshot (null for pickup)"
-          },
-          "phone": {
-            "type": "string",
-            "example": "+998901234567"
-          },
-          "comment": {
-            "type": "string"
-          },
-          "paymentMethod": {
-            "type": "string",
-            "enum": [
-              "cash",
-              "click",
-              "payme"
-            ]
-          },
-          "paymentStatus": {
-            "type": "string",
-            "enum": [
-              "not_required",
-              "pending",
-              "paid",
-              "failed",
-              "cancelled",
-              "refund_pending",
-              "refunded"
-            ]
-          },
-          "payment": {
-            "nullable": true,
-            "description": "null for cash",
-            "type": "object",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/OrderPaymentDto"
-              }
-            ]
-          },
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/OrderItemDto"
-            }
-          },
-          "currency": {
-            "type": "string",
-            "example": "UZS"
-          },
-          "subtotal": {
-            "type": "number"
-          },
-          "deliveryFee": {
-            "type": "number",
-            "description": "Delivery fee fixed when the order was placed; 0 for pickup and free delivery"
-          },
-          "discount": {
-            "type": "number"
-          },
-          "total": {
-            "type": "number"
-          },
-          "cashChangeFrom": {
-            "type": "number",
-            "nullable": true,
-            "example": 200000,
-            "description": "Cash: the amount the guest pays with (change is due)"
-          },
-          "cancelledBy": {
-            "type": "string",
-            "enum": [
-              "customer",
-              "restaurant",
-              "system"
-            ],
-            "nullable": true
-          },
-          "cancelReason": {
-            "type": "string",
-            "nullable": true
-          },
-          "customer": {
-            "$ref": "#/components/schemas/OrderCustomerDto"
-          },
-          "events": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/OrderEventDto"
-            }
-          }
-        },
-        "required": [
-          "id",
-          "number",
-          "status",
-          "fulfillmentMode",
-          "createdAt",
-          "branchId",
-          "branch",
-          "address",
-          "phone",
-          "comment",
-          "paymentMethod",
-          "paymentStatus",
-          "payment",
-          "items",
-          "currency",
-          "subtotal",
-          "deliveryFee",
-          "discount",
-          "total",
-          "cashChangeFrom",
-          "cancelledBy",
-          "cancelReason",
-          "customer",
-          "events"
-        ]
-      },
-      "StaffOrderListDto": {
-        "type": "object",
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/StaffOrderViewDto"
-            }
-          },
-          "nextCursor": {
-            "type": "string",
-            "nullable": true,
-            "description": "Pass as ?cursor= for the next page"
-          }
-        },
-        "required": [
-          "items",
-          "nextCursor"
-        ]
-      },
-      "RejectOrderDto": {
-        "type": "object",
-        "properties": {
-          "reason": {
-            "type": "string",
-            "example": "out_of_stock"
-          }
-        }
-      },
-      "SetOrderStatusDto": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string",
-            "enum": [
-              "accepted",
-              "preparing",
-              "on_the_way",
-              "ready",
-              "completed"
-            ]
-          }
-        },
-        "required": [
-          "status"
-        ]
-      },
-      "UpdateOrderSettingsDto": {
-        "type": "object",
-        "properties": {
-          "minOrderPickup": {
-            "type": "number"
-          },
-          "deliveryPriceStep": {
-            "type": "number",
-            "enum": [
-              100,
-              500,
-              1000
-            ],
-            "description": "Delivery fees are rounded up to this step (sum)"
-          },
-          "courierMode": {
-            "type": "string",
-            "enum": [
-              "own",
-              "external",
-              "both"
-            ],
-            "description": "Who delivers: own couriers, external services or both. external: cash on delivery is not offered"
-          },
-          "acceptanceTimeoutSeconds": {
-            "type": "number",
-            "description": "Restoran qabul qilmasa avto-bekor (soniya), 60..3600"
-          },
-          "paymentTimeoutSeconds": {
-            "type": "number",
-            "description": "Onlayn to'lov oynasi (soniya), 120..7200"
-          },
-          "maxActiveOrders": {
-            "type": "number"
-          }
-        }
-      },
-      "CheckoutPaymentMethodsDto": {
-        "type": "object",
-        "properties": {
-          "delivery": {
-            "type": "array",
-            "description": "cash unless only external services deliver (courier mode external); click/payme when the venue set its keys",
-            "items": {
-              "type": "string",
-              "enum": [
-                "cash",
-                "click",
-                "payme"
-              ]
-            }
-          },
-          "pickup": {
-            "type": "array",
-            "description": "cash always; click/payme when the venue set its keys",
-            "items": {
-              "type": "string",
-              "enum": [
-                "cash",
-                "click",
-                "payme"
-              ]
-            }
-          }
-        },
-        "required": [
-          "delivery",
-          "pickup"
-        ]
-      },
-      "CheckoutConfigDto": {
-        "type": "object",
-        "properties": {
-          "currency": {
-            "type": "string",
-            "example": "UZS",
-            "description": "The venue's currency"
-          },
-          "minOrderPickup": {
-            "type": "number",
-            "example": 0,
-            "description": "Minimum pickup order (sum)"
-          },
-          "paymentMethods": {
-            "$ref": "#/components/schemas/CheckoutPaymentMethodsDto"
-          }
-        },
-        "required": [
-          "currency",
-          "minOrderPickup",
-          "paymentMethods"
         ]
       },
       "UpsertPaymentProviderDto": {
@@ -9338,6 +9922,276 @@
           "freeFrom",
           "minOrder",
           "shortBy"
+        ]
+      },
+      "CreateCategoryDto": {
+        "type": "object",
+        "properties": {
+          "translations": {
+            "description": "title",
+            "example": [
+              {
+                "title": "string",
+                "lang": "en"
+              },
+              {
+                "title": "string",
+                "lang": "ru"
+              },
+              {
+                "title": "string",
+                "lang": "uz"
+              }
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "organization_id": {
+            "type": "string",
+            "description": "Deprecated: the category always goes to your own organization; another id is 404",
+            "example": ""
+          }
+        }
+      },
+      "UpdateCategoryDto": {
+        "type": "object",
+        "properties": {
+          "translations": {
+            "description": "title",
+            "example": [
+              {
+                "id": "string",
+                "title": "string",
+                "lang": "en"
+              },
+              {
+                "id": "string",
+                "title": "string",
+                "lang": "ru"
+              },
+              {
+                "id": "string",
+                "title": "string",
+                "lang": "uz"
+              }
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "MoveCategoryDto": {
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "type": "string",
+            "description": "categoryId",
+            "example": ""
+          },
+          "organizationId": {
+            "type": "string",
+            "description": "Deprecated: always your own organization; another id is 404",
+            "example": ""
+          },
+          "newIndex": {
+            "type": "number",
+            "description": "title",
+            "example": ""
+          }
+        }
+      },
+      "MenuNutritionDto": {
+        "type": "object",
+        "properties": {
+          "kcal": {
+            "type": "number",
+            "example": 325
+          },
+          "protein": {
+            "type": "string",
+            "example": "70 g"
+          },
+          "fat": {
+            "type": "string",
+            "example": "12 g"
+          },
+          "carbs": {
+            "type": "string",
+            "example": "24 g"
+          }
+        }
+      },
+      "MenuOptionDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "example": "Extra cheese"
+          },
+          "price": {
+            "type": "number",
+            "example": 3500,
+            "description": "Whole sums, rounded"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "price"
+        ]
+      },
+      "MenuOptionGroupDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "example": "Toppings"
+          },
+          "selectionType": {
+            "type": "string",
+            "enum": [
+              "single",
+              "multi"
+            ]
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "min": {
+            "type": "number",
+            "nullable": true,
+            "description": "Minimum choices; null = none"
+          },
+          "max": {
+            "type": "number",
+            "description": "Maximum choices, never above the option count"
+          },
+          "currency": {
+            "type": "string",
+            "example": "UZS",
+            "description": "The venue's currency"
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MenuOptionDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "selectionType",
+          "required",
+          "min",
+          "max",
+          "currency",
+          "options"
+        ]
+      },
+      "MenuItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "example": "Lamb manti"
+          },
+          "description": {
+            "type": "string",
+            "description": "Empty string when missing"
+          },
+          "image": {
+            "type": "string",
+            "nullable": true,
+            "description": "Absolute URL of the first image"
+          },
+          "images": {
+            "description": "Absolute URLs",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "price": {
+            "type": "number",
+            "example": 45000,
+            "description": "Whole sums, rounded"
+          },
+          "currency": {
+            "type": "string",
+            "example": "UZS",
+            "description": "The venue's currency"
+          },
+          "weight": {
+            "type": "string",
+            "example": "800 g",
+            "description": "Empty string when unknown"
+          },
+          "nutrition": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MenuNutritionDto"
+              }
+            ]
+          },
+          "optionGroups": {
+            "description": "Groups without options are left out",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MenuOptionGroupDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "image",
+          "images",
+          "price",
+          "currency",
+          "weight",
+          "nutrition",
+          "optionGroups"
+        ]
+      },
+      "MenuCategoryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "example": "Main dishes"
+          },
+          "items": {
+            "description": "Never empty: categories without active items are left out",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MenuItemDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "items"
         ]
       },
       "CreateProductDto": {

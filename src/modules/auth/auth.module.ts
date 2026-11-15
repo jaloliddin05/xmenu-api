@@ -1,3 +1,4 @@
+import { CourierModule } from '../courier/courier.module';
 import type { IConfig } from 'src/config/config.interface';
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { PassportModule } from '@nestjs/passport';
@@ -54,6 +55,7 @@ import { NoStoreMiddleware } from './middleware/no-store.middleware';
     CustomerModule,
     TenantModule,
     TelegramModule,
+    CourierModule,
     MiniAppModule,
     GuestLoginModule,
     PrismaModule,

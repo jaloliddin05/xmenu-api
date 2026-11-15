@@ -17,10 +17,11 @@ const UPDATE = {
   message: { contact: { phone_number: '+998901234567', user_id: 5 } },
 };
 
-function deps(bot: typeof BOT | null = BOT) {
+function deps(bot: typeof BOT | null = BOT, courierHandles = false) {
   return {
     bots: { byKey: jest.fn(async () => bot) },
     verification: { handleUpdate: jest.fn(async () => undefined) },
+    couriers: { handleUpdate: jest.fn(async () => courierHandles) },
   };
 }
 
@@ -31,7 +32,16 @@ describe('processTelegramUpdate', () => {
       processTelegramUpdate(d as any, { botKey: 'bot-1', update: UPDATE }),
     ).resolves.toBe('done');
     expect(d.bots.byKey).toHaveBeenCalledWith('bot-1');
+    expect(d.couriers.handleUpdate).toHaveBeenCalledWith(UPDATE, BOT);
     expect(d.verification.handleUpdate).toHaveBeenCalledWith(BOT, UPDATE);
+  });
+
+  it("a courier's update (invitation, shift menu, card button) stops at the courier provider", async () => {
+    const d = deps(BOT, true);
+    await expect(
+      processTelegramUpdate(d as any, { botKey: 'bot-1', update: UPDATE }),
+    ).resolves.toBe('done');
+    expect(d.verification.handleUpdate).not.toHaveBeenCalled();
   });
 
   it('skips an update of a bot disconnected since the webhook call', async () => {

@@ -42,7 +42,7 @@ Env: см. `.env.example` (полный; тест сверяет его со с�
 `GET /tenant/config` в `TenantConfigModule`), `organization` (+ настройки заведения), `user`, `employee` (не
 используется), `branch`, `category`, `product` (+ группы допов), `menu` (публичный), `customer` (+ адреса),
 `order` (state machine, очереди, уведомления), `delivery` (правила цены доставки филиалов, расчёт для корзины и
-заказа), `payment` (Click, Payme, ключи тенанта, возвраты),
+заказа), `courier` (свои курьеры: смены, назначение, бот курьера, провайдер доставки), `payment` (Click, Payme, ключи тенанта, возвраты),
 `sms` (провайдеры eskiz, telegram, console), `telegram` (боты заведений: `TelegramBotService`, `TelegramClient`,
 `/telegram-bot`), `tenant-domain` (свои домены заведения, `/organization/:id/domains`), `file`, `translation`, `application`,
 `revalidate-queue` (`RevalidateModule`: ревалидация QR-меню и сайта доставки, `docs/REVALIDATE.md`), `guest-login` (способы входа
@@ -166,6 +166,30 @@ test, `npm run openapi` + `git diff --exit-code docs/`, `format:check`, `lint` �
 Оплату подтверждает только вебхук провайдера. Эскалация: 45 с повтор в Telegram, 120 с SMS, 300 с авто-отмена и
 возврат. Робозвонка в цепочке нет: задачи `esc-call`, оставшиеся в Redis, молча пропускаются. Click возвращает автоматически,
 Payme вручную через ops-чат.
+- Автомат различает тип заказа (`only` в правилах `order-state-machine.ts`): у доставки нет `preparing`, «В пути» и
+  «Доставлен» ставит только исполнитель `courier`, и `transitionInTx` проверяет, что это назначенный заказу курьер
+  (`CourierNotAssignedError`). Тест сверяет весь список переходов со схемой `../docs/DELIVERY.md`.
+- Действия без смены статуса (назначение, снятие курьера) пишутся в журнал `recordInTx` (`from = to`, `note`).
+- Эффекты после коммита: `courier_card` (очередь `courier-cards`, ключ задания с `version` заказа) и `operator_alert`
+  (срочное сообщение в чат филиала, `RestaurantNotifierService.alertDeliveryProblem`).
+
+## Курьеры
+Контракт: `docs/API.md`, «Курьеры»; спецификация `../docs/DELIVERY.md`. Модуль `courier`.
+- Модели (`courier/models/courier.prisma`): `courier` (`@@unique([organization_id, phone])`,
+  `@@unique([organization_id, telegram_user_id])`), `courier_invitation` (sha256 токена, 24 ч, одноразовое),
+  `courier_shift` (частичный уникальный индекс «одна открытая смена на курьера» в миграции), `courier_card` (сообщение
+  карточки на пару заказ–курьер); в `customer_order`: `courier_id`, `courier_assigned_at`, `courier_shift_id`,
+  `door_problem`, `door_problem_reason`.
+- Провайдер доставки: интерфейс `courier/provider/delivery-provider.ts`, адаптер `OwnCouriersProvider`. Апдейты бота
+  заведения (`TelegramUpdateProcessor`) сначала идут в него (`CourierBotService`), остальное в проверку номера гостя.
+  `setWebhook` бота заведения просит `message` и `callback_query`.
+- `CourierAssignmentService`: назначение только курьеру на смене, до «Забрал» (`order_courier_locked` после), optimistic
+  locking по `version`. Отключение курьера (`CourierService.disable`) снимает незавершённые заказы (в пути → `ready`
+  от `system`) и заканчивает смену.
+- Карточка: чистая `courier/domain/courier-card.ts` (тексты и кнопки, данные кнопок `cr:<действие>:<uuid>`), отправка и
+  правка `CourierCardService` (не правится → новая карточка). Тексты бота: `courier/domain/courier-texts.ts` (в
+  `BOT_TEXT_FILES`).
+- Тесты сервисов на фейке `courier/courier-prisma.fake.ts` с настоящим `OrderTransitionService`.
 
 ## Авторизация клиентов
 Телефон + OTP (HMAC-хеш кода, TTL, лимит попыток, cooldown) через `SmsProvider`; refresh-токены с ротацией и
@@ -281,8 +305,8 @@ App (`instant`) нового номера кладёт Telegram-id в `registrat
   `revokeAllForUser`; владельца отключить нельзя.
 
 ## Что нужно построить
-- Интерфейс провайдера доставки (создать, отменить, статус, вебхук) и адаптер собственных курьеров; внешние сервисы
-  (Noor, Yandex, Millennium) по мере доступа к API.
+- Сверка наличных за смену, таймер ожидания у двери, передача внешней службе (`handed_to_external`) и её адаптер,
+  способ оплаты «карта курьеру»; адаптеры внешних служб (Noor, Yandex, Millennium) по мере доступа к API.
 - Уведомления о заказах персоналу через бота ресторана (пока идут через платформенного бота из env).
 - История старых slug с редиректом.
 - Возврат после оплаты на сайт заведения: `MINIAPP_RETURN_URL`/`MINIAPP_URL` один на платформу

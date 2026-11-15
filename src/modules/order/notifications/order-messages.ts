@@ -28,11 +28,20 @@ const STATUS_LABEL: Record<OrderStatusName, string> = {
   preparing: '👨‍🍳 Готовится',
   on_the_way: '🛵 В пути',
   ready: '🛍 Готов к выдаче',
+  problem_at_door: '🚪 Проблема у двери',
   completed: '🏁 Выполнен',
   cancelled: '❌ Отменён',
+  returned_to_restaurant: '↩️ Возвращён в ресторан',
+  handed_to_external: '↗️ Передан внешней службе',
 };
 
-export const statusLabel = (s: OrderStatusName) => STATUS_LABEL[s];
+export const statusLabel = (
+  s: OrderStatusName,
+  fulfillment: 'delivery' | 'pickup' = 'pickup',
+) =>
+  s === 'ready' && fulfillment === 'delivery'
+    ? '📦 Готов, ждёт курьера'
+    : STATUS_LABEL[s];
 
 const PAYMENT_LABEL = {
   cash: 'Наличными',
@@ -43,7 +52,7 @@ const PAYMENT_LABEL = {
 export function buildRestaurantText(order: OrderWithItems): string {
   const lines: string[] = [];
   lines.push(
-    `<b>Заказ №${order.number}</b> · ${statusLabel(order.status as OrderStatusName)}`,
+    `<b>Заказ №${order.number}</b> · ${statusLabel(order.status as OrderStatusName, order.fulfillment)}`,
   );
   lines.push(
     `🏪 ${esc(order.branch.title)} · ${order.fulfillment === 'delivery' ? '🛵 Доставка' : '🛍 Самовывоз'}`,
@@ -111,11 +120,17 @@ export const CALLBACK = {
   next: 'o:n:',
 } as const;
 
-const NEXT_LABEL: Partial<Record<OrderStatusName, string>> = {
-  accepted: '👨‍🍳 Начали готовить',
-  preparing: '🛵 Курьер выехал',
-  on_the_way: '🏁 Доставлен',
-  ready: '🏁 Выдан клиенту',
+/** Button for the restaurant's next step; a delivery stops at "ready" (the courier moves it on). */
+const NEXT_LABEL: Record<
+  'delivery' | 'pickup',
+  Partial<Record<OrderStatusName, string>>
+> = {
+  delivery: { accepted: '📦 Готов' },
+  pickup: {
+    accepted: '👨‍🍳 Начали готовить',
+    preparing: '🛍 Готов к выдаче',
+    ready: '🏁 Выдан клиенту',
+  },
 };
 
 export function buildRestaurantKeyboard(
@@ -132,26 +147,11 @@ export function buildRestaurantKeyboard(
       ],
     };
   }
-  if (status === 'preparing') {
-    const label =
-      order.fulfillment === 'delivery'
-        ? '🛵 Передан курьеру'
-        : '🛍 Готов к выдаче';
+  const label = NEXT_LABEL[order.fulfillment][status];
+  if (nextRestaurantStatus(status, order.fulfillment) && label) {
     return {
       inline_keyboard: [
         [{ text: label, callback_data: CALLBACK.next + order.id }],
-      ],
-    };
-  }
-  if (nextRestaurantStatus(status, order.fulfillment) && NEXT_LABEL[status]) {
-    return {
-      inline_keyboard: [
-        [
-          {
-            text: NEXT_LABEL[status],
-            callback_data: CALLBACK.next + order.id,
-          },
-        ],
       ],
     };
   }
@@ -163,9 +163,11 @@ export function buildCustomerText(
   order: Pick<
     OrderWithItems,
     'number' | 'status' | 'payment_method' | 'payment_status' | 'cancelled_by'
-  >,
+  > &
+    Partial<Pick<OrderWithItems, 'fulfillment' | 'door_problem'>>,
   from: OrderStatusName | null,
   lang: Lang = 'ru',
+  courierName: string | null = null,
 ): string | null {
   const t = CUSTOMER_TEXTS[lang];
   const n = order.number;
@@ -177,9 +179,15 @@ export function buildCustomerText(
     case 'preparing':
       return t.preparing(n);
     case 'on_the_way':
-      return t.onTheWay(n);
+      return courierName ? t.onTheWayWith(n, courierName) : t.onTheWay(n);
     case 'ready':
-      return t.ready(n);
+      if (order.fulfillment !== 'delivery') return t.ready(n);
+      // "Cannot deliver" puts the order back to ready: the guest does not need that step again
+      return from === 'accepted' ? t.readyForCourier(n) : null;
+    case 'problem_at_door':
+      return order.door_problem === 'no_answer' ? t.courierAtDoor(n) : null;
+    case 'returned_to_restaurant':
+      return t.returned(n);
     case 'completed':
       return t.completed(n);
     case 'cancelled': {
@@ -194,5 +202,22 @@ ${t.refundNote}`
     }
     default:
       return null;
+  }
+}
+
+/** Urgent message to the branch chat about a delivery problem (docs/DELIVERY.md, "Проблемные ситуации"). */
+export function buildDeliveryAlertText(
+  number: number,
+  kind: 'no_answer' | 'refused' | 'cannot_deliver',
+  courierName: string | null,
+): string {
+  const who = courierName ? ` (курьер ${esc(courierName)})` : '';
+  switch (kind) {
+    case 'no_answer':
+      return `📵 <b>Заказ №${number}: курьер у двери и не может дозвониться до гостя${who}.</b>\nЕсли гость не ответит, верните заказ в ресторан или отмените его.`;
+    case 'refused':
+      return `🚫 <b>Заказ №${number}: гость отказался от заказа${who}.</b>\nВерните заказ в ресторан или отмените его.`;
+    case 'cannot_deliver':
+      return `⚠️ <b>Срочно: заказ №${number} снова готов и без курьера${who}.</b>\nНазначьте другого курьера.`;
   }
 }

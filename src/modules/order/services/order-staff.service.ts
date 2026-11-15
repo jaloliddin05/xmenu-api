@@ -17,6 +17,7 @@ const INCLUDE = {
   items: { include: { options: true } },
   branch: { select: { id: true, title: true, address: true } },
   customer: { select: { id: true, name: true, phone: true } },
+  courier: { select: { id: true, name: true, phone: true } },
   events: { orderBy: { id: 'asc' } },
 } satisfies Prisma.customer_orderInclude;
 
@@ -54,6 +55,10 @@ export class OrderStaffService {
         name: order.customer.name,
         phone: order.customer.phone,
       },
+      // The operator sees the whole courier, the guest only the name (toOrderView)
+      courier: order.courier,
+      courierAssignedAt: order.courier_assigned_at?.toISOString() ?? null,
+      doorProblemReason: order.door_problem_reason,
       events: order.events.map((e) => ({
         from: e.from_status,
         to: e.to_status,
@@ -70,6 +75,9 @@ export class OrderStaffService {
     q: {
       statuses?: OrderStatusName[];
       branchId?: string;
+      courierId?: string;
+      /** Delivery orders waiting for a courier (accepted or ready, nobody assigned) */
+      unassigned?: boolean;
       cursor?: string;
       limit?: number;
     },
@@ -80,6 +88,14 @@ export class OrderStaffService {
         organization_id: organizationId,
         ...(q.statuses?.length ? { status: { in: q.statuses } } : {}),
         ...(q.branchId ? { branch_id: q.branchId } : {}),
+        ...(q.courierId ? { courier_id: q.courierId } : {}),
+        ...(q.unassigned
+          ? {
+              fulfillment: 'delivery' as const,
+              courier_id: null,
+              status: { in: ['accepted', 'ready'] as OrderStatusName[] },
+            }
+          : {}),
       },
       orderBy: [{ created_at: 'desc' }, { id: 'desc' }],
       take: limit + 1,

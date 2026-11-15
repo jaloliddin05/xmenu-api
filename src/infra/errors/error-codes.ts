@@ -330,6 +330,32 @@ export const ERROR_CODES = spec({
     when: 'Владелец: действие с заказом недоступно в его статусе; `details.status`',
     details: ['status'],
   },
+  order_courier_locked: {
+    status: 409,
+    message: 'The courier has picked up the order',
+    when: 'Назначить другого курьера или снять курьера после «Забрал» нельзя: только «Не могу доставить» курьера или решение оператора (вернуть, отменить)',
+  },
+  courier_phone_taken: {
+    status: 409,
+    message: 'A courier with this phone exists',
+    when: 'У заведения уже есть курьер с этим телефоном',
+  },
+  courier_inactive: {
+    status: 409,
+    message: 'The courier is disabled',
+    when: 'Курьер отключён: назначить, пригласить или изменить его нельзя',
+  },
+  courier_not_on_shift: {
+    status: 409,
+    message: 'The courier is not on shift',
+    when: 'Назначить заказ можно только курьеру на смене',
+  },
+  courier_has_active_orders: {
+    status: 409,
+    message: 'The courier has unfinished orders',
+    when: 'Закрыть смену нельзя, пока на курьере есть незавершённые заказы; `details.activeOrders`',
+    details: ['activeOrders'],
+  },
   delivery_unavailable_no_zone: {
     status: 422,
     message: 'Delivery zone is not set',

@@ -8,6 +8,7 @@ import {
 import { bullConnection } from 'src/infra/redis/bull-connection';
 import { errorMessage } from 'src/infra/helper/error-text';
 import { TelegramBotService } from 'src/modules/telegram/telegram-bot.service';
+import { OwnCouriersProvider } from 'src/modules/courier/provider/own-couriers.provider';
 import { TELEGRAM_UPDATE_QUEUE_NAME } from './telegram-update.queue';
 import type { TelegramUpdateJob } from './telegram-update.queue';
 import { TelegramVerificationService } from './telegram-verification.service';
@@ -15,10 +16,13 @@ import { TelegramVerificationService } from './telegram-verification.service';
 export interface TelegramUpdateDeps {
   bots: Pick<TelegramBotService, 'byKey'>;
   verification: Pick<TelegramVerificationService, 'handleUpdate'>;
+  couriers: Pick<OwnCouriersProvider, 'handleUpdate'>;
 }
 
 /**
- * One queued update. A bot disconnected (or disabled) since the webhook call is skipped. Errors
+ * One queued update. A bot disconnected (or disabled) since the webhook call is skipped. A courier's update
+ * (invitation, shift menu, order card buttons) goes to the own-couriers provider, the rest to the guest phone
+ * check. Errors
  * propagate so BullMQ retries; Telegram failures are already absorbed inside handleUpdate, so a
  * retry means Redis or the database failed.
  */
@@ -28,6 +32,7 @@ export async function processTelegramUpdate(
 ): Promise<'done' | 'skipped'> {
   const bot = await deps.bots.byKey(job.botKey);
   if (!bot) return 'skipped';
+  if (await deps.couriers.handleUpdate(job.update, bot)) return 'done';
   await deps.verification.handleUpdate(bot, job.update);
   return 'done';
 }
@@ -47,6 +52,7 @@ export class TelegramUpdateProcessor implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly bots: TelegramBotService,
     private readonly verification: TelegramVerificationService,
+    private readonly couriers: OwnCouriersProvider,
   ) {}
 
   onModuleInit() {
@@ -54,7 +60,11 @@ export class TelegramUpdateProcessor implements OnModuleInit, OnModuleDestroy {
       TELEGRAM_UPDATE_QUEUE_NAME,
       async (job: Job<TelegramUpdateJob>) => {
         const result = await processTelegramUpdate(
-          { bots: this.bots, verification: this.verification },
+          {
+            bots: this.bots,
+            verification: this.verification,
+            couriers: this.couriers,
+          },
           job.data,
         );
         if (result === 'skipped')

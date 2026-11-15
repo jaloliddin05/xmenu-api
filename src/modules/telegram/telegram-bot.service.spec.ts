@@ -129,7 +129,7 @@ describe('TelegramBotService', () => {
     const secret = (webhookCall[2] as { secret_token: string }).secret_token;
     expect(webhookCall[2]).toMatchObject({
       url: `https://api.xmenu.uz/telegram/bot/${row.id}/webhook`,
-      allowed_updates: ['message'],
+      allowed_updates: ['message', 'callback_query'],
     });
     // Only the hash is stored; the secret itself is known to Telegram alone
     expect(secret).toMatch(/^[0-9a-f]{64}$/);

@@ -39,7 +39,18 @@ class OrderModifierGroupDto {
   options: OrderModifierOptionDto[];
 }
 
-class OrderItemDto {
+class OrderCourierNameDto {
+  @ApiProperty() name: string;
+}
+
+class OrderCourierDto {
+  @ApiProperty() id: string;
+  @ApiProperty() name: string;
+  @ApiProperty({ example: '+998901234567' }) phone: string;
+}
+
+// Not OrderItemDto: Swagger keys schemas by class name, and create-order.dto.ts has an OrderItemDto of its own
+class OrderViewItemDto {
   @ApiProperty({ description: 'Menu item id (snapshot)' }) itemId: string;
   @ApiProperty() name: string;
   @ApiProperty({ type: String, nullable: true }) image: string | null;
@@ -87,7 +98,7 @@ export class OrderViewDto {
     description: 'null for cash',
   })
   payment: OrderPaymentDto | null;
-  @ApiProperty({ type: [OrderItemDto] }) items: OrderItemDto[];
+  @ApiProperty({ type: [OrderViewItemDto] }) items: OrderViewItemDto[];
   @ApiProperty({ example: 'UZS' }) currency: string;
   @ApiProperty() subtotal: number;
   @ApiProperty({
@@ -107,6 +118,20 @@ export class OrderViewDto {
   @ApiProperty({ enum: ['customer', 'restaurant', 'system'], nullable: true })
   cancelledBy: string | null;
   @ApiProperty({ type: String, nullable: true }) cancelReason: string | null;
+  @ApiProperty({
+    type: OrderCourierNameDto,
+    nullable: true,
+    description:
+      'The courier while on the way or at the door (name only); null otherwise',
+  })
+  courier: OrderCourierNameDto | null;
+  @ApiProperty({
+    enum: ['no_answer', 'refused'],
+    nullable: true,
+    description:
+      'problem_at_door: no_answer — the courier cannot reach the guest; refused — the guest refused',
+  })
+  doorProblem: 'no_answer' | 'refused' | null;
 }
 
 class OrderCustomerDto {
@@ -118,16 +143,44 @@ class OrderCustomerDto {
 class OrderEventDto {
   @ApiProperty({ enum: ORDER_STATUSES, nullable: true }) from: string | null;
   @ApiProperty({ enum: ORDER_STATUSES }) to: string;
-  @ApiProperty({ enum: ['customer', 'restaurant', 'system', 'payment'] })
+  @ApiProperty({
+    enum: ['customer', 'restaurant', 'courier', 'system', 'payment'],
+  })
   actor: string;
-  @ApiProperty({ type: String, nullable: true }) actorId: string | null;
-  @ApiProperty({ type: String, nullable: true }) note: string | null;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Staff user id, courier id (actor courier) or customer id',
+  })
+  actorId: string | null;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description:
+      'With from = to the entry is not a status change: courier_assigned:<id>, courier_reassigned:<id>, courier_unassigned:<id>',
+  })
+  note: string | null;
   @ApiProperty({ format: 'date-time' }) at: string;
 }
 
 /** GET /order/:id and the result of staff actions: the order plus customer and status history. */
 export class StaffOrderViewDto extends OrderViewDto {
   @ApiProperty({ type: OrderCustomerDto }) customer: OrderCustomerDto;
+  @ApiProperty({
+    type: OrderCourierDto,
+    nullable: true,
+    description: 'The courier assigned now (any status); the staff view only',
+  })
+  // Overrides the guest field (name only); the class only describes the response for Swagger
+  courier: OrderCourierDto | null = null;
+  @ApiProperty({ type: String, nullable: true, format: 'date-time' })
+  courierAssignedAt: string | null;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'refused: changed_mind | wrong_order | quality | other',
+  })
+  doorProblemReason: string | null;
   @ApiProperty({ type: [OrderEventDto] }) events: OrderEventDto[];
 }
 

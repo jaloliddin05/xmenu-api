@@ -6,6 +6,12 @@ import { bullConnection } from 'src/infra/redis/bull-connection';
 export const ESCALATION_QUEUE = 'order-escalation';
 export const REFUND_QUEUE = 'order-refunds';
 export const GUEST_NOTIFICATION_QUEUE = 'guest-notifications';
+/** Order cards in couriers' chats (worker: courier module, CourierCardProcessor). */
+export const COURIER_CARD_QUEUE = 'courier-cards';
+export interface CourierCardJob {
+  orderId: string;
+  courierId: string;
+}
 /** Temporary Telegram failures are retried: 10 s, 20 s, 40 s, 80 s after the first attempt. */
 export const GUEST_NOTIFICATION_ATTEMPTS = 5;
 
@@ -40,6 +46,7 @@ export class OrderQueueService implements OnModuleDestroy {
   private escalation?: Queue;
   private refunds?: Queue;
   private guestNotifications?: Queue;
+  private courierCards?: Queue;
 
   private get escalationQueue(): Queue {
     return (this.escalation ??= new Queue(ESCALATION_QUEUE, {
@@ -73,6 +80,18 @@ export class OrderQueueService implements OnModuleDestroy {
         removeOnFail: 100,
         attempts: GUEST_NOTIFICATION_ATTEMPTS,
         backoff: { type: 'exponential', delay: 10_000 },
+      },
+    }));
+  }
+
+  private get courierCardQueue(): Queue {
+    return (this.courierCards ??= new Queue(COURIER_CARD_QUEUE, {
+      connection: bullConnection(),
+      defaultJobOptions: {
+        removeOnComplete: true,
+        removeOnFail: 100,
+        attempts: 5,
+        backoff: { type: 'exponential', delay: 3000 },
       },
     }));
   }
@@ -132,6 +151,20 @@ export class OrderQueueService implements OnModuleDestroy {
     );
   }
 
+  /**
+   * Rebuild the order card in the courier's chat. The job reads the order when it runs, so the card always
+   * shows the latest state; the order version in the job id keeps one job per change.
+   */
+  enqueueCourierCard(orderId: string, courierId: string, version: number) {
+    return this.safe('enqueueCourierCard', () =>
+      this.courierCardQueue.add(
+        'card',
+        { orderId, courierId } satisfies CourierCardJob,
+        { jobId: `card-${orderId}-${courierId}-${version}` },
+      ),
+    );
+  }
+
   /** False when there is no queue (ORDER_QUEUES=off) or it failed (logged): the caller sends at once. */
   async enqueueGuestNotification(data: {
     orderId: string;
@@ -154,6 +187,7 @@ export class OrderQueueService implements OnModuleDestroy {
       this.escalation?.close(),
       this.refunds?.close(),
       this.guestNotifications?.close(),
+      this.courierCards?.close(),
     ]);
   }
 }
