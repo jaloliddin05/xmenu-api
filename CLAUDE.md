@@ -11,7 +11,7 @@ Swagger (`/docs`), Jest. Prettier: одинарные кавычки, trailing c
 ## Команды
 `npm run start:dev` · `npm run build` · `npm run lint` · `npm run format:check` · `npm run format` · `npm run lint:fix` · `npm test` ·
 `npm run test:e2e` · `npm run openapi` · `npm run check:env` · `npm run check:user-texts`
-(`openapi` собирает проект и пишет `docs/openapi.json` и `docs/ERRORS.md` из сборки, без БД и Redis; `docs/API.md` правится руками;
+(`openapi` собирает проект и пишет `docs/openapi.json`, `docs/ERRORS.md` и матрицу прав в `docs/API.md` из сборки, без БД и Redis; остальной `docs/API.md` правится руками;
 `check:env` проверяет `.env` той же схемой, что старт, `-- --production` как production; `check:user-texts` см. «Ошибки»).
 Миграции: `npm run migrate` (собирает схему и запускает `prisma migrate dev`), на сервере `npx prisma migrate deploy`.
 `generate-schema` вызывает `cat`: под Windows (npm запускает скрипты через cmd) он падает и оставляет
