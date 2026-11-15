@@ -8,7 +8,8 @@ model user {
   url         String?
   isActive  Boolean @default(false) 
   created_at  DateTime    @default(now())
-  organization organization?
+  // The venue this staff user works in, with the role (one venue per user for now)
+  membership   organization_member?
   sessions     staff_session[]
   avatar_id    String?      @unique
   avatar       file?        @relation(fields: [avatar_id], references: [id])

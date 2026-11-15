@@ -31,6 +31,7 @@ import { StaffAuthEventService } from './services/staff-auth-event.service';
 import { StaffAuthService } from './services/staff-auth.service';
 import { StaffSessionService } from './services/staff-session.service';
 import { StaffPasswordService } from './services/staff-password.service';
+import { StaffInvitationService } from './services/staff-invitation.service';
 import { StaffLoginThrottleService } from './services/staff-login-throttle.service';
 import { CustomerCleanupService } from './services/customer-cleanup.service';
 import { RateLimitService } from './services/rate-limit.service';
@@ -73,6 +74,7 @@ import { NoStoreMiddleware } from './middleware/no-store.middleware';
     StaffAuthService,
     StaffSessionService,
     StaffPasswordService,
+    StaffInvitationService,
     StaffLoginThrottleService,
     CustomerAuthService,
     { provide: CUSTOMER_AUTH_CONFIG, useFactory: loadCustomerAuthConfig },
@@ -96,7 +98,13 @@ import { NoStoreMiddleware } from './middleware/no-store.middleware';
     AuthCustomerController,
     TelegramBotWebhookController,
   ],
-  exports: [AuthService, CUSTOMER_AUTH_CONFIG, RateLimitService],
+  exports: [
+    AuthService,
+    CUSTOMER_AUTH_CONFIG,
+    RateLimitService,
+    StaffSessionService,
+    StaffAuthEventService,
+  ],
 })
 export class AuthModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

@@ -6,6 +6,7 @@ import { AppModule } from './app.module';
 import { configureStatic } from './infra/http/static-assets';
 import { configureErrorHandling } from './infra/errors/configure';
 import { AccessTokenUserGuard } from './modules/auth/passport-strategies/access-token-user/access-token-user.guard';
+import { StaffAccessGuard } from './modules/auth/access/staff-access.guard';
 import { checkEnvAtStartup } from './config/env/startup-check';
 
 async function bootstrap() {
@@ -36,7 +37,11 @@ async function bootstrap() {
   configureErrorHandling(app);
 
   const reflector = app.get(Reflector);
-  app.useGlobalGuards(new AccessTokenUserGuard(reflector));
+  // The staff token first, then the route's access rule for the caller's role (deny by default)
+  app.useGlobalGuards(
+    new AccessTokenUserGuard(reflector),
+    new StaffAccessGuard(reflector),
+  );
 
   const document = createOpenApiDocument(app);
   SwaggerModule.setup('docs', app, document, {

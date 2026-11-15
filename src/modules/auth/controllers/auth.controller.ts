@@ -25,6 +25,11 @@ import {
 import { StaffAuthService } from '../services/staff-auth.service';
 import { StaffSessionService } from '../services/staff-session.service';
 import { StaffPasswordService } from '../services/staff-password.service';
+import { StaffInvitationService } from '../services/staff-invitation.service';
+import {
+  StaffInvitationAcceptDto,
+  StaffInvitationCodeDto,
+} from '../dto/staff-invitation.dto';
 import {
   StaffForgotPasswordDto,
   StaffResetPasswordDto,
@@ -47,6 +52,7 @@ export class AuthController {
     private readonly staffAuth: StaffAuthService,
     private readonly sessions: StaffSessionService,
     private readonly passwords: StaffPasswordService,
+    private readonly invitations: StaffInvitationService,
   ) {}
 
   @Public()
@@ -139,6 +145,36 @@ export class AuthController {
     @Req() req: express.Request,
   ): Promise<void> {
     await this.passwords.reset(dto, requestCtx(req));
+  }
+
+  @Public()
+  @Post('/invitation/code')
+  @ApiOperation({
+    summary:
+      'Invited operator: send a code to the phone. The answer, limits and timing are the same for any phone; the code goes out only with an open invitation',
+  })
+  @ApiOkResponse({ type: StaffForgotPasswordResponseDto })
+  @HttpCode(200)
+  invitationCode(
+    @Body() dto: StaffInvitationCodeDto,
+    @Req() req: express.Request,
+  ) {
+    return this.invitations.requestCode(dto, requestCtx(req));
+  }
+
+  @Public()
+  @Post('/invitation/accept')
+  @ApiOperation({
+    summary:
+      'Invited operator: confirm the phone with the code and set the password; signs the operator in',
+  })
+  @ApiOkResponse({ type: StaffCheckCodeResponseDto })
+  @HttpCode(200)
+  acceptInvitation(
+    @Body() dto: StaffInvitationAcceptDto,
+    @Req() req: express.Request,
+  ) {
+    return this.invitations.accept(dto, requestCtx(req));
   }
 
   @Public()

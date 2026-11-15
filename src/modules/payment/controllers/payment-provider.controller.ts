@@ -18,6 +18,7 @@ import {
 import { UpsertPaymentProviderDto } from '../dto/payment-provider.dto';
 import type { OnlineProvider } from '../services/payment-config.service';
 import { PaymentConfigService } from '../services/payment-config.service';
+import { StaffAccess } from 'src/modules/auth/access/staff-access.decorator';
 
 enum ProviderParam {
   click = 'click',
@@ -30,6 +31,7 @@ enum ProviderParam {
 export class PaymentProviderController {
   constructor(private readonly configs: PaymentConfigService) {}
 
+  @StaffAccess('venue')
   @Get()
   @ApiOperation({
     summary:
@@ -51,6 +53,7 @@ export class PaymentProviderController {
     };
   }
 
+  @StaffAccess('venue')
   @Put(':provider')
   @ApiOperation({
     summary: 'Provayder kalitlarini saqlash (shifrlanadi) va yoqish',
@@ -69,6 +72,7 @@ export class PaymentProviderController {
     );
   }
 
+  @StaffAccess('venue')
   @Post(':provider/disable')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: "Provayderni o'chirish (kalitlar saqlanadi)" })

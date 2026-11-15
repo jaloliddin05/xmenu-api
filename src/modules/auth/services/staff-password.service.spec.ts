@@ -369,4 +369,54 @@ describe('StaffPasswordService', () => {
       expect(codes[5]).toBe('rate_limited');
     });
   });
+
+  describe('operator', () => {
+    const OP_PHONE = '+998907654321';
+
+    /** The operator is a staff user like the owner: recovery reads the user, not the role. */
+    const addOperator = async (isActive = true) => {
+      const user = await addOwner(OP_PHONE, isActive);
+      deps.db.members.push({
+        id: 'member-op',
+        organization_id: 'org-1',
+        user_id: user.id,
+        role: 'operator',
+        status: isActive ? 'active' : 'disabled',
+        phone: OP_PHONE,
+        first_name: 'Dilshod',
+        last_name: null,
+      });
+      return user;
+    };
+
+    it('recovers the password with a code and ends every login', async () => {
+      const user = await addOperator();
+      await service.forgot({ phone: OP_PHONE }, CTX);
+      await service.reset(
+        {
+          phone: OP_PHONE,
+          code: deps.sms.lastCode(),
+          newPassword: NEW_PASSWORD,
+        },
+        CTX,
+      );
+      const row = deps.db.users.find((u) => u.id === user.id)!;
+      expect(await bcrypt.compare(NEW_PASSWORD, row.password!)).toBe(true);
+      expect(sessions.revokeAllForUser).toHaveBeenCalledWith(user.id);
+    });
+
+    it('a disabled operator gets no code and cannot reset', async () => {
+      await addOperator(false);
+      const res = await service.forgot({ phone: OP_PHONE }, CTX);
+      expect(res).toEqual({ resendAfter: 60, codeLength: 6, expiresIn: 300 });
+      expect(deps.sms.sent).toHaveLength(0);
+      await expectCode(
+        service.reset(
+          { phone: OP_PHONE, code: '123456', newPassword: NEW_PASSWORD },
+          CTX,
+        ),
+        'invalid_code',
+      );
+    });
+  });
 });

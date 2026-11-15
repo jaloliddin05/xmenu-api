@@ -30,6 +30,7 @@ import {
 } from './dto/telegram-bot-profile.dto';
 import { TelegramBotProfileService } from './telegram-bot-profile.service';
 import { TelegramBotService } from './telegram-bot.service';
+import { StaffAccess } from 'src/modules/auth/access/staff-access.decorator';
 
 type StaffRequest = Parameters<typeof requireStaffOrganizationId>[0];
 
@@ -45,6 +46,7 @@ export class TelegramBotController {
     private readonly profile: TelegramBotProfileService,
   ) {}
 
+  @StaffAccess('venue')
   @Get()
   @ApiOperation({
     summary: 'Connection status of the venue bot and the profile pushed to it',
@@ -54,6 +56,7 @@ export class TelegramBotController {
     return this.profile.fullStatus(requireStaffOrganizationId(req));
   }
 
+  @StaffAccess('venue')
   @Put()
   @ApiOperation({
     summary:
@@ -82,6 +85,7 @@ export class TelegramBotController {
     return this.profile.fullStatus(organizationId);
   }
 
+  @StaffAccess('venue')
   @Put('profile')
   @ApiOperation({
     summary: 'Save the bot profile (per language) and push it to Telegram',
@@ -98,6 +102,7 @@ export class TelegramBotController {
     return this.profile.fullStatus(organizationId);
   }
 
+  @StaffAccess('venue')
   @Post('sync')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -112,6 +117,7 @@ export class TelegramBotController {
     return this.profile.fullStatus(organizationId);
   }
 
+  @StaffAccess('venue')
   @Delete()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({

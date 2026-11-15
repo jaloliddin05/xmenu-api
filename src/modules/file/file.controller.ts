@@ -11,12 +11,14 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { MulterStorage } from 'src/infra/helper/upload/multer-upload';
 import { fieldError } from 'src/infra/validators/validation-errors';
+import { StaffAccess } from 'src/modules/auth/access/staff-access.decorator';
 
 @ApiTags('File')
 @Controller('file')
 export class FileController {
   constructor(private readonly fileService: FileService) {}
 
+  @StaffAccess('profile')
   @Post('upload')
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(

@@ -8,8 +8,11 @@ import { StaffSessionService } from '../services/staff-session.service';
 import { AuthController } from './auth.controller';
 import { StaffAuthService } from '../services/staff-auth.service';
 import { StaffSessionsController } from './staff-sessions.controller';
+import { StaffInvitationService } from '../services/staff-invitation.service';
 
 const ME = 'user-me';
+const OPERATOR = 'user-operator';
+const OP_SID = '0b1c2d3e-4f5a-4b6c-9d7e-8f9a0b1c2d3e';
 const SID = '3f2b8c1e-4d5a-4b6c-8d7e-9f0a1b2c3d4e';
 const OTHER_SID = '9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d';
 
@@ -36,6 +39,14 @@ describe('owner password and sessions routes', () => {
     reset: jest.fn(async () => undefined),
     change: jest.fn(async () => undefined),
   };
+  const invitations = {
+    requestCode: jest.fn(async () => ({
+      resendAfter: 60,
+      codeLength: 6,
+      expiresIn: 300,
+    })),
+    accept: jest.fn(async () => ({ success: true })),
+  };
 
   beforeAll(async () => {
     app = await createHttpApp(
@@ -45,9 +56,13 @@ describe('owner password and sessions routes', () => {
           { provide: StaffSessionService, useValue: sessions },
           { provide: StaffPasswordService, useValue: passwords },
           { provide: StaffAuthService, useValue: {} },
+          { provide: StaffInvitationService, useValue: invitations },
         ],
       },
-      [{ id: ME, organization: null }],
+      [
+        { id: ME, organization: null },
+        { id: OPERATOR, role: 'operator', organization: { id: 'org-1' } },
+      ],
     );
   });
 
@@ -178,5 +193,94 @@ describe('owner password and sessions routes', () => {
       .set(bearer());
     expect(res.status).toBe(204);
     expect(sessions.endOthers).toHaveBeenCalledWith(ME, SID, expect.anything());
+  });
+
+  describe('operator', () => {
+    const op = () => ({
+      Authorization: `Bearer ${staffToken(OPERATOR, undefined, OP_SID)}`,
+    });
+
+    it('changes the password, lists and ends own logins like the owner', async () => {
+      const change = await request(app.getHttpServer())
+        .post('/auth/password/change')
+        .set(op())
+        .send({
+          currentPassword: 'old-password-1',
+          newPassword: 'long-enough-1',
+        });
+      expect(change.status).toBe(204);
+      expect(passwords.change).toHaveBeenCalledWith(
+        OPERATOR,
+        OP_SID,
+        expect.anything(),
+        expect.anything(),
+      );
+
+      const list = await request(app.getHttpServer())
+        .get('/auth/sessions')
+        .set(op());
+      expect(list.status).toBe(200);
+      expect(sessions.listActive).toHaveBeenCalledWith(OPERATOR, OP_SID);
+
+      const end = await request(app.getHttpServer())
+        .delete(`/auth/sessions/${OP_SID}`)
+        .set(op());
+      expect(end.status).toBe(204);
+      expect(sessions.end).toHaveBeenCalledWith(
+        OPERATOR,
+        OP_SID,
+        expect.anything(),
+      );
+
+      const others = await request(app.getHttpServer())
+        .delete('/auth/sessions')
+        .set(op());
+      expect(others.status).toBe(204);
+    });
+
+    it('an ended login of the operator is refused at once', async () => {
+      revoked.add(OP_SID);
+      const res = await request(app.getHttpServer())
+        .get('/auth/sessions')
+        .set(op());
+      expect(res.status).toBe(401);
+    });
+  });
+
+  describe('invitation', () => {
+    it('code and accept are public', async () => {
+      const code = await request(app.getHttpServer())
+        .post('/auth/invitation/code')
+        .send({ phone: '+998 90 123 45 67' });
+      expect(code.status).toBe(200);
+      expect(invitations.requestCode).toHaveBeenCalledWith(
+        { phone: '+998901234567' },
+        expect.objectContaining({ ip: expect.any(String) }),
+      );
+
+      const accept = await request(app.getHttpServer())
+        .post('/auth/invitation/accept')
+        .send({
+          phone: '+998901234567',
+          code: '123456',
+          password: 'long-enough-1',
+        });
+      expect(accept.status).toBe(200);
+      expect(invitations.accept).toHaveBeenCalledWith(
+        { phone: '+998901234567', code: '123456', password: 'long-enough-1' },
+        expect.anything(),
+      );
+    });
+
+    it('accept rejects a short password with a field error and never calls the service', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/auth/invitation/accept')
+        .send({ phone: '+998901234567', code: '123456', password: 'short' });
+      expect(res.status).toBe(400);
+      expect(res.body.fields).toEqual([
+        expect.objectContaining({ field: 'password' }),
+      ]);
+      expect(invitations.accept).not.toHaveBeenCalled();
+    });
   });
 });

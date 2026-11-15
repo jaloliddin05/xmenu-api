@@ -1,6 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import type { CustomerUser } from 'src/modules/customer/services/customer.service';
 import type { StaffUser } from 'src/infra/helper/auth/staff-user';
+import { PERMISSIONS, STAFF_ROLES } from 'src/modules/auth/access/permissions';
+import type {
+  Permission,
+  StaffRole,
+} from 'src/modules/auth/access/permissions';
 
 // ---------------------------------------------------------------- customer
 
@@ -89,6 +94,19 @@ export class StaffUserDto implements StaffUser {
   @ApiProperty() isActive: boolean;
   @ApiProperty() created_at: Date;
   @ApiProperty({ type: String, nullable: true }) avatar_id: string | null;
+  @ApiPropertyOptional({
+    enum: STAFF_ROLES,
+    nullable: true,
+    description: 'Role in the venue',
+  })
+  role?: StaffRole | null;
+  @ApiPropertyOptional({
+    enum: PERMISSIONS,
+    isArray: true,
+    description:
+      'What the role may do; the dashboard shows screens by it (docs/API.md, "Сотрудники и права")',
+  })
+  permissions?: Permission[];
   @ApiPropertyOptional({ type: StaffOrganizationDto, nullable: true })
   organization?: StaffOrganizationDto | null;
 }

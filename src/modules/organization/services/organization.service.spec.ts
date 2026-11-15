@@ -4,11 +4,22 @@ import {
 } from '../domain/platform-defaults';
 import { OrganizationService } from './organization.service';
 
+const OWNER = {
+  id: 'user-1',
+  phone: '+998901234567',
+  first_name: 'Ali',
+  last_name: null,
+};
+
 describe('OrganizationService.create', () => {
   function setup(existing: Record<string, unknown> | null) {
     const db = {
+      organization_member: {
+        findUnique: jest.fn(async () =>
+          existing ? { organization: existing } : null,
+        ),
+      },
       organization: {
-        findUnique: jest.fn(async () => existing),
         findFirst: jest.fn(async () => null),
         create: jest.fn(async ({ data }) => ({ id: 'org-new', ...data })),
         update: jest.fn(async ({ where, data }) => ({ id: where.id, ...data })),
@@ -26,9 +37,18 @@ describe('OrganizationService.create', () => {
 
   it('creates both settings rows with the platform defaults in the same write', async () => {
     const { db, service } = setup(null);
-    await service.create({ name: 'Demo Cafe', type: 'cafe' } as any, 'user-1');
+    await service.create({ name: 'Demo Cafe', type: 'cafe' } as any, OWNER);
 
     const { data } = db.organization.create.mock.calls[0][0];
+    expect(data.members).toEqual({
+      create: expect.objectContaining({
+        user_id: 'user-1',
+        role: 'owner',
+        status: 'active',
+        phone: '+998901234567',
+        first_name: 'Ali',
+      }),
+    });
     expect(data.settings).toEqual({ create: PLATFORM_SETTINGS });
     expect(data.order_settings).toEqual({ create: PLATFORM_ORDER_SETTINGS });
     expect(PLATFORM_SETTINGS).toEqual({
@@ -39,8 +59,8 @@ describe('OrganizationService.create', () => {
   });
 
   it('adds missing settings rows to a venue left by the old signup flow without touching existing ones', async () => {
-    const { db, service } = setup({ id: 'org-old', owner_id: 'user-1' });
-    await service.create({ name: 'Demo Cafe', type: 'cafe' } as any, 'user-1');
+    const { db, service } = setup({ id: 'org-old' });
+    await service.create({ name: 'Demo Cafe', type: 'cafe' } as any, OWNER);
 
     expect(db.organization.create).not.toHaveBeenCalled();
     const { data } = db.organization.update.mock.calls[0][0];

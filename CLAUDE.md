@@ -37,7 +37,8 @@ Env: см. `.env.example` (полный; тест сверяет его со с�
 `npm run generate-schema`. Меняй модельные файлы, потом `npm run migrate`.
 
 ## Модули
-`auth` (два контура: staff и customer), `tenant` (`TenantGuard`, `TenantService`: тенант по id; `GET /tenant/by-slug`,
+`auth` (два контура: staff и customer; права staff в `auth/access`), `staff` (сотрудники заведения: список, приглашение
+и отключение операторов), `tenant` (`TenantGuard`, `TenantService`: тенант по id; `GET /tenant/by-slug`,
 `GET /tenant/config` в `TenantConfigModule`), `organization` (+ настройки заведения), `user`, `employee` (не
 используется), `branch`, `category`, `product` (+ группы допов), `menu` (публичный), `customer` (+ адреса),
 `order` (state machine, очереди, уведомления), `payment` (Click, Payme, ключи тенанта, возвраты),
@@ -239,10 +240,29 @@ App (`instant`) нового номера кладёт Telegram-id в `registrat
   `SmsProvider`. `SMS_PROVIDER=console` и `OTP_DEV_MODE` в production не стартуют.
 - Вход: лимит по IP, нарастающая блокировка по телефону (60 с → 1 ч), единый `401 invalid_credentials` и одна
   bcrypt-проверка на любую неудачу (фиктивный хеш для неизвестного номера).
-- Токены staff принимаются только для существующего пользователя с `isActive=true`; хеш пароля не уходит в ответы.
+- Токены staff принимаются только для существующего пользователя с `isActive=true` и активной строкой в
+  `organization_member` (роль читается из БД на каждом запросе); хеш пароля не уходит в ответы.
 - IP клиента: `trust proxy = loopback` в `main.ts`, nginx должен передавать `X-Forwarded-For`.
 - Владение данными: организация из `requireStaffOrganizationId(req)`; меню проверяется фрагментами из
   `product/services/menu-ownership.ts`; чужой id в пути или в теле → 404. Новые эндпоинты админки делай так же.
+
+## Сотрудники и права
+Контракт и матрица маршрутов: `docs/API.md`, «Сотрудники и права».
+- Роли `owner` и `operator` в `organization_member` (модель в `user/models/organization-member.prisma`: `user_id`
+  уникален, один пользователь в одном заведении; `@@unique([organization_id, phone])`). Колонки `organization.owner_id`
+  нет: владелец заведения = строка с `role = owner`, её создаёт `OrganizationService.create` при регистрации.
+  `toStaffUser` берёт заведение и роль из membership (`STAFF_USER_INCLUDE`) и отдаёт `role` и `permissions`.
+- Права: `auth/access/permissions.ts` (`ROLE_PERMISSIONS`). Каждый не-`@Public` маршрут несёт `@StaffAccess(право,
+  { orgParam? })` на методе (не на классе); `StaffAccessGuard` (глобальный, после `AccessTokenUserGuard`, в `main.ts`
+  и `createHttpApp`) без правила отвечает 403, без права у роли 403, чужой id заведения в `orgParam` 404.
+  `@PlatformAdminRoute()` отдаёт решение `PlatformAdminGuard`. Новый маршрут: правило в коде и строка в `EXPECTED`
+  в `auth/access/staff-access.matrix.spec.ts` (иначе тест красный); матрицу в `docs/API.md` пишет `npm run openapi`
+  (`collectRoutes`, `renderAccessMatrix` в `auth/access/route-rules.ts`), в OpenAPI поле `x-permission`.
+- Приглашение оператора: владелец `POST /organization/:id/staff` (72 ч, ничего не отправляет), оператор
+  `POST /auth/invitation/code` (одинаковый ответ для любого номера, цель кода `invite`) и `/accept` (`StaffInvitationService`:
+  user и активация membership в одной транзакции, условный `updateMany`). Приглашения одного номера сериализует
+  `pg_advisory_xact_lock`. Отключение (`StaffService.disable`): membership `disabled`, `user.isActive = false`,
+  `revokeAllForUser`; владельца отключить нельзя.
 
 ## Что нужно построить
 - Интерфейс провайдера доставки (создать, отменить, статус, вебхук) и адаптер собственных курьеров; внешние сервисы
@@ -252,7 +272,8 @@ App (`instant`) нового номера кладёт Telegram-id в `registrat
 - Возврат после оплаты на сайт заведения: `MINIAPP_RETURN_URL`/`MINIAPP_URL` один на платформу
   (`payment/domain/payment-url.ts`), а не `https://{slug}.xmenu.uz`. Бэкенд адресов `{slug}.xmenu.uz` нигде не строит:
   slug только валидируется как поддомен (`organization/domain/slug.ts`).
-- Роли сотрудников для отдельного приложения (курьеры, официанты, менеджеры). Таблица `employee` есть, не используется.
+- Роли сотрудников для отдельного приложения (курьеры, официанты, менеджеры). Таблица `employee` есть, не используется
+  (операторы админки живут в `organization_member`, раздел «Сотрудники и права»).
 - Позже: POS, Web Push/WebSocket для админки, фискальные чеки, промокоды (поле `discount` всегда 0), заказ ко
   времени, меню по филиалам, ротация `PAYMENT_CONFIG_KEY`, rate limit на
   `POST /orders`.

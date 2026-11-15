@@ -19,7 +19,11 @@ export type StaffAuthEventType =
   | 'staff_password_reset'
   | 'staff_password_changed'
   | 'staff_session_revoked'
-  | 'staff_sessions_revoked_all';
+  | 'staff_sessions_revoked_all'
+  | 'staff_invited'
+  | 'staff_invite_code_requested'
+  | 'staff_invite_accepted'
+  | 'staff_disabled';
 
 /** Owner auth audit: DB row + structured log. Codes, passwords, tokens and full phones are never written. */
 @Injectable()

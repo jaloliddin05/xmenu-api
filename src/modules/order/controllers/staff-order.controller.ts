@@ -28,6 +28,7 @@ import {
   SetOrderStatusDto,
 } from '../dto/staff-order.dto';
 import { OrderStaffService } from '../services/order-staff.service';
+import { StaffAccess } from 'src/modules/auth/access/staff-access.decorator';
 
 /** Restoran paneli: kelgan buyurtmalar va ularni boshqarish. Tenant — tokendagi organization. */
 @ApiTags('Orders (staff)')
@@ -35,6 +36,7 @@ import { OrderStaffService } from '../services/order-staff.service';
 export class StaffOrderController {
   constructor(private readonly staff: OrderStaffService) {}
 
+  @StaffAccess('orders')
   @Get()
   @ApiOperation({
     summary: "Buyurtmalar ro'yxati (yangilari birinchi, cursor pagination)",
@@ -69,6 +71,7 @@ export class StaffOrderController {
     });
   }
 
+  @StaffAccess('orders')
   @Get(':id')
   @ApiOperation({ summary: 'Buyurtma tafsiloti (mijoz, status tarixi bilan)' })
   @ApiOkResponse({ type: StaffOrderViewDto })
@@ -76,6 +79,7 @@ export class StaffOrderController {
     return this.staff.get(requireStaffOrganizationId(req), id);
   }
 
+  @StaffAccess('orders')
   @Post(':id/accept')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Qabul qilish (ixtiyoriy: ETA)' })
@@ -97,6 +101,7 @@ export class StaffOrderController {
     );
   }
 
+  @StaffAccess('orders')
   @Post(':id/reject')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Rad etish (to'langan bo'lsa pul qaytariladi)" })
@@ -114,6 +119,7 @@ export class StaffOrderController {
     );
   }
 
+  @StaffAccess('orders')
   @Post(':id/advance')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -130,6 +136,7 @@ export class StaffOrderController {
     );
   }
 
+  @StaffAccess('orders')
   @Post(':id/status')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({

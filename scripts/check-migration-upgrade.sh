@@ -8,6 +8,7 @@
 # 3. applies the remaining migrations (`prisma migrate deploy`),
 # 4. checks the existing row kept its data and got the column defaults,
 #    and the venue bot's webhook secret was replaced by its sha256 hash,
+#    and the venue's owner became its owner row in organization_member,
 # 5. checks the tenant_domain rules on that venue (one verified host per venue, pending claims by
 #    several venues, cascade on delete).
 #
@@ -60,6 +61,9 @@ values ('00000000-0000-4000-8000-000000000001', 10000, 50000, 0, 25, 40, 300, 90
 insert into organization_telegram_bot (id, organization_id, telegram_bot_id, username, token_encrypted, webhook_secret, updated_at)
 values ('00000000-0000-4000-8000-0000000000b1', '00000000-0000-4000-8000-000000000001', '123456789', 'mant_bot',
   'encrypted', 'plain-webhook-secret', now());
+insert into "user" (id, phone, password, first_name, "isActive")
+values ('00000000-0000-4000-8000-0000000000a1', '+998901112233', 'hash', 'Owner', true);
+update organization set owner_id = '00000000-0000-4000-8000-0000000000a1' where id = '00000000-0000-4000-8000-000000000001';
 SQL
 
 echo "== applying the remaining migrations"
@@ -88,6 +92,13 @@ fi
 bot="$("${PSQL[@]}" -c "select webhook_secret_hash = encode(sha256(convert_to('plain-webhook-secret', 'UTF8')), 'hex') from organization_telegram_bot where id = '00000000-0000-4000-8000-0000000000b1'")"
 if [ "$bot" != 't' ]; then
   echo "FAIL: webhook secret of the existing bot is not its sha256 hash ('$bot')" >&2
+  exit 1
+fi
+
+# organization.owner_id became the owner row in organization_member
+member="$("${PSQL[@]}" -F '|' -c "select user_id, role, status, phone, first_name from organization_member where organization_id = '00000000-0000-4000-8000-000000000001'")"
+if [ "$member" != '00000000-0000-4000-8000-0000000000a1|owner|active|+998901112233|Owner' ]; then
+  echo "FAIL: the owner was not carried over to organization_member: '$member'" >&2
   exit 1
 fi
 

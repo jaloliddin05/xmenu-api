@@ -4,7 +4,10 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../_prisma/prisma.service';
 import { UpdateUserDto } from './dto';
 import { FileService } from '../file/file.service';
-import { toStaffUser } from 'src/infra/helper/auth/staff-user';
+import {
+  STAFF_USER_INCLUDE,
+  toStaffUser,
+} from 'src/infra/helper/auth/staff-user';
 
 @Injectable()
 export class UserService {
@@ -16,11 +19,7 @@ export class UserService {
   async findOne(id: string) {
     const user = await this.prismaService.user.findUnique({
       where: { id },
-      include: {
-        organization: {
-          include: { logo: true, banner: true, translations: true },
-        },
-      },
+      include: STAFF_USER_INCLUDE,
     });
     return user ? toStaffUser(user) : null;
   }
@@ -31,23 +30,6 @@ export class UserService {
       include: { avatar: true },
     });
     return user;
-  }
-
-  async findByPhone(phone: string) {
-    return await this.prismaService.user.findUnique({
-      where: {
-        phone,
-      },
-      include: {
-        organization: {
-          include: {
-            logo: true,
-            banner: true,
-            translations: true,
-          },
-        },
-      },
-    });
   }
 
   async update(id: string, data: UpdateUserDto, file?: Express.Multer.File) {

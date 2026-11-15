@@ -14,6 +14,7 @@ import { RateLimitService } from '../auth/services/rate-limit.service';
 import { translationIpRate, translationRate } from './translation.limits';
 import { requestCtx, type StaffRequest } from 'src/infra/http/request-helpers';
 import { AppException } from 'src/infra/errors/app-exception';
+import { StaffAccess } from 'src/modules/auth/access/staff-access.decorator';
 
 @ApiTags('Translation')
 @Controller('translation')
@@ -23,6 +24,7 @@ export class TranslationController {
     private readonly rateLimit: RateLimitService,
   ) {}
 
+  @StaffAccess('venue')
   @Post()
   @ApiOperation({
     summary:
