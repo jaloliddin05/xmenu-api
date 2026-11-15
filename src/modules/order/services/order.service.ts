@@ -8,12 +8,8 @@ import { PrismaService } from 'src/modules/_prisma/prisma.service';
 import { PaymentConfigService } from 'src/modules/payment/services/payment-config.service';
 import { PaymentLinkService } from 'src/modules/payment/services/payment-link.service';
 import { CreateOrderDto } from '../dto/create-order.dto';
-import { chooseBranch } from '../domain/branch-choice';
-import {
-  computeTotals,
-  deliveryZoneProblem,
-  hashOrderRequest,
-} from '../domain/order-money';
+import { choosePickupBranch } from '../domain/branch-choice';
+import { computeTotals, hashOrderRequest } from '../domain/order-money';
 import { priceLines, PricingProduct } from '../domain/order-pricing';
 import {
   ACTIVE_STATUSES,
@@ -23,7 +19,9 @@ import {
 import type { Tenant } from 'src/modules/tenant/tenant.service';
 import { orderingProblem } from 'src/modules/organization/domain/publication';
 import { MiniAppAccessService } from 'src/modules/auth/services/mini-app-access.service';
-import { OrderSettingsService } from './order-settings.service';
+import { DeliveryQuoteService } from 'src/modules/delivery/services/delivery-quote.service';
+import { fieldError } from 'src/infra/validators/validation-errors';
+import { cashOnDelivery, OrderSettingsService } from './order-settings.service';
 import {
   InvalidTransitionError,
   OrderNotFoundError,
@@ -50,13 +48,15 @@ export class OrderService {
     private readonly payments: PaymentConfigService,
     private readonly links: PaymentLinkService,
     private readonly miniApp: MiniAppAccessService,
+    private readonly delivery: DeliveryQuoteService,
   ) {}
 
   // ------------------------------------------------------------------ create
 
   /**
-   * POST /orders. Tartib: takror so'rovmi? → mijoz → kanal va nashr → filial/ish vaqti → manzil/zona →
-   * to'lov usuli → narxlash (bazadan) → summa/minimum → faol buyurtmalar chegarasi →
+   * POST /orders. Tartib: takror so'rovmi? → mijoz → kanal va nashr → narxlash (bazadan) → filial: olib
+   * ketish — tanlangan, yetkazish — manzil bo'yicha eng yaqin (DeliveryQuoteService, savatdagi bilan bir xil) →
+   * to'lov usuli → qaytim → yetkazish narxi va summa o'zgarmaganmi → minimum → faol buyurtmalar chegarasi →
    * yozish (bitta tranzaksiya). Birinchi topilgan muammo darhol xato qaytaradi.
    */
   async create(
@@ -99,50 +99,7 @@ export class OrderService {
     const settings = await this.settings.get(organizationId);
     const mode = dto.fulfillmentMode;
 
-    // 3. Filial va ish vaqti
-    const branch = await this.chooseBranch(organizationId, mode, dto.branchId);
-
-    // 4. Manzil va zona (delivery)
-    let addressSnapshot: Prisma.InputJsonValue | undefined;
-    if (mode === 'delivery') {
-      if (!dto.addressId)
-        throw new AppException('validation_error', {
-          message: 'addressId is required for delivery',
-        });
-      const address = await this.prisma.customer_address.findFirst({
-        where: { id: dto.addressId, customer_id: customerId },
-      });
-      if (!address) throw new AppException('address_not_found');
-
-      const zoneProblem = deliveryZoneProblem(settings.deliveryZone, address);
-      if (zoneProblem === 'delivery_unavailable_no_zone') {
-        throw new AppException(zoneProblem, {
-          message: 'Delivery is unavailable: the venue has no delivery zone',
-        });
-      }
-      if (zoneProblem)
-        throw new AppException(zoneProblem, {
-          message: 'Address is outside the delivery zone',
-        });
-      addressSnapshot = toAddressView(
-        address,
-      ) as unknown as Prisma.InputJsonValue;
-    }
-
-    // 5. To'lov usuli: naqd doim, onlayn — tenant kalitlarini kiritgan bo'lsa
-    const online = dto.paymentMethod !== 'cash';
-    if (
-      online &&
-      !(await this.payments.enabledProviders(organizationId)).has(
-        dto.paymentMethod,
-      )
-    ) {
-      throw new AppException('payment_method_unavailable', {
-        message: 'This payment method is not available',
-      });
-    }
-
-    // 6. Narxlash (faqat bazadagi narxlar)
+    // 3. Narxlash (faqat bazadagi narxlar): the delivery price and minimum depend on the subtotal
     const products = await this.loadProducts(
       organizationId,
       dto.items.map((i) => i.itemId),
@@ -154,28 +111,119 @@ export class OrderService {
       tenant.defaultLanguage,
     );
 
-    const serviceFee = mode === 'delivery' ? settings.deliveryServiceFee : 0;
-    const totals = computeTotals(subtotal, serviceFee);
+    // 4. Filial, manzil va yetkazish narxi
+    let branchId: string;
+    let addressSnapshot: Prisma.InputJsonValue | undefined;
+    let deliveryFee = 0;
+    let minAmount = settings.minOrderPickup;
+    let rule: { freeFrom: number | null; minOrder: number } | undefined;
+    if (mode === 'delivery') {
+      if (!dto.addressId)
+        throw new AppException('validation_error', {
+          message: 'addressId is required for delivery',
+        });
+      const address = await this.prisma.customer_address.findFirst({
+        where: { id: dto.addressId, customer_id: customerId },
+      });
+      if (!address) throw new AppException('address_not_found');
 
-    // 7. Mijoz ko'rgan summa bilan solishtirish (narx o'zgargan bo'lsa yangi narxlar bilan 409)
+      const point: [number, number] | null =
+        address.latitude != null && address.longitude != null
+          ? [address.latitude, address.longitude]
+          : null;
+      const choice = await this.delivery.choose(
+        organizationId,
+        point,
+        subtotal,
+      );
+      branchId = choice.branch.id;
+      deliveryFee = choice.price.deliveryFee;
+      minAmount = choice.price.minOrder;
+      rule = {
+        freeFrom: choice.price.freeFrom,
+        minOrder: choice.price.minOrder,
+      };
+      addressSnapshot = toAddressView(
+        address,
+      ) as unknown as Prisma.InputJsonValue;
+    } else {
+      branchId = (await this.choosePickupBranch(organizationId, dto.branchId))
+        .id;
+    }
+
+    // 5. To'lov usuli: naqd — olib ketishda doim, yetkazishda o'z kuryerlari bo'lsa; onlayn — tenant kalitlari bilan
+    const online = dto.paymentMethod !== 'cash';
+    if (
+      !online &&
+      mode === 'delivery' &&
+      !cashOnDelivery(settings.courierMode)
+    ) {
+      throw new AppException('payment_method_unavailable', {
+        message: 'Cash on delivery is not available: external couriers only',
+      });
+    }
+    if (
+      online &&
+      !(await this.payments.enabledProviders(organizationId)).has(
+        dto.paymentMethod,
+      )
+    ) {
+      throw new AppException('payment_method_unavailable', {
+        message: 'This payment method is not available',
+      });
+    }
+
+    const totals = computeTotals(subtotal, deliveryFee);
+
+    // 6. Qaytim: faqat naqd, jami summadan kam emas
+    if (dto.cashChangeFrom != null) {
+      if (online)
+        throw fieldError(
+          'cashChangeFrom',
+          'cash_only',
+          'cashChangeFrom is only for cash payment',
+        );
+      if (dto.cashChangeFrom < totals.total)
+        throw fieldError(
+          'cashChangeFrom',
+          'below_total',
+          'cashChangeFrom must not be less than the total',
+        );
+    }
+
+    // 7. Mijoz ko'rgan narxlar bilan solishtirish: first the delivery fee (the rules may have changed while
+    // the guest was in the cart), then the total (menu prices)
+    if (
+      rule &&
+      dto.expectedDeliveryFee != null &&
+      dto.expectedDeliveryFee !== deliveryFee
+    ) {
+      throw new AppException('delivery_fee_changed', {
+        message: 'Delivery fee has changed',
+        details: {
+          deliveryFee,
+          freeFrom: rule.freeFrom,
+          minOrder: rule.minOrder,
+          total: totals.total,
+        },
+      });
+    }
     if (dto.expectedTotal != null && dto.expectedTotal !== totals.total) {
       throw new AppException('price_changed', {
         message: 'Prices have changed',
         details: {
           items: lines.map((l, index) => ({ index, unitPrice: l.unitPrice })),
           subtotal: totals.subtotal,
-          serviceFee: totals.serviceFee,
+          deliveryFee: totals.deliveryFee,
           total: totals.total,
         },
       });
     }
 
-    const minAmount =
-      mode === 'delivery' ? settings.minOrderDelivery : settings.minOrderPickup;
     if (totals.subtotal < minAmount) {
       throw new AppException('min_order_not_reached', {
         message: 'Order is below the minimum amount',
-        details: { minAmount },
+        details: { minAmount, shortBy: minAmount - totals.subtotal },
       });
     }
 
@@ -212,7 +260,7 @@ export class OrderService {
             number,
             organization_id: organizationId,
             customer_id: customerId,
-            branch_id: branch.id,
+            branch_id: branchId,
             status,
             fulfillment: mode,
             idempotency_key: idempotencyKey,
@@ -226,11 +274,10 @@ export class OrderService {
             payment_expires_at: paymentExpiresAt,
             currency: tenant.currency,
             subtotal: totals.subtotal,
-            service_fee: totals.serviceFee,
+            delivery_fee: totals.deliveryFee,
             discount: totals.discount,
             total: totals.total,
-            eta_min: settings.etaMin,
-            eta_max: settings.etaMax,
+            cash_change_from: dto.cashChangeFrom ?? null,
             placed_at: online ? null : new Date(now),
             items: {
               create: lines.map((l) => ({
@@ -536,14 +583,12 @@ export class OrderService {
     return this.miniApp.check(organizationId, initData, org!.delivery_mode);
   }
 
-  private async chooseBranch(
+  private async choosePickupBranch(
     organizationId: string,
-    mode: 'delivery' | 'pickup',
-    requestedId?: string,
+    requestedId: string | undefined,
   ) {
-    return chooseBranch(
+    return choosePickupBranch(
       await this.branches.listActiveWithState(organizationId),
-      mode,
       requestedId,
     );
   }

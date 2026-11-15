@@ -90,15 +90,20 @@ export class OrderViewDto {
   @ApiProperty({ type: [OrderItemDto] }) items: OrderItemDto[];
   @ApiProperty({ example: 'UZS' }) currency: string;
   @ApiProperty() subtotal: number;
-  @ApiProperty() serviceFee: number;
+  @ApiProperty({
+    description:
+      'Delivery fee fixed when the order was placed; 0 for pickup and free delivery',
+  })
+  deliveryFee: number;
   @ApiProperty() discount: number;
   @ApiProperty() total: number;
   @ApiProperty({
-    type: [Number],
-    example: [30, 45],
-    description: '[min, max] minutes',
+    type: Number,
+    nullable: true,
+    example: 200000,
+    description: 'Cash: the amount the guest pays with (change is due)',
   })
-  etaMinutes: number[];
+  cashChangeFrom: number | null;
   @ApiProperty({ enum: ['customer', 'restaurant', 'system'], nullable: true })
   cancelledBy: string | null;
   @ApiProperty({ type: String, nullable: true }) cancelReason: string | null;

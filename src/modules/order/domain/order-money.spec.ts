@@ -1,104 +1,10 @@
-import {
-  computeTotals,
-  deliveryZoneProblem,
-  hashOrderRequest,
-  parseZone,
-  pointInPolygon,
-  toSum,
-} from './order-money';
-
-// Toshkent markazi atrofida kvadrat zona
-const zone: [number, number][] = [
-  [41.2, 69.1],
-  [41.2, 69.4],
-  [41.4, 69.4],
-  [41.4, 69.1],
-];
-
-describe('pointInPolygon', () => {
-  it('inside / outside', () => {
-    expect(pointInPolygon(41.3, 69.25, zone)).toBe(true);
-    expect(pointInPolygon(41.5, 69.25, zone)).toBe(false);
-    expect(pointInPolygon(41.3, 69.5, zone)).toBe(false);
-  });
-
-  it('works for a concave polygon (notch is outside)', () => {
-    const c: [number, number][] = [
-      [0, 0],
-      [0, 10],
-      [10, 10],
-      [10, 6],
-      [4, 6],
-      [4, 4],
-      [10, 4],
-      [10, 0],
-    ];
-    expect(pointInPolygon(5, 5, c)).toBe(false); // in the notch
-    expect(pointInPolygon(2, 2, c)).toBe(true);
-  });
-});
-
-describe('deliveryZoneProblem', () => {
-  const zone: [number, number][] = [
-    [41.2, 69.1],
-    [41.4, 69.1],
-    [41.4, 69.4],
-    [41.2, 69.4],
-  ];
-  it('without a zone delivery is unavailable, whatever the address', () => {
-    expect(
-      deliveryZoneProblem(null, { latitude: 41.3, longitude: 69.25 }),
-    ).toBe('delivery_unavailable_no_zone');
-    expect(deliveryZoneProblem(null, { latitude: null, longitude: null })).toBe(
-      'delivery_unavailable_no_zone',
-    );
-  });
-  it('serves an address inside the zone only', () => {
-    expect(
-      deliveryZoneProblem(zone, { latitude: 41.3, longitude: 69.25 }),
-    ).toBeNull();
-    expect(
-      deliveryZoneProblem(zone, { latitude: 41.5, longitude: 69.25 }),
-    ).toBe('out_of_delivery_zone');
-  });
-  it('treats an address without coordinates as outside', () => {
-    expect(
-      deliveryZoneProblem(zone, { latitude: null, longitude: 69.25 }),
-    ).toBe('out_of_delivery_zone');
-  });
-});
-
-describe('parseZone', () => {
-  it('accepts a valid polygon', () => expect(parseZone(zone)).toEqual(zone));
-  it.each([
-    null,
-    undefined,
-    'x',
-    [],
-    [
-      [1, 2],
-      [3, 4],
-    ],
-    [
-      [1, 2],
-      [3, 4],
-      ['a', 5],
-    ],
-    [
-      [1, 2, 3],
-      [1, 2],
-      [3, 4],
-    ],
-  ])('rejects %p (zone is then not enforced)', (v) =>
-    expect(parseZone(v)).toBeNull(),
-  );
-});
+import { computeTotals, hashOrderRequest, toSum } from './order-money';
 
 describe('money', () => {
   it('totals', () => {
     expect(computeTotals(97000, 16000)).toEqual({
       subtotal: 97000,
-      serviceFee: 16000,
+      deliveryFee: 16000,
       discount: 0,
       total: 113000,
     });
@@ -155,5 +61,9 @@ describe('hashOrderRequest', () => {
       hashOrderRequest({ ...base, items: [{ ...base.items[0], quantity: 3 }] }),
     ).not.toBe(h);
     expect(hashOrderRequest({ ...base, comment: 'x' })).not.toBe(h);
+    expect(hashOrderRequest({ ...base, expectedDeliveryFee: 5000 })).not.toBe(
+      h,
+    );
+    expect(hashOrderRequest({ ...base, cashChangeFrom: 200000 })).not.toBe(h);
   });
 });

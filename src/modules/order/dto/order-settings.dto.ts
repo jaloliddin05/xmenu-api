@@ -1,39 +1,31 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsArray, IsInt, IsOptional, Max, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, Max, Min } from 'class-validator';
+import { DELIVERY_PRICE_STEPS } from 'src/modules/branch/domain/delivery-pricing';
+
+export const COURIER_MODES = ['own', 'external', 'both'] as const;
 
 export class UpdateOrderSettingsDto {
-  @ApiPropertyOptional({
-    description: "Yetkazib berish uchun xizmat to'lovi (so'm)",
-  })
-  @IsOptional()
-  @IsInt()
-  @Min(0)
-  @Max(10_000_000)
-  readonly deliveryServiceFee?: number;
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsInt()
-  @Min(0)
-  @Max(100_000_000)
-  readonly minOrderDelivery?: number;
   @ApiPropertyOptional()
   @IsOptional()
   @IsInt()
   @Min(0)
   @Max(100_000_000)
   readonly minOrderPickup?: number;
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    enum: DELIVERY_PRICE_STEPS,
+    description: 'Delivery fees are rounded up to this step (sum)',
+  })
   @IsOptional()
-  @IsInt()
-  @Min(1)
-  @Max(600)
-  readonly etaMin?: number;
-  @ApiPropertyOptional()
+  @IsIn(DELIVERY_PRICE_STEPS)
+  readonly deliveryPriceStep?: number;
+  @ApiPropertyOptional({
+    enum: COURIER_MODES,
+    description:
+      'Who delivers: own couriers, external services or both. external: cash on delivery is not offered',
+  })
   @IsOptional()
-  @IsInt()
-  @Min(1)
-  @Max(600)
-  readonly etaMax?: number;
+  @IsIn(COURIER_MODES)
+  readonly courierMode?: (typeof COURIER_MODES)[number];
   @ApiPropertyOptional({
     description: 'Restoran qabul qilmasa avto-bekor (soniya), 60..3600',
   })
@@ -56,12 +48,4 @@ export class UpdateOrderSettingsDto {
   @Min(1)
   @Max(50)
   readonly maxActiveOrders?: number;
-  @ApiPropertyOptional({
-    description:
-      '[[lat, lng], ...] with at least 3 points; null removes the zone and makes delivery unavailable',
-    nullable: true,
-  })
-  @IsOptional()
-  @IsArray()
-  readonly deliveryZone?: number[][] | null;
 }

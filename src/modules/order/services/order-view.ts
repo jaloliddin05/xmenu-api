@@ -71,10 +71,10 @@ export function toOrderView(
       })),
     currency: order.currency,
     subtotal: order.subtotal,
-    serviceFee: order.service_fee,
+    deliveryFee: order.delivery_fee,
     discount: order.discount,
     total: order.total,
-    etaMinutes: [order.eta_min, order.eta_max],
+    cashChangeFrom: order.cash_change_from,
     cancelledBy:
       order.cancelled_by && order.cancelled_by !== 'payment'
         ? order.cancelled_by

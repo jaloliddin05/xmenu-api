@@ -30,6 +30,8 @@ model branch {
   working_hours   branch_working_hours[]
   hours_exceptions branch_hours_exception[]
   orders          customer_order[]
+  delivery_zones    branch_delivery_zone[]
+  delivery_distance branch_delivery_distance?
 
   @@index([organization_id, is_active, sort_order])
 }

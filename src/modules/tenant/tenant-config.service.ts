@@ -1,7 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { Lang } from 'src/infra/http/request-helpers';
 import { publicFileUrl } from 'src/modules/menu/menu.mapper';
-import { OrderSettingsService } from 'src/modules/order/services/order-settings.service';
+import {
+  cashOnDelivery,
+  OrderSettingsService,
+} from 'src/modules/order/services/order-settings.service';
+import { DeliveryPricingService } from 'src/modules/delivery/services/delivery-pricing.service';
 import {
   resolveTheme,
   toSettingsView,
@@ -40,16 +44,16 @@ export function pickDescription(
 
 /**
  * Modes a customer can actually order with (order.service.ts): none while ordering is off or not
- * published (domain/publication.ts), delivery also needs a delivery zone.
+ * published (domain/publication.ts), delivery also needs a delivering branch with delivery pricing.
  */
 export function fulfillmentModes(
   branches: { accepts_delivery: boolean; accepts_pickup: boolean }[],
-  hasDeliveryZone: boolean,
+  deliveryPriced: boolean,
   ordering = true,
 ): FulfillmentMode[] {
   const modes: FulfillmentMode[] = [];
   if (!ordering) return modes;
-  if (hasDeliveryZone && branches.some((b) => b.accepts_delivery))
+  if (deliveryPriced && branches.some((b) => b.accepts_delivery))
     modes.push('delivery');
   if (branches.some((b) => b.accepts_pickup)) modes.push('pickup');
   return modes;
@@ -57,11 +61,11 @@ export function fulfillmentModes(
 
 /**
  * Whether delivery can be ordered and, when not, the first reason in this order: no branch takes
- * delivery, ordering is off, not published, no delivery zone. Mirrors fulfillmentModes.
+ * delivery, ordering is off, not published, no delivering branch has pricing. Mirrors fulfillmentModes.
  */
 export function deliveryStatus(
   branches: { accepts_delivery: boolean }[],
-  hasDeliveryZone: boolean,
+  deliveryPriced: boolean,
   problem: OrderingProblem | null,
 ): Pick<
   TenantFulfillmentDto,
@@ -72,7 +76,7 @@ export function deliveryStatus(
   if (!deliveryOffered) reason = 'not_offered';
   else if (problem === 'ordering_channel_disabled') reason = 'channel_disabled';
   else if (problem === 'ordering_not_published') reason = 'not_published';
-  else if (!hasDeliveryZone) reason = 'no_zone';
+  else if (!deliveryPriced) reason = 'not_configured';
   return {
     deliveryOffered,
     deliveryAvailable: reason === null,
@@ -101,10 +105,11 @@ export class TenantConfigService {
     private readonly prisma: PrismaService,
     private readonly orderSettings: OrderSettingsService,
     private readonly guestLogin: GuestLoginService,
+    private readonly deliveryPricing: DeliveryPricingService,
   ) {}
 
   async get(tenant: Tenant, lang: Lang): Promise<TenantConfigDto> {
-    const [org, ordering, branches] = await Promise.all([
+    const [org, ordering, branches, priced] = await Promise.all([
       this.prisma.organization.findUnique({
         where: { id: tenant.id },
         select: {
@@ -134,6 +139,7 @@ export class TenantConfigService {
           longitude: true,
         },
       }),
+      this.deliveryPricing.pricedDeliveryBranches(tenant.id),
     ]);
     if (!org) throw new AppException('tenant_not_found');
     if (!org.settings) {
@@ -155,14 +161,14 @@ export class TenantConfigService {
     const auth = await this.guestLogin.methods(tenant.id, published);
     // Same bot check as channels.auth: a bot that cannot serve guests offers no Mini App
     const miniApp = auth.telegram && modeNeedsBot(org.delivery_mode);
-    const modes = fulfillmentModes(
-      branches,
-      ordering.deliveryZone !== null,
-      published,
+    const deliveryPriced = priced.length > 0;
+    const deliveryZones = priced.flatMap((b) =>
+      b.rules.zones.map((z) => z.polygon),
     );
+    const modes = fulfillmentModes(branches, deliveryPriced, published);
     const view = resolveMapView(
       { center: s.mapCenter, zoom: s.mapZoom },
-      ordering.deliveryZone,
+      deliveryZones.length ? deliveryZones.flat() : null,
       branchPoints(branches),
     );
     return {
@@ -201,7 +207,9 @@ export class TenantConfigService {
       fulfillment: {
         modes,
         defaultMode: modes[0] ?? null,
-        ...deliveryStatus(branches, ordering.deliveryZone !== null, problem),
+        ...deliveryStatus(branches, deliveryPriced, problem),
+        courierMode: ordering.courierMode,
+        cashOnDelivery: cashOnDelivery(ordering.courierMode),
       },
       map: {
         center: view.center,
@@ -209,7 +217,7 @@ export class TenantConfigService {
         zoom: view.zoom,
         city: s.city,
         bounds: s.mapBounds,
-        deliveryZone: ordering.deliveryZone,
+        deliveryZones,
       },
     };
   }

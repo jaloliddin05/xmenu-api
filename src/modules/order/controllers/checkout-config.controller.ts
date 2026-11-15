@@ -10,13 +10,14 @@ import { PaymentConfigService } from 'src/modules/payment/services/payment-confi
 import { CurrentTenant } from 'src/modules/tenant/current-tenant.decorator';
 import type { Tenant } from 'src/modules/tenant/tenant.service';
 import { CheckoutConfigDto } from '../dto/checkout-config.dto';
-import { OrderSettingsService } from '../services/order-settings.service';
+import {
+  cashOnDelivery,
+  OrderSettingsService,
+} from '../services/order-settings.service';
 
 /**
- * Savat hisob-kitobi uchun sozlamalar: yetkazib berish narxi, minimal summa,
- * ETA va hozir yoqilgan to'lov usullari. Frontend ularni savatda ko'rsatadi —
- * shu sababli serverdagi haqiqiy qiymatlar bilan mos bo'ladi (aks holda
- * expectedTotal har safar farq qilib, `price_changed` aylanib qolardi).
+ * Savat hisob-kitobi uchun sozlamalar: olib ketish minimumi va hozir yoqilgan to'lov usullari (yetkazish va
+ * olib ketish uchun alohida). The delivery fee and minimum depend on the address: GET /delivery/quote.
  * Maxfiy narsa yo'q: ommaviy.
  */
 @ApiTags('Checkout config (customer)')
@@ -39,7 +40,7 @@ export class CheckoutConfigController {
   @Header('Vary', 'X-Tenant-Id')
   @ApiOperation({
     summary:
-      "Savat sozlamalari: yetkazib berish narxi, minimal summa, ETA, to'lov usullari",
+      "Savat sozlamalari: olib ketish minimumi, to'lov usullari (yetkazish va olib ketish)",
   })
   @ApiOkResponse({ type: CheckoutConfigDto })
   async get(@CurrentTenant() tenant: Tenant): Promise<CheckoutConfigDto> {
@@ -47,15 +48,18 @@ export class CheckoutConfigController {
       this.settings.get(tenant.id),
       this.payments.enabledProviders(tenant.id),
     ]);
+    const providers = (['click', 'payme'] as const).filter((p) =>
+      online.has(p),
+    );
     return {
       currency: tenant.currency,
-      deliveryServiceFee: s.deliveryServiceFee,
-      minOrder: { delivery: s.minOrderDelivery, pickup: s.minOrderPickup },
-      etaMinutes: [s.etaMin, s.etaMax],
-      paymentMethods: [
-        'cash',
-        ...(['click', 'payme'] as const).filter((p) => online.has(p)),
-      ],
+      minOrderPickup: s.minOrderPickup,
+      paymentMethods: {
+        delivery: cashOnDelivery(s.courierMode)
+          ? ['cash', ...providers]
+          : [...providers],
+        pickup: ['cash', ...providers],
+      },
     };
   }
 }

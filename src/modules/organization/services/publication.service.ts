@@ -232,7 +232,7 @@ export class PublicationService {
     db: Db,
     organizationId: string,
   ): Promise<PublicationFacts> {
-    const [org, categories, products, branches, ordering, botConnected] =
+    const [org, categories, products, branches, botConnected] =
       await Promise.all([
         db.organization.findUnique({
           where: { id: organizationId },
@@ -263,11 +263,9 @@ export class PublicationService {
             accepts_pickup: true,
             accepts_delivery: true,
             working_hours: { select: { is_closed: true } },
+            delivery_zones: { select: { id: true }, take: 1 },
+            delivery_distance: { select: { branch_id: true } },
           },
-        }),
-        db.organization_order_settings.findUnique({
-          where: { organization_id: organizationId },
-          select: { delivery_zone: true },
         }),
         this.botConnected(db, organizationId),
       ]);
@@ -287,9 +285,9 @@ export class PublicationService {
         hasCoordinates: !(b.latitude === 0 && b.longitude === 0),
         acceptsPickup: b.accepts_pickup,
         acceptsDelivery: b.accepts_delivery,
+        hasDeliveryPricing:
+          b.delivery_zones.length > 0 || b.delivery_distance !== null,
       })),
-      // The row is created at signup; no row means no zone, like delivery_zone = NULL
-      hasDeliveryZone: ordering?.delivery_zone != null,
       botConnected,
     };
   }

@@ -253,18 +253,24 @@ export const ERROR_CODES = spec({
     status: 409,
     message: 'Prices have changed',
     when: '`expectedTotal` не совпал с суммой по ценам из базы; новые цены в `details`',
-    details: ['items', 'subtotal', 'serviceFee', 'total'],
+    details: ['items', 'subtotal', 'deliveryFee', 'total'],
+  },
+  delivery_fee_changed: {
+    status: 409,
+    message: 'Delivery fee has changed',
+    when: '`expectedDeliveryFee` не совпал с ценой доставки по текущим правилам филиала; новая цена в `details`',
+    details: ['deliveryFee', 'freeFrom', 'minOrder', 'total'],
   },
   min_order_not_reached: {
     status: 422,
     message: 'Order is below the minimum amount',
-    when: 'Сумма меньше минимальной; `details.minAmount`',
-    details: ['minAmount'],
+    when: 'Сумма без доставки меньше минимальной; `details.minAmount`, `details.shortBy` (сколько не хватает)',
+    details: ['minAmount', 'shortBy'],
   },
   out_of_delivery_zone: {
     status: 422,
     message: 'Address is outside the delivery zone',
-    when: 'Адрес вне зоны доставки',
+    when: 'Ни один филиал с правилами доставки не доставляет на этот адрес (вне зон и дальше максимального расстояния) или у адреса нет координат',
   },
   fulfillment_unavailable: {
     status: 422,
@@ -328,6 +334,12 @@ export const ERROR_CODES = spec({
     status: 422,
     message: 'Delivery zone is not set',
     when: 'У заведения не нарисована зона доставки',
+    deprecated: 'delivery_not_configured',
+  },
+  delivery_not_configured: {
+    status: 422,
+    message: 'Delivery pricing is not set',
+    when: 'Ни у одного филиала с доставкой нет правил стоимости (зон или правила по расстоянию)',
   },
   ordering_channel_disabled: {
     status: 422,

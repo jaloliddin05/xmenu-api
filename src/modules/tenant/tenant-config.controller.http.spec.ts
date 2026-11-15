@@ -11,6 +11,7 @@ import { GuestLoginService } from '../guest-login/guest-login.service';
 import { TelegramBotService } from '../telegram/telegram-bot.service';
 import { OpsNotifierService } from '../order/notifications/ops-notifier.service';
 import { REDIS } from 'src/infra/redis/redis.module';
+import { DeliveryPricingService } from '../delivery/services/delivery-pricing.service';
 
 const FULL = '3f2b8c1e-4d5a-4b6c-8d7e-9f0a1b2c3d4e';
 const BARE = '0a1b2c3d-4e5f-4a6b-8c7d-8e9f0a1b2c3d';
@@ -39,23 +40,38 @@ const settings = (over: Record<string, unknown> = {}) => ({
   map_bounds: null,
   ...over,
 });
-const ordering = (zone: unknown) => ({
-  delivery_service_fee: 0,
-  min_order_delivery: 0,
+const ordering = (courierMode = 'own') => ({
   min_order_pickup: 0,
-  eta_min: 20,
-  eta_max: 30,
+  delivery_price_step: 100,
+  courier_mode: courierMode,
   acceptance_timeout_seconds: 300,
   payment_timeout_seconds: 900,
   max_active_orders: 5,
-  delivery_zone: zone,
 });
+/** A delivering branch priced by one zone, or by the distance rule only (no zone to draw). */
+const zoneRules = (zone: number[][]) => ({
+  zones: [{ polygon: zone, price: 10000, minOrder: 0, freeFrom: null }],
+  distance: null,
+});
+const distanceRules = {
+  zones: [],
+  distance: {
+    basePrice: 8000,
+    includedKm: 2,
+    pricePerKm: 1000,
+    maxKm: 10,
+    minOrder: 0,
+    freeFrom: null,
+  },
+};
 
 describe('GET /tenant/config', () => {
   let app: INestApplication;
   let orgs: Record<string, any>;
   let orderRows: Record<string, any>;
   let branches: Record<string, any[]>;
+  // DeliveryPricingService.pricedDeliveryBranches: rules of the delivering branches that have any
+  let priced: Record<string, { zones: any[]; distance: any }[]>;
 
   beforeAll(async () => {
     jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
@@ -98,6 +114,13 @@ describe('GET /tenant/config', () => {
         },
         { provide: OpsNotifierService, useValue: { alert: jest.fn() } },
         { provide: REDIS, useValue: { set: jest.fn(async () => 'OK') } },
+        {
+          provide: DeliveryPricingService,
+          useValue: {
+            pricedDeliveryBranches: async (id: string) =>
+              (priced[id] ?? []).map((rules, i) => ({ id: `b${i}`, rules })),
+          },
+        },
       ],
     });
   });
@@ -170,7 +193,8 @@ describe('GET /tenant/config', () => {
       },
       [OFF]: { id: OFF, slug: 'off', name: 'Off', is_active: false },
     };
-    orderRows = { [FULL]: ordering(ZONE), [BARE]: ordering(null) };
+    orderRows = { [FULL]: ordering(), [BARE]: ordering() };
+    priced = { [FULL]: [zoneRules(ZONE)] };
     branches = {
       [FULL]: [
         { is_active: true, accepts_delivery: true, accepts_pickup: false },
@@ -231,6 +255,8 @@ describe('GET /tenant/config', () => {
         deliveryOffered: true,
         deliveryAvailable: true,
         deliveryUnavailableReason: null,
+        courierMode: 'own',
+        cashOnDelivery: true,
       },
       map: {
         center: [41.31, 69.24],
@@ -241,7 +267,7 @@ describe('GET /tenant/config', () => {
           [41.15, 69.0],
           [41.45, 69.45],
         ],
-        deliveryZone: ZONE,
+        deliveryZones: [ZONE],
       },
     });
     expect(res.headers['cache-control']).toBe('public, max-age=60');
@@ -296,6 +322,8 @@ describe('GET /tenant/config', () => {
         deliveryOffered: false,
         deliveryAvailable: false,
         deliveryUnavailableReason: 'not_offered',
+        courierMode: 'own',
+        cashOnDelivery: true,
       },
       map: {
         center: null,
@@ -303,7 +331,7 @@ describe('GET /tenant/config', () => {
         zoom: null,
         city: null,
         bounds: null,
-        deliveryZone: null,
+        deliveryZones: [],
       },
     });
   });
@@ -314,7 +342,7 @@ describe('GET /tenant/config', () => {
       published_at: new Date('2026-10-31T10:00:00Z'),
     });
 
-  it('offers delivery only with a delivery zone', async () => {
+  it('offers delivery only when a delivering branch has pricing', async () => {
     publishBare();
     branches[BARE] = [
       { is_active: true, accepts_delivery: true, accepts_pickup: true },
@@ -326,7 +354,23 @@ describe('GET /tenant/config', () => {
       defaultMode: 'pickup',
       deliveryOffered: true,
       deliveryAvailable: false,
-      deliveryUnavailableReason: 'no_zone',
+      deliveryUnavailableReason: 'not_configured',
+      courierMode: 'own',
+      cashOnDelivery: true,
+    });
+    // A distance rule alone is enough; there is no zone to draw
+    priced[BARE] = [distanceRules];
+    const priced2 = await config(BARE).expect(200);
+    expect(priced2.body.fulfillment.modes).toEqual(['delivery', 'pickup']);
+    expect(priced2.body.map.deliveryZones).toEqual([]);
+  });
+
+  it('external couriers only: no cash on delivery', async () => {
+    orderRows[FULL] = ordering('external');
+    const { fulfillment } = (await config(FULL).expect(200)).body;
+    expect(fulfillment).toMatchObject({
+      courierMode: 'external',
+      cashOnDelivery: false,
     });
   });
 
@@ -335,7 +379,7 @@ describe('GET /tenant/config', () => {
     branches[BARE] = [
       { is_active: true, accepts_delivery: false, accepts_pickup: true },
     ];
-    orderRows[BARE] = ordering(ZONE);
+    priced[BARE] = [zoneRules(ZONE)];
     app.get(OrderSettingsService).invalidate(BARE);
     const res = await config(BARE).expect(200);
     expect(res.body.fulfillment).toEqual({
@@ -344,6 +388,8 @@ describe('GET /tenant/config', () => {
       deliveryOffered: false,
       deliveryAvailable: false,
       deliveryUnavailableReason: 'not_offered',
+      courierMode: 'own',
+      cashOnDelivery: true,
     });
   });
 
@@ -377,6 +423,8 @@ describe('GET /tenant/config', () => {
         deliveryOffered: true,
         deliveryAvailable: false,
         deliveryUnavailableReason: reason,
+        courierMode: 'own',
+        cashOnDelivery: true,
       });
       expect(res.body.channels.delivery).toEqual({
         enabled: state.delivery_enabled,
@@ -386,7 +434,7 @@ describe('GET /tenant/config', () => {
         botUsername: 'demo_cafe_bot',
       });
       // The map and zone stay: the site can still show them while orders are paused
-      expect(res.body.map.deliveryZone).toEqual(ZONE);
+      expect(res.body.map.deliveryZones).toEqual([ZONE]);
     },
   );
 
@@ -409,7 +457,7 @@ describe('GET /tenant/config', () => {
 
     it('centers on the branches when there is no zone, skipping (0, 0) and inactive ones', async () => {
       unsave();
-      orderRows[FULL] = ordering(null);
+      priced[FULL] = [];
       branches[FULL] = [
         { is_active: true, latitude: 41.3, longitude: 69.2 },
         { is_active: true, latitude: 41.32, longitude: 69.3 },
@@ -432,7 +480,7 @@ describe('GET /tenant/config', () => {
 
     it('stays null for a venue with neither zone nor branch coordinates', async () => {
       unsave();
-      orderRows[FULL] = ordering(null);
+      priced[FULL] = [];
       branches[FULL] = [{ is_active: true, latitude: 0, longitude: 0 }];
       const { map } = (await config(FULL).expect(200)).body;
       expect(map.center).toBeNull();

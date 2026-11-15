@@ -53,6 +53,8 @@ export function buildRestaurantText(order: OrderWithItems): string {
   lines.push(
     `💳 ${PAYMENT_LABEL[order.payment_method]}${order.payment_method === 'cash' ? '' : paid ? ' — оплачено' : ' — не оплачено'}`,
   );
+  if (order.cash_change_from != null)
+    lines.push(`💵 Сдача с ${fmtSum(order.cash_change_from)}`);
   lines.push('');
 
   for (const item of [...order.items].sort((a, b) => a.position - b.position)) {
@@ -65,8 +67,8 @@ export function buildRestaurantText(order: OrderWithItems): string {
     if (extras.length) lines.push(`   <i>${extras.join(', ')}</i>`);
   }
   lines.push('');
-  if (order.service_fee > 0)
-    lines.push(`Сервисный сбор: ${fmtSum(order.service_fee)}`);
+  if (order.delivery_fee > 0)
+    lines.push(`Доставка: ${fmtSum(order.delivery_fee)}`);
   lines.push(`<b>Итого: ${fmtSum(order.total)}</b>`);
   lines.push('');
   lines.push(`📞 ${esc(order.phone)}`);

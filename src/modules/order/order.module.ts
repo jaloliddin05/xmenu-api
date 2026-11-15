@@ -13,6 +13,7 @@ import { OrderCoreModule } from './order-core.module';
 import { RevalidateModule } from '../revalidate-queue/revalidate.module';
 import { OrderStaffService } from './services/order-staff.service';
 import { OrderService } from './services/order.service';
+import { DeliveryModule } from '../delivery/delivery.module';
 
 /** Buyurtma API'si: mijoz, restoran paneli, Telegram tugmalari, sozlamalar. Yadro — OrderCoreModule. */
 @Module({
@@ -24,6 +25,7 @@ import { OrderService } from './services/order.service';
     OrderCoreModule,
     RevalidateModule,
     MiniAppModule,
+    DeliveryModule,
   ],
   controllers: [
     CustomerOrderController,

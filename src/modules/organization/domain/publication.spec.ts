@@ -16,6 +16,7 @@ const BRANCH: BranchFacts = {
   hasCoordinates: true,
   acceptsPickup: true,
   acceptsDelivery: true,
+  hasDeliveryPricing: true,
 };
 
 const READY: PublicationFacts = {
@@ -26,7 +27,6 @@ const READY: PublicationFacts = {
   hasActiveCategory: true,
   hasActiveProduct: true,
   branches: [BRANCH],
-  hasDeliveryZone: true,
   botConnected: false,
 };
 
@@ -56,7 +56,10 @@ describe('evaluateChecklist', () => {
     ['menu_category', { hasActiveCategory: false }],
     ['menu_product', { hasActiveProduct: false }],
     ['branch', { branches: [] }],
-    ['delivery_zone', { hasDeliveryZone: false }],
+    [
+      'delivery_pricing',
+      { branches: [{ ...BRANCH, hasDeliveryPricing: false }] },
+    ],
     ['telegram_bot', { deliveryMode: 'miniapp', botConnected: false }],
     ['telegram_bot', { deliveryMode: 'both', botConnected: false }],
   ])('%s is todo for %p, with a hint, and blocks', (id, facts) => {
@@ -81,21 +84,38 @@ describe('evaluateChecklist', () => {
     ).toEqual({ id: 'telegram_bot', status: 'not_required', hint: null });
   });
 
-  it('delivery zone is not required when no branch delivers', () => {
+  it('delivery pricing is not required when no branch delivers', () => {
     const facts = {
-      branches: [{ ...BRANCH, acceptsDelivery: false }],
-      hasDeliveryZone: false,
+      branches: [
+        { ...BRANCH, acceptsDelivery: false, hasDeliveryPricing: false },
+      ],
     };
-    expect(item(facts, 'delivery_zone').status).toBe('not_required');
+    expect(item(facts, 'delivery_pricing').status).toBe('not_required');
     expect(isReady(evaluateChecklist({ ...READY, ...facts }))).toBe(true);
   });
 
-  it('delivery zone is required as soon as one branch delivers', () => {
+  it('delivery pricing is required as soon as one branch delivers', () => {
     const facts = {
-      branches: [{ ...BRANCH, acceptsDelivery: false }, { ...BRANCH }],
-      hasDeliveryZone: false,
+      branches: [
+        { ...BRANCH, acceptsDelivery: false, hasDeliveryPricing: false },
+        { ...BRANCH, hasDeliveryPricing: false },
+      ],
     };
-    expect(item(facts, 'delivery_zone').status).toBe('todo');
+    expect(item(facts, 'delivery_pricing').status).toBe('todo');
+  });
+
+  it('pricing on a branch that does not deliver does not count', () => {
+    const facts = {
+      branches: [
+        { ...BRANCH, acceptsDelivery: false, hasDeliveryPricing: true },
+        { ...BRANCH, hasDeliveryPricing: false },
+      ],
+    };
+    expect(item(facts, 'delivery_pricing').status).toBe('todo');
+    expect(
+      item({ branches: [...facts.branches, { ...BRANCH }] }, 'delivery_pricing')
+        .status,
+    ).toBe('done');
   });
 
   describe('branch', () => {
