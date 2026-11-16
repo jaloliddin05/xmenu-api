@@ -28,6 +28,7 @@ const READY: PublicationFacts = {
   hasActiveProduct: true,
   branches: [BRANCH],
   botConnected: false,
+  hasDeliveryPaymentMethod: true,
 };
 
 const item = (facts: Partial<PublicationFacts>, id: ChecklistId) =>
@@ -62,6 +63,7 @@ describe('evaluateChecklist', () => {
     ],
     ['telegram_bot', { deliveryMode: 'miniapp', botConnected: false }],
     ['telegram_bot', { deliveryMode: 'both', botConnected: false }],
+    ['delivery_payment', { hasDeliveryPaymentMethod: false }],
   ])('%s is todo for %p, with a hint, and blocks', (id, facts) => {
     const r = item(facts, id);
     expect(r.status).toBe('todo');
@@ -91,6 +93,15 @@ describe('evaluateChecklist', () => {
       ],
     };
     expect(item(facts, 'delivery_pricing').status).toBe('not_required');
+    expect(isReady(evaluateChecklist({ ...READY, ...facts }))).toBe(true);
+  });
+
+  it('a payment method at delivery is not required when no branch delivers (W13F-04)', () => {
+    const facts = {
+      hasDeliveryPaymentMethod: false,
+      branches: [{ ...BRANCH, acceptsDelivery: false }],
+    };
+    expect(item(facts, 'delivery_payment').status).toBe('not_required');
     expect(isReady(evaluateChecklist({ ...READY, ...facts }))).toBe(true);
   });
 

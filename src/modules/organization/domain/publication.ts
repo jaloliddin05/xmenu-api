@@ -44,6 +44,8 @@ export interface PublicationFacts {
   branches: BranchFacts[];
   /** The venue's bot is connected and enabled (organization_telegram_bot.is_enabled). */
   botConnected: boolean;
+  /** The guest has at least one payment method at delivery (deliveryPaymentMethods is not empty). */
+  hasDeliveryPaymentMethod: boolean;
 }
 
 export const CHECKLIST_IDS = [
@@ -54,6 +56,7 @@ export const CHECKLIST_IDS = [
   'menu_product',
   'branch',
   'delivery_pricing',
+  'delivery_payment',
   'telegram_bot',
 ] as const;
 export type ChecklistId = (typeof CHECKLIST_IDS)[number];
@@ -109,7 +112,10 @@ function branchItem(branches: BranchFacts[]): ChecklistItem {
   return todo('branch', hint);
 }
 
-/** Every item, in CHECKLIST_IDS order. Logo, colors, contacts and payment keys never block publication. */
+/**
+ * Every item, in CHECKLIST_IDS order. Logo, colors, contacts and payment keys never block publication by
+ * themselves: keys matter only when online is the venue's sole payment method at delivery.
+ */
 export function evaluateChecklist(f: PublicationFacts): ChecklistItem[] {
   const deliversSomewhere = f.branches.some((b) => b.acceptsDelivery);
   return [
@@ -134,6 +140,14 @@ export function evaluateChecklist(f: PublicationFacts): ChecklistItem[] {
           'Задайте стоимость доставки (зону или расстояние) хотя бы у одного филиала с доставкой или отключите доставку в филиалах',
         )
       : notRequired('delivery_pricing'),
+    // A venue setting, not the platform's: blocks like delivery pricing (W13F-04)
+    deliversSomewhere
+      ? check(
+          'delivery_payment',
+          f.hasDeliveryPaymentMethod,
+          'Включите способ оплаты при доставке: наличные или карту курьеру (если доставляют свои курьеры) или онлайн с подключённым Click или Payme',
+        )
+      : notRequired('delivery_payment'),
     modeNeedsBot(f.deliveryMode)
       ? check(
           'telegram_bot',

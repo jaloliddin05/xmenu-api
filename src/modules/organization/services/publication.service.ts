@@ -16,6 +16,8 @@ import { PublicationViewDto } from '../dto/publication.dto';
 import { AppException } from 'src/infra/errors/app-exception';
 import { GuestLoginService } from 'src/modules/guest-login/guest-login.service';
 import { TelegramBotProfileService } from 'src/modules/telegram/telegram-bot-profile.service';
+import { deliveryPaymentMethods } from 'src/modules/order/domain/delivery-payment';
+import { readDeliveryPayment } from 'src/modules/order/services/delivery-payment-state';
 
 type Db = Prisma.TransactionClient;
 
@@ -232,7 +234,7 @@ export class PublicationService {
     db: Db,
     organizationId: string,
   ): Promise<PublicationFacts> {
-    const [org, categories, products, branches, botConnected] =
+    const [org, categories, products, branches, botConnected, payment] =
       await Promise.all([
         db.organization.findUnique({
           where: { id: organizationId },
@@ -268,6 +270,7 @@ export class PublicationService {
           },
         }),
         this.botConnected(db, organizationId),
+        readDeliveryPayment(db, organizationId),
       ]);
     if (!org)
       throw new AppException('not_found', {
@@ -289,6 +292,8 @@ export class PublicationService {
           b.delivery_zones.length > 0 || b.delivery_distance !== null,
       })),
       botConnected,
+      hasDeliveryPaymentMethod:
+        deliveryPaymentMethods(payment, payment.providers).length > 0,
     };
   }
 

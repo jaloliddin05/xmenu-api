@@ -895,9 +895,18 @@ QR-меню и сайта доставки (`REVALIDATE.md`).
 
 `deliveryPayment`: `online: true` без подключённого провайдера (`/payment-provider`) → `400 invalid_settings`,
 `fields: [{ field: "deliveryPayment.online", code: "online_payment_not_connected" }]`; все три выключены → `400
-invalid_settings`, `fields: [{ field: "deliveryPayment", code: "delivery_payment_required" }]`. Отключённый позже
-провайдер настройку не меняет: онлайн просто пропадает из действующих способов. Подключение и отключение провайдера
-ставит ревалидацию сайта доставки (`route: settings`).
+invalid_settings`, `fields: [{ field: "deliveryPayment", code: "delivery_payment_required" }]`.
+
+У доставки всегда остаётся хотя бы один действующий способ оплаты. `PUT` с `deliveryPayment` или `courierMode`
+проверяет итоговое состояние: если гостю не осталось бы ни одного способа (только внешние службы при наличных и карте,
+только онлайн без включённого провайдера), → `400 invalid_settings`, `fields: [{ field, code:
+"delivery_payment_none_available" }]`; `field` = `courierMode`, если включены наличные или карта, но их некому
+принять (`courierMode: external`), иначе `deliveryPayment`. Отключение провайдера (`POST
+/payment-provider/:provider/disable` или `PUT /payment-provider/:provider` с `isEnabled: false`), после которого у
+доставки не осталось бы способов, → `409 delivery_payment_last_method`, провайдер остаётся включённым. Если способов
+уже нет (например, ключи перестали расшифровываться), отключение не отклоняется. Обе проверки идут под блокировкой
+строки заведения (той же, что у публикации), поэтому параллельные запросы не обходят друг друга. Подключение и
+отключение провайдера ставит ревалидацию сайта доставки (`route: settings`).
 
 ## Отчёты (владелец)
 
@@ -1038,6 +1047,7 @@ invalid_settings`, `fields: [{ field: "deliveryPayment", code: "delivery_payment
     { "id": "menu_product", "status": "todo", "hint": "Добавьте хотя бы одно активное блюдо в активную категорию" },
     { "id": "branch", "status": "todo", "hint": "Укажите у филиала часы работы (или «круглосуточно»)" },
     { "id": "delivery_pricing", "status": "todo", "hint": "Задайте стоимость доставки (зону или расстояние) хотя бы у одного филиала с доставкой или отключите доставку в филиалах" },
+    { "id": "delivery_payment", "status": "done", "hint": null },
     { "id": "telegram_bot", "status": "not_required", "hint": null }
   ],
   "warnings": [
@@ -1063,10 +1073,11 @@ invalid_settings`, `fields: [{ field: "deliveryPayment", code: "delivery_payment
 | `menu_product` | есть активное блюдо в активной категории |
 | `branch` | есть активный филиал, у которого одновременно: часы работы хотя бы в один день (`is24h` подходит, `isClosed` нет), точка на карте (не `0, 0`), самовывоз или доставка |
 | `delivery_pricing` | у активного филиала с доставкой есть правила стоимости (зона или расстояние, `PUT /branch/:id/delivery-pricing`); `not_required`, если ни один активный филиал не принимает доставку |
+| `delivery_payment` | у гостя есть хотя бы один способ оплаты доставки (`fulfillment.deliveryPaymentMethods` не пуст: наличные или карта курьеру не при `courierMode: external`, онлайн с включённым провайдером); `not_required`, если ни один активный филиал не принимает доставку |
 | `telegram_bot` | бот заведения подключён и включён (`/telegram-bot`); `not_required` в режиме `site` |
 
-Логотип, цвета, контакты и ключи Click/Payme публикацию не блокируют; наличные при доставке включены по умолчанию
-(`deliveryPayment`, кроме `courierMode: external`).
+Логотип, цвета и контакты публикацию не блокируют; ключи Click/Payme нужны, только если онлайн единственный способ
+оплаты доставки (`delivery_payment`). Наличные при доставке включены по умолчанию (`deliveryPayment`).
 
 `warnings`: предупреждения отдельно от чеклиста, публикацию не блокируют (`publish` с ними проходит). Пусто, пока канал
 заказов выключен. Сейчас только о входе гостей: он зависит и от платформы (SMS), поэтому пунктом чеклиста не является.

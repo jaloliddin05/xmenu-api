@@ -3,14 +3,13 @@ import request from 'supertest';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
 import { createHttpApp, staffToken } from 'src/infra/testing/http-app.fake';
 import { PLATFORM_ORDER_SETTINGS } from 'src/modules/organization/domain/platform-defaults';
-import { PaymentConfigService } from 'src/modules/payment/services/payment-config.service';
 import { RevalidateService } from 'src/modules/revalidate-queue/revalidate.service';
 import { OrderSettingsService } from '../services/order-settings.service';
 import { OrderSettingsController } from './order-settings.controller';
 
 const ORG = '11111111-1111-4111-8111-111111111111';
 
-describe('GET/PUT /order-settings: payment methods at delivery (W13-05)', () => {
+describe('GET/PUT /order-settings: payment methods at delivery (W13-05, W13F-04)', () => {
   let app: INestApplication;
   let row: Record<string, unknown>;
   let providers: string[];
@@ -18,6 +17,15 @@ describe('GET/PUT /order-settings: payment methods at delivery (W13-05)', () => 
 
   beforeAll(async () => {
     const prisma = {
+      $transaction: jest.fn((fn: (tx: unknown) => Promise<unknown>) =>
+        fn(prisma),
+      ),
+      $queryRaw: jest.fn(async () => []),
+      organization_payment_provider: {
+        findMany: jest.fn(async () =>
+          providers.map((provider) => ({ provider })),
+        ),
+      },
       organization_order_settings: {
         findUnique: jest.fn(async () => ({ ...row })),
         update: jest.fn(async ({ data }) => {
@@ -33,10 +41,6 @@ describe('GET/PUT /order-settings: payment methods at delivery (W13-05)', () => 
         providers: [
           OrderSettingsService,
           { provide: PrismaService, useValue: prisma },
-          {
-            provide: PaymentConfigService,
-            useValue: { enabledProviders: async () => new Set(providers) },
-          },
           {
             provide: RevalidateService,
             useValue: { addRevalidationJob: jest.fn(async () => undefined) },
@@ -119,6 +123,56 @@ describe('GET/PUT /order-settings: payment methods at delivery (W13-05)', () => 
         code: 'delivery_payment_required',
       }),
     ]);
+  });
+
+  it('only external services with cash and card: 400 on courierMode, nothing saved; the venue row is locked', async () => {
+    await put({
+      deliveryPayment: { cash: true, card: true, online: false },
+    }).expect(200);
+    const res = await put({ courierMode: 'external' }).expect(400);
+    expect(res.body).toMatchObject({
+      code: 'invalid_settings',
+      fields: [
+        { field: 'courierMode', code: 'delivery_payment_none_available' },
+      ],
+    });
+    expect(row.courier_mode).toBe('own');
+    expect(
+      (app.get(PrismaService).$queryRaw as jest.Mock).mock.calls
+        .at(-1)[0]
+        .join('?'),
+    ).toContain('FOR UPDATE');
+
+    // online with a provider makes external services possible
+    providers = ['payme'];
+    await put({
+      courierMode: 'external',
+      deliveryPayment: { cash: true, card: true, online: true },
+    }).expect(200);
+    expect(row.courier_mode).toBe('external');
+  });
+
+  it('only online after its provider was disabled: saving the same switches is refused, adding cash fixes it', async () => {
+    row.delivery_pay_cash = false;
+    row.delivery_pay_online = true;
+    const res = await put({
+      deliveryPayment: { cash: false, card: false, online: true },
+    }).expect(400);
+    expect(res.body.fields).toEqual([
+      expect.objectContaining({
+        field: 'deliveryPayment',
+        code: 'delivery_payment_none_available',
+      }),
+    ]);
+    await put({
+      deliveryPayment: { cash: true, card: false, online: true },
+    }).expect(200);
+  });
+
+  it('other settings save without the payment check', async () => {
+    row.courier_mode = 'external';
+    await put({ doorWaitMinutes: 15 }).expect(200);
+    expect(row.door_wait_minutes).toBe(15);
   });
 
   it('a partial or non-boolean switch is a validation error', async () => {
