@@ -30,6 +30,11 @@ import {
   courierLang,
 } from '../domain/courier-texts';
 import { CourierCardService } from './courier-card.service';
+import { OrderSettingsService } from 'src/modules/order/services/order-settings.service';
+import {
+  doorPaymentChoices,
+  doorPaymentMethods,
+} from 'src/modules/order/domain/delivery-payment';
 import { CourierShiftService } from './courier-shift.service';
 
 /** The parts of a Telegram update the courier bot reads. */
@@ -90,6 +95,7 @@ export class CourierBotService {
     private readonly transitions: OrderTransitionService,
     private readonly shifts: CourierShiftService,
     private readonly cards: CourierCardService,
+    private readonly settings: OrderSettingsService,
   ) {}
 
   /** true: the update was the courier's and is handled. */
@@ -338,15 +344,39 @@ export class CourierBotService {
 
     const order = await this.prisma.customer_order.findFirst({
       where: { id: action.orderId, organization_id: c.organization_id },
-      select: { id: true, courier_id: true, status: true },
+      select: {
+        id: true,
+        courier_id: true,
+        status: true,
+        payment_method: true,
+      },
     });
     if (!order) return 'notYours';
+
+    // A payment button the card does not show now (the venue switched the method off): refused like a stale one
+    if (
+      order.courier_id === c.id &&
+      (action.a === 'delivered' || action.a === 'delivered_card')
+    ) {
+      const choices = doorPaymentChoices(
+        order.payment_method,
+        doorPaymentMethods(await this.settings.get(c.organization_id)),
+      );
+      const wanted = action.a === 'delivered' ? 'cash' : 'card';
+      if (choices.length ? !choices.includes(wanted) : wanted === 'card')
+        return 'notAvailable';
+    }
 
     switch (action.a) {
       case 'pick':
         return this.move(c, order.id, { to: 'on_the_way' });
       case 'delivered':
-        return this.move(c, order.id, { to: 'completed', note: 'delivered' });
+        // Banknotes for an order paid at the door; nothing to mark for an online one
+        return this.move(c, order.id, {
+          to: 'completed',
+          note: 'delivered',
+          cashCollected: 'cash',
+        });
       case 'delivered_card':
         return this.move(c, order.id, {
           to: 'completed',

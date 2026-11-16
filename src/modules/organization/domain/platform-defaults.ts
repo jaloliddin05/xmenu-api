@@ -34,6 +34,10 @@ export const PLATFORM_ORDER_SETTINGS = {
   min_order_pickup: 0,
   delivery_price_step: 100,
   courier_mode: 'own' as const,
+  // Payment at delivery: cash only (docs/DELIVERY.md, "Настройки")
+  delivery_pay_cash: true,
+  delivery_pay_card: false,
+  delivery_pay_online: false,
   acceptance_timeout_seconds: 300,
   payment_timeout_seconds: 900,
   max_active_orders: 5,

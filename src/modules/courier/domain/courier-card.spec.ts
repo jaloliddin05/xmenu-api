@@ -40,8 +40,18 @@ const order = (o: Partial<CourierCardOrder> = {}): CourierCardOrder => ({
   ...o,
 });
 
-const card = (o: Partial<CourierCardOrder> = {}, readyFromBranch = 1) =>
-  renderCourierCard(order(o), { courierId: ME, lang: 'ru', readyFromBranch });
+const BOTH = ['cash', 'card'] as const;
+const card = (
+  o: Partial<CourierCardOrder> = {},
+  readyFromBranch = 1,
+  doorMethods: readonly ('cash' | 'card')[] = BOTH,
+) =>
+  renderCourierCard(order(o), {
+    courierId: ME,
+    lang: 'ru',
+    readyFromBranch,
+    doorMethods,
+  });
 const buttons = (c: ReturnType<typeof card>) =>
   (c.keyboard?.inline_keyboard ?? []).flat().map((b) => b.text);
 
@@ -89,6 +99,44 @@ describe('courier card', () => {
     ]);
   });
 
+  it('the venue takes no card now: a cash order shows only "cash received" (W13-05)', () => {
+    expect(buttons(card({ status: 'on_the_way' }, 1, ['cash']))).toEqual([
+      '✅ Доставил, деньги получены',
+      '📵 Не дозвонился',
+      '🚫 Отказ гостя',
+      '⚠️ Не могу доставить',
+    ]);
+  });
+
+  it('a card to the courier: the total to collect, "paid by card" first, cash only if the venue takes it', () => {
+    const c = card({
+      status: 'on_the_way',
+      paymentMethod: 'card',
+      cashChangeFrom: null,
+    });
+    expect(c.text).toContain('125 000 сум (картой курьеру)');
+    expect(buttons(c).slice(0, 3)).toEqual([
+      '💳 Доставил, оплачено картой',
+      '✅ Доставил, деньги получены',
+      '📵 Не дозвонился',
+    ]);
+    const cardOnly = card({ status: 'on_the_way', paymentMethod: 'card' }, 1, [
+      'card',
+    ]);
+    expect(buttons(cardOnly).slice(0, 2)).toEqual([
+      '💳 Доставил, оплачено картой',
+      '📵 Не дозвонился',
+    ]);
+    // the change line is for cash only
+    expect(cardOnly.text).not.toContain('Сдача');
+  });
+
+  it('a method switched off after the order: the chosen one is still there to mark', () => {
+    expect(
+      buttons(card({ status: 'on_the_way', paymentMethod: 'card' }, 1, []))[0],
+    ).toBe('💳 Доставил, оплачено картой');
+  });
+
   it('on the way, paid online: "delivered", nothing to collect and no change line', () => {
     const c = card({
       status: 'on_the_way',
@@ -106,6 +154,7 @@ describe('courier card', () => {
       lang: 'ru',
       readyFromBranch: 0,
       refuseMenu: true,
+      doorMethods: BOTH,
     });
     expect(buttons(c)).toEqual([
       'Передумал',
@@ -160,6 +209,7 @@ describe('courier card', () => {
       courierId: ME,
       lang: 'uz',
       readyFromBranch: 0,
+      doorMethods: BOTH,
     });
     expect(uz.text).toContain('№1042 buyurtma');
     expect(uz.text).toContain("125 000 so'm (naqd)");
@@ -167,6 +217,7 @@ describe('courier card', () => {
       courierId: ME,
       lang: 'en',
       readyFromBranch: 1,
+      doorMethods: BOTH,
     });
     expect(buttons(en)).toEqual(['📦 Picked up']);
   });

@@ -44,7 +44,8 @@ export class ExternalDeliveryService {
           id: orderId,
           organization_id: organizationId,
           status: 'handed_to_external',
-          payment_method: 'cash',
+          // Paid at the door (cash or a card): the service collected it, the operator marks it once
+          payment_method: { in: ['cash', 'card'] },
           external_cash_received: null,
         },
         data: { external_cash_received: received },

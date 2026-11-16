@@ -3,6 +3,7 @@ import { TelegramApiError } from 'src/modules/telegram/telegram-client';
 import { COURIER_TEXTS } from '../domain/courier-texts';
 import { makeCourierDb, seedVenue } from '../courier-prisma.fake';
 import { CourierCardService } from './courier-card.service';
+import { ORDER_SETTINGS } from '../courier-setup.fake';
 
 beforeAll(() => {
   jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
@@ -41,6 +42,7 @@ async function setup() {
     db as any,
     { forTenant: async () => bot } as any,
     telegram as any,
+    { get: async () => ORDER_SETTINGS } as any,
   );
   const methods = () => telegram.call.mock.calls.map((c) => c[1]);
   return { db, courier, order, row, telegram, service, methods };

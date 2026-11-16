@@ -91,6 +91,13 @@ describe('handing an order to an external service', () => {
       ),
     ).toHaveLength(1);
 
+    // a card to the courier is paid at the door too: the service collected it, the operator marks it
+    const card = await s.venue.order({ payment_method: 'card' });
+    await handTo(card.id);
+    expect(s.order(card.id).external_cash_received).toBeNull();
+    await external.markPayment(s.venue.org.id, card.id, true, STAFF);
+    expect(s.order(card.id).external_cash_received).toBe(true);
+
     const online = await s.venue.order({ payment_method: 'click' });
     await handTo(online.id);
     await expect(
@@ -300,6 +307,16 @@ describe('shift cash and courier pay', () => {
       (await deliver({ total: 90_000, payment_method: 'click' }))
         .cash_collected,
     ).toBeNull();
+  });
+
+  it('a card order counts as card unless the courier took banknotes (W13-05)', async () => {
+    await deliver({ total: 40_000, payment_method: 'card' }, 'dc');
+    await deliver({ total: 60_000, payment_method: 'card' });
+    expect((await s.shifts.get(s.venue.org.id, shiftId())).cash).toMatchObject({
+      deliveries: 2,
+      due: 60_000,
+      card: 40_000,
+    });
   });
 
   it('to hand in: delivered cash only (not card, online, returned); reconciled once, the discrepancy kept', async () => {

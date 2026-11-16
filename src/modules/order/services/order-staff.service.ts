@@ -1,3 +1,4 @@
+import { paidAtDoor } from '../domain/delivery-payment';
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
@@ -80,7 +81,7 @@ export class OrderStaffService {
               cashReceived: order.external_cash_received,
               paymentMarkPending:
                 order.status === 'handed_to_external' &&
-                order.payment_method === 'cash' &&
+                paidAtDoor(order.payment_method) &&
                 order.external_cash_received === null,
             }
           : null,

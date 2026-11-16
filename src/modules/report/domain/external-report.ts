@@ -1,3 +1,5 @@
+import { paidAtDoor } from 'src/modules/order/domain/delivery-payment';
+
 /**
  * Report by external services (docs/DELIVERY.md, "Отчёты"): orders handed over in the period and what the
  * venue paid, per service; for cash orders whether the venue got the money (sums of the order totals).
@@ -54,7 +56,7 @@ export function externalReport(orders: readonly ReportExternalOrder[]): {
     const one = empty();
     one.orders = 1;
     one.cost = o.external_cost ?? 0;
-    if (o.payment_method === 'cash') {
+    if (paidAtDoor(o.payment_method)) {
       if (o.external_cash_received === true) one.cashReceived = o.total;
       else if (o.external_cash_received === false)
         one.cashNotReceived = o.total;

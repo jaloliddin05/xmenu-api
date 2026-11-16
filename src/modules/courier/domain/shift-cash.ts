@@ -1,3 +1,5 @@
+import { paidAtDoor } from 'src/modules/order/domain/delivery-payment';
+
 /**
  * Cash of a courier's shift (docs/DELIVERY.md, "Наличные"): "to hand in" is the cash of the orders the
  * courier delivered in the shift and took in banknotes; a card paid to the courier is counted apart and not
@@ -24,8 +26,9 @@ export function shiftCash(orders: readonly ShiftOrder[]): ShiftCash {
   for (const o of orders) {
     if (o.status !== 'completed') continue;
     out.deliveries++;
-    if (o.payment_method !== 'cash') continue;
-    if (o.cash_collected === 'card') out.card += o.total;
+    if (!paidAtDoor(o.payment_method)) continue;
+    // What the courier took decides (the guest may change their mind at the door), else what was chosen
+    if ((o.cash_collected ?? o.payment_method) === 'card') out.card += o.total;
     else out.due += o.total;
   }
   return out;

@@ -24,6 +24,8 @@ enum OrderFulfillment {
 
 enum OrderPaymentMethod {
   cash
+  // A card to the courier at the door (delivery only)
+  card
   click
   payme
 }

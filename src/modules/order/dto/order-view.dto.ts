@@ -1,3 +1,4 @@
+import { PAYMENT_METHODS } from '../domain/delivery-payment';
 import { ApiProperty } from '@nestjs/swagger';
 import { ORDER_STATUSES } from '../domain/order-state-machine';
 
@@ -79,7 +80,7 @@ export class OrderViewDto {
   address: Record<string, unknown> | null;
   @ApiProperty({ example: '+998901234567' }) phone: string;
   @ApiProperty() comment: string;
-  @ApiProperty({ enum: ['cash', 'click', 'payme'] }) paymentMethod: string;
+  @ApiProperty({ enum: PAYMENT_METHODS }) paymentMethod: string;
   @ApiProperty({
     enum: [
       'not_required',

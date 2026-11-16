@@ -1,20 +1,22 @@
 import { ApiProperty } from '@nestjs/swagger';
-
-const METHODS = ['cash', 'click', 'payme'] as const;
-type Method = (typeof METHODS)[number];
+import {
+  PAYMENT_METHODS as METHODS,
+  type PaymentMethod as Method,
+} from '../domain/delivery-payment';
 
 export class CheckoutPaymentMethodsDto {
   @ApiProperty({
     enum: METHODS,
     isArray: true,
     description:
-      'cash unless only external services deliver (courier mode external); click/payme when the venue set its keys',
+      'The methods the venue switched on for delivery (order settings deliveryPayment): cash and card (to the courier) unless only external services deliver; click/payme when online is on and the venue set its keys',
   })
   delivery: Method[];
   @ApiProperty({
     enum: METHODS,
     isArray: true,
-    description: 'cash always; click/payme when the venue set its keys',
+    description:
+      'cash always; click/payme when the venue set its keys; never card',
   })
   pickup: Method[];
 }

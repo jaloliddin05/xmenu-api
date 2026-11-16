@@ -359,6 +359,45 @@ describe('courier buttons', () => {
     expect(s.order(o.id).status).toBe('accepted');
   });
 
+  it('payment at the door: only the buttons the venue takes now are accepted (W13-05)', async () => {
+    const onTheWay = async (payment_method: string) => {
+      const o = await assigned({ status: 'ready', payment_method });
+      expect(await s.press(tg, act('pk', o.id))).toBe(t.done);
+      return o;
+    };
+    // the venue takes cash only: "paid by card" on a cash order is refused and the order stays on the way
+    s.orderSettings.deliveryPayment = {
+      cash: true,
+      card: false,
+      online: false,
+    };
+    const cash = await onTheWay('cash');
+    expect(await s.press(tg, act('dc', cash.id))).toBe(t.notAvailable);
+    expect(s.order(cash.id).status).toBe('on_the_way');
+    expect(await s.press(tg, act('dl', cash.id))).toBe(t.done);
+    expect(s.order(cash.id)).toMatchObject({
+      status: 'completed',
+      cash_collected: 'cash',
+    });
+
+    // a card order keeps its own button even with card switched off later; the guest may pay cash instead
+    const card = await onTheWay('card');
+    expect(await s.press(tg, act('dc', card.id))).toBe(t.done);
+    expect(s.order(card.id)).toMatchObject({
+      status: 'completed',
+      cash_collected: 'card',
+    });
+    const paidCash = await onTheWay('card');
+    expect(await s.press(tg, act('dl', paidCash.id))).toBe(t.done);
+    expect(s.order(paidCash.id).cash_collected).toBe('cash');
+
+    // online: no card button
+    const online = await onTheWay('click');
+    expect(await s.press(tg, act('dc', online.id))).toBe(t.notAvailable);
+    expect(await s.press(tg, act('dl', online.id))).toBe(t.done);
+    expect(s.order(online.id).cash_collected).toBeNull();
+  });
+
   it('"picked up all" takes the ready orders of that branch only', async () => {
     const o1 = await assigned();
     const o2 = await assigned();

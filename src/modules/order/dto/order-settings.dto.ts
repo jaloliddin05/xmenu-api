@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  IsBoolean,
   IsIn,
   IsInt,
   IsNumber,
@@ -35,6 +36,28 @@ export class PayRateDto {
   readonly perKm: number;
 }
 
+/** Payment methods offered at delivery (pickup: cash always, online with keys). */
+export class DeliveryPaymentDto {
+  @ApiProperty({
+    description:
+      'Cash to the courier. Not offered while only external services deliver',
+  })
+  @IsBoolean()
+  readonly cash: boolean;
+  @ApiProperty({
+    description:
+      'A card to the courier at the door. Not offered while only external services deliver',
+  })
+  @IsBoolean()
+  readonly card: boolean;
+  @ApiProperty({
+    description:
+      'Online (Click, Payme). Switching it on needs a connected provider: 400 invalid_settings, field code online_payment_not_connected',
+  })
+  @IsBoolean()
+  readonly online: boolean;
+}
+
 export class UpdateOrderSettingsDto {
   @ApiPropertyOptional()
   @IsOptional()
@@ -57,6 +80,15 @@ export class UpdateOrderSettingsDto {
   @IsOptional()
   @IsIn(COURIER_MODES)
   readonly courierMode?: (typeof COURIER_MODES)[number];
+  @ApiPropertyOptional({
+    type: DeliveryPaymentDto,
+    description:
+      'Payment methods at delivery, all three at once. None on: 400 invalid_settings, field code delivery_payment_required',
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => DeliveryPaymentDto)
+  readonly deliveryPayment?: DeliveryPaymentDto;
   @ApiPropertyOptional({
     description: 'Restoran qabul qilmasa avto-bekor (soniya), 60..3600',
   })
@@ -123,6 +155,8 @@ export class OrderSettingsViewDto {
   @ApiProperty({ enum: DELIVERY_PRICE_STEPS })
   readonly deliveryPriceStep: number;
   @ApiProperty({ enum: COURIER_MODES }) readonly courierMode: string;
+  @ApiProperty({ type: DeliveryPaymentDto })
+  readonly deliveryPayment: DeliveryPaymentDto;
   @ApiProperty() readonly acceptanceTimeoutSeconds: number;
   @ApiProperty() readonly paymentTimeoutSeconds: number;
   @ApiProperty() readonly maxActiveOrders: number;

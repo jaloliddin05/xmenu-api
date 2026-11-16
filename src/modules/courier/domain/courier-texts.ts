@@ -37,6 +37,7 @@ export interface CourierTexts {
   items: string;
   total: string;
   payCash: string;
+  payCard: string;
   payOnline: string;
   changeFrom: string;
   doorReason: string;
@@ -130,6 +131,7 @@ export const COURIER_TEXTS: Record<CourierLang, CourierTexts> = {
     items: 'Состав',
     total: 'К оплате',
     payCash: 'наличные',
+    payCard: 'картой курьеру',
     payOnline: 'оплачен онлайн',
     changeFrom: 'Сдача с',
     doorReason: 'Причина',
@@ -204,6 +206,7 @@ export const COURIER_TEXTS: Record<CourierLang, CourierTexts> = {
     items: 'Tarkibi',
     total: "To'lov",
     payCash: 'naqd',
+    payCard: 'kuryerga karta bilan',
     payOnline: "onlayn to'langan",
     changeFrom: 'Qaytim',
     doorReason: 'Sabab',
@@ -278,6 +281,7 @@ export const COURIER_TEXTS: Record<CourierLang, CourierTexts> = {
     items: 'Items',
     total: 'To pay',
     payCash: 'cash',
+    payCard: 'card to the courier',
     payOnline: 'paid online',
     changeFrom: 'Change from',
     doorReason: 'Reason',

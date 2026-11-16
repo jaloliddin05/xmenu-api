@@ -22,7 +22,12 @@ import { orderingProblem } from 'src/modules/organization/domain/publication';
 import { MiniAppAccessService } from 'src/modules/auth/services/mini-app-access.service';
 import { DeliveryQuoteService } from 'src/modules/delivery/services/delivery-quote.service';
 import { fieldError } from 'src/infra/validators/validation-errors';
-import { cashOnDelivery, OrderSettingsService } from './order-settings.service';
+import { OrderSettingsService } from './order-settings.service';
+import {
+  deliveryPaymentMethods,
+  isOnlineMethod,
+  pickupPaymentMethods,
+} from '../domain/delivery-payment';
 import {
   InvalidTransitionError,
   OrderNotFoundError,
@@ -153,23 +158,15 @@ export class OrderService {
         .id;
     }
 
-    // 5. To'lov usuli: naqd — olib ketishda doim, yetkazishda o'z kuryerlari bo'lsa; onlayn — tenant kalitlari bilan
-    const online = dto.paymentMethod !== 'cash';
-    if (
-      !online &&
-      mode === 'delivery' &&
-      !cashOnDelivery(settings.courierMode)
-    ) {
-      throw new AppException('payment_method_unavailable', {
-        message: 'Cash on delivery is not available: external couriers only',
-      });
-    }
-    if (
-      online &&
-      !(await this.payments.enabledProviders(organizationId)).has(
-        dto.paymentMethod,
-      )
-    ) {
+    // 5. Payment method: delivery offers what the venue switched on (cash and card need own couriers, online
+    // needs keys); pickup: cash always, online with keys (order/domain/delivery-payment.ts)
+    const online = isOnlineMethod(dto.paymentMethod);
+    const providers = await this.payments.enabledProviders(organizationId);
+    const allowed =
+      mode === 'delivery'
+        ? deliveryPaymentMethods(settings, providers)
+        : pickupPaymentMethods(providers);
+    if (!allowed.includes(dto.paymentMethod)) {
       throw new AppException('payment_method_unavailable', {
         message: 'This payment method is not available',
       });
@@ -179,7 +176,7 @@ export class OrderService {
 
     // 6. Qaytim: faqat naqd, jami summadan kam emas
     if (dto.cashChangeFrom != null) {
-      if (online)
+      if (dto.paymentMethod !== 'cash')
         throw fieldError(
           'cashChangeFrom',
           'cash_only',
@@ -428,7 +425,10 @@ export class OrderService {
 
   async retryPayment(principal: CustomerPrincipal, id: string, lang: Lang) {
     const order = await this.findOwn(principal, id);
-    if (order.status !== 'payment_failed' || order.payment_method === 'cash') {
+    if (
+      order.status !== 'payment_failed' ||
+      !isOnlineMethod(order.payment_method)
+    ) {
       throw new AppException('payment_not_retryable', {
         message: 'Payment cannot be retried now',
       });

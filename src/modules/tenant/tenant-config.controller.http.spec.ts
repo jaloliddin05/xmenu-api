@@ -12,6 +12,7 @@ import { TelegramBotService } from '../telegram/telegram-bot.service';
 import { OpsNotifierService } from '../order/notifications/ops-notifier.service';
 import { REDIS } from 'src/infra/redis/redis.module';
 import { DeliveryPricingService } from '../delivery/services/delivery-pricing.service';
+import { PaymentConfigService } from '../payment/services/payment-config.service';
 
 const FULL = '3f2b8c1e-4d5a-4b6c-8d7e-9f0a1b2c3d4e';
 const BARE = '0a1b2c3d-4e5f-4a6b-8c7d-8e9f0a1b2c3d';
@@ -40,10 +41,13 @@ const settings = (over: Record<string, unknown> = {}) => ({
   map_bounds: null,
   ...over,
 });
-const ordering = (courierMode = 'own') => ({
+const ordering = (courierMode = 'own', pay = { cash: true, card: false }) => ({
   min_order_pickup: 0,
   delivery_price_step: 100,
   courier_mode: courierMode,
+  delivery_pay_cash: pay.cash,
+  delivery_pay_card: pay.card,
+  delivery_pay_online: true,
   acceptance_timeout_seconds: 300,
   payment_timeout_seconds: 900,
   max_active_orders: 5,
@@ -72,6 +76,8 @@ describe('GET /tenant/config', () => {
   let branches: Record<string, any[]>;
   // DeliveryPricingService.pricedDeliveryBranches: rules of the delivering branches that have any
   let priced: Record<string, { zones: any[]; distance: any }[]>;
+  // PaymentConfigService.enabledProviders: the connected online providers
+  let providers: Record<string, string[]>;
 
   beforeAll(async () => {
     jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
@@ -115,6 +121,13 @@ describe('GET /tenant/config', () => {
         { provide: OpsNotifierService, useValue: { alert: jest.fn() } },
         { provide: REDIS, useValue: { set: jest.fn(async () => 'OK') } },
         {
+          provide: PaymentConfigService,
+          useValue: {
+            enabledProviders: async (id: string) =>
+              new Set(providers[id] ?? []),
+          },
+        },
+        {
           provide: DeliveryPricingService,
           useValue: {
             pricedDeliveryBranches: async (id: string) =>
@@ -131,6 +144,7 @@ describe('GET /tenant/config', () => {
   });
 
   beforeEach(() => {
+    providers = {};
     orgs = {
       [FULL]: {
         id: FULL,
@@ -256,6 +270,8 @@ describe('GET /tenant/config', () => {
         deliveryAvailable: true,
         deliveryUnavailableReason: null,
         courierMode: 'own',
+        deliveryPaymentMethods: ['cash'],
+        deliveryPaymentMethods: ['cash'],
         cashOnDelivery: true,
       },
       map: {
@@ -323,6 +339,8 @@ describe('GET /tenant/config', () => {
         deliveryAvailable: false,
         deliveryUnavailableReason: 'not_offered',
         courierMode: 'own',
+        deliveryPaymentMethods: ['cash'],
+        deliveryPaymentMethods: ['cash'],
         cashOnDelivery: true,
       },
       map: {
@@ -356,6 +374,7 @@ describe('GET /tenant/config', () => {
       deliveryAvailable: false,
       deliveryUnavailableReason: 'not_configured',
       courierMode: 'own',
+      deliveryPaymentMethods: ['cash'],
       cashOnDelivery: true,
     });
     // A distance rule alone is enough; there is no zone to draw
@@ -370,6 +389,30 @@ describe('GET /tenant/config', () => {
     const { fulfillment } = (await config(FULL).expect(200)).body;
     expect(fulfillment).toMatchObject({
       courierMode: 'external',
+      deliveryPaymentMethods: [],
+      cashOnDelivery: false,
+    });
+  });
+
+  it('payment at delivery follows the venue switches, the courier mode and the connected providers (W13-05)', async () => {
+    orderRows[FULL] = ordering('both', { cash: false, card: true });
+    // online is switched on, but no provider is connected yet
+    let { fulfillment } = (await config(FULL).expect(200)).body;
+    expect(fulfillment).toMatchObject({
+      deliveryPaymentMethods: ['card'],
+      cashOnDelivery: false,
+    });
+
+    providers[FULL] = ['payme'];
+    ({ fulfillment } = (await config(FULL).expect(200)).body);
+    expect(fulfillment.deliveryPaymentMethods).toEqual(['card', 'online']);
+
+    // only external services: nothing is paid at the door
+    orderRows[FULL] = ordering('external', { cash: true, card: true });
+    app.get(OrderSettingsService).invalidate(FULL); // the settings are cached for 30 s
+    ({ fulfillment } = (await config(FULL).expect(200)).body);
+    expect(fulfillment).toMatchObject({
+      deliveryPaymentMethods: ['online'],
       cashOnDelivery: false,
     });
   });
@@ -389,6 +432,7 @@ describe('GET /tenant/config', () => {
       deliveryAvailable: false,
       deliveryUnavailableReason: 'not_offered',
       courierMode: 'own',
+      deliveryPaymentMethods: ['cash'],
       cashOnDelivery: true,
     });
   });
@@ -424,6 +468,8 @@ describe('GET /tenant/config', () => {
         deliveryAvailable: false,
         deliveryUnavailableReason: reason,
         courierMode: 'own',
+        deliveryPaymentMethods: ['cash'],
+        deliveryPaymentMethods: ['cash'],
         cashOnDelivery: true,
       });
       expect(res.body.channels.delivery).toEqual({

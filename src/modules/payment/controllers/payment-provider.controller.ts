@@ -19,6 +19,7 @@ import { UpsertPaymentProviderDto } from '../dto/payment-provider.dto';
 import type { OnlineProvider } from '../services/payment-config.service';
 import { PaymentConfigService } from '../services/payment-config.service';
 import { StaffAccess } from 'src/modules/auth/access/staff-access.decorator';
+import { RevalidateService } from 'src/modules/revalidate-queue/revalidate.service';
 
 enum ProviderParam {
   click = 'click',
@@ -29,7 +30,18 @@ enum ProviderParam {
 @ApiTags('Payment providers')
 @Controller('payment-provider')
 export class PaymentProviderController {
-  constructor(private readonly configs: PaymentConfigService) {}
+  constructor(
+    private readonly configs: PaymentConfigService,
+    private readonly revalidate: RevalidateService,
+  ) {}
+
+  /** Online payment at delivery is part of the delivery site's config (fulfillment.deliveryPaymentMethods) */
+  private async changed(organizationId: string) {
+    await this.revalidate.addRevalidationJob({
+      tenantId: organizationId,
+      route: 'settings',
+    });
+  }
 
   @StaffAccess('venue')
   @Get()
@@ -58,18 +70,21 @@ export class PaymentProviderController {
   @ApiOperation({
     summary: 'Provayder kalitlarini saqlash (shifrlanadi) va yoqish',
   })
-  upsert(
+  async upsert(
     @Param('provider', new ParseEnumPipe(ProviderParam))
     provider: OnlineProvider,
     @Body() dto: UpsertPaymentProviderDto,
     @Req() req: StaffRequest,
   ) {
-    return this.configs.upsert(
-      requireStaffOrganizationId(req),
+    const organizationId = requireStaffOrganizationId(req);
+    const result = await this.configs.upsert(
+      organizationId,
       provider,
       dto.config,
       dto.isEnabled ?? true,
     );
+    await this.changed(organizationId);
+    return result;
   }
 
   @StaffAccess('venue')
@@ -81,10 +96,8 @@ export class PaymentProviderController {
     provider: OnlineProvider,
     @Req() req: StaffRequest,
   ) {
-    await this.configs.setEnabled(
-      requireStaffOrganizationId(req),
-      provider,
-      false,
-    );
+    const organizationId = requireStaffOrganizationId(req);
+    await this.configs.setEnabled(organizationId, provider, false);
+    await this.changed(organizationId);
   }
 }

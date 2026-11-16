@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { RevalidateModule } from '../revalidate-queue/revalidate.module';
 import { PrismaModule } from '../_prisma/prisma.module';
 import { OrderCoreModule } from '../order/order-core.module';
 import { ClickController } from './controllers/click.controller';
@@ -9,7 +10,7 @@ import { PaymentLinkService } from './services/payment-link.service';
 import { RefundProcessor } from './services/refund.processor';
 
 @Module({
-  imports: [PrismaModule, OrderCoreModule],
+  imports: [PrismaModule, OrderCoreModule, RevalidateModule],
   controllers: [ClickController, PaymeController, PaymentProviderController],
   providers: [PaymentConfigService, PaymentLinkService, RefundProcessor],
   exports: [PaymentConfigService, PaymentLinkService],

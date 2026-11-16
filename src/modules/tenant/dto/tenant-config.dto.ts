@@ -1,3 +1,7 @@
+import {
+  DELIVERY_PAYMENT_KINDS,
+  type DeliveryPaymentKind,
+} from 'src/modules/order/domain/delivery-payment';
 import { ApiProperty } from '@nestjs/swagger';
 import { LANGS } from 'src/infra/http/request-helpers';
 import type { Lang } from 'src/infra/http/request-helpers';
@@ -188,9 +192,18 @@ export class TenantFulfillmentDto {
   courierMode: (typeof COURIER_MODES)[number];
 
   @ApiProperty({
+    enum: DELIVERY_PAYMENT_KINDS,
+    isArray: true,
+    example: ['cash'],
+    description:
+      'Payment methods for delivery orders: the ones the venue switched on (order settings), without cash and card while only external services deliver, without online while no provider is connected. The exact online providers come from GET /checkout-config',
+  })
+  deliveryPaymentMethods: DeliveryPaymentKind[];
+
+  @ApiProperty({
     example: true,
     description:
-      'Cash is accepted for delivery orders; false when only external services deliver. Pickup is always payable in cash',
+      'Cash is accepted for delivery orders (deliveryPaymentMethods has cash). Pickup is always payable in cash',
   })
   cashOnDelivery: boolean;
 }
