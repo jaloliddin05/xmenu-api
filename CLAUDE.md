@@ -164,6 +164,10 @@ test, `npm run openapi` + `git diff --exit-code docs/`, `format:check`, `lint` �
   при `courier_mode = external` ни наличных, ни карты курьеру, онлайн только с подключённым провайдером. Им пользуются
   `/tenant/config` (`deliveryPaymentMethods`, `cashOnDelivery`), `/checkout-config` и `POST /orders`; кнопки оплаты
   курьера `doorPaymentChoices`. Способ заказа `card` = карта курьеру у двери (`paidAtDoor`: `cash`, `card`).
+  Доставка не остаётся без способа: `PUT /order-settings` (`deliveryPaymentProblems`, код поля
+  `delivery_payment_none_available`) и отключение провайдера (`PaymentConfigService`, `providerDisableLeavesNoMethod`,
+  `409 delivery_payment_last_method`) проверяют итог под блокировкой строки `organization`
+  (`order/services/delivery-payment-state.ts`); пункт чеклиста `delivery_payment` блокирует публикацию.
   `cash_change_from` в заказе: только наличные, не меньше `total`.
 
 ## Заказы

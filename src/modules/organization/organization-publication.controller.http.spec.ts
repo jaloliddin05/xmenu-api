@@ -39,6 +39,15 @@ interface Venue {
   products: { category_id: string; is_active: boolean | null }[];
   branches: FakeBranch[];
   bot: { is_enabled: boolean } | null;
+  /** organization_order_settings: who delivers and the payment switches at delivery */
+  payment: {
+    courier_mode: 'own' | 'external' | 'both';
+    delivery_pay_cash: boolean;
+    delivery_pay_card: boolean;
+    delivery_pay_online: boolean;
+  };
+  /** Enabled online providers */
+  providers: string[];
 }
 
 const HOURS = Array.from({ length: 7 }, () => ({ is_closed: false }));
@@ -69,6 +78,14 @@ const fresh = (id: string): Venue => ({
   products: [],
   branches: [],
   bot: null,
+  // Platform defaults: own couriers, cash only
+  payment: {
+    courier_mode: 'own',
+    delivery_pay_cash: true,
+    delivery_pay_card: false,
+    delivery_pay_online: false,
+  },
+  providers: [],
 });
 
 /** Everything the checklist needs, ordering channel on, not published yet. */
@@ -184,6 +201,20 @@ describe('Organization channels and publication (owner)', () => {
         return venues[where.organization_id].bot;
       }),
     },
+    organization_order_settings: {
+      findUnique: jest.fn(async ({ where }) => {
+        await tick();
+        return { ...venues[where.organization_id].payment };
+      }),
+    },
+    organization_payment_provider: {
+      findMany: jest.fn(async ({ where }) => {
+        await tick();
+        return venues[where.organization_id].providers.map((provider) => ({
+          provider,
+        }));
+      }),
+    },
   };
 
   // Sign-in methods of the venue's customers (GuestLoginService has its own spec)
@@ -262,6 +293,7 @@ describe('Organization channels and publication (owner)', () => {
         menu_product: 'todo',
         branch: 'todo',
         delivery_pricing: 'not_required',
+        delivery_payment: 'not_required',
         telegram_bot: 'not_required',
       });
       for (const item of res.body.checklist) {
@@ -370,6 +402,24 @@ describe('Organization channels and publication (owner)', () => {
         },
         'telegram_bot',
       ],
+      [
+        'only online at delivery, no provider (W13F-04)',
+        (v) =>
+          Object.assign(v.payment, {
+            delivery_pay_cash: false,
+            delivery_pay_online: true,
+          }),
+        'delivery_payment',
+      ],
+      [
+        'only external services deliver, cash and card only (W13F-04)',
+        (v) =>
+          Object.assign(v.payment, {
+            courier_mode: 'external',
+            delivery_pay_card: true,
+          }),
+        'delivery_payment',
+      ],
       ['empty name', (v) => (v.org.name = ' '), 'venue_name'],
       ['no slug', (v) => (v.org.slug = null), 'venue_slug'],
     ])('%s: %s is todo', async (_, change, id) => {
@@ -394,6 +444,27 @@ describe('Organization channels and publication (owner)', () => {
       venues[ORG_A].branches[0].delivery_zones = [];
       const res = await get().expect(200);
       expect(status(res.body).delivery_pricing).toBe('not_required');
+      expect(res.body.ready).toBe(true);
+    });
+
+    it('only online at delivery counts with an enabled provider', async () => {
+      venues[ORG_A] = ready(ORG_A);
+      Object.assign(venues[ORG_A].payment, {
+        courier_mode: 'external',
+        delivery_pay_online: true,
+      });
+      venues[ORG_A].providers = ['click'];
+      const res = await get().expect(200);
+      expect(status(res.body).delivery_payment).toBe('done');
+      expect(res.body.ready).toBe(true);
+    });
+
+    it('pickup-only branches need no payment method at delivery', async () => {
+      venues[ORG_A] = ready(ORG_A);
+      venues[ORG_A].branches[0].accepts_delivery = false;
+      venues[ORG_A].payment.courier_mode = 'external';
+      const res = await get().expect(200);
+      expect(status(res.body).delivery_payment).toBe('not_required');
       expect(res.body.ready).toBe(true);
     });
 
@@ -558,6 +629,16 @@ describe('Organization channels and publication (owner)', () => {
       expect(res.body.details.missing.map((i) => i.id)).toEqual([
         'delivery_channel',
       ]);
+    });
+
+    it('no payment method left at delivery blocks publication (W13F-04)', async () => {
+      venues[ORG_A] = ready(ORG_A);
+      venues[ORG_A].payment.courier_mode = 'external';
+      const res = await publish().expect(409);
+      expect(res.body.details.missing.map((i) => i.id)).toEqual([
+        'delivery_payment',
+      ]);
+      expect(venues[ORG_A].org.published_at).toBeNull();
     });
 
     it('publishes a ready venue and revalidates', async () => {

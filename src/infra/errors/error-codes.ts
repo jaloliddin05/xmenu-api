@@ -421,6 +421,11 @@ export const ERROR_CODES = spec({
     message: 'Connect the venue Telegram bot first',
     when: 'Режим `miniapp`/`both` без подключённого бота',
   },
+  delivery_payment_last_method: {
+    status: 409,
+    message: 'The provider is the last payment method at delivery',
+    when: 'Отключение Click/Payme (`POST /payment-provider/:provider/disable`, `PUT` с `isEnabled: false`) оставило бы доставку без способа оплаты: сначала включить наличные или карту курьеру (или своих курьеров)',
+  },
   miniapp_required: {
     status: 403,
     message: 'The venue takes orders only in its Telegram Mini App',

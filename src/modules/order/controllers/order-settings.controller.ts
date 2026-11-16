@@ -12,9 +12,9 @@ import {
 import { OrderSettingsService } from '../services/order-settings.service';
 import { RevalidateService } from 'src/modules/revalidate-queue/revalidate.service';
 import { StaffAccess } from 'src/modules/auth/access/staff-access.decorator';
-import { PaymentConfigService } from 'src/modules/payment/services/payment-config.service';
 import { fieldErrorsException } from 'src/infra/validators/validation-errors';
 import { deliveryPaymentProblems } from '../domain/delivery-payment';
+import { lockDeliveryPayment } from '../services/delivery-payment-state';
 
 /**
  * Restoran paneli: minimal summa (olib ketish), yetkazib berish narxini yaxlitlash qadami, kim yetkazadi,
@@ -27,7 +27,6 @@ export class OrderSettingsController {
     private readonly settings: OrderSettingsService,
     private readonly prisma: PrismaService,
     private readonly revalidate: RevalidateService,
-    private readonly payments: PaymentConfigService,
   ) {}
 
   @StaffAccess('venue')
@@ -70,21 +69,25 @@ export class OrderSettingsController {
         courier_pay_per_km: dto.courierPay?.perKm ?? null,
       }),
     };
-    // settings_missing instead of a Prisma "not found"
-    const current = await this.settings.get(organizationId);
-    if (dto.deliveryPayment) {
-      const providers = await this.payments.enabledProviders(organizationId);
-      const problems = deliveryPaymentProblems(
-        dto.deliveryPayment,
-        current.deliveryPayment,
-        providers.size > 0,
-      );
-      if (problems.length)
-        throw fieldErrorsException('invalid_settings', problems);
-    }
-    await this.prisma.organization_order_settings.update({
-      where: { organization_id: organizationId },
-      data,
+    await this.prisma.$transaction(async (tx) => {
+      // settings_missing instead of a Prisma "not found"
+      const current = await lockDeliveryPayment(tx, organizationId);
+      if (dto.deliveryPayment || dto.courierMode) {
+        const problems = deliveryPaymentProblems(
+          {
+            courierMode: dto.courierMode ?? current.courierMode,
+            deliveryPayment: dto.deliveryPayment ?? current.deliveryPayment,
+          },
+          current.deliveryPayment,
+          current.providers,
+        );
+        if (problems.length)
+          throw fieldErrorsException('invalid_settings', problems);
+      }
+      await tx.organization_order_settings.update({
+        where: { organization_id: organizationId },
+        data,
+      });
     });
     this.settings.invalidate(organizationId);
     // The pickup minimum and the payment methods at delivery are part of the delivery site's config

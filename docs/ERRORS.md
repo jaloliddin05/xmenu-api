@@ -81,6 +81,7 @@
 | `invalid_slug` | 400 | Slug не по правилам (формат, UUID, зарезервирован) | — |
 | `slug_taken` | 409 | Slug занят другим заведением | — |
 | `telegram_bot_required` | 422 | Режим `miniapp`/`both` без подключённого бота | — |
+| `delivery_payment_last_method` | 409 | Отключение Click/Payme (`POST /payment-provider/:provider/disable`, `PUT` с `isEnabled: false`) оставило бы доставку без способа оплаты: сначала включить наличные или карту курьеру (или своих курьеров) | — |
 | `miniapp_required` | 403 | Режим `miniapp`: заказ или вход гостя без заголовка `X-Telegram-Init-Data`; открыть заведение в Telegram | — |
 | `miniapp_init_data_invalid` | 403 | Режимы `miniapp`/`both`: `X-Telegram-Init-Data` не подписан ботом заведения или устарел; переоткрыть Mini App | — |
 | `publication_incomplete` | 409 | Публикация: не выполнены пункты чеклиста; `details.missing` | `details.missing` |

@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
 import {
   decryptConfig,
@@ -7,8 +8,13 @@ import {
 } from '../domain/payment-crypto';
 import { ClickConfig, PaymeConfig } from '../domain/payment-url';
 import { fieldError } from 'src/infra/validators/validation-errors';
-import { platformMisconfigured } from 'src/infra/errors/app-exception';
+import {
+  AppException,
+  platformMisconfigured,
+} from 'src/infra/errors/app-exception';
 import { errorMessage } from 'src/infra/helper/error-text';
+import { providerDisableLeavesNoMethod } from 'src/modules/order/domain/delivery-payment';
+import { lockDeliveryPayment } from 'src/modules/order/services/delivery-payment-state';
 
 export type OnlineProvider = 'click' | 'payme';
 
@@ -96,17 +102,24 @@ export class PaymentConfigService {
       clean[field] = v.trim();
     }
     const config_encrypted = encryptConfig(clean, this.key);
-    await this.prisma.organization_payment_provider.upsert({
-      where: {
-        organization_id_provider: { organization_id: organizationId, provider },
-      },
-      create: {
-        organization_id: organizationId,
-        provider,
-        is_enabled: isEnabled,
-        config_encrypted,
-      },
-      update: { is_enabled: isEnabled, config_encrypted },
+    await this.prisma.$transaction(async (tx) => {
+      if (!isEnabled)
+        await this.assertNotLastMethod(tx, organizationId, provider);
+      await tx.organization_payment_provider.upsert({
+        where: {
+          organization_id_provider: {
+            organization_id: organizationId,
+            provider,
+          },
+        },
+        create: {
+          organization_id: organizationId,
+          provider,
+          is_enabled: isEnabled,
+          config_encrypted,
+        },
+        update: { is_enabled: isEnabled, config_encrypted },
+      });
     });
     return { provider, isEnabled, configured: true };
   }
@@ -116,9 +129,24 @@ export class PaymentConfigService {
     provider: OnlineProvider,
     isEnabled: boolean,
   ) {
-    await this.prisma.organization_payment_provider.updateMany({
-      where: { organization_id: organizationId, provider },
-      data: { is_enabled: isEnabled },
+    await this.prisma.$transaction(async (tx) => {
+      if (!isEnabled)
+        await this.assertNotLastMethod(tx, organizationId, provider);
+      await tx.organization_payment_provider.updateMany({
+        where: { organization_id: organizationId, provider },
+        data: { is_enabled: isEnabled },
+      });
     });
+  }
+
+  /** Switching a provider off must not take away the guest's last payment method at delivery (W13F-04) */
+  private async assertNotLastMethod(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+    provider: OnlineProvider,
+  ) {
+    const state = await lockDeliveryPayment(tx, organizationId);
+    if (providerDisableLeavesNoMethod(state, state.providers, provider))
+      throw new AppException('delivery_payment_last_method');
   }
 }
