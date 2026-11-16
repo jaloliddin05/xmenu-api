@@ -181,6 +181,20 @@ class OrderEventDto {
   @ApiProperty({
     type: String,
     nullable: true,
+    example: 'Dilshod Karimov',
+    description:
+      'Name of the staff member (actor restaurant) or the courier (actor courier) of this venue; null for the guest, the system, the payment and an unknown id',
+  })
+  actorName: string | null;
+  @ApiProperty({
+    enum: ['owner', 'operator'],
+    nullable: true,
+    description: 'Role of the staff member for actor restaurant; else null',
+  })
+  actorRole: 'owner' | 'operator' | null;
+  @ApiProperty({
+    type: String,
+    nullable: true,
     description:
       'With from = to the entry is not a status change: courier_assigned:<id>, courier_reassigned:<id>, courier_unassigned:<id>',
   })
@@ -227,7 +241,7 @@ export class StaffOrderViewDto extends OrderViewDto {
     enum: ['cash', 'card'],
     nullable: true,
     description:
-      'Delivered cash orders: banknotes (handed in at the shift end) or a card to the courier',
+      'Delivered orders paid at the door (cash or card): banknotes (handed in at the shift end) or a card to the courier',
   })
   cashCollected: 'cash' | 'card' | null;
   @ApiProperty({ type: OrderExternalDto, nullable: true })
@@ -235,8 +249,30 @@ export class StaffOrderViewDto extends OrderViewDto {
   @ApiProperty({ type: [OrderEventDto] }) events: OrderEventDto[];
 }
 
+/** Timer thresholds of the venue (order settings, minutes) for highlighting late orders */
+export class OrderRemindersDto {
+  @ApiProperty({
+    example: 5,
+    description: '"Picked up" not pressed this long after "ready"',
+  })
+  pickupReminderMinutes: number;
+  @ApiProperty({ example: 60, description: 'On the way longer than this' })
+  onTheWayAlertMinutes: number;
+  @ApiProperty({
+    example: 10,
+    description: 'Wait at the door after "no answer"',
+  })
+  doorWaitMinutes: number;
+}
+
 export class StaffOrderListDto {
   @ApiProperty({ type: [StaffOrderViewDto] }) items: StaffOrderViewDto[];
+  @ApiProperty({
+    type: OrderRemindersDto,
+    description:
+      'The reminder thresholds of the venue, for the operator too (who cannot read /order-settings)',
+  })
+  reminders: OrderRemindersDto;
   @ApiProperty({
     type: String,
     nullable: true,
