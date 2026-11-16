@@ -87,9 +87,10 @@ if [ "$settings" != 'UZS|ru|Tashkent|#EE2E17' ]; then
   exit 1
 fi
 
-orders="$("${PSQL[@]}" -F '|' -c "select min_order_pickup, acceptance_timeout_seconds, delivery_price_step, courier_mode from organization_order_settings where organization_id = '00000000-0000-4000-8000-000000000001'")"
-if [ "$orders" != '0|300|100|own' ]; then
-  echo "FAIL: order settings row is '$orders', expected '0|300|100|own'" >&2
+# Payment at delivery (delivery_payment_methods): an existing venue takes cash only
+orders="$("${PSQL[@]}" -F '|' -c "select min_order_pickup, acceptance_timeout_seconds, delivery_price_step, courier_mode, delivery_pay_cash, delivery_pay_card, delivery_pay_online from organization_order_settings where organization_id = '00000000-0000-4000-8000-000000000001'")"
+if [ "$orders" != '0|300|100|own|t|f|f' ]; then
+  echo "FAIL: order settings row is '$orders', expected '0|300|100|own|t|f|f'" >&2
   exit 1
 fi
 
