@@ -2659,7 +2659,7 @@
         "tags": [
           "Couriers (staff)"
         ],
-        "x-permission": "couriers"
+        "x-permission": "couriers.manage"
       }
     },
     "/couriers/pay-rates": {
@@ -2811,7 +2811,7 @@
         "tags": [
           "Couriers (staff)"
         ],
-        "x-permission": "couriers"
+        "x-permission": "couriers.manage"
       }
     },
     "/couriers/{id}/invitation": {
@@ -2858,7 +2858,7 @@
         "tags": [
           "Couriers (staff)"
         ],
-        "x-permission": "couriers"
+        "x-permission": "couriers.manage"
       }
     },
     "/couriers/{id}/disable": {
@@ -2905,7 +2905,7 @@
         "tags": [
           "Couriers (staff)"
         ],
-        "x-permission": "couriers"
+        "x-permission": "couriers.manage"
       }
     },
     "/shifts": {
@@ -6514,12 +6514,13 @@
             "name": "format",
             "required": false,
             "in": "query",
-            "description": "csv: a file (UTF-8 with BOM, comma), column names in the request language (?lang or Accept-Language)",
+            "description": "A file with column names in the request language (?lang or Accept-Language). xlsx: an Excel workbook, columns, number cells and the period as dates whatever the Excel locale (for people). csv: UTF-8 with BOM, comma (for other systems; ru and uz Excel open it as one column)",
             "schema": {
               "type": "string",
               "enum": [
                 "json",
-                "csv"
+                "csv",
+                "xlsx"
               ]
             }
           },
@@ -6547,6 +6548,11 @@
                 }
               },
               "text/csv": {
+                "schema": {
+                  "$ref": "#/components/schemas/CourierReportDto"
+                }
+              },
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
                 "schema": {
                   "$ref": "#/components/schemas/CourierReportDto"
                 }
@@ -6604,12 +6610,13 @@
             "name": "format",
             "required": false,
             "in": "query",
-            "description": "csv: a file (UTF-8 with BOM, comma), column names in the request language (?lang or Accept-Language)",
+            "description": "A file with column names in the request language (?lang or Accept-Language). xlsx: an Excel workbook, columns, number cells and the period as dates whatever the Excel locale (for people). csv: UTF-8 with BOM, comma (for other systems; ru and uz Excel open it as one column)",
             "schema": {
               "type": "string",
               "enum": [
                 "json",
-                "csv"
+                "csv",
+                "xlsx"
               ]
             }
           },
@@ -6637,6 +6644,11 @@
                 }
               },
               "text/csv": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExternalReportDto"
+                }
+              },
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
                 "schema": {
                   "$ref": "#/components/schemas/ExternalReportDto"
                 }
@@ -6694,12 +6706,13 @@
             "name": "format",
             "required": false,
             "in": "query",
-            "description": "csv: a file (UTF-8 with BOM, comma), column names in the request language (?lang or Accept-Language)",
+            "description": "A file with column names in the request language (?lang or Accept-Language). xlsx: an Excel workbook, columns, number cells and the period as dates whatever the Excel locale (for people). csv: UTF-8 with BOM, comma (for other systems; ru and uz Excel open it as one column)",
             "schema": {
               "type": "string",
               "enum": [
                 "json",
-                "csv"
+                "csv",
+                "xlsx"
               ]
             }
           },
@@ -6727,6 +6740,11 @@
                 }
               },
               "text/csv": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemReportDto"
+                }
+              },
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemReportDto"
                 }
@@ -7186,6 +7204,7 @@
                 "orders",
                 "couriers",
                 "shifts",
+                "couriers.manage",
                 "branches.read",
                 "menu.read",
                 "venue",
@@ -9562,6 +9581,21 @@
             "nullable": true,
             "description": "Staff user id, courier id (actor courier) or customer id"
           },
+          "actorName": {
+            "type": "string",
+            "nullable": true,
+            "example": "Dilshod Karimov",
+            "description": "Name of the staff member (actor restaurant) or the courier (actor courier) of this venue; null for the guest, the system, the payment and an unknown id"
+          },
+          "actorRole": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "operator"
+            ],
+            "nullable": true,
+            "description": "Role of the staff member for actor restaurant; else null"
+          },
           "note": {
             "type": "string",
             "nullable": true,
@@ -9577,6 +9611,8 @@
           "to",
           "actor",
           "actorId",
+          "actorName",
+          "actorRole",
           "note",
           "at"
         ]
@@ -9642,6 +9678,7 @@
             "type": "string",
             "enum": [
               "cash",
+              "card",
               "click",
               "payme"
             ]
@@ -9771,7 +9808,7 @@
               "card"
             ],
             "nullable": true,
-            "description": "Delivered cash orders: banknotes (handed in at the shift end) or a card to the courier"
+            "description": "Delivered orders paid at the door (cash or card): banknotes (handed in at the shift end) or a card to the courier"
           },
           "external": {
             "nullable": true,
@@ -9920,9 +9957,11 @@
             "type": "string",
             "enum": [
               "cash",
+              "card",
               "click",
               "payme"
-            ]
+            ],
+            "description": "One of GET /checkout-config paymentMethods for the chosen mode; otherwise 422 payment_method_unavailable. card: a card to the courier, delivery only"
           },
           "items": {
             "type": "array",
@@ -10023,6 +10062,7 @@
             "type": "string",
             "enum": [
               "cash",
+              "card",
               "click",
               "payme"
             ]
@@ -10144,6 +10184,31 @@
           "externalService"
         ]
       },
+      "OrderRemindersDto": {
+        "type": "object",
+        "properties": {
+          "pickupReminderMinutes": {
+            "type": "number",
+            "example": 5,
+            "description": "\"Picked up\" not pressed this long after \"ready\""
+          },
+          "onTheWayAlertMinutes": {
+            "type": "number",
+            "example": 60,
+            "description": "On the way longer than this"
+          },
+          "doorWaitMinutes": {
+            "type": "number",
+            "example": 10,
+            "description": "Wait at the door after \"no answer\""
+          }
+        },
+        "required": [
+          "pickupReminderMinutes",
+          "onTheWayAlertMinutes",
+          "doorWaitMinutes"
+        ]
+      },
       "StaffOrderListDto": {
         "type": "object",
         "properties": {
@@ -10153,6 +10218,14 @@
               "$ref": "#/components/schemas/StaffOrderViewDto"
             }
           },
+          "reminders": {
+            "description": "The reminder thresholds of the venue, for the operator too (who cannot read /order-settings)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OrderRemindersDto"
+              }
+            ]
+          },
           "nextCursor": {
             "type": "string",
             "nullable": true,
@@ -10161,6 +10234,7 @@
         },
         "required": [
           "items",
+          "reminders",
           "nextCursor"
         ]
       },
@@ -10191,6 +10265,28 @@
           "status"
         ]
       },
+      "DeliveryPaymentDto": {
+        "type": "object",
+        "properties": {
+          "cash": {
+            "type": "boolean",
+            "description": "Cash to the courier. Not offered while only external services deliver"
+          },
+          "card": {
+            "type": "boolean",
+            "description": "A card to the courier at the door. Not offered while only external services deliver"
+          },
+          "online": {
+            "type": "boolean",
+            "description": "Online (Click, Payme). Switching it on needs a connected provider: 400 invalid_settings, field code online_payment_not_connected"
+          }
+        },
+        "required": [
+          "cash",
+          "card",
+          "online"
+        ]
+      },
       "OrderSettingsViewDto": {
         "type": "object",
         "properties": {
@@ -10212,6 +10308,9 @@
               "external",
               "both"
             ]
+          },
+          "deliveryPayment": {
+            "$ref": "#/components/schemas/DeliveryPaymentDto"
           },
           "acceptanceTimeoutSeconds": {
             "type": "number"
@@ -10245,6 +10344,7 @@
           "minOrderPickup",
           "deliveryPriceStep",
           "courierMode",
+          "deliveryPayment",
           "acceptanceTimeoutSeconds",
           "paymentTimeoutSeconds",
           "maxActiveOrders",
@@ -10277,6 +10377,14 @@
               "both"
             ],
             "description": "Who delivers: own couriers, external services or both. external: cash on delivery is not offered"
+          },
+          "deliveryPayment": {
+            "description": "Payment methods at delivery, all three at once. None on: 400 invalid_settings, field code delivery_payment_required",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DeliveryPaymentDto"
+              }
+            ]
           },
           "acceptanceTimeoutSeconds": {
             "type": "number",
@@ -10318,11 +10426,12 @@
         "properties": {
           "delivery": {
             "type": "array",
-            "description": "cash unless only external services deliver (courier mode external); click/payme when the venue set its keys",
+            "description": "The methods the venue switched on for delivery (order settings deliveryPayment): cash and card (to the courier) unless only external services deliver; click/payme when online is on and the venue set its keys",
             "items": {
               "type": "string",
               "enum": [
                 "cash",
+                "card",
                 "click",
                 "payme"
               ]
@@ -10330,11 +10439,12 @@
           },
           "pickup": {
             "type": "array",
-            "description": "cash always; click/payme when the venue set its keys",
+            "description": "cash always; click/payme when the venue set its keys; never card",
             "items": {
               "type": "string",
               "enum": [
                 "cash",
+                "card",
                 "click",
                 "payme"
               ]
@@ -11757,10 +11867,25 @@
             "example": "own",
             "description": "Who delivers: own couriers, external services or both (order settings)"
           },
+          "deliveryPaymentMethods": {
+            "type": "array",
+            "example": [
+              "cash"
+            ],
+            "description": "Payment methods for delivery orders: the ones the venue switched on (order settings), without cash and card while only external services deliver, without online while no provider is connected. The exact online providers come from GET /checkout-config",
+            "items": {
+              "type": "string",
+              "enum": [
+                "cash",
+                "card",
+                "online"
+              ]
+            }
+          },
           "cashOnDelivery": {
             "type": "boolean",
             "example": true,
-            "description": "Cash is accepted for delivery orders; false when only external services deliver. Pickup is always payable in cash"
+            "description": "Cash is accepted for delivery orders (deliveryPaymentMethods has cash). Pickup is always payable in cash"
           }
         },
         "required": [
@@ -11770,6 +11895,7 @@
           "deliveryAvailable",
           "deliveryUnavailableReason",
           "courierMode",
+          "deliveryPaymentMethods",
           "cashOnDelivery"
         ]
       },
