@@ -44,12 +44,20 @@ export class StaffOrderController {
     description: 'Vergul bilan: pending_acceptance,accepted',
   })
   @ApiQuery({ name: 'branchId', required: false })
+  @ApiQuery({ name: 'courierId', required: false })
+  @ApiQuery({
+    name: 'unassigned',
+    required: false,
+    description: 'true: delivery orders accepted or ready without a courier',
+  })
   @ApiQuery({ name: 'cursor', required: false })
   @ApiQuery({ name: 'limit', required: false })
   list(
     @Req() req: StaffRequest,
     @Query('status') status?: string,
     @Query('branchId') branchId?: string,
+    @Query('courierId') courierId?: string,
+    @Query('unassigned') unassigned?: string,
     @Query('cursor') cursor?: string,
     @Query('limit') limit?: string,
   ) {
@@ -62,6 +70,8 @@ export class StaffOrderController {
     return this.staff.list(requireStaffOrganizationId(req), {
       statuses,
       branchId,
+      courierId,
+      unassigned: unassigned === 'true',
       cursor,
       limit: limit ? Number(limit) : undefined,
     });

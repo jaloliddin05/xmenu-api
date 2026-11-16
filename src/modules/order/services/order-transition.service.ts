@@ -1,7 +1,15 @@
 import { errorMessage } from 'src/infra/helper/error-text';
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma, customer_order } from '@prisma/client';
+import { AppException } from 'src/infra/errors/app-exception';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
+import {
+  courierPay,
+  deliveryDistanceKm,
+  effectiveRate,
+  payRateOf,
+} from 'src/modules/courier/domain/courier-pay';
+import { deliveryTimerFor } from '../domain/delivery-timers';
 import {
   FulfillmentName,
   OrderActorName,
@@ -24,6 +32,8 @@ export class InvalidTransitionError extends Error {
 }
 
 export class OrderNotFoundError extends Error {}
+/** A courier pressed a button of an order that is not (or no longer) assigned to them. */
+export class CourierNotAssignedError extends Error {}
 class VersionConflictError extends Error {}
 
 export interface TransitionInput {
@@ -37,7 +47,16 @@ export interface TransitionInput {
   reason?: string;
   /** awaiting_payment (qayta urinish): yangi to'lov muddati */
   paymentExpiresAt?: Date;
+  /** problem_at_door: what happened at the door (refused: with a reason code) */
+  doorProblem?: { kind: 'no_answer' | 'refused'; reason?: string };
+  /** completed, cash order: how the guest paid the courier (banknotes by default, or a card) */
+  cashCollected?: 'cash' | 'card';
+  /** handed_to_external: the service and what the venue paid it */
+  external?: { service: string; cost: number };
 }
+
+/** Why the operator gets an urgent message about a delivery. */
+export type OperatorAlertKind = 'no_answer' | 'refused' | 'cannot_deliver';
 
 export type Effect =
   | {
@@ -47,7 +66,12 @@ export type Effect =
     }
   | { type: 'placed' }
   | { type: 'payment_window'; expiresAt: Date }
-  | { type: 'refund' };
+  | { type: 'refund' }
+  /** Rebuild the order card in this courier's chat */
+  | { type: 'courier_card'; courierId: string }
+  | { type: 'operator_alert'; kind: OperatorAlertKind }
+  /** A delivery changed status: drop its pending timers, schedule the one of the new status */
+  | { type: 'delivery_timers' };
 
 export interface TransitionResult {
   order: customer_order;
@@ -101,6 +125,16 @@ export class OrderTransitionService {
     );
     if (!check.ok)
       throw new InvalidTransitionError(from, input.to, check.reason);
+    // Only the courier assigned to this order moves it (docs/DELIVERY.md, "Безопасность")
+    if (input.actor === 'courier' && order.courier_id !== input.actorId)
+      throw new CourierNotAssignedError();
+    // At the door only a guest who did not answer can still get the order; a refusal waits for the operator
+    if (
+      from === 'problem_at_door' &&
+      input.to === 'completed' &&
+      order.door_problem !== 'no_answer'
+    )
+      throw new InvalidTransitionError(from, input.to, 'not_allowed');
 
     const now = new Date();
     const data: Prisma.customer_orderUncheckedUpdateManyInput = {
@@ -123,7 +157,43 @@ export class OrderTransitionService {
         break;
       case 'completed':
         data.completed_at = now;
+        if (order.fulfillment === 'delivery' && order.courier_id)
+          Object.assign(data, await this.deliveredByCourier(tx, order, input));
         break;
+      case 'on_the_way':
+        data.picked_up_at = now;
+        break;
+      case 'handed_to_external':
+        // Only instead of an own courier (docs/DELIVERY.md, "Передача внешней службе")
+        if (order.courier_id) throw new AppException('order_courier_assigned');
+        if (!input.external)
+          throw new Error('handed_to_external needs the external service');
+        data.external_service = input.external.service;
+        data.external_cost = input.external.cost;
+        data.external_handed_at = now;
+        data.external_cash_received = null;
+        break;
+      case 'ready':
+        data.ready_at = now;
+        // "Cannot deliver" (or the courier was disabled): ready again, without a courier; the operator
+        // assigns another one
+        if (from === 'on_the_way' || from === 'problem_at_door') {
+          data.courier_id = null;
+          data.courier_assigned_at = null;
+          data.courier_shift_id = null;
+          data.door_problem = null;
+          data.door_problem_reason = null;
+          effects.push({ type: 'operator_alert', kind: 'cannot_deliver' });
+        }
+        break;
+      case 'problem_at_door': {
+        const kind = input.doorProblem?.kind ?? 'no_answer';
+        data.door_problem = kind;
+        data.door_problem_reason = input.doorProblem?.reason ?? null;
+        data.door_problem_at = now;
+        effects.push({ type: 'operator_alert', kind });
+        break;
+      }
       case 'payment_failed':
         data.payment_status = 'failed';
         break;
@@ -151,6 +221,13 @@ export class OrderTransitionService {
         break;
     }
 
+    if (order.fulfillment === 'delivery')
+      effects.push({ type: 'delivery_timers' });
+
+    // Every change of an order with a courier rebuilds the courier's card (the old one too, after "cannot deliver")
+    if (order.courier_id)
+      effects.push({ type: 'courier_card', courierId: order.courier_id });
+
     const updated = await tx.customer_order.updateMany({
       where: { id: order.id, version: order.version },
       data,
@@ -172,6 +249,77 @@ export class OrderTransitionService {
       where: { id: order.id },
     });
     return { order: fresh, from, effects };
+  }
+
+  /**
+   * A courier delivered: how a cash order was paid, and the courier's pay at this moment (the courier's own
+   * rate or the venue's; km in a straight line from the branch to the address).
+   */
+  private async deliveredByCourier(
+    tx: Prisma.TransactionClient,
+    order: customer_order,
+    input: TransitionInput,
+  ): Promise<Prisma.customer_orderUncheckedUpdateManyInput> {
+    const [courier, branch, settings] = await Promise.all([
+      tx.courier.findUnique({
+        where: { id: order.courier_id! },
+        select: {
+          pay_per_delivery: true,
+          pay_included_km: true,
+          pay_per_km: true,
+        },
+      }),
+      tx.branch.findUnique({
+        where: { id: order.branch_id },
+        select: { latitude: true, longitude: true },
+      }),
+      this.settings.get(order.organization_id),
+    ]);
+    const rate = effectiveRate(
+      courier
+        ? payRateOf({
+            perDelivery: courier.pay_per_delivery,
+            includedKm: courier.pay_included_km,
+            perKm: courier.pay_per_km,
+          })
+        : null,
+      settings.courierPay,
+    );
+    const km = branch ? deliveryDistanceKm(branch, order.address_snapshot) : 0;
+    return {
+      cash_collected:
+        order.payment_method === 'cash'
+          ? (input.cashCollected ?? 'cash')
+          : null,
+      courier_distance_km: Math.round(km * 1000) / 1000,
+      courier_pay: courierPay(rate, km),
+    };
+  }
+
+  /**
+   * A journal entry without a status change (a courier assigned or taken off): who, what, when. The status
+   * is written as both from and to, the action goes to `note`.
+   */
+  async recordInTx(
+    tx: Prisma.TransactionClient,
+    input: {
+      orderId: string;
+      status: OrderStatusName;
+      actor: OrderActorName;
+      actorId?: string;
+      note: string;
+    },
+  ): Promise<void> {
+    await tx.order_status_event.create({
+      data: {
+        order_id: input.orderId,
+        from_status: input.status,
+        to_status: input.status,
+        actor: input.actor,
+        actor_id: input.actorId ?? null,
+        note: input.note,
+      },
+    });
   }
 
   /** Alohida tranzaksiyada o'tkazadi; versiya to'qnashuvida qayta o'qib urinadi. */
@@ -248,6 +396,24 @@ export class OrderTransitionService {
           case 'refund':
             await this.queues.enqueueRefund(order.id);
             break;
+          case 'courier_card':
+            await this.queues.enqueueCourierCard(
+              order.id,
+              effect.courierId,
+              order.version,
+            );
+            break;
+          case 'operator_alert':
+            await this.restaurant.alertDeliveryProblem(order.id, effect.kind);
+            break;
+          case 'delivery_timers': {
+            const s = await this.settings.get(order.organization_id);
+            await this.queues.resetDeliveryTimers(
+              order.id,
+              deliveryTimerFor(order, s),
+            );
+            break;
+          }
         }
       } catch (e) {
         this.logger.error(

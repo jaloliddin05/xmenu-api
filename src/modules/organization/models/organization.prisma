@@ -48,6 +48,8 @@ model organization {
 
   // Owner and operators (organization-member.prisma); the owner is the row with role = owner
   members      organization_member[]
+  couriers     courier[]
+  courier_shifts courier_shift[]
 
   logo_id      String?           @unique
   logo         file?             @relation("OrganizationLogo", fields: [logo_id], references: [id])

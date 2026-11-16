@@ -42,6 +42,30 @@ model customer_order {
 
   // Cash orders: the banknote the guest pays with, so the courier brings change
   cash_change_from Int?
+  // Own courier of the venue (docs/DELIVERY.md): set on "accepted", locked after "picked up"
+  courier_id          String?
+  courier             courier?       @relation(fields: [courier_id], references: [id], onDelete: SetNull)
+  courier_assigned_at DateTime?
+  // The courier's shift the order was assigned in (cash to hand in is counted per shift)
+  courier_shift_id    String?
+  courier_shift       courier_shift? @relation(fields: [courier_shift_id], references: [id], onDelete: SetNull)
+  door_problem        DoorProblem?
+  door_problem_reason String?
+  // Delivery timers start at these moments (docs/DELIVERY.md, "Напоминания")
+  ready_at            DateTime?
+  picked_up_at        DateTime?
+  door_problem_at     DateTime?
+  // Cash orders delivered by a courier: banknotes or a card to the courier
+  cash_collected      CashCollection?
+  // Courier pay accrued at delivery: straight-line km from the branch and the amount (null: no rate set)
+  courier_distance_km Float?
+  courier_pay         Int?
+  // Handed to an external service (handed_to_external): its name, what the venue paid it, when; for a cash
+  // order the operator marks later whether the venue got the money (null: not marked yet)
+  external_service       String?
+  external_cost          Int?
+  external_handed_at     DateTime?
+  external_cash_received Boolean?
 
   cancelled_by    OrderActor?
   cancel_reason   String?
@@ -68,12 +92,16 @@ model customer_order {
   items           customer_order_item[]
   payments        order_payment[]
   events          order_status_event[]
+  courier_cards   courier_card[]
 
   @@unique([organization_id, number])
   @@unique([customer_id, idempotency_key])
   @@index([organization_id, status, created_at])
   @@index([customer_id, created_at])
   @@index([branch_id, status])
+  @@index([courier_id, status])
+  @@index([courier_shift_id, status])
+  @@index([organization_id, external_handed_at])
 }
 
 model customer_order_item {

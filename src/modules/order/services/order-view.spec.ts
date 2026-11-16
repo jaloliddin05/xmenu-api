@@ -175,3 +175,25 @@ describe('toOrderView', () => {
     ).toMatchObject({ cancelledBy: 'restaurant', cancelReason: 'declined' });
   });
 });
+
+describe('courier in the guest view', () => {
+  const courier = { id: 'c1', name: 'Bekzod', phone: '+998907770000' };
+  it('the name (never the phone) while on the way or at the door', () => {
+    for (const status of ['on_the_way', 'problem_at_door'] as const) {
+      const view = toOrderView(
+        base({ status, courier, door_problem: 'no_answer' }),
+      );
+      expect(view.courier).toEqual({ name: 'Bekzod' });
+      expect(JSON.stringify(view)).not.toContain('+998907770000');
+    }
+    expect(
+      toOrderView(
+        base({ status: 'problem_at_door', courier, door_problem: 'no_answer' }),
+      ).doorProblem,
+    ).toBe('no_answer');
+  });
+  it('no courier before "picked up" or after the end', () => {
+    for (const status of ['accepted', 'ready', 'completed'] as const)
+      expect(toOrderView(base({ status, courier })).courier).toBeNull();
+  });
+});

@@ -37,6 +37,14 @@ export const PLATFORM_ORDER_SETTINGS = {
   acceptance_timeout_seconds: 300,
   payment_timeout_seconds: 900,
   max_active_orders: 5,
+  // Delivery timers (docs/DELIVERY.md, "Настройки")
+  pickup_reminder_minutes: 5,
+  on_the_way_alert_minutes: 60,
+  door_wait_minutes: 10,
+  // Courier pay is not set: nothing is accrued
+  courier_pay_per_delivery: null,
+  courier_pay_included_km: null,
+  courier_pay_per_km: null,
 };
 
 /**

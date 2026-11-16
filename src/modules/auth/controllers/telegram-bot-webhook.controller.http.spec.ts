@@ -87,7 +87,10 @@ describe('POST /telegram/bot/:botKey/webhook', () => {
       { startUrl: async () => null } as any,
     );
     queue = new InProcessTelegramUpdateQueue((job) =>
-      processTelegramUpdate({ bots, verification }, job),
+      processTelegramUpdate(
+        { bots, verification, couriers: { handleUpdate: async () => false } },
+        job,
+      ),
     );
     app = await createHttpApp({
       controllers: [TelegramBotWebhookController],

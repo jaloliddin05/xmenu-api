@@ -11,12 +11,18 @@ import {
   OrderTransitionService,
 } from './order-transition.service';
 import { OrderWithItems, toOrderView } from './order-view';
+import { OrderSettingsService } from './order-settings.service';
+import {
+  DeliveryTimerSettings,
+  doorWaitEndsAt,
+} from '../domain/delivery-timers';
 import { AppException } from 'src/infra/errors/app-exception';
 
 const INCLUDE = {
   items: { include: { options: true } },
   branch: { select: { id: true, title: true, address: true } },
   customer: { select: { id: true, name: true, phone: true } },
+  courier: { select: { id: true, name: true, phone: true } },
   events: { orderBy: { id: 'asc' } },
 } satisfies Prisma.customer_orderInclude;
 
@@ -42,11 +48,14 @@ export class OrderStaffService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly transitions: OrderTransitionService,
+    private readonly settings: OrderSettingsService,
   ) {}
 
   private toStaffView(
     order: Prisma.customer_orderGetPayload<{ include: typeof INCLUDE }>,
+    timers: DeliveryTimerSettings,
   ) {
+    const doorEnds = doorWaitEndsAt(order, timers);
     return {
       ...toOrderView(order as unknown as OrderWithItems),
       customer: {
@@ -54,6 +63,27 @@ export class OrderStaffService {
         name: order.customer.name,
         phone: order.customer.phone,
       },
+      // The operator sees the whole courier, the guest only the name (toOrderView)
+      courier: order.courier,
+      courierAssignedAt: order.courier_assigned_at?.toISOString() ?? null,
+      doorProblemReason: order.door_problem_reason,
+      readyAt: order.ready_at?.toISOString() ?? null,
+      pickedUpAt: order.picked_up_at?.toISOString() ?? null,
+      doorWaitEndsAt: doorEnds?.toISOString() ?? null,
+      cashCollected: order.cash_collected,
+      external:
+        order.external_service && order.external_handed_at
+          ? {
+              service: order.external_service,
+              cost: order.external_cost ?? 0,
+              handedAt: order.external_handed_at.toISOString(),
+              cashReceived: order.external_cash_received,
+              paymentMarkPending:
+                order.status === 'handed_to_external' &&
+                order.payment_method === 'cash' &&
+                order.external_cash_received === null,
+            }
+          : null,
       events: order.events.map((e) => ({
         from: e.from_status,
         to: e.to_status,
@@ -70,16 +100,28 @@ export class OrderStaffService {
     q: {
       statuses?: OrderStatusName[];
       branchId?: string;
+      courierId?: string;
+      /** Delivery orders waiting for a courier (accepted or ready, nobody assigned) */
+      unassigned?: boolean;
       cursor?: string;
       limit?: number;
     },
   ) {
     const limit = Math.min(Math.max(q.limit ?? 30, 1), 100);
+    const timers = await this.settings.get(organizationId);
     const rows = await this.prisma.customer_order.findMany({
       where: {
         organization_id: organizationId,
         ...(q.statuses?.length ? { status: { in: q.statuses } } : {}),
         ...(q.branchId ? { branch_id: q.branchId } : {}),
+        ...(q.courierId ? { courier_id: q.courierId } : {}),
+        ...(q.unassigned
+          ? {
+              fulfillment: 'delivery' as const,
+              courier_id: null,
+              status: { in: ['accepted', 'ready'] as OrderStatusName[] },
+            }
+          : {}),
       },
       orderBy: [{ created_at: 'desc' }, { id: 'desc' }],
       take: limit + 1,
@@ -88,7 +130,7 @@ export class OrderStaffService {
     });
     const page = rows.slice(0, limit);
     return {
-      items: page.map((o) => this.toStaffView(o)),
+      items: page.map((o) => this.toStaffView(o, timers)),
       nextCursor: rows.length > limit ? page[page.length - 1].id : null,
     };
   }
@@ -100,7 +142,7 @@ export class OrderStaffService {
     });
     if (!order)
       throw new AppException('not_found', { message: 'Order not found' });
-    return this.toStaffView(order);
+    return this.toStaffView(order, await this.settings.get(organizationId));
   }
 
   /** Panel uchun: natijada yangilangan buyurtma. Ruxsat etilmagan o'tish — 409. */

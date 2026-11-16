@@ -9,15 +9,21 @@ export class RejectOrderDto {
   readonly reason?: string;
 }
 
+/**
+ * Statuses the restaurant sets itself. Delivery: accepted → ready, and returned_to_restaurant after a problem
+ * at the door; "on the way" and "delivered" are the courier's (bot buttons). Pickup: preparing, ready,
+ * completed. Cancelling is POST /order/:id/reject with a reason.
+ */
+const STAFF_SETTABLE = [
+  'accepted',
+  'preparing',
+  'ready',
+  'completed',
+  'returned_to_restaurant',
+] as const;
+
 export class SetOrderStatusDto {
-  @ApiProperty({
-    enum: ['accepted', 'preparing', 'on_the_way', 'ready', 'completed'],
-  })
-  @IsIn(['accepted', 'preparing', 'on_the_way', 'ready', 'completed'])
-  readonly status:
-    | 'accepted'
-    | 'preparing'
-    | 'on_the_way'
-    | 'ready'
-    | 'completed';
+  @ApiProperty({ enum: STAFF_SETTABLE })
+  @IsIn(STAFF_SETTABLE)
+  readonly status: (typeof STAFF_SETTABLE)[number];
 }

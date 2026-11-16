@@ -56,6 +56,9 @@ export class CustomerNotifierService {
         payment_method: true,
         payment_status: true,
         cancelled_by: true,
+        fulfillment: true,
+        door_problem: true,
+        courier: { select: { name: true } },
         organization_id: true,
         channel: true,
         customer: { select: { language: true } },
@@ -68,7 +71,12 @@ export class CustomerNotifierService {
       order.organization_id,
       order.customer.language,
     );
-    const text = buildCustomerText(order, from, lang);
+    const text = buildCustomerText(
+      order,
+      from,
+      lang,
+      order.courier?.name ?? null,
+    );
     if (text) await this.dispatch({ orderId, text });
   }
 

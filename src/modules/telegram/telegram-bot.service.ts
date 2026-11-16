@@ -241,7 +241,8 @@ export class TelegramBotService {
       await this.client.call(token, 'setWebhook', {
         url: this.webhookUrl(id),
         secret_token: webhookSecret,
-        allowed_updates: ['message'],
+        // callback_query: buttons on the courier order cards
+        allowed_updates: ['message', 'callback_query'],
         drop_pending_updates: true,
       });
     } catch (e) {

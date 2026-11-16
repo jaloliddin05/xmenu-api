@@ -13,7 +13,7 @@ export const PERMISSIONS = [
   'profile',
   // Orders: list, card, accept, reject, statuses, cancel with a reason
   'orders',
-  // Couriers and shifts (cash reconciliation included); their routes come with delivery
+  // Couriers and shifts (the cash reconciliation of a shift included)
   'couriers',
   'shifts',
   // Read the branch list (the order filter)
@@ -24,6 +24,8 @@ export const PERMISSIONS = [
   'venue',
   // Staff accounts: invite and disable operators
   'staff',
+  // Delivery reports with money: couriers (cash, pay), external services, problems
+  'reports',
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 

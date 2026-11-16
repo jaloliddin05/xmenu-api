@@ -7,8 +7,14 @@ enum OrderStatus {
   preparing
   on_the_way
   ready
+  // Delivery: the courier is at the door and cannot hand over (no answer, refused); the operator decides
+  problem_at_door
   completed
   cancelled
+  // Delivery closed without a delivery: the order went back to the restaurant
+  returned_to_restaurant
+  // Delivery closed by handing the order to an external service (no integration)
+  handed_to_external
 }
 
 enum OrderFulfillment {
@@ -36,6 +42,7 @@ enum OrderPaymentStatus {
 enum OrderActor {
   customer
   restaurant
+  courier
   system
   payment
 }
@@ -51,4 +58,16 @@ enum CourierMode {
   own
   external
   both
+}
+
+// How the guest paid a cash order at the door: banknotes (handed in at the shift end) or a card to the courier
+enum CashCollection {
+  cash
+  card
+}
+
+// Why a courier could not hand over at the door (problem_at_door)
+enum DoorProblem {
+  no_answer
+  refused
 }

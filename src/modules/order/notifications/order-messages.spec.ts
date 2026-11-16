@@ -1,5 +1,6 @@
 import {
   buildCustomerText,
+  buildDeliveryAlertText,
   buildRestaurantKeyboard,
   buildRestaurantText,
   esc,
@@ -94,9 +95,21 @@ describe('restaurant keyboard', () => {
       )!.inline_keyboard[0][0].text,
     ).toContain('Готов к выдаче');
     expect(
-      buildRestaurantKeyboard(order({ status: 'on_the_way' })),
+      buildRestaurantKeyboard(
+        order({ status: 'ready', fulfillment: 'pickup' }),
+      ),
     ).not.toBeNull();
     expect(buildRestaurantKeyboard(order({ status: 'completed' }))).toBeNull();
+    // A delivery stops at "ready": picked up and delivered are the courier's buttons, not the branch chat's
+    expect(
+      buildRestaurantKeyboard(
+        order({ status: 'accepted', fulfillment: 'delivery' }),
+      )!.inline_keyboard[0][0].text,
+    ).toContain('Готов');
+    for (const status of ['ready', 'on_the_way', 'problem_at_door'] as const)
+      expect(
+        buildRestaurantKeyboard(order({ status, fulfillment: 'delivery' })),
+      ).toBeNull();
     expect(buildRestaurantKeyboard(order({ status: 'cancelled' }))).toBeNull();
     expect(
       buildRestaurantKeyboard(order({ status: 'awaiting_payment' })),
@@ -167,5 +180,55 @@ describe('customer message', () => {
         'pending_acceptance',
       ),
     ).not.toContain('вернутся');
+  });
+});
+
+describe('customer message for delivery steps', () => {
+  const delivery = (status: string, over: Record<string, unknown> = {}) =>
+    order({ status, fulfillment: 'delivery', payment_method: 'cash', ...over });
+  it('ready: "waiting for the courier" once, not again after "cannot deliver"', () => {
+    expect(buildCustomerText(delivery('ready'), 'accepted')).toBe(
+      '📦 Заказ №1042 готов и ждёт курьера',
+    );
+    expect(buildCustomerText(delivery('ready'), 'on_the_way')).toBeNull();
+    expect(
+      buildCustomerText(
+        order({ status: 'ready', fulfillment: 'pickup' }),
+        'preparing',
+      ),
+    ).toContain('готов к выдаче');
+  });
+  it('on the way with the courier name; at the door only when the guest does not answer; returned', () => {
+    expect(
+      buildCustomerText(delivery('on_the_way'), 'ready', 'ru', 'Bekzod'),
+    ).toBe('🛵 Заказ №1042 в пути, курьер Bekzod');
+    expect(
+      buildCustomerText(
+        delivery('problem_at_door', { door_problem: 'no_answer' }),
+        'on_the_way',
+        'uz',
+      ),
+    ).toContain("qo'ng'iroq qila olmayapti");
+    expect(
+      buildCustomerText(
+        delivery('problem_at_door', { door_problem: 'refused' }),
+        'on_the_way',
+      ),
+    ).toBeNull();
+    expect(
+      buildCustomerText(
+        delivery('returned_to_restaurant'),
+        'problem_at_door',
+        'en',
+      ),
+    ).toBe('↩️ Order #1042 was returned to the restaurant');
+  });
+  it('the operator alert names the problem and the courier', () => {
+    expect(buildDeliveryAlertText(1042, 'cannot_deliver', 'Bek <z>')).toContain(
+      'Срочно: заказ №1042 снова готов и без курьера (курьер Bek &lt;z&gt;)',
+    );
+    expect(buildDeliveryAlertText(1042, 'no_answer', null)).toContain(
+      'не может дозвониться',
+    );
   });
 });
