@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
 import { AppException } from 'src/infra/errors/app-exception';
 import { PayRate, payRateOf } from 'src/modules/courier/domain/courier-pay';
+import type { DeliveryPaymentSettings } from '../domain/delivery-payment';
 
 export type CourierMode = 'own' | 'external' | 'both';
 
@@ -13,8 +14,10 @@ export interface OrderSettings {
   minOrderPickup: number;
   /** Delivery fees are rounded up to it: 100, 500 or 1000 */
   deliveryPriceStep: number;
-  /** external: only external services deliver, so cash on delivery is not offered */
+  /** external: only external services deliver, so nothing is paid at the door (deliveryPaymentMethods) */
   courierMode: CourierMode;
+  /** Payment methods the venue offers at delivery; narrowed by courierMode and the keys */
+  deliveryPayment: DeliveryPaymentSettings;
   acceptanceTimeoutSeconds: number;
   paymentTimeoutSeconds: number;
   maxActiveOrders: number;
@@ -27,10 +30,6 @@ export interface OrderSettings {
   /** The venue's courier pay rate; null: no pay is accrued (unless a courier has an own rate) */
   courierPay: PayRate | null;
 }
-
-/** Cash on delivery needs own couriers: an external service does not collect cash for the venue. */
-export const cashOnDelivery = (mode: CourierMode): boolean =>
-  mode !== 'external';
 
 const TTL_MS = 30_000;
 
@@ -61,6 +60,11 @@ export class OrderSettingsService {
       minOrderPickup: row.min_order_pickup,
       deliveryPriceStep: row.delivery_price_step,
       courierMode: row.courier_mode,
+      deliveryPayment: {
+        cash: row.delivery_pay_cash,
+        card: row.delivery_pay_card,
+        online: row.delivery_pay_online,
+      },
       acceptanceTimeoutSeconds: row.acceptance_timeout_seconds,
       paymentTimeoutSeconds: row.payment_timeout_seconds,
       maxActiveOrders: row.max_active_orders,

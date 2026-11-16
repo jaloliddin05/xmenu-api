@@ -97,7 +97,7 @@ export class CourierController {
     );
   }
 
-  @StaffAccess('couriers')
+  @StaffAccess('couriers.manage')
   @Post()
   @ApiOperation({
     summary: 'Add a courier (name, phone); 409 courier_phone_taken',
@@ -107,7 +107,7 @@ export class CourierController {
     return this.couriers.create(requireStaffOrganizationId(req), dto);
   }
 
-  @StaffAccess('couriers')
+  @StaffAccess('couriers.manage')
   @Patch(':id')
   @ApiOperation({ summary: 'Change the name or phone of an active courier' })
   @ApiOkResponse({ type: CourierViewDto })
@@ -119,7 +119,7 @@ export class CourierController {
     return this.couriers.update(requireStaffOrganizationId(req), id, dto);
   }
 
-  @StaffAccess('couriers')
+  @StaffAccess('couriers.manage')
   @Post(':id/invitation')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -131,7 +131,7 @@ export class CourierController {
     return this.couriers.invite(requireStaffOrganizationId(req), id);
   }
 
-  @StaffAccess('couriers')
+  @StaffAccess('couriers.manage')
   @Post(':id/disable')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({

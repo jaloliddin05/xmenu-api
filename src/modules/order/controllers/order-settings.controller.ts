@@ -12,6 +12,9 @@ import {
 import { OrderSettingsService } from '../services/order-settings.service';
 import { RevalidateService } from 'src/modules/revalidate-queue/revalidate.service';
 import { StaffAccess } from 'src/modules/auth/access/staff-access.decorator';
+import { PaymentConfigService } from 'src/modules/payment/services/payment-config.service';
+import { fieldErrorsException } from 'src/infra/validators/validation-errors';
+import { deliveryPaymentProblems } from '../domain/delivery-payment';
 
 /**
  * Restoran paneli: minimal summa (olib ketish), yetkazib berish narxini yaxlitlash qadami, kim yetkazadi,
@@ -24,6 +27,7 @@ export class OrderSettingsController {
     private readonly settings: OrderSettingsService,
     private readonly prisma: PrismaService,
     private readonly revalidate: RevalidateService,
+    private readonly payments: PaymentConfigService,
   ) {}
 
   @StaffAccess('venue')
@@ -48,6 +52,11 @@ export class OrderSettingsController {
       min_order_pickup: dto.minOrderPickup,
       delivery_price_step: dto.deliveryPriceStep,
       courier_mode: dto.courierMode,
+      ...(dto.deliveryPayment && {
+        delivery_pay_cash: dto.deliveryPayment.cash,
+        delivery_pay_card: dto.deliveryPayment.card,
+        delivery_pay_online: dto.deliveryPayment.online,
+      }),
       acceptance_timeout_seconds: dto.acceptanceTimeoutSeconds,
       payment_timeout_seconds: dto.paymentTimeoutSeconds,
       max_active_orders: dto.maxActiveOrders,
@@ -61,13 +70,24 @@ export class OrderSettingsController {
         courier_pay_per_km: dto.courierPay?.perKm ?? null,
       }),
     };
-    await this.settings.get(organizationId); // settings_missing instead of a Prisma "not found"
+    // settings_missing instead of a Prisma "not found"
+    const current = await this.settings.get(organizationId);
+    if (dto.deliveryPayment) {
+      const providers = await this.payments.enabledProviders(organizationId);
+      const problems = deliveryPaymentProblems(
+        dto.deliveryPayment,
+        current.deliveryPayment,
+        providers.size > 0,
+      );
+      if (problems.length)
+        throw fieldErrorsException('invalid_settings', problems);
+    }
     await this.prisma.organization_order_settings.update({
       where: { organization_id: organizationId },
       data,
     });
     this.settings.invalidate(organizationId);
-    // The pickup minimum and cash on delivery (courier mode) are part of the delivery site's config
+    // The pickup minimum and the payment methods at delivery are part of the delivery site's config
     await this.revalidate.addRevalidationJob({
       tenantId: organizationId,
       route: 'settings',

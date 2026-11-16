@@ -1,3 +1,4 @@
+import { isOnlineMethod } from '../domain/delivery-payment';
 import type {
   customer_order,
   customer_order_item,
@@ -27,7 +28,7 @@ export function toOrderView(
   order: OrderWithItems,
   opts: OrderViewOptions = {},
 ) {
-  const online = order.payment_method !== 'cash';
+  const online = isOnlineMethod(order.payment_method);
 
   return {
     id: order.id,

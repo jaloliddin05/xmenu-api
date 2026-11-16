@@ -1,3 +1,7 @@
+import {
+  PAYMENT_METHODS,
+  type PaymentMethod,
+} from '../domain/delivery-payment';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
@@ -82,9 +86,13 @@ export class CreateOrderDto {
   @MaxLength(500)
   readonly comment?: string;
 
-  @ApiProperty({ enum: ['cash', 'click', 'payme'] })
-  @IsIn(['cash', 'click', 'payme'])
-  readonly paymentMethod: 'cash' | 'click' | 'payme';
+  @ApiProperty({
+    enum: PAYMENT_METHODS,
+    description:
+      'One of GET /checkout-config paymentMethods for the chosen mode; otherwise 422 payment_method_unavailable. card: a card to the courier, delivery only',
+  })
+  @IsIn(PAYMENT_METHODS)
+  readonly paymentMethod: PaymentMethod;
 
   @ApiProperty({ type: [OrderItemDto] })
   @IsArray()

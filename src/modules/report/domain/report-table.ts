@@ -1,6 +1,5 @@
 import type { Lang } from 'src/infra/http/request-helpers';
 import type { CourierReportRow, CourierReportTotals } from './courier-report';
-import { CsvCell, toCsv } from './csv';
 import type {
   ExternalReportRow,
   ExternalReportTotals,
@@ -8,11 +7,27 @@ import type {
 import type { ProblemReport } from './problem-report';
 
 /**
- * CSV files of the reports: the column names in the language of the request (ru, uz, en). Listed in
- * BOT_TEXT_FILES (npm run check:user-texts). Uzbek is Latin script.
+ * The reports as tables for the files (CSV, XLSX): the column names in the language of the request (ru, uz,
+ * en), numbers stay numbers. Listed in BOT_TEXT_FILES (npm run check:user-texts). Uzbek is Latin script.
  */
+export type ReportCell = string | number | null;
+
+export interface ReportTable {
+  /** The sheet name of the XLSX file (Excel: at most 31 characters) */
+  title: string;
+  header: string[];
+  /** The last row is the total when the report has one */
+  rows: ReportCell[][];
+  /** The last row is a total: the XLSX file makes it bold */
+  hasTotal: boolean;
+}
+
 interface ReportTexts {
   total: string;
+  /** Labels of the period above the XLSX table */
+  periodFrom: string;
+  periodTo: string;
+  titles: { couriers: string; external: string; problems: string };
   couriers: [
     courier: string,
     shifts: string,
@@ -45,6 +60,13 @@ interface ReportTexts {
 const TEXTS: Record<Lang, ReportTexts> = {
   ru: {
     total: 'Итого',
+    periodFrom: 'Период с',
+    periodTo: 'до',
+    titles: {
+      couriers: 'Курьеры',
+      external: 'Внешние службы',
+      problems: 'Проблемы',
+    },
     couriers: [
       'Курьер',
       'Смен',
@@ -87,6 +109,13 @@ const TEXTS: Record<Lang, ReportTexts> = {
   },
   uz: {
     total: 'Jami',
+    periodFrom: 'Davr boshi',
+    periodTo: 'Davr oxiri',
+    titles: {
+      couriers: 'Kuryerlar',
+      external: 'Tashqi xizmatlar',
+      problems: 'Muammolar',
+    },
     couriers: [
       'Kuryer',
       'Smenalar',
@@ -129,6 +158,13 @@ const TEXTS: Record<Lang, ReportTexts> = {
   },
   en: {
     total: 'Total',
+    periodFrom: 'From',
+    periodTo: 'To',
+    titles: {
+      couriers: 'Couriers',
+      external: 'External services',
+      problems: 'Problems',
+    },
     couriers: [
       'Courier',
       'Shifts',
@@ -171,7 +207,12 @@ const TEXTS: Record<Lang, ReportTexts> = {
   },
 };
 
-const courierCells = (r: CourierReportTotals): CsvCell[] => [
+export const periodLabels = (lang: Lang) => ({
+  from: TEXTS[lang].periodFrom,
+  to: TEXTS[lang].periodTo,
+});
+
+const courierCells = (r: CourierReportTotals): ReportCell[] => [
   r.shifts,
   r.hours,
   r.deliveries,
@@ -183,18 +224,23 @@ const courierCells = (r: CourierReportTotals): CsvCell[] => [
   r.unreconciledShifts,
 ];
 
-export function couriersCsv(
+export function couriersTable(
   report: { rows: CourierReportRow[]; total: CourierReportTotals },
   lang: Lang,
-): string {
+): ReportTable {
   const t = TEXTS[lang];
-  return toCsv(t.couriers, [
-    ...report.rows.map((r) => [r.name, ...courierCells(r)]),
-    [t.total, ...courierCells(report.total)],
-  ]);
+  return {
+    title: t.titles.couriers,
+    header: [...t.couriers],
+    rows: [
+      ...report.rows.map((r) => [r.name, ...courierCells(r)]),
+      [t.total, ...courierCells(report.total)],
+    ],
+    hasTotal: true,
+  };
 }
 
-const externalCells = (r: ExternalReportTotals): CsvCell[] => [
+const externalCells = (r: ExternalReportTotals): ReportCell[] => [
   r.orders,
   r.cost,
   r.cashReceived,
@@ -202,20 +248,25 @@ const externalCells = (r: ExternalReportTotals): CsvCell[] => [
   r.cashUnmarked,
 ];
 
-export function externalCsv(
+export function externalTable(
   report: { rows: ExternalReportRow[]; total: ExternalReportTotals },
   lang: Lang,
-): string {
+): ReportTable {
   const t = TEXTS[lang];
-  return toCsv(t.external, [
-    ...report.rows.map((r) => [r.service, ...externalCells(r)]),
-    [t.total, ...externalCells(report.total)],
-  ]);
+  return {
+    title: t.titles.external,
+    header: [...t.external],
+    rows: [
+      ...report.rows.map((r) => [r.service, ...externalCells(r)]),
+      [t.total, ...externalCells(report.total)],
+    ],
+    hasTotal: true,
+  };
 }
 
-export function problemsCsv(report: ProblemReport, lang: Lang): string {
+export function problemsTable(report: ProblemReport, lang: Lang): ReportTable {
   const t = TEXTS[lang];
-  const rows: CsvCell[][] = [
+  const rows: ReportCell[][] = [
     [t.kinds.no_answer, null, report.counts.noAnswer],
     // Every kind has a row, zero included
     ...(report.refusedReasons.length
@@ -235,5 +286,10 @@ export function problemsCsv(report: ProblemReport, lang: Lang): string {
         ])
       : [[t.kinds.cancelled, null, 0]]),
   ];
-  return toCsv(t.problems, rows);
+  return {
+    title: t.titles.problems,
+    header: [...t.problems],
+    rows,
+    hasTotal: false,
+  };
 }

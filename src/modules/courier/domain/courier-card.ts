@@ -1,5 +1,9 @@
 import type { OrderStatusName } from 'src/modules/order/domain/order-state-machine';
 import {
+  doorPaymentChoices,
+  paidAtDoor,
+} from 'src/modules/order/domain/delivery-payment';
+import {
   COURIER_TEXTS,
   CourierCardStatus,
   CourierLang,
@@ -123,6 +127,8 @@ export interface CardContext {
   readyFromBranch: number;
   /** The refusal reasons menu is open on this card */
   refuseMenu?: boolean;
+  /** Cash and card the venue takes at the door now (doorPaymentMethods): which payment buttons to show */
+  doorMethods: readonly ('cash' | 'card')[];
 }
 
 export function courierCardStatus(
@@ -210,11 +216,17 @@ export function renderCourierCard(
   lines.push(
     `${t.items}: ${order.items.map((i) => `${i.name} × ${i.quantity}`).join('; ')}`,
   );
-  const cash = order.paymentMethod === 'cash';
+  const atDoor = paidAtDoor(order.paymentMethod);
+  const payLabel =
+    order.paymentMethod === 'cash'
+      ? t.payCash
+      : order.paymentMethod === 'card'
+        ? t.payCard
+        : t.payOnline;
   lines.push(
-    `${t.total}: ${formatMoney(cash ? order.total : 0, order.currency, ctx.lang)} (${cash ? t.payCash : t.payOnline})`,
+    `${t.total}: ${formatMoney(atDoor ? order.total : 0, order.currency, ctx.lang)} (${payLabel})`,
   );
-  if (cash && order.cashChangeFrom)
+  if (order.paymentMethod === 'cash' && order.cashChangeFrom)
     lines.push(
       `${t.changeFrom}: ${formatMoney(order.cashChangeFrom, order.currency, ctx.lang)}`,
     );
@@ -241,19 +253,16 @@ function keyboardFor(
     callback_data: encodeCourierAction(action),
   });
   const id = order.id;
-  const cash = order.paymentMethod === 'cash';
-  // A cash order: banknotes (handed in at the shift end) or a card to the courier
-  const deliveredRows: InlineButton[][] = [
-    [
-      btn(cash ? t.deliveredCash : t.delivered, {
-        a: 'delivered',
-        orderId: id,
-      }),
-    ],
-    ...(cash
-      ? [[btn(t.deliveredCard, { a: 'delivered_card', orderId: id })]]
-      : []),
-  ];
+  // Paid at the door: the chosen method first, the other one if the venue takes it now (banknotes are
+  // handed in at the shift end, a card is not reconciled); online: just "delivered"
+  const choices = doorPaymentChoices(order.paymentMethod, ctx.doorMethods);
+  const deliveredRows: InlineButton[][] = choices.length
+    ? choices.map((m) => [
+        m === 'cash'
+          ? btn(t.deliveredCash, { a: 'delivered', orderId: id })
+          : btn(t.deliveredCard, { a: 'delivered_card', orderId: id }),
+      ])
+    : [[btn(t.delivered, { a: 'delivered', orderId: id })]];
 
   if (status === 'ready') {
     const rows = [[btn(t.pickedUp, { a: 'pick', orderId: id })]];

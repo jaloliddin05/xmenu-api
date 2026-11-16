@@ -229,7 +229,11 @@ describe('OrderService.create: ordering channel and publication', () => {
 /** POST /orders past the gate: branch, delivery fee, payment method, change and price checks. */
 describe('OrderService.create: delivery price, payment and change', () => {
   const SUBTOTAL = 60000;
-  let settings: { minOrderPickup: number; courierMode: string };
+  let settings: {
+    minOrderPickup: number;
+    courierMode: string;
+    deliveryPayment: { cash: boolean; card: boolean; online: boolean };
+  };
   let choice: {
     branch: { id: string; title: string; address: string };
     price: {
@@ -333,7 +337,11 @@ describe('OrderService.create: delivery price, payment and change', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     created = undefined;
-    settings = { minOrderPickup: 0, courierMode: 'own' };
+    settings = {
+      minOrderPickup: 0,
+      courierMode: 'own',
+      deliveryPayment: { cash: true, card: false, online: true },
+    };
     choice = {
       branch: { id: 'near', title: 'Near', address: 'Street 1' },
       price: { deliveryFee: 12000, freeFrom: 150000, minOrder: 50000 },
@@ -456,6 +464,60 @@ describe('OrderService.create: delivery price, payment and change', () => {
         expect(await run(order())).toBeNull();
       },
     );
+
+    it('external couriers only: a card to the courier is refused as well', async () => {
+      settings.deliveryPayment.card = true;
+      settings.courierMode = 'external';
+      expect(await run(order({ paymentMethod: 'card' }))).toMatchObject({
+        code: 'payment_method_unavailable',
+      });
+    });
+  });
+
+  describe('payment methods the venue switched on for delivery (W13-05)', () => {
+    it('a card to the courier: refused while off, placed as paid at the door while on', async () => {
+      const off = await run(order({ paymentMethod: 'card' }));
+      expect(off).toMatchObject({ code: 'payment_method_unavailable' });
+      expect(created).toBeUndefined();
+
+      settings.deliveryPayment.card = true;
+      expect(await run(order({ paymentMethod: 'card' }))).toBeNull();
+      expect(created).toMatchObject({
+        payment_method: 'card',
+        payment_status: 'not_required',
+      });
+    });
+
+    it('cash switched off: refused for delivery, still taken for pickup', async () => {
+      settings.deliveryPayment.cash = false;
+      expect(await run(order())).toMatchObject({
+        code: 'payment_method_unavailable',
+      });
+      expect(await run({ ...dto('pickup') })).toBeNull();
+    });
+
+    it('online switched off: refused for delivery even with keys, still offered for pickup', async () => {
+      settings.deliveryPayment.online = false;
+      expect(await run(order({ paymentMethod: 'click' }))).toMatchObject({
+        code: 'payment_method_unavailable',
+      });
+      expect(
+        await run({ ...dto('pickup'), paymentMethod: 'click' }),
+      ).toBeNull();
+    });
+
+    it('online on, but the provider has no keys: refused', async () => {
+      expect(await run(order({ paymentMethod: 'payme' }))).toMatchObject({
+        code: 'payment_method_unavailable',
+      });
+    });
+
+    it('a card is never taken for pickup', async () => {
+      settings.deliveryPayment.card = true;
+      expect(
+        await run({ ...dto('pickup'), paymentMethod: 'card' }),
+      ).toMatchObject({ code: 'payment_method_unavailable' });
+    });
   });
 
   describe('cashChangeFrom', () => {
@@ -477,9 +539,10 @@ describe('OrderService.create: delivery price, payment and change', () => {
       ]);
     });
 
-    it('only with cash', async () => {
+    it.each(['click', 'card'])('only with cash, not %s', async (method) => {
+      settings.deliveryPayment.card = true;
       const r = await run(
-        order({ paymentMethod: 'click', cashChangeFrom: 200000 }),
+        order({ paymentMethod: method, cashChangeFrom: 200000 }),
       );
       expect(r?.body.fields).toEqual([
         expect.objectContaining({ field: 'cashChangeFrom', code: 'cash_only' }),

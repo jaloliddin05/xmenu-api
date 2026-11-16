@@ -2,6 +2,7 @@ import { INestApplication, Logger } from '@nestjs/common';
 import request from 'supertest';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
 import { createHttpApp, staffToken } from 'src/infra/testing/http-app.fake';
+import { strFromU8, unzipSync } from 'fflate';
 import { ReportController } from './report.controller';
 import { ReportService } from './report.service';
 
@@ -131,11 +132,40 @@ describe('GET /reports/*', () => {
     expect(lines[1].startsWith("'=Bekzod,2,")).toBe(true);
   });
 
+  it('XLSX: an Excel workbook named after the period, the header in the request language', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/reports/couriers')
+      .query({ from: FROM, to: TO, format: 'xlsx', lang: 'uz' })
+      .set('Authorization', owner)
+      .buffer(true)
+      .parse((r, done) => {
+        const chunks: Buffer[] = [];
+        r.on('data', (c: Buffer) => chunks.push(c));
+        r.on('end', () => done(null, Buffer.concat(chunks)));
+      })
+      .expect(200);
+    expect(res.headers['content-type']).toBe(
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    expect(res.headers['content-disposition']).toBe(
+      'attachment; filename="couriers_2026-10-31_2026-11-01.xlsx"',
+    );
+    expect(res.headers['cache-control']).toBe('no-store');
+    const sheet = strFromU8(
+      unzipSync(new Uint8Array(res.body as Buffer))['xl/worksheets/sheet1.xml'],
+    );
+    expect(sheet).toContain('Davr boshi');
+    expect(sheet).toContain('Kuryer');
+    // the courier name typed as a formula stays text with the leading quote
+    expect(sheet).toContain("'=Bekzod");
+    expect(sheet).not.toContain('<f>');
+  });
+
   it.each([
     [{ from: FROM }, 'to'],
     [{ from: TO, to: FROM }, 'to'],
     [{ from: 'yesterday', to: TO }, 'from'],
-    [{ from: FROM, to: TO, format: 'xlsx' }, 'format'],
+    [{ from: FROM, to: TO, format: 'pdf' }, 'format'],
   ])('%j → 400 validation_error on %s', async (query, field) => {
     const res = await request(app.getHttpServer())
       .get('/reports/problems')

@@ -1,3 +1,4 @@
+import { paidAtDoor } from '../domain/delivery-payment';
 import { errorMessage } from 'src/infra/helper/error-text';
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma, customer_order } from '@prisma/client';
@@ -287,10 +288,10 @@ export class OrderTransitionService {
     );
     const km = branch ? deliveryDistanceKm(branch, order.address_snapshot) : 0;
     return {
-      cash_collected:
-        order.payment_method === 'cash'
-          ? (input.cashCollected ?? 'cash')
-          : null,
+      // Paid at the door: the courier marks banknotes or a card whatever the guest chose at checkout
+      cash_collected: paidAtDoor(order.payment_method)
+        ? (input.cashCollected ?? order.payment_method)
+        : null,
       courier_distance_km: Math.round(km * 1000) / 1000,
       courier_pay: courierPay(rate, km),
     };

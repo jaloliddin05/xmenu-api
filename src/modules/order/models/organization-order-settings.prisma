@@ -10,6 +10,11 @@ model organization_order_settings {
   delivery_price_step  Int
   // Who delivers: own couriers, external services or both; external only offers no cash on delivery
   courier_mode         CourierMode
+  // Payment methods offered at delivery (docs/DELIVERY.md): cash, a card to the courier, online. Cash and card
+  // need own couriers; online needs a connected provider (order/domain/delivery-payment.ts)
+  delivery_pay_cash    Boolean
+  delivery_pay_card    Boolean
+  delivery_pay_online  Boolean
 
   // Restoran buyurtmani qabul qilmasa — shu vaqtdan keyin avtomatik bekor (soniya)
   acceptance_timeout_seconds Int

@@ -1,8 +1,8 @@
 import { courierReport } from './courier-report';
-import { toCsv } from './csv';
+import { tableCsv, toCsv } from './csv';
 import { externalReport } from './external-report';
 import { problemReport } from './problem-report';
-import { couriersCsv, problemsCsv } from './report-csv';
+import { couriersTable, problemsTable } from './report-table';
 import { parsePeriod } from './report-period';
 
 const at = (iso: string) => new Date(iso);
@@ -299,13 +299,17 @@ describe('CSV', () => {
   });
 
   it('column names in the request language; a total row; every problem kind has a row', () => {
-    const couriers = couriersCsv(courierReport([], [], new Date()), 'en');
+    const couriers = tableCsv(
+      couriersTable(courierReport([], [], new Date()), 'en'),
+    );
     expect(couriers.split('\r\n')[0]).toBe(
       '﻿Courier,Shifts,Shift hours,Deliveries,Cash to hand in,Received,Discrepancy,Paid by card,Accrued pay,Shifts not reconciled',
     );
     expect(couriers.split('\r\n')[1]).toBe('Total,0,0,0,0,0,0,0,0,0');
 
-    const problems = problemsCsv(problemReport([], []), 'ru').split('\r\n');
+    const problems = tableCsv(problemsTable(problemReport([], []), 'ru')).split(
+      '\r\n',
+    );
     expect(problems.slice(1, -1)).toEqual([
       'Не дозвонился,,0',
       'Отказ гостя,,0',

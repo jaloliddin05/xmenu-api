@@ -1,3 +1,4 @@
+import { paidAtDoor } from '../domain/delivery-payment';
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
@@ -32,6 +33,18 @@ export type RestaurantAction =
   | { type: 'next' }
   | { type: 'set'; status: OrderStatusName };
 
+type StaffOrderRow = Prisma.customer_orderGetPayload<{
+  include: typeof INCLUDE;
+}>;
+
+/** Who did a step of the history: the name of the staff member or courier and the staff role */
+interface EventActor {
+  name: string;
+  role: 'owner' | 'operator' | null;
+}
+
+const actorKey = (actor: string, id: string) => `${actor}:${id}`;
+
 export interface ActionResult {
   /** false — buyurtma allaqachon shu holatda/o'tib bo'lgan (takror bosish, Telegram'da ikki xodim) */
   changed: boolean;
@@ -51,9 +64,64 @@ export class OrderStaffService {
     private readonly settings: OrderSettingsService,
   ) {}
 
+  /**
+   * Names for the history (W13-13): restaurant steps carry the staff user id (a member of this venue, a disabled
+   * operator included), courier steps the courier id; one query per kind for all the orders. Ids of another
+   * venue or not found stay without a name.
+   */
+  private async eventActors(
+    organizationId: string,
+    orders: readonly StaffOrderRow[],
+  ): Promise<Map<string, EventActor>> {
+    const ids = (actor: string) => [
+      ...new Set(
+        orders.flatMap((o) =>
+          o.events
+            .filter((e) => e.actor === actor && e.actor_id)
+            .map((e) => e.actor_id as string),
+        ),
+      ),
+    ];
+    const staffIds = ids('restaurant');
+    const courierIds = ids('courier');
+    const [members, couriers] = await Promise.all([
+      staffIds.length
+        ? this.prisma.organization_member.findMany({
+            where: {
+              organization_id: organizationId,
+              user_id: { in: staffIds },
+            },
+            select: {
+              user_id: true,
+              first_name: true,
+              last_name: true,
+              role: true,
+            },
+          })
+        : [],
+      courierIds.length
+        ? this.prisma.courier.findMany({
+            where: { organization_id: organizationId, id: { in: courierIds } },
+            select: { id: true, name: true },
+          })
+        : [],
+    ]);
+    const out = new Map<string, EventActor>();
+    for (const m of members)
+      if (m.user_id)
+        out.set(actorKey('restaurant', m.user_id), {
+          name: [m.first_name, m.last_name].filter(Boolean).join(' '),
+          role: m.role,
+        });
+    for (const c of couriers)
+      out.set(actorKey('courier', c.id), { name: c.name, role: null });
+    return out;
+  }
+
   private toStaffView(
-    order: Prisma.customer_orderGetPayload<{ include: typeof INCLUDE }>,
+    order: StaffOrderRow,
     timers: DeliveryTimerSettings,
+    actors: ReadonlyMap<string, EventActor>,
   ) {
     const doorEnds = doorWaitEndsAt(order, timers);
     return {
@@ -80,18 +148,25 @@ export class OrderStaffService {
               cashReceived: order.external_cash_received,
               paymentMarkPending:
                 order.status === 'handed_to_external' &&
-                order.payment_method === 'cash' &&
+                paidAtDoor(order.payment_method) &&
                 order.external_cash_received === null,
             }
           : null,
-      events: order.events.map((e) => ({
-        from: e.from_status,
-        to: e.to_status,
-        actor: e.actor,
-        actorId: e.actor_id,
-        note: e.note,
-        at: e.created_at.toISOString(),
-      })),
+      events: order.events.map((e) => {
+        const who = e.actor_id
+          ? actors.get(actorKey(e.actor, e.actor_id))
+          : undefined;
+        return {
+          from: e.from_status,
+          to: e.to_status,
+          actor: e.actor,
+          actorId: e.actor_id,
+          actorName: who?.name ?? null,
+          actorRole: who?.role ?? null,
+          note: e.note,
+          at: e.created_at.toISOString(),
+        };
+      }),
     };
   }
 
@@ -129,9 +204,16 @@ export class OrderStaffService {
       include: INCLUDE,
     });
     const page = rows.slice(0, limit);
+    const actors = await this.eventActors(organizationId, page);
     return {
-      items: page.map((o) => this.toStaffView(o, timers)),
+      items: page.map((o) => this.toStaffView(o, timers, actors)),
       nextCursor: rows.length > limit ? page[page.length - 1].id : null,
+      // The operator does not read /order-settings: the list carries the timer thresholds for the highlight
+      reminders: {
+        pickupReminderMinutes: timers.pickupReminderMinutes,
+        onTheWayAlertMinutes: timers.onTheWayAlertMinutes,
+        doorWaitMinutes: timers.doorWaitMinutes,
+      },
     };
   }
 
@@ -142,7 +224,11 @@ export class OrderStaffService {
     });
     if (!order)
       throw new AppException('not_found', { message: 'Order not found' });
-    return this.toStaffView(order, await this.settings.get(organizationId));
+    const [timers, actors] = await Promise.all([
+      this.settings.get(organizationId),
+      this.eventActors(organizationId, [order]),
+    ]);
+    return this.toStaffView(order, timers, actors);
   }
 
   /** Panel uchun: natijada yangilangan buyurtma. Ruxsat etilmagan o'tish — 409. */

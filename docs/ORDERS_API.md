@@ -56,7 +56,8 @@ Webhook'и Click/Payme переводят заказ `awaiting_payment → pendi
   группы выполнены `required/min/max`; `quantity` 1..50 в строке и не больше 50 одного блюда
   на весь заказ (строки с разными модификаторами суммируются); филиал открыт;
   адрес принадлежит клиенту, и какой-то открытый филиал на него доставляет; минимальная сумма;
-  способ оплаты включён у тенанта.
+  способ оплаты включён у тенанта (`paymentMethod`: `cash`, `card` — карта курьеру, только доставка, `click`,
+  `payme`; доставка — способы из `deliveryPayment` заведения, `GET /checkout-config`).
 * `expectedDeliveryFee` — цена доставки, которую клиент видел в корзине (`deliveryFee` из `GET /delivery/quote`).
   Правила изменились → `409 delivery_fee_changed` с новой ценой; клиент показывает её и просит подтвердить.
 * `expectedTotal` — сумма, которую видел клиент. Не совпала → `409 price_changed`.
@@ -74,7 +75,7 @@ Webhook'и Click/Payme переводят заказ `awaiting_payment → pendi
 Порядок проверок на сервере: повтор по ключу → клиент (не заблокирован) → канал заказов
 и публикация заведения → режим доставки (Mini App) → расчёт по БД (`item_unavailable`, `invalid_modifiers`,
 `invalid_order`) → филиал: самовывоз — выбранный и его часы, доставка — адрес и выбор филиала с ценой → способ оплаты
-(наличные при доставке и `courierMode: external` → `payment_method_unavailable`) → `cashChangeFrom` →
+(не из `paymentMethods` выбранного режима → `payment_method_unavailable`) → `cashChangeFrom` →
 `delivery_fee_changed` → `price_changed` → `min_order_not_reached` → лимит активных заказов. Первая найденная проблема
 возвращается сразу.
 
@@ -166,8 +167,8 @@ cash ─────────────────────▶ pending_
 `cancelled`: `cancelledBy` = `customer | restaurant | system`;
 `cancelReason`, напр. `declined`, `no_response` (авто-отмена, если ресторан
 не принял за 5 мин — по ранее спроектированной эскалации).
-Клиент может отменить доставку только из `awaiting_payment`, `payment_failed`, `pending_acceptance` (до принятия
-рестораном), самовывоз ещё и из `accepted`; иначе `409 cancel_not_allowed`.
+Клиент может отменить заказ (доставку и самовывоз) только из `awaiting_payment`, `payment_failed`,
+`pending_acceptance` (до принятия рестораном); иначе `409 cancel_not_allowed`.
 Повторная отмена уже отменённого — не ошибка.
 
 ### `paymentStatus`
@@ -218,8 +219,10 @@ cash ─────────────────────▶ pending_
 { "currency": "UZS", "minOrderPickup": 0,
   "paymentMethods": { "delivery": ["cash", "click"], "pickup": ["cash", "click"] } }
 ```
-`currency` из настроек заведения (`organization_settings`). `paymentMethods.delivery` без `cash`, если доставляют
-только внешние службы (`courierMode: external`); самовывоз за наличные всегда. Цена и минимум доставки зависят от
+`currency` из настроек заведения (`organization_settings`). `paymentMethods.delivery`: способы, включённые
+заведением (`deliveryPayment` в `/order-settings`): `cash`, `card` (карта курьеру) только не при `courierMode:
+external`, `click`/`payme` при включённом онлайне и ключах провайдера. `pickup`: `cash` всегда, `click`/`payme` с
+ключами, `card` никогда. Цена и минимум доставки зависят от
 адреса: `GET /delivery/quote`. Значения задаёт ресторан: `PUT /order-settings`, `PUT /branch/:id/delivery-pricing` и
 `PUT /payment-provider/:provider`.
 
@@ -227,7 +230,7 @@ cash ─────────────────────▶ pending_
 
 | Метод | Путь | |
 |---|---|---|
-| GET | `/order?status=a,b&branchId=&courierId=&unassigned=true&cursor=&limit=` | список, новые первыми; `unassigned=true`: доставка в `accepted`/`ready` без курьера |
+| GET | `/order?status=a,b&branchId=&courierId=&unassigned=true&cursor=&limit=` | `{ items, nextCursor, reminders }`: новые первыми; `unassigned=true`: доставка в `accepted`/`ready` без курьера; `reminders` — пороги напоминаний заведения в минутах (`API.md`, «Напоминания») |
 | GET | `/order/:id` | детали + клиент + курьер + журнал статусов |
 | POST | `/order/:id/accept` | принять |
 | POST | `/order/:id/reject` `{reason?}` | отменить с причиной на любом шаге до конечного (оплаченный — возврат) |
@@ -245,10 +248,11 @@ cash ─────────────────────▶ pending_
 В ответе персоналу дополнительно: `courier` `{ id, name, phone } | null` (назначенный сейчас, в любом статусе),
 `courierAssignedAt`, `doorProblemReason` (`changed_mind | wrong_order | quality | other` при `refused`), `readyAt`,
 `pickedUpAt`, `doorWaitEndsAt`, `cashCollected` (`cash | card`), `external` (передача службе; `API.md`, «Курьеры») и в журнале
-`events[]` исполнитель `courier` (с `actorId` = id курьера) и записи без смены статуса (`from = to`, `note`:
+`events[]` имя исполнителя (`actorName`, `actorRole`: `API.md`, «История заказа»), исполнитель `courier` (с `actorId` =
+id курьера) и записи без смены статуса (`from = to`, `note`:
 `courier_assigned:<id>`, `courier_reassigned:<id>`, `courier_unassigned:<id>`, `external_cash_received`,
 `external_cash_not_received`; `courier_disabled:<id>` у перехода `on_the_way → ready` от `system`; `delivered_card` у
-доставки, оплаченной курьеру картой).
+доставки, оплаченной курьеру картой у двери).
 
 ## Проверка сценариев без бэкенда
 

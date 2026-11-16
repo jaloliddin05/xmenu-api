@@ -1,3 +1,4 @@
+import { isOnlineMethod, paidAtDoor } from '../domain/delivery-payment';
 import type { Lang } from 'src/infra/http/request-helpers';
 import { CUSTOMER_TEXTS } from './customer-messages';
 import type { OrderWithItems } from '../services/order-view';
@@ -45,6 +46,7 @@ export const statusLabel = (
 
 const PAYMENT_LABEL = {
   cash: 'Наличными',
+  card: 'Картой курьеру',
   click: 'Click',
   payme: 'Payme',
 } as const;
@@ -60,7 +62,7 @@ export function buildRestaurantText(order: OrderWithItems): string {
 
   const paid = order.payment_status === 'paid';
   lines.push(
-    `💳 ${PAYMENT_LABEL[order.payment_method]}${order.payment_method === 'cash' ? '' : paid ? ' — оплачено' : ' — не оплачено'}`,
+    `💳 ${PAYMENT_LABEL[order.payment_method]}${paidAtDoor(order.payment_method) ? '' : paid ? ' — оплачено' : ' — не оплачено'}`,
   );
   if (order.cash_change_from != null)
     lines.push(`💵 Сдача с ${fmtSum(order.cash_change_from)}`);
@@ -197,7 +199,7 @@ export function buildCustomerText(
     case 'cancelled': {
       if (order.cancelled_by === 'customer') return null; // сам отменил — он это видит в приложении
       const refund =
-        order.payment_method !== 'cash' &&
+        isOnlineMethod(order.payment_method) &&
         ['refund_pending', 'refunded'].includes(order.payment_status)
           ? `
 ${t.refundNote}`

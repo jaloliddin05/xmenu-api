@@ -1,10 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { Lang } from 'src/infra/http/request-helpers';
 import { publicFileUrl } from 'src/modules/menu/menu.mapper';
+import { OrderSettingsService } from 'src/modules/order/services/order-settings.service';
 import {
-  cashOnDelivery,
-  OrderSettingsService,
-} from 'src/modules/order/services/order-settings.service';
+  deliveryPaymentKinds,
+  deliveryPaymentMethods,
+} from 'src/modules/order/domain/delivery-payment';
+import { PaymentConfigService } from 'src/modules/payment/services/payment-config.service';
 import { DeliveryPricingService } from 'src/modules/delivery/services/delivery-pricing.service';
 import {
   resolveTheme,
@@ -97,6 +99,17 @@ export function branchPoints(
   return points;
 }
 
+/** Payment at delivery for the guest: kinds without provider names; cashOnDelivery is the cash one of them */
+const deliveryPayment = (
+  methods: ReturnType<typeof deliveryPaymentMethods>,
+) => {
+  const kinds = deliveryPaymentKinds(methods);
+  return {
+    deliveryPaymentMethods: kinds,
+    cashOnDelivery: kinds.includes('cash'),
+  };
+};
+
 @Injectable()
 export class TenantConfigService {
   private readonly logger = new Logger(TenantConfigService.name);
@@ -106,10 +119,11 @@ export class TenantConfigService {
     private readonly orderSettings: OrderSettingsService,
     private readonly guestLogin: GuestLoginService,
     private readonly deliveryPricing: DeliveryPricingService,
+    private readonly payments: PaymentConfigService,
   ) {}
 
   async get(tenant: Tenant, lang: Lang): Promise<TenantConfigDto> {
-    const [org, ordering, branches, priced] = await Promise.all([
+    const [org, ordering, branches, priced, providers] = await Promise.all([
       this.prisma.organization.findUnique({
         where: { id: tenant.id },
         select: {
@@ -140,6 +154,7 @@ export class TenantConfigService {
         },
       }),
       this.deliveryPricing.pricedDeliveryBranches(tenant.id),
+      this.payments.enabledProviders(tenant.id),
     ]);
     if (!org) throw new AppException('tenant_not_found');
     if (!org.settings) {
@@ -209,7 +224,7 @@ export class TenantConfigService {
         defaultMode: modes[0] ?? null,
         ...deliveryStatus(branches, deliveryPriced, problem),
         courierMode: ordering.courierMode,
-        cashOnDelivery: cashOnDelivery(ordering.courierMode),
+        ...deliveryPayment(deliveryPaymentMethods(ordering, providers)),
       },
       map: {
         center: view.center,

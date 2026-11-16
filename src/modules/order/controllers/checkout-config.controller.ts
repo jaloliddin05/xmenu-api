@@ -10,10 +10,11 @@ import { PaymentConfigService } from 'src/modules/payment/services/payment-confi
 import { CurrentTenant } from 'src/modules/tenant/current-tenant.decorator';
 import type { Tenant } from 'src/modules/tenant/tenant.service';
 import { CheckoutConfigDto } from '../dto/checkout-config.dto';
+import { OrderSettingsService } from '../services/order-settings.service';
 import {
-  cashOnDelivery,
-  OrderSettingsService,
-} from '../services/order-settings.service';
+  deliveryPaymentMethods,
+  pickupPaymentMethods,
+} from '../domain/delivery-payment';
 
 /**
  * Savat hisob-kitobi uchun sozlamalar: olib ketish minimumi va hozir yoqilgan to'lov usullari (yetkazish va
@@ -48,17 +49,12 @@ export class CheckoutConfigController {
       this.settings.get(tenant.id),
       this.payments.enabledProviders(tenant.id),
     ]);
-    const providers = (['click', 'payme'] as const).filter((p) =>
-      online.has(p),
-    );
     return {
       currency: tenant.currency,
       minOrderPickup: s.minOrderPickup,
       paymentMethods: {
-        delivery: cashOnDelivery(s.courierMode)
-          ? ['cash', ...providers]
-          : [...providers],
-        pickup: ['cash', ...providers],
+        delivery: deliveryPaymentMethods(s, online),
+        pickup: pickupPaymentMethods(online),
       },
     };
   }

@@ -13,9 +13,11 @@ export const PERMISSIONS = [
   'profile',
   // Orders: list, card, accept, reject, statuses, cancel with a reason
   'orders',
-  // Couriers and shifts (the cash reconciliation of a shift included)
+  // See the couriers (to assign them) and work the shifts (the cash reconciliation of a shift included)
   'couriers',
   'shifts',
+  // Manage the couriers: add, edit, invite, disable (docs/DELIVERY.md: the owner adds a courier)
+  'couriers.manage',
   // Read the branch list (the order filter)
   'branches.read',
   // Read the menu

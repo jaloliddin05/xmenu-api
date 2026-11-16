@@ -223,8 +223,8 @@ IP берётся из `X-Forwarded-For` только от локального 
 
 ## Сотрудники и права
 
-В заведении две роли: **владелец** (регистрирует заведение, может всё) и **оператор** (заказы, курьеры, смены; без
-настроек, денег и сотрудников). Оператор входит в админку своим аккаунтом: тот же `POST /auth/login`, `refresh`,
+В заведении две роли: **владелец** (регистрирует заведение, может всё) и **оператор** (заказы, назначение курьеров,
+смены; без настроек, денег, сотрудников и управления курьерами). Оператор входит в админку своим аккаунтом: тот же `POST /auth/login`, `refresh`,
 `logout`, восстановление и смена пароля, сессии, что у владельца (раздел выше). Один пользователь работает в одном
 заведении. Связь «пользователь → заведение, роль» хранит `organization_member` (у владельца строка `role = owner`).
 
@@ -238,7 +238,8 @@ IP берётся из `X-Forwarded-For` только от локального 
 | `account` | свой вход: `GET /user/me`, смена пароля, сессии | ✓ | ✓ |
 | `profile` | свой профиль: `PUT /user/:id` (только свой id), `POST /file/upload` | ✓ | ✓ |
 | `orders` | заказы: список, карточка, принять, отклонить, статусы, отмена с причиной | ✓ | ✓ |
-| `couriers`, `shifts` | курьеры (список, добавление, приглашение, отключение) и смены (раздел «Курьеры») | ✓ | ✓ |
+| `couriers`, `shifts` | список курьеров (для назначения) и смены со сверкой (раздел «Курьеры») | ✓ | ✓ |
+| `couriers.manage` | курьеры: добавление, правка, приглашение, отключение | ✓ | — |
 | `branches.read` | список филиалов (фильтр заказов) | ✓ | ✓ |
 | `menu.read` | чтение меню: категории и блюда | ✓ | ✓ |
 | `venue` | заведение и его настройки, изменение филиалов и меню, настройки заказов и цены доставки, платёжные ключи, домены, бот, публикация, перевод, удаление аккаунта | ✓ | — |
@@ -316,10 +317,10 @@ IP берётся из `X-Forwarded-For` только от локального 
 | GET | `/category/for-select/{organizationId}` | `menu.read` | `organizationId` | ✓ | ✓ |
 | PATCH | `/category/index` | `venue` |  | ✓ | — |
 | GET | `/couriers` | `couriers` |  | ✓ | ✓ |
-| POST | `/couriers` | `couriers` |  | ✓ | ✓ |
-| PATCH | `/couriers/{id}` | `couriers` |  | ✓ | ✓ |
-| POST | `/couriers/{id}/disable` | `couriers` |  | ✓ | ✓ |
-| POST | `/couriers/{id}/invitation` | `couriers` |  | ✓ | ✓ |
+| POST | `/couriers` | `couriers.manage` |  | ✓ | — |
+| PATCH | `/couriers/{id}` | `couriers.manage` |  | ✓ | — |
+| POST | `/couriers/{id}/disable` | `couriers.manage` |  | ✓ | — |
+| POST | `/couriers/{id}/invitation` | `couriers.manage` |  | ✓ | — |
 | PUT | `/couriers/{id}/pay-rate` | `venue` |  | ✓ | — |
 | GET | `/couriers/pay-rates` | `venue` |  | ✓ | — |
 | GET | `/external-services` | `orders` |  | ✓ | ✓ |
@@ -386,19 +387,20 @@ IP берётся из `X-Forwarded-For` только от локального 
 ## Курьеры (владелец и оператор)
 
 Собственные курьеры заведения (спецификация `../docs/DELIVERY.md`). Курьеры общие для всех филиалов, работают только
-в чате с ботом заведения, доступа к дашборду у них нет. Маршруты: право `couriers` (курьеры), `shifts` (смены),
-`orders` (назначение, внешняя служба); у владельца и оператора одинаково. Ставки оплаты курьерам только у владельца
-(`venue`), отчёты тоже (`reports`, раздел «Отчёты»). Чужой курьер, смена или заказ → `404`.
+в чате с ботом заведения, доступа к дашборду у них нет. Маршруты: право `couriers` (список курьеров), `shifts` (смены),
+`orders` (назначение, внешняя служба) у владельца и оператора; добавляет, правит, приглашает и отключает курьеров только
+владелец (`couriers.manage`, оператору `403 forbidden`). Ставки оплаты курьерам только у владельца (`venue`), отчёты
+тоже (`reports`, раздел «Отчёты»). Чужой курьер, смена или заказ → `404`.
 
 ### Курьеры
 
 | Метод | Путь | Ответ |
 |---|---|---|
 | GET | `/couriers` | `CourierView[]`: активные первыми |
-| POST | `/couriers` `{ name, phone }` | `CourierView`; телефон уже есть у курьера заведения → `409 courier_phone_taken` |
-| PATCH | `/couriers/{id}` `{ name?, phone? }` | `CourierView`; отключённого менять нельзя → `409 courier_inactive` |
-| POST | `/couriers/{id}/invitation` | `{ link, expiresAt }` |
-| POST | `/couriers/{id}/disable` | `CourierView` |
+| POST | `/couriers` `{ name, phone }` (владелец) | `CourierView`; телефон уже есть у курьера заведения → `409 courier_phone_taken` |
+| PATCH | `/couriers/{id}` `{ name?, phone? }` (владелец) | `CourierView`; отключённого менять нельзя → `409 courier_inactive` |
+| POST | `/couriers/{id}/invitation` (владелец) | `{ link, expiresAt }` |
+| POST | `/couriers/{id}/disable` (владелец) | `CourierView` |
 
 `CourierView`: `{ id, name, phone, isActive, linked, state, activeOrders, shift: { id, startedAt } | null, createdAt,
 disabledAt }`. `linked`: курьер открыл приглашение, бот знает его Telegram. `state`: `off_shift` (не на смене), `free`
@@ -477,10 +479,10 @@ activeOrders, cash: { deliveries, due, card, received, discrepancy }, reconciled
 - Заказ сразу закрывается: `status: handed_to_external`, исполнитель `restaurant`, `note: external_service`. Гость
   видит `externalService` (название, без суммы) и получает «Заказ №N передан в службу доставки <название>», если ему
   может писать бот заведения.
-- Заказ с наличными: оператор отдельно отмечает, получило ли заведение деньги, один раз (`external.cashReceived`,
-  запись в журнале `external_cash_received` / `external_cash_not_received`). Онлайн, ещё не переданный или уже
-  отмеченный заказ → `409 external_payment_not_pending`. При `courierMode: external` наличных при доставке нет, отметка
-  на деле нужна в режимах `both` и `own`.
+- Заказ с оплатой у двери (`cash` или `card`): оператор отдельно отмечает, получило ли заведение деньги, один раз
+  (`external.cashReceived`, запись в журнале `external_cash_received` / `external_cash_not_received`). Онлайн, ещё не
+  переданный или уже отмеченный заказ → `409 external_payment_not_pending`. При `courierMode: external` оплаты у двери
+  нет, отметка на деле нужна в режимах `both` и `own`.
 - Интеграции со службами нет: в бэкенде это адаптер `external_service` за тем же интерфейсом провайдера доставки, что
   и свои курьеры.
 
@@ -489,7 +491,8 @@ activeOrders, cash: { deliveries, due, card, received, discrepancy }, reconciled
 ### Напоминания и ожидание у двери
 
 Значения в `GET/PUT /order-settings` (минуты): `pickupReminderMinutes` (5, 1–60), `onTheWayAlertMinutes` (60,
-10–480), `doorWaitMinutes` (10, 1–60). Сообщения оператору идут в чат филиала (тот же бот, что и заказы), курьеру в
+10–480), `doorWaitMinutes` (10, 1–60). Оператор настроек не читает: те же три значения приходят в `GET /order` полем
+`reminders { pickupReminderMinutes, onTheWayAlertMinutes, doorWaitMinutes }` (для подсветки опаздывающих заказов). Сообщения оператору идут в чат филиала (тот же бот, что и заказы), курьеру в
 бот заведения. Каждый таймер срабатывает один раз; смена статуса снимает его.
 
 | Когда | Таймер от | Кому |
@@ -500,7 +503,28 @@ activeOrders, cash: { deliveries, due, card, received, discrepancy }, reconciled
 
 После «Отказа гостя» таймера нет: решение сразу за оператором. В ответе персоналу: `readyAt`, `pickedUpAt`,
 `doorWaitEndsAt` (когда закончится ожидание у двери, только в эпизоде «Не дозвонился»), `cashCollected` (`cash` |
-`card` у доставленного заказа с наличными).
+`card` у доставленного заказа с оплатой у двери: что курьер отметил кнопкой).
+
+### Оплата у двери: кнопки курьера
+
+Способы оплаты при доставке включает заведение (`deliveryPayment` в `/order-settings`, раздел «Настройки
+заведения»). Заказ с `paymentMethod: cash` или `card` оплачивается у двери; кнопки «Доставил»:
+
+| Заказ | Кнопки |
+|---|---|
+| `cash` | «Доставил, деньги получены»; «Доставил, оплачено картой», если заведение сейчас принимает карту курьеру |
+| `card` | «Доставил, оплачено картой»; «Доставил, деньги получены», если заведение сейчас принимает наличные |
+| онлайн | «Доставил» |
+
+Гость решает у двери: способ из заказа есть всегда, второй только включённый (и не при `courierMode: external`).
+Нажатие кнопки, которой на карточке нет, бот отклоняет («недоступно»), заказ не меняется. «К сдаче» в смене
+считается по отметке (`cashCollected: cash`), карта курьеру идёт в `cash.card` без сверки.
+
+### История заказа
+
+`events[]` в ответе персоналу: `{ from, to, actor, actorId, actorName, actorRole, note, at }`. `actorName`: имя
+сотрудника заведения (`actor: restaurant`, отключённый оператор тоже) или курьера (`actor: courier`); `actorRole`:
+`owner` | `operator` у сотрудника, иначе `null`. У гостя, системы, оплаты и неизвестного id оба `null`.
 
 ### Оплата курьерам (только владелец)
 
@@ -582,7 +606,8 @@ activeOrders, cash: { deliveries, due, card, received, discrepancy }, reconciled
   "contacts": { "phone": null, "telegramUsername": null, "workingHours": null, "address": null },
   "channels": { "qr": true, "auth": { "sms": true, "telegram": false }, "delivery": { "enabled": true, "mode": "site", "published": true, "miniApp": false, "botUsername": null } },
   "fulfillment": { "modes": ["pickup"], "defaultMode": "pickup", "deliveryOffered": true, "deliveryAvailable": false,
-                   "deliveryUnavailableReason": "not_configured", "courierMode": "own", "cashOnDelivery": true },
+                   "deliveryUnavailableReason": "not_configured", "courierMode": "own",
+                   "deliveryPaymentMethods": ["cash"], "cashOnDelivery": true },
   "map": { "center": [41.311081, 69.240562], "centerSource": "saved", "zoom": 15, "city": "Ташкент",
            "bounds": [[41.15, 69.0], [41.45, 69.45]], "deliveryZones": [] }
 }
@@ -625,8 +650,10 @@ activeOrders, cash: { deliveries, due, card, received, discrepancy }, reconciled
   `not_published` (не опубликовано или пауза), `not_configured` (ни у одного филиала с доставкой нет правил стоимости).
   Доставляют ли на конкретный адрес, отвечает `GET /delivery/quote`.
 - `fulfillment.courierMode`: кто доставляет (`own` свои курьеры, `external` внешние службы, `both`), из
-  `PUT /order-settings`. `fulfillment.cashOnDelivery`: наличные при доставке принимаются; `false` при `external`
-  (самовывоз за наличные доступен всегда).
+  `PUT /order-settings`. `fulfillment.deliveryPaymentMethods`: способы оплаты доставки (`cash`, `card` — карта
+  курьеру, `online`): включённые заведением, без `cash` и `card` при `external`, без `online`, пока не подключён
+  ни один провайдер (какие именно, отвечает `GET /checkout-config`). `fulfillment.cashOnDelivery`: в списке есть
+  `cash` (самовывоз за наличные доступен всегда).
 - `map.center` `[lat, lng]`: сохранённый вид карты; если его нет, середина ограничивающего прямоугольника зон
   доставки, иначе филиалов с координатами ((0, 0) пропускается). `null` только у заведения без зон и без филиалов с
   координатами. Источник в `map.centerSource`: `saved`, `zone`, `branches` (`null`, если центра нет). `map.zoom`:
@@ -861,9 +888,16 @@ QR-меню и сайта доставки (`REVALIDATE.md`).
 Настройки заказов `GET/PUT /order-settings` (строка тоже создаётся при регистрации; `PUT` меняет только переданные
 поля): `minOrderPickup` (минимум самовывоза), `deliveryPriceStep` (`100`, `500` или `1000`: шаг округления цены
 доставки вверх, по умолчанию `100`), `courierMode` (`own`, `external`, `both`; по умолчанию `own`; при `external`
-наличные при доставке не принимаются), тайм-ауты и лимит активных заказов; для доставки `pickupReminderMinutes`,
+наличные и карта курьеру при доставке не принимаются), `deliveryPayment { cash, card, online }` (способы оплаты при
+доставке, все три сразу; по умолчанию только наличные), тайм-ауты и лимит активных заказов; для доставки `pickupReminderMinutes`,
 `onTheWayAlertMinutes`, `doorWaitMinutes` и ставка оплаты курьерам `courierPay` (раздел «Курьеры»). Цены, минимумы и
 зоны доставки задаются у филиалов (раздел «Стоимость доставки»). Примерного времени доставки в API нет.
+
+`deliveryPayment`: `online: true` без подключённого провайдера (`/payment-provider`) → `400 invalid_settings`,
+`fields: [{ field: "deliveryPayment.online", code: "online_payment_not_connected" }]`; все три выключены → `400
+invalid_settings`, `fields: [{ field: "deliveryPayment", code: "delivery_payment_required" }]`. Отключённый позже
+провайдер настройку не меняет: онлайн просто пропадает из действующих способов. Подключение и отключение провайдера
+ставит ревалидацию сайта доставки (`route: settings`).
 
 ## Отчёты (владелец)
 
@@ -872,9 +906,9 @@ QR-меню и сайта доставки (`REVALIDATE.md`).
 
 | Метод | Путь | Что внутри |
 |---|---|---|
-| GET | `/reports/couriers?from&to[&format=csv]` | по курьерам: `shifts`, `hours`, `deliveries`, `cashDue`, `cashReceived`, `discrepancy`, `card`, `pay`, `unreconciledShifts`; `total` |
-| GET | `/reports/external?from&to[&format=csv]` | по службам: `orders`, `cost`, `cashReceived`, `cashNotReceived`, `cashUnmarked` (суммы заказов с наличными); `total` |
-| GET | `/reports/problems?from&to[&format=csv]` | `counts { noAnswer, refused, cannotDeliver, returned, cancelled }`, `refusedReasons[]`, `cancelReasons[] { by, reason, count }` |
+| GET | `/reports/couriers?from&to[&format=xlsx\|csv]` | по курьерам: `shifts`, `hours`, `deliveries`, `cashDue`, `cashReceived`, `discrepancy`, `card`, `pay`, `unreconciledShifts`; `total` |
+| GET | `/reports/external?from&to[&format=xlsx\|csv]` | по службам: `orders`, `cost`, `cashReceived`, `cashNotReceived`, `cashUnmarked` (суммы заказов с оплатой у двери); `total` |
+| GET | `/reports/problems?from&to[&format=xlsx\|csv]` | `counts { noAnswer, refused, cannotDeliver, returned, cancelled }`, `refusedReasons[]`, `cancelReasons[] { by, reason, count }` |
 
 - Период: `from` и `to` — моменты ISO 8601, `[from, to)`, `to > from`, не длиннее 366 дней; иначе `400
   validation_error` с полем. Полночь в поясе заведения подставляет дашборд. Ответ повторяет `from`, `to` в UTC.
@@ -884,10 +918,15 @@ QR-меню и сайта доставки (`REVALIDATE.md`).
 - Внешние службы: заказы, переданные в периоде; одна служба независимо от регистра и пробелов, в строке последнее
   написание. Проблемы: только доставка; «не дозвонился», отказы, «не могу доставить» и возвраты по журналу заказа в
   периоде, отмены по `cancelledAt`.
-- `format=csv`: файл `text/csv; charset=utf-8` с BOM, разделитель запятая, строки CRLF, `Content-Disposition:
-  attachment; filename="<отчёт>_<from>_<to>.csv"`. Заголовки колонок на языке `?lang` или `Accept-Language` (`ru` по
-  умолчанию, `uz`, `en`); последняя строка «Итого» (кроме проблем). Текст, который таблица приняла бы за формулу
-  (`= + - @` в начале), получает `'` впереди.
+- Файлы: заголовки колонок на языке `?lang` или `Accept-Language` (`ru` по умолчанию, `uz`, `en`); последняя строка
+  «Итого» (кроме проблем); `Content-Disposition: attachment; filename="<отчёт>_<from>_<to>.<xlsx|csv>"`, `no-store`.
+  Текст, который таблица приняла бы за формулу (`= + - @` в начале), получает `'` впереди.
+- `format=xlsx` (для людей): книга Excel
+  `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` с одним листом: над таблицей период двумя
+  ячейками-датами (местное время из `from`, `to` запроса), шапка и «Итого» жирным, числа числовыми ячейками, шапка
+  закреплена. Колонки делятся при любом разделителе списков в региональных настройках Excel.
+- `format=csv` (для других систем): `text/csv; charset=utf-8` с BOM, разделитель запятая, строки CRLF. Excel с
+  русскими и узбекскими региональными настройками (разделитель `;`) открывает его одной колонкой.
 
 ## Стоимость доставки
 
@@ -961,10 +1000,11 @@ QR-меню и сайта доставки (`REVALIDATE.md`).
 - Клиент показывает `deliveryFee` в корзине и шлёт его в `POST /orders` как `expectedDeliveryFee`: если правила
   изменились, заказ отвечает `409 delivery_fee_changed` с новой ценой (`docs/ORDERS_API.md`).
 
-**Способ доставки и наличные**: `courierMode` в `PUT /order-settings`. При `external` наличные при доставке не
-принимаются: `GET /tenant/config` (`fulfillment.cashOnDelivery: false`), `GET /checkout-config`
-(`paymentMethods.delivery` без `cash`) и `POST /orders` (`422 payment_method_unavailable`). Самовывоз за наличные
-доступен всегда. Гость при наличных может указать `cashChangeFrom` (с какой суммы сдача, не меньше суммы к оплате).
+**Способ доставки и оплата**: `courierMode` и `deliveryPayment` в `PUT /order-settings`. Доставку можно оплатить
+только включёнными способами; при `external` наличные и карта курьеру не принимаются, онлайн только с подключённым
+провайдером: `GET /tenant/config` (`fulfillment.deliveryPaymentMethods`), `GET /checkout-config`
+(`paymentMethods.delivery`) и `POST /orders` (`422 payment_method_unavailable`). Самовывоз: наличные всегда, онлайн
+с ключами, карты курьеру нет. Гость при наличных может указать `cashChangeFrom` (с какой суммы сдача, не меньше суммы к оплате).
 
 ## Каналы и публикация (владелец)
 
@@ -1025,8 +1065,8 @@ QR-меню и сайта доставки (`REVALIDATE.md`).
 | `delivery_pricing` | у активного филиала с доставкой есть правила стоимости (зона или расстояние, `PUT /branch/:id/delivery-pricing`); `not_required`, если ни один активный филиал не принимает доставку |
 | `telegram_bot` | бот заведения подключён и включён (`/telegram-bot`); `not_required` в режиме `site` |
 
-Логотип, цвета, контакты и ключи Click/Payme публикацию не блокируют; наличные доступны всегда (при доставке, кроме
-`courierMode: external`).
+Логотип, цвета, контакты и ключи Click/Payme публикацию не блокируют; наличные при доставке включены по умолчанию
+(`deliveryPayment`, кроме `courierMode: external`).
 
 `warnings`: предупреждения отдельно от чеклиста, публикацию не блокируют (`publish` с ними проходит). Пусто, пока канал
 заказов выключен. Сейчас только о входе гостей: он зависит и от платформы (SMS), поэтому пунктом чеклиста не является.

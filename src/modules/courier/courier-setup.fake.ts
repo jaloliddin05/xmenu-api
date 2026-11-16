@@ -17,6 +17,7 @@ export const ORDER_SETTINGS: OrderSettings = {
   minOrderPickup: 0,
   deliveryPriceStep: 100,
   courierMode: 'own',
+  deliveryPayment: { cash: true, card: true, online: false },
   acceptanceTimeoutSeconds: 300,
   paymentTimeoutSeconds: 900,
   maxActiveOrders: 5,
@@ -89,6 +90,7 @@ export async function setup() {
     transitions,
     shifts,
     cards as any,
+    settings as any,
   );
 
   let tgId = 5000;

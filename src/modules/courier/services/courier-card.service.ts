@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
+import { OrderSettingsService } from 'src/modules/order/services/order-settings.service';
+import { doorPaymentMethods } from 'src/modules/order/domain/delivery-payment';
 import {
   TelegramApiError,
   TelegramClient,
@@ -58,6 +60,7 @@ export class CourierCardService {
     private readonly prisma: PrismaService,
     private readonly bots: TelegramBotService,
     private readonly telegram: TelegramClient,
+    private readonly settings: OrderSettingsService,
   ) {}
 
   /** Rebuild the card of this order in this courier's chat (queue job; also called directly by the bot). */
@@ -94,11 +97,15 @@ export class CourierCardService {
           })
         : 0;
     const lang = courierLang(courier.language_code);
+    const doorMethods = doorPaymentMethods(
+      await this.settings.get(order.organization_id),
+    );
     const rendered = renderCourierCard(toCardOrder(order), {
       courierId,
       lang,
       readyFromBranch,
       refuseMenu: opts.refuseMenu,
+      doorMethods,
     });
 
     // A finished card that was never sent stays unsent: nothing to tell the courier

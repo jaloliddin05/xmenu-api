@@ -61,7 +61,7 @@ test, `npm run openapi` + `git diff --exit-code docs/`, `format:check`, `lint` �
   (кэш 30 с, `invalidate(id)`), `TenantGuard` по `X-Tenant-Id`. Slug в заголовке → `tenant_not_found` без запроса в БД.
   Запасного пути по slug нет. Вебхуки оплаты по id: `payments/click/:tenantId`, `payments/payme/:tenantId`.
 - `GET /tenant/by-slug/:slug` → `{ id, slug }` (только активные). `GET /tenant/config` → публичный конфиг
-  (`tenant-config.service.ts`): незаполненное `null`, `delivery` в режимах только при заданной зоне.
+  (`tenant-config.service.ts`): незаполненное `null`, `delivery` в режимах только если у доставляющего филиала есть правила цены (`fulfillmentModes`).
 - `GET /tenant/by-host/:host` → `{ id, slug, name, primaryDomain }` (`TenantService.findActiveByHost`): хост
   нормализуется (`tenant/host.ts`: регистр, порт, точка в конце, IDN → punycode); `{slug}.{PLATFORM_DOMAIN}` ровно с
   одной меткой разбирается по slug без таблицы, любой другой хост только через подтверждённый `tenant_domain`
@@ -159,8 +159,12 @@ test, `npm run openapi` + `git diff --exit-code docs/`, `format:check`, `lint` �
   расхождении `409 delivery_fee_changed`.
 - Филиал доставки: открытые, с `accepts_delivery`, покрывающие адрес по своим правилам; ближайший по прямой. `branchId`
   в заказе доставки не учитывается.
-- `courier_mode = external`: наличные при доставке недоступны (`cashOnDelivery` в `order-settings.service.ts`;
-  `/tenant/config`, `/checkout-config`, `POST /orders`). `cash_change_from` в заказе: только наличные, не меньше `total`.
+- Способы оплаты при доставке: `delivery_pay_cash|card|online` в `organization_order_settings` (`deliveryPayment`,
+  по умолчанию только наличные); действующий список считает `deliveryPaymentMethods` (`order/domain/delivery-payment.ts`):
+  при `courier_mode = external` ни наличных, ни карты курьеру, онлайн только с подключённым провайдером. Им пользуются
+  `/tenant/config` (`deliveryPaymentMethods`, `cashOnDelivery`), `/checkout-config` и `POST /orders`; кнопки оплаты
+  курьера `doorPaymentChoices`. Способ заказа `card` = карта курьеру у двери (`paidAtDoor`: `cash`, `card`).
+  `cash_change_from` в заказе: только наличные, не меньше `total`.
 
 ## Заказы
 `OrderTransitionService` единственный путь смены статуса (автомат, optimistic locking по `version`, журнал).
@@ -191,18 +195,19 @@ Payme вручную через ops-чат.
   правка `CourierCardService` (не правится → новая карточка). Тексты бота: `courier/domain/courier-texts.ts` (в
   `BOT_TEXT_FILES`).
 - Внешняя служба: адаптер `ExternalServiceProvider` (`handed_to_external` от `restaurant`, только без своего курьера:
-  `order_courier_assigned`), поля `external_*` в заказе; отметка оплаты заказа с наличными и подсказки названий в
+  `order_courier_assigned`), поля `external_*` в заказе; отметка оплаты заказа с оплатой у двери (наличные или карта) и подсказки названий в
   `ExternalDeliveryService`.
 - Таймеры доставки (`order/domain/delivery-timers.ts`): эффект `delivery_timers` после каждой смены статуса доставки
   удаляет задания заказа в очереди `delivery-timers` и ставит таймер нового статуса (`ready_at`, `picked_up_at`,
   `door_problem_at`; минуты из `organization_order_settings`); `DeliveryTimerProcessor` проверяет, что заказ ещё в том же
   эпизоде (`timerStillDue`), и пишет в чат филиала и курьеру.
-- Наличные смены: `courier/domain/shift-cash.ts` (к сдаче = доставленные заказы смены с наличными купюрами,
+- Наличные смены: `courier/domain/shift-cash.ts` (к сдаче = доставленные заказы смены с оплатой у двери, отмеченные купюрами,
   `cash_collected`), сверка один раз условным `updateMany` (`CourierShiftService.reconcile`).
 - Оплата курьерам: `courier/domain/courier-pay.ts`, считается в `OrderTransitionService` при `completed` от курьера
   (`courier_distance_km`, `courier_pay`); ставка заведения в `organization_order_settings.courier_pay_*`, своя в
   `courier.pay_*`, маршруты ставок и отчёты только у владельца (`venue`, `reports`).
-- Отчёты (`modules/report`): чистые сборщики `report/domain/*`, CSV `report-csv.ts` (в `BOT_TEXT_FILES`), период
+- Отчёты (`modules/report`): чистые сборщики `report/domain/*`, таблицы с заголовками на трёх языках `report-table.ts`
+  (в `BOT_TEXT_FILES`), файлы `csv.ts` и `xlsx.ts` (XLSX собирается вручную из XML и `fflate`, без библиотеки таблиц), период
   `[from, to)` до 366 дней (`report-period.ts`).
 - Тесты сервисов на фейке `courier/courier-prisma.fake.ts` с настоящим `OrderTransitionService`; общий сетап
   `courier/courier-setup.fake.ts`.
@@ -314,6 +319,9 @@ App (`instant`) нового номера кладёт Telegram-id в `registrat
   `@PlatformAdminRoute()` отдаёт решение `PlatformAdminGuard`. Новый маршрут: правило в коде и строка в `EXPECTED`
   в `auth/access/staff-access.matrix.spec.ts` (иначе тест красный); матрицу в `docs/API.md` пишет `npm run openapi`
   (`collectRoutes`, `renderAccessMatrix` в `auth/access/route-rules.ts`), в OpenAPI поле `x-permission`.
+- Курьеров добавляет, правит, приглашает и отключает только владелец (`couriers.manage`); оператор видит список
+  (`couriers`), назначает (`orders`) и ведёт смены (`shifts`). Пороги напоминаний оператор получает в `GET /order`
+  (`reminders`), `/order-settings` ему закрыт.
 - Приглашение оператора: владелец `POST /organization/:id/staff` (72 ч, ничего не отправляет), оператор
   `POST /auth/invitation/code` (одинаковый ответ для любого номера, цель кода `invite`) и `/accept` (`StaffInvitationService`:
   user и активация membership в одной транзакции, условный `updateMany`). Приглашения одного номера сериализует
@@ -321,8 +329,7 @@ App (`instant`) нового номера кладёт Telegram-id в `registrat
   `revokeAllForUser`; владельца отключить нельзя.
 
 ## Что нужно построить
-- Способ оплаты «карта курьеру» при оформлении (сейчас курьер отмечает карту у заказа с наличными); адаптеры внешних
-  служб (Noor, Yandex, Millennium) по мере доступа к API.
+- Адаптеры внешних служб (Noor, Yandex, Millennium) по мере доступа к API.
 - Уведомления о заказах персоналу через бота ресторана (пока идут через платформенного бота из env).
 - История старых slug с редиректом.
 - Возврат после оплаты на сайт заведения: `MINIAPP_RETURN_URL`/`MINIAPP_URL` один на платформу
