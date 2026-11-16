@@ -61,7 +61,7 @@ test, `npm run openapi` + `git diff --exit-code docs/`, `format:check`, `lint` �
   (кэш 30 с, `invalidate(id)`), `TenantGuard` по `X-Tenant-Id`. Slug в заголовке → `tenant_not_found` без запроса в БД.
   Запасного пути по slug нет. Вебхуки оплаты по id: `payments/click/:tenantId`, `payments/payme/:tenantId`.
 - `GET /tenant/by-slug/:slug` → `{ id, slug }` (только активные). `GET /tenant/config` → публичный конфиг
-  (`tenant-config.service.ts`): незаполненное `null`, `delivery` в режимах только при заданной зоне.
+  (`tenant-config.service.ts`): незаполненное `null`, `delivery` в режимах только если у доставляющего филиала есть правила цены (`fulfillmentModes`).
 - `GET /tenant/by-host/:host` → `{ id, slug, name, primaryDomain }` (`TenantService.findActiveByHost`): хост
   нормализуется (`tenant/host.ts`: регистр, порт, точка в конце, IDN → punycode); `{slug}.{PLATFORM_DOMAIN}` ровно с
   одной меткой разбирается по slug без таблицы, любой другой хост только через подтверждённый `tenant_domain`
