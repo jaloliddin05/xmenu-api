@@ -166,8 +166,8 @@ cash ─────────────────────▶ pending_
 `cancelled`: `cancelledBy` = `customer | restaurant | system`;
 `cancelReason`, напр. `declined`, `no_response` (авто-отмена, если ресторан
 не принял за 5 мин — по ранее спроектированной эскалации).
-Клиент может отменить доставку только из `awaiting_payment`, `payment_failed`, `pending_acceptance` (до принятия
-рестораном), самовывоз ещё и из `accepted`; иначе `409 cancel_not_allowed`.
+Клиент может отменить заказ (доставку и самовывоз) только из `awaiting_payment`, `payment_failed`,
+`pending_acceptance` (до принятия рестораном); иначе `409 cancel_not_allowed`.
 Повторная отмена уже отменённого — не ошибка.
 
 ### `paymentStatus`

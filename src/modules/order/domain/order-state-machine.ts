@@ -18,7 +18,7 @@
  *   accepted | ready ─operator─▶ handed_to_external (closed at once)
  *
  *   cancelled — awaiting_payment / payment_failed / pending_acceptance dan mijoz
- *   (pickup: accepted dan ham); pending_acceptance dan boshlab restoran (yakunlanguncha);
+ *   (the guest never cancels an accepted order); pending_acceptance dan boshlab restoran (yakunlanguncha);
  *   tizim (vaqt tugashi) — faqat hali qabul qilinmagan holatlardan.
  */
 
@@ -74,9 +74,8 @@ const RULES: Record<OrderStatusName, Rule[]> = {
     { to: 'ready', actors: ['restaurant'], only: 'delivery' },
     { to: 'handed_to_external', actors: ['restaurant'], only: 'delivery' },
     // 'payment' — provayder (Payme) to'lovni o'zi qaytarganda
+    // The guest cancels only until the restaurant accepts, pickup and delivery alike (docs/DELIVERY.md)
     { to: 'cancelled', actors: ['restaurant', 'payment'] },
-    // A delivery guest cancels only until the restaurant accepts (docs/DELIVERY.md)
-    { to: 'cancelled', actors: ['customer'], only: 'pickup' },
   ],
   preparing: [
     { to: 'ready', actors: ['restaurant'], only: 'pickup' },

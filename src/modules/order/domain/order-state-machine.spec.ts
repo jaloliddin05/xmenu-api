@@ -86,7 +86,6 @@ describe('order state machine', () => {
         'accepted -> preparing by restaurant',
         'accepted -> cancelled by restaurant',
         'accepted -> cancelled by payment',
-        'accepted -> cancelled by customer',
         'preparing -> ready by restaurant',
         'preparing -> cancelled by restaurant',
         'ready -> completed by restaurant',
@@ -121,10 +120,11 @@ describe('order state machine', () => {
       expect(ok('awaiting_payment', 'pending_acceptance', actor)).toBe(false);
   });
 
-  it('a delivery guest cancels only until the restaurant accepts, a pickup guest until the kitchen starts', () => {
+  it('the guest cancels only until the restaurant accepts, pickup and delivery alike', () => {
     expect(customerCanCancel('pending_acceptance', 'delivery')).toBe(true);
+    expect(customerCanCancel('pending_acceptance', 'pickup')).toBe(true);
     expect(customerCanCancel('accepted', 'delivery')).toBe(false);
-    expect(customerCanCancel('accepted', 'pickup')).toBe(true);
+    expect(customerCanCancel('accepted', 'pickup')).toBe(false);
     expect(customerCanCancel('preparing', 'pickup')).toBe(false);
     expect(customerCanCancel('on_the_way', 'delivery')).toBe(false);
   });
