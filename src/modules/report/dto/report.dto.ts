@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsIn, IsISO8601, IsOptional } from 'class-validator';
 
-export const REPORT_FORMATS = ['json', 'csv'] as const;
+export const REPORT_FORMATS = ['json', 'csv', 'xlsx'] as const;
 
 export class ReportQueryDto {
   @ApiProperty({
@@ -23,7 +23,7 @@ export class ReportQueryDto {
   @ApiPropertyOptional({
     enum: REPORT_FORMATS,
     description:
-      'csv: a file (UTF-8 with BOM, comma), column names in the request language (?lang or Accept-Language)',
+      'A file with column names in the request language (?lang or Accept-Language). xlsx: an Excel workbook, columns, number cells and the period as dates whatever the Excel locale (for people). csv: UTF-8 with BOM, comma (for other systems; ru and uz Excel open it as one column)',
   })
   @IsOptional()
   @IsIn(REPORT_FORMATS)

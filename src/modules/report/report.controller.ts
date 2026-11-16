@@ -1,4 +1,12 @@
-import { Controller, Get, Headers, Query, Req, Res } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Headers,
+  Query,
+  Req,
+  Res,
+  StreamableFile,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOkResponse,
@@ -8,13 +16,22 @@ import {
 } from '@nestjs/swagger';
 import type { Response } from 'express';
 import {
+  type Lang,
   LANGS,
   requireStaffOrganizationId,
   resolveLang,
   type StaffRequest,
 } from 'src/infra/http/request-helpers';
 import { StaffAccess } from 'src/modules/auth/access/staff-access.decorator';
-import { couriersCsv, externalCsv, problemsCsv } from './domain/report-csv';
+import { tableCsv } from './domain/csv';
+import {
+  couriersTable,
+  externalTable,
+  periodLabels,
+  problemsTable,
+  ReportTable,
+} from './domain/report-table';
+import { toXlsx, wallClock, XLSX_CONTENT_TYPE } from './domain/xlsx';
 import { parsePeriod, ReportPeriod } from './domain/report-period';
 import {
   CourierReportDto,
@@ -37,7 +54,7 @@ export class ReportController {
     summary:
       'Couriers: deliveries, cash due, received, discrepancy, card, shift hours, accrued pay',
   })
-  @ApiProduces('application/json', 'text/csv')
+  @ApiProduces('application/json', 'text/csv', XLSX_CONTENT_TYPE)
   @ApiOkResponse({ type: CourierReportDto })
   async couriers(
     @Req() req: StaffRequest,
@@ -50,12 +67,14 @@ export class ReportController {
       requireStaffOrganizationId(req),
       p,
     );
-    return q.format === 'csv'
-      ? sendCsv(
+    return q.format && q.format !== 'json'
+      ? sendFile(
           res,
           'couriers',
+          q,
           p,
-          couriersCsv(report, langOf(q, acceptLanguage)),
+          (lang) => couriersTable(report, lang),
+          acceptLanguage,
         )
       : report;
   }
@@ -65,7 +84,7 @@ export class ReportController {
   @ApiOperation({
     summary: 'External services: orders handed over and costs per service',
   })
-  @ApiProduces('application/json', 'text/csv')
+  @ApiProduces('application/json', 'text/csv', XLSX_CONTENT_TYPE)
   @ApiOkResponse({ type: ExternalReportDto })
   async external(
     @Req() req: StaffRequest,
@@ -78,12 +97,14 @@ export class ReportController {
       requireStaffOrganizationId(req),
       p,
     );
-    return q.format === 'csv'
-      ? sendCsv(
+    return q.format && q.format !== 'json'
+      ? sendFile(
           res,
           'external',
+          q,
           p,
-          externalCsv(report, langOf(q, acceptLanguage)),
+          (lang) => externalTable(report, lang),
+          acceptLanguage,
         )
       : report;
   }
@@ -94,7 +115,7 @@ export class ReportController {
     summary:
       'Problems of delivery orders: no answer, refusals, cannot deliver, returns, cancellations with reasons',
   })
-  @ApiProduces('application/json', 'text/csv')
+  @ApiProduces('application/json', 'text/csv', XLSX_CONTENT_TYPE)
   @ApiOkResponse({ type: ProblemReportDto })
   async problems(
     @Req() req: StaffRequest,
@@ -107,12 +128,14 @@ export class ReportController {
       requireStaffOrganizationId(req),
       p,
     );
-    return q.format === 'csv'
-      ? sendCsv(
+    return q.format && q.format !== 'json'
+      ? sendFile(
           res,
           'problems',
+          q,
           p,
-          problemsCsv(report, langOf(q, acceptLanguage)),
+          (lang) => problemsTable(report, lang),
+          acceptLanguage,
         )
       : report;
   }
@@ -125,18 +148,38 @@ const langOf = (q: ReportQueryDto, acceptLanguage: string | undefined) =>
     { languages: LANGS, defaultLanguage: 'ru' },
   );
 
-function sendCsv(
+/**
+ * The report as a file in the request language: csv (comma, UTF-8 with BOM) or xlsx (columns, numbers and the
+ * period as dates whatever the Excel locale).
+ */
+function sendFile(
   res: Response,
   name: string,
+  q: ReportQueryDto,
   p: ReportPeriod,
-  csv: string,
-): string {
+  table: (lang: Lang) => ReportTable,
+  acceptLanguage: string | undefined,
+): string | StreamableFile {
+  const lang = langOf(q, acceptLanguage);
   const day = (d: Date) => d.toISOString().slice(0, 10);
-  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  const xlsx = q.format === 'xlsx';
+  res.setHeader(
+    'Content-Type',
+    xlsx ? XLSX_CONTENT_TYPE : 'text/csv; charset=utf-8',
+  );
   res.setHeader(
     'Content-Disposition',
-    `attachment; filename="${name}_${day(p.from)}_${day(p.to)}.csv"`,
+    `attachment; filename="${name}_${day(p.from)}_${day(p.to)}.${xlsx ? 'xlsx' : 'csv'}"`,
   );
   res.setHeader('Cache-Control', 'no-store');
-  return csv;
+  // A binary body goes as a file: Nest would send a plain Buffer as JSON
+  return xlsx
+    ? new StreamableFile(
+        toXlsx(table(lang), {
+          labels: periodLabels(lang),
+          from: wallClock(q.from),
+          to: wallClock(q.to),
+        }),
+      )
+    : tableCsv(table(lang));
 }
