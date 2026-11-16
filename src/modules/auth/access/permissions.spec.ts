@@ -20,6 +20,9 @@ describe('role permissions', () => {
     );
     expect(roleCan('operator', 'venue')).toBe(false);
     expect(roleCan('operator', 'staff')).toBe(false);
+    // the operator sees and assigns couriers, the owner adds, invites and disables them (W13-04)
+    expect(roleCan('operator', 'couriers.manage')).toBe(false);
+    expect(roleCan('owner', 'couriers.manage')).toBe(true);
   });
 
   it('no role, no permissions', () => {
