@@ -26,6 +26,7 @@ import { TelegramModule } from './modules/telegram/telegram.module';
 import { TenantDomainModule } from './modules/tenant-domain/tenant-domain.module';
 import { StaffModule } from './modules/staff/staff.module';
 import { ReportModule } from './modules/report/report.module';
+import { HealthModule } from './modules/health/health.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -40,6 +41,7 @@ import { ReportModule } from './modules/report/report.module';
     CategoryModule,
     CustomerModule,
     FileModule,
+    HealthModule,
     MenuModule,
     OrderModule,
     DeliveryModule,

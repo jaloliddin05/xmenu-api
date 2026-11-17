@@ -1,0 +1,30 @@
+# Only what the image build reads: package files, prisma/, src/, the tsconfig and nest-cli files.
+# Secrets never enter the build context.
+.env
+.env.*
+!.env.example
+
+node_modules
+dist
+coverage
+uploads
+logs
+*.log
+
+# Tests and their fakes (tsconfig.build.json leaves them out of the build anyway)
+test
+**/*.spec.ts
+**/*.fake.ts
+
+# Repository and editor files
+.git
+.github
+.claude
+.vscode
+.idea
+docs
+scripts
+README.md
+CLAUDE.md
+Dockerfile
+.dockerignore
