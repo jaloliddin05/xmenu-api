@@ -385,9 +385,11 @@ Docker Compose на одном сервере, снаружи Caddy (TLS, `api.x
   `uniquelocal`, иначе все гости получат IP Caddy и общие лимиты), `NEXT_PUBLIC_URL=http://qr:3000` и
   `CLIENT_REVALIDATE_URL=http://client:3000/api/revalidate` (ревалидация по внутренней сети, не через Caddy),
   `PUBLIC_API_URL=https://api.xmenu.uz`, `PLATFORM_DOMAIN=xmenu.uz`, `DELIVERY_URL_TEMPLATE=https://{slug}.xmenu.uz`.
-- Сертификаты поддоменов `{slug}.xmenu.uz` и своих доменов заведений: on-demand TLS Caddy с вопросом к API
-  `GET /internal/tls/allow?domain=…` (200 только для активного заведения, отвечает только изнутри сети, без
-  заголовков прокси: `tenant/internal-tls.controller.ts`, `infra/http/internal-request.ts`). Фрагмент Caddyfile:
+- Сертификаты: поддомены `{slug}.xmenu.uz` под одним wildcard-сертификатом `*.xmenu.uz` (DNS-01 через Cloudflare,
+  API не спрашивается); свои домены заведений: on-demand TLS Caddy с вопросом к API `GET /internal/tls/allow?domain=…`
+  (200 только для `{slug}.PLATFORM_DOMAIN` и подтверждённого домена активного заведения, отвечает только изнутри сети,
+  без заголовков прокси: `tenant/internal-tls.controller.ts`, `infra/http/internal-request.ts`). Полный Caddyfile:
+  `../infra/caddy/Caddyfile` (корневой репозиторий), сокращённо:
 
   ```caddyfile
   {
@@ -397,7 +399,16 @@ Docker Compose на одном сервере, снаружи Caddy (TLS, `api.x
   }
   api.xmenu.uz {
   	respond /internal/* 404
+  	request_body {
+  		max_size 10MB
+  	}
   	reverse_proxy api:4000
+  }
+  *.xmenu.uz {
+  	tls {
+  		dns cloudflare {env.CF_API_TOKEN}
+  	}
+  	reverse_proxy client:3000
   }
   https:// {
   	tls {
@@ -406,8 +417,10 @@ Docker Compose на одном сервере, снаружи Caddy (TLS, `api.x
   	reverse_proxy client:3000
   }
   ```
-  Caddy передаёт исходный `Host` и ставит `X-Forwarded-For`, `-Proto`, `-Host`; `api`, `dashboard`, `qr` описаны
-  отдельными сайтами (обычные сертификаты), всё прочее идёт в `client`.
+  Caddy передаёт исходный `Host` и ставит `X-Forwarded-For`, `-Proto`, `-Host`; `api`, `dashboard`, `qr`, `app`
+  (редирект на `qr`) описаны отдельными сайтами, зарезервированные имена из `RESERVED_SLUGS` под `*.xmenu.uz` отдают
+  404 (список в Caddyfile ведётся вручную), всё прочее идёт в `client`. `TRUST_PROXY` = фиксированный адрес Caddy в
+  сети compose (`172.30.0.10`, `../infra/docker-compose.prod.yml`).
 - `.github/workflows/deploy.yml` (старый деплой через SSH, `git pull` и pm2) запускается только вручную и под Docker не
   переделан; не запускай его.
 - Прод не стартует с `SMS_PROVIDER=console`, `OTP_DEV_MODE`, пустым `REVALIDATE_SECRET`, `DOMAIN_VERIFY_SKIP=true`, без
