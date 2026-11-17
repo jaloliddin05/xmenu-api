@@ -628,10 +628,9 @@ export class PosOrderService {
     return this.view(orderId);
   }
 
-  private async startRound(orderId: string) {
-    if (this.queue.enabled)
-      await this.queue.push(orderId, 0, 0, Date.now().toString(36));
-    else await this.push(orderId);
+  /** A new round of attempts; without queues (ORDER_QUEUES=off) the order stays queued, as after accepting. */
+  private startRound(orderId: string) {
+    return this.queue.push(orderId, 0, 0, Date.now().toString(36));
   }
 
   // ---- Own couriers (docs/IIKO.md, "Курьеры") ----
