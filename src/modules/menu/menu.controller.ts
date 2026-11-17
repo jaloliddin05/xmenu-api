@@ -1,8 +1,16 @@
-import { Controller, Get, Header, Req } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Header,
+  ParseUUIDPipe,
+  Query,
+  Req,
+} from '@nestjs/common';
 import {
   ApiHeader,
   ApiOkResponse,
   ApiOperation,
+  ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
 import type { Request } from 'express';
@@ -31,13 +39,28 @@ export class MenuController {
     summary: 'Menyu: kategoriyalar → taomlar → modifikator guruhlari',
   })
   @ApiOkResponse({ type: [MenuCategoryDto] })
+  @ApiQuery({
+    name: 'branchId',
+    required: false,
+    description:
+      'With a POS connected: leave out what is in the stop list of this branch (without it, only dishes stopped in every linked branch are left out)',
+  })
   @Header('Cache-Control', 'public, max-age=30')
   @Header('Vary', 'X-Tenant-Id, Accept-Language')
-  get(@CurrentTenant() tenant: Tenant, @Req() req: Request) {
-    return this.menu.getMenu(tenant.id, {
-      lang: resolveLang(req, tenant),
-      fallback: tenant.defaultLanguage,
-      currency: tenant.currency,
-    });
+  get(
+    @CurrentTenant() tenant: Tenant,
+    @Req() req: Request,
+    @Query('branchId', new ParseUUIDPipe({ optional: true }))
+    branchId?: string,
+  ) {
+    return this.menu.getMenu(
+      tenant.id,
+      {
+        lang: resolveLang(req, tenant),
+        fallback: tenant.defaultLanguage,
+        currency: tenant.currency,
+      },
+      branchId,
+    );
   }
 }

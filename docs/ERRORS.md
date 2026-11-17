@@ -19,7 +19,7 @@
 | `rate_limited` | 429 | Превышен лимит запросов (по IP, номеру или пользователю) | `retryAfter` |
 | `internal_error` | 500 | Непредвиденная ошибка сервера; подробности только в логе по `requestId` | — |
 | `unavailable` | 503 | Временный сбой (очередь, база); повторить позже | — |
-| `platform_misconfigured` | 503 | Функция выключена настройкой платформы (не заведения); `details.feature`: `telegram_bot`, `delivery_link`, `sms`, `domains`, `payments`, `translation`, `order_notifications` | `details.feature` |
+| `platform_misconfigured` | 503 | Функция выключена настройкой платформы (не заведения); `details.feature`: `telegram_bot`, `delivery_link`, `sms`, `domains`, `payments`, `translation`, `order_notifications`, `pos` | `details.feature` |
 | `tenant_required` | 400 | Клиентский запрос без заголовка `X-Tenant-Id` | — |
 | `tenant_not_found` | 404 | Нет активного заведения с таким id (или передан slug вместо id) | — |
 | `tenant_inactive` | 403 | Заведение отключено | — |
@@ -48,7 +48,7 @@
 | `address_limit_reached` | 409 | У клиента уже максимум сохранённых адресов | — |
 | `invalid_order` | 400 | Заказ не собирается (пустой, неверное количество, нет адреса или филиала); `details.items` по позициям | `details.items` |
 | `invalid_modifiers` | 422 | Неизвестная группа или вариант допа, повтор, не выбран обязательный | `details.items` |
-| `item_unavailable` | 409 | Блюда нет или оно скрыто; `details.items` | `details.items` |
+| `item_unavailable` | 409 | Блюда нет, оно скрыто или в стоп-листе кассы у филиала; `details.items` (`reason`: `not_available` \| `stop_list`) | `details.items` |
 | `price_changed` | 409 | `expectedTotal` не совпал с суммой по ценам из базы; новые цены в `details` | `details.items`, `details.subtotal`, `details.deliveryFee`, `details.total` |
 | `delivery_fee_changed` | 409 | `expectedDeliveryFee` не совпал с ценой доставки по текущим правилам филиала; новая цена в `details` | `details.deliveryFee`, `details.freeFrom`, `details.minOrder`, `details.total` |
 | `min_order_not_reached` | 422 | Сумма без доставки меньше минимальной; `details.minAmount`, `details.shortBy` (сколько не хватает) | `details.minAmount`, `details.shortBy` |
@@ -101,3 +101,14 @@
 | `telegram_request_failed` | 502 | Bot API отказал в применении пункта профиля бота (`code` пункта в `lastSync`); текст ответа только в логе | — |
 | `translation_failed` | 502 | Сервис перевода не ответил или ответил не по формату | — |
 | ~~`translation_unavailable`~~ устарел → `platform_misconfigured` | 503 | Перевод не настроен на платформе | — |
+| `pos_not_connected` | 404 | Интеграция с кассой не начата (нет ключа) или шаг требует предыдущего | — |
+| `pos_key_invalid` | 422 | iiko не выдал маркер по ключу ресторана (неверный, отозван или истёк) | — |
+| `pos_access_denied` | 422 | У ключа iiko нет прав на метод или организацию, либо адрес сервера не разрешён (ответ iiko 403) | — |
+| `pos_module_missing` | 422 | В организации iiko не подключён модуль доставки (ответ iiko 402 или нет лицензии) | — |
+| `pos_access_blocked` | 422 | Доступ к iiko заблокирован (подписка, ответ iiko 423) | — |
+| `pos_unavailable` | 502 | iiko не ответил, ответил не по формату, ограничил частоту запросов или вернул ошибку сервера; повторить позже | — |
+| `pos_external_menu_missing` | 422 | В iiko не настроено внешнее меню (или выбранного больше нет): подключение на шаге «Меню» не завершается | — |
+| `pos_links_invalid` | 422 | Связи с iiko не сходятся со справочниками iiko или правилами; `fields[]` | `fields` |
+| `pos_setup_incomplete` | 409 | Включение интеграции до прохождения всех шагов и проверок; `details.missing` (шаги и проверки) | `details.missing` |
+| `pos_managed_field` | 409 | Правка поля, которое ведёт iiko (имя на языке iiko, цена, допы, категория), или удаление позиции из iiko; `fields[]` | `fields` |
+| `pos_courier_mode_locked` | 409 | Смена режима курьеров при незавершённых заказах доставки | — |

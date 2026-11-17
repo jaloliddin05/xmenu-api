@@ -11,7 +11,7 @@ import {
 } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { errorMessage } from 'src/infra/helper/error-text';
-import { webhookSecretMatches } from 'src/modules/telegram/domain/webhook-secret';
+import { webhookSecretMatches } from 'src/infra/http/webhook-secret';
 import { TelegramBotService } from 'src/modules/telegram/telegram-bot.service';
 import { Public } from '../decorators/public.decorator';
 import { TELEGRAM_UPDATE_QUEUE } from '../services/telegram-update.queue';

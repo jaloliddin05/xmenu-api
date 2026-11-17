@@ -18,6 +18,19 @@ import {
   ownProduct,
 } from './menu-ownership';
 import { AppException } from 'src/infra/errors/app-exception';
+import {
+  assertNoManagedChanges,
+  assertNotManaged,
+  changedFields,
+  posSourceLang,
+  sourceTranslationProblems,
+} from './pos-managed';
+
+const managedProblem = (field: string) => ({
+  field,
+  code: 'pos_managed',
+  message: 'Managed by the POS',
+});
 
 @Injectable()
 export class AdditionalProductService {
@@ -69,8 +82,16 @@ export class AdditionalProductService {
     organizationId: string,
     slug: string,
   ) {
-    if (dto.product_id)
+    if (dto.product_id) {
       await this.assertOwnProduct(dto.product_id, organizationId);
+      // Option groups of a POS dish come from the POS
+      if (
+        (await posSourceLang(this.prismaService, {
+          product_id: dto.product_id,
+        })) !== null
+      )
+        assertNoManagedChanges([managedProblem('product_id')]);
+    }
 
     const data: Prisma.additional_product_groupCreateInput = {
       is_multiple: dto.is_multiple ?? false,
@@ -119,6 +140,12 @@ export class AdditionalProductService {
     slug: string,
   ) {
     await this.findOwnGroup(dto.additional_product_group_id, organizationId);
+    if (
+      (await posSourceLang(this.prismaService, {
+        group_id: dto.additional_product_group_id,
+      })) !== null
+    )
+      assertNoManagedChanges([managedProblem('additional_product_group_id')]);
 
     const add_prod = await this.prismaService.additional_product.create({
       data: {
@@ -162,6 +189,22 @@ export class AdditionalProductService {
     assertOwnTranslations(group.translations, dto.translations);
     if (dto.product_id)
       await this.assertOwnProduct(dto.product_id, organizationId);
+    const groupLang = await posSourceLang(this.prismaService, { group_id: id });
+    if (groupLang !== null)
+      assertNoManagedChanges([
+        ...changedFields(group, {
+          is_multiple: dto.is_multiple,
+          is_required: dto.is_required,
+          min_selected: dto.min_selected,
+          max_selected: dto.max_selected,
+          product_id: dto.product_id,
+        }),
+        ...sourceTranslationProblems(
+          groupLang,
+          group.translations,
+          dto.translations,
+        ),
+      ]);
 
     // 🔹 Translationlarni update qilish
     if (dto.translations && dto.translations.length > 0) {
@@ -171,6 +214,7 @@ export class AdditionalProductService {
           data: {
             lang: t.lang,
             title: t.title,
+            stale: false,
           },
         });
       }
@@ -216,6 +260,21 @@ export class AdditionalProductService {
     assertOwnTranslations(product.translations, dto.translations);
     if (dto.additional_product_group_id)
       await this.findOwnGroup(dto.additional_product_group_id, organizationId);
+    const optionLang = await posSourceLang(this.prismaService, {
+      option_id: id,
+    });
+    if (optionLang !== null)
+      assertNoManagedChanges([
+        ...changedFields(product, {
+          price: dto.price,
+          additional_product_group_id: dto.additional_product_group_id,
+        }),
+        ...sourceTranslationProblems(
+          optionLang,
+          product.translations,
+          dto.translations,
+        ),
+      ]);
 
     // 🔹 Translationlarni update qilish
     if (dto.translations && dto.translations.length > 0) {
@@ -225,6 +284,7 @@ export class AdditionalProductService {
           data: {
             lang: t.lang,
             title: t.title,
+            stale: false,
           },
         });
       }
@@ -260,6 +320,7 @@ export class AdditionalProductService {
 
   async deleteGroup(id: string, organizationId: string, slug: string) {
     await this.findOwnGroup(id, organizationId);
+    assertNotManaged(await posSourceLang(this.prismaService, { group_id: id }));
     const add_prod_gr =
       await this.prismaService.additional_product_group.delete({
         where: { id },
@@ -277,6 +338,9 @@ export class AdditionalProductService {
 
   async delete(id: string, organizationId: string, slug: string) {
     await this.findOwnOption(id, organizationId);
+    assertNotManaged(
+      await posSourceLang(this.prismaService, { option_id: id }),
+    );
     const add_prod = await this.prismaService.additional_product.delete({
       where: { id },
       include: { additional_product_group: { include: { product: true } } },

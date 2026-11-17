@@ -21,5 +21,7 @@ model additional_product_group {
   organization    organization? @relation(fields: [organization_id], references: [id], onDelete: Cascade)
   organization_id String?
 
+  pos_link pos_menu_link?
+
   @@index([organization_id])
 }

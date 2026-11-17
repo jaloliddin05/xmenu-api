@@ -38,6 +38,91 @@ describe('ProductService: organization ownership (IDOR)', () => {
     expect(files.uploadFile).not.toHaveBeenCalled();
   }
 
+  describe('a dish imported from the POS', () => {
+    beforeEach(() => {
+      const pos = db.seed('pos_integration', {
+        organization_id: ORG,
+        source_lang: 'ru',
+      });
+      db.seed('pos_menu_link', {
+        integration_id: pos.id,
+        kind: 'product',
+        product_id: t.mine.product.id,
+        hidden_in_pos: false,
+      });
+      db.seed('product_translation', {
+        product_id: t.mine.product.id,
+        lang: 'uz',
+        title: 'Taom',
+        stale: true,
+      });
+    });
+
+    const uzId = () =>
+      db.data.product_translation.find(
+        (x) => x.product_id === t.mine.product.id && x.lang === 'uz',
+      )!.id;
+
+    it('price, category and the name in the POS language are read-only: 409 pos_managed_field, nothing written', async () => {
+      const e = await service
+        .updateProduct(
+          t.mine.product.id,
+          {
+            price: 999,
+            translations: [
+              { id: t.mine.productTr.id, lang: 'ru', title: 'Другое' },
+            ],
+          } as any,
+          ORG,
+          'mine',
+        )
+        .catch((x: any) => x);
+      expect(e.code).toBe('pos_managed_field');
+      expect(e.fields.map((f: any) => f.field)).toEqual([
+        'price',
+        'translations[0].title',
+      ]);
+      expect(db.log).toEqual([]);
+    });
+
+    it('the same values pass, and another translation is editable and no longer stale', async () => {
+      await service.updateProduct(
+        t.mine.product.id,
+        {
+          price: 100,
+          translations: [
+            {
+              id: t.mine.productTr.id,
+              lang: 'ru',
+              title: 'Mine dish',
+              description: 'Новое описание',
+            },
+            { id: uzId(), lang: 'uz', title: 'Yangi', description: undefined },
+          ],
+        } as any,
+        ORG,
+        'mine',
+      );
+      const uz = db.data.product_translation.find((x) => x.id === uzId())!;
+      expect(uz).toMatchObject({ title: 'Yangi', stale: false });
+    });
+
+    it('cannot be deleted; reads say it is managed by the POS', async () => {
+      await expect(
+        service.delete(t.mine.product.id, ORG, 'mine'),
+      ).rejects.toMatchObject({ code: 'pos_managed_field' });
+      expect((await service.findById(t.mine.product.id, ORG)).pos).toEqual({
+        managed: true,
+        hiddenInPos: false,
+      });
+      const [listed] = await service.findAll(ORG, undefined as any, 'uz');
+      expect(listed).toMatchObject({
+        pos: { managed: true, hiddenInPos: false },
+        translation_stale: true,
+      });
+    });
+  });
+
   it('lists only my dishes', async () => {
     const list = await service.findAll(ORG, undefined as any, 'ru');
     expect(list.map((p) => p.id)).toEqual([t.mine.product.id]);

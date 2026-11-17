@@ -25,7 +25,9 @@ Env: см. `.env.example` (полный; тест сверяет его со с�
 Новую переменную добавляй в схему и `.env.example`. Ключевые: `JWT_*`, `OTP_*`, `SMS_PROVIDER`, `PAYMENT_CONFIG_KEY`, `REDIS_URL`, `PUBLIC_API_URL`, `PUBLIC_FILES_URL`,
 `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ORDERS_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `TELEGRAM_VERIFY_TTL_SECONDS`,
 `TELEGRAM_API_BASE_URL` (база всех вызовов Bot API, `infra/telegram/telegram-api-url.ts`; фейк в тестах и e2e, в production только
-`https://api.telegram.org`), `OPS_CHAT_ID`, `ORDER_QUEUES`,
+`https://api.telegram.org`), `IIKO_APP_ID` + `IIKO_CLIENT_SECRET` (приложение интегратора iiko, одно на платформу; без
+них `platform_misconfigured`, `feature: pos`), `IIKO_API_BASE_URL` (`infra/iiko/iiko-api-url.ts`; фейк в тестах, в production
+только `https://api-ru.iiko.services`), `OPS_CHAT_ID`, `ORDER_QUEUES`,
 `MINIAPP_URL`, `UPLOAD_MAX_BYTES`, `PLATFORM_ADMIN_USER_IDS`, `TRANSLATION_*`, `OPENAI_API_KEY` (необязателен: без него
 `/translation` → `503 platform_misconfigured`, `feature: translation`), `NEXT_PUBLIC_URL` + `REVALIDATE_SECRET` (QR),
 `CLIENT_REVALIDATE_URL` + `CLIENT_REVALIDATE_SECRET` (сайт доставки), `DELIVERY_URL_TEMPLATE` (адрес Mini App для кнопки бота),
@@ -47,7 +49,8 @@ Env: см. `.env.example` (полный; тест сверяет его со с�
 `sms` (провайдеры eskiz, telegram, console), `telegram` (боты заведений: `TelegramBotService`, `TelegramClient`,
 `/telegram-bot`), `tenant-domain` (свои домены заведения, `/organization/:id/domains`), `file`, `translation`, `application`,
 `revalidate-queue` (`RevalidateModule`: ревалидация QR-меню и сайта доставки, `docs/REVALIDATE.md`), `guest-login` (способы входа
-клиентов заведения: `GuestLoginService`).
+клиентов заведения: `GuestLoginService`), `pos` (интеграция с кассой iiko: подключение, меню, стоп-лист, вебхук; раздел
+«Интеграция с кассой»).
 
 ## Контракт API
 Единое место: `docs/API.md` и `docs/openapi.json`. Подробности: `docs/ORDERS_API.md`, `docs/BRANCHES_API.md`,
@@ -182,6 +185,35 @@ Payme вручную через ops-чат.
 - Эффекты после коммита: `courier_card` (очередь `courier-cards`, ключ задания с `version` заказа) и `operator_alert`
   (срочное сообщение в чат филиала, `RestaurantNotifierService.alertDeliveryProblem`).
 
+## Интеграция с кассой (iiko)
+Контракт: `docs/API.md`, «Интеграция с кассой (iiko)»; спецификация `../docs/IIKO.md`. Модуль `pos`. Часть 1:
+подключение, связи, меню, стоп-лист, вебхук; отправка заказов и статусы iiko ещё не сделаны.
+- Интерфейс `provider/pos-provider.ts` (`POS_PROVIDER`), адаптер `iiko/iiko.provider.ts`; транспорт `IikoApiClient`
+  (маркер v2 по `appId` + `clientSecret` из env и ключу ресторана, в памяти процесса до `exp − 5 мин`, при 401 один
+  повтор; ошибки без ключа, маркера и тела ответа, в лог `iikoErrorText`; HTTP-статусы → коды `pos_*`). Нормализация
+  меню `iiko/iiko-menu.ts` (поля по OpenAPI iiko: `itemsGroups`, `sizePrices`, модификаторы по id).
+- Модели `pos/models/pos.prisma`: `pos_integration` (одна на заведение, ключ `AES-256-GCM` `PAYMENT_CONFIG_KEY` через
+  `PosKeyring`, `webhook_secret_hash`), `pos_branch_link`, `pos_payment_link`, `pos_menu_link` (строка меню ↔ позиция
+  iiko, `@@unique([integration_id, kind, external_id])`, FK с cascade на строку меню; удаление интеграции снимает
+  связи, строки остаются), `pos_stop_item` (по филиалу). У переводов меню `stale`, у `file` `content_hash` и `from_pos`.
+- Импорт `PosMenuImportService`: чистый план `domain/menu-import-plan.ts`, затем одна транзакция; сбой оставляет меню
+  и пишет код в `menu_import_error`, `pos_key_invalid` переводит `active` в `needs_reconnect`. Размеры → обязательная
+  группа «Размер» (`size_group`/`size`). Фото `PosImageStore` (файл по sha256 в `uploads/image/products/pos`;
+  `FileService.removeFile` не удаляет файл с диска, пока на путь ссылается другая строка).
+- Только чтение у связанных строк: `product/services/pos-managed.ts` (`posSourceLang`, `pos_managed_field`) в сервисах
+  блюд, категорий и допов; `posMarker` даёт `pos` в ответах владельца.
+- Стоп-лист `PosStopListService` (чистые правила `domain/stop-list.ts`); `GET /menu` и `POST /orders`
+  (`assertNotStopped` после выбора филиала, `reason: stop_list`) читают `pos_stop_item`, скрытое в iiko исключают
+  через `pos_link.hidden_in_pos` (`SHOWN_BY_POS` в `menu.service.ts`, `loadProducts` в заказе).
+- Очередь `pos-sync` (`PosSyncQueue`): задания `menu` (один ожидающий на интеграцию) и `stop-list`, расписание
+  импорта каждые 30 минут (`upsertJobScheduler`, `pos-menu-<id>`); при `ORDER_QUEUES=off` работа идёт в запросе.
+  Обработчик берёт одно задание за раз, но в каждом процессе pm2 свой: при нескольких процессах два импорта одного
+  заведения могут совпасть, второй упрётся в уникальный индекс `pos_menu_link` и запишет `menu_import_error`.
+- Вебхук `PosWebhookService`: `Authorization` против sha256 (`infra/http/webhook-secret.ts`, общий с ботом заведения),
+  одинаковый 401, дедупликация событий в Redis (`pos:evt:<id>:<sha256 события>`, 24 ч).
+- Тесты: ответы iiko подменяет `iiko/iiko-server.fake.ts` (HTTP-сервер в процессе), сервисы меню на
+  `menu-prisma.fake.ts` (поддерживает `pos_*`, обратные связи `pos_link`, `AND`/`OR`, `notIn`).
+
 ## Курьеры
 Контракт: `docs/API.md`, «Курьеры»; спецификация `../docs/DELIVERY.md`. Модуль `courier`.
 - Модели (`courier/models/courier.prisma`): `courier` (`@@unique([organization_id, phone])`,
@@ -248,7 +280,7 @@ App (`instant`) нового номера кладёт Telegram-id в `registrat
 - `TelegramBotService` (`modules/telegram`): `GET/PUT/DELETE /telegram-bot` из админки. Таблица
   `organization_telegram_bot` (одна строка на заведение, `telegram_bot_id` уникален), токен зашифрован
   `PAYMENT_CONFIG_KEY`, `PUT` требует https `PUBLIC_API_URL`. Webhook `POST /telegram/bot/:botKey/webhook`
-  (`botKey` = id строки, не slug): в БД sha256 секрета (`webhook_secret_hash`, `domain/webhook-secret.ts`), заголовок
+  (`botKey` = id строки, не slug): в БД sha256 секрета (`webhook_secret_hash`, `infra/http/webhook-secret.ts`), заголовок
   хешируется и сравнивается за константное время. Вебхук после секрета и отметки `update_id` (`claimUpdate`) кладёт апдейт
   в очередь BullMQ `telegram-update` и сразу отвечает 200; обработка (`TelegramUpdateProcessor`, 3 попытки) идёт в фоне,
   сбой постановки в очередь → 503. `DELETE /telegram-bot` → 200 `{ connected: false, leftOnBot }`: имя, описания и
@@ -341,7 +373,9 @@ App (`instant`) нового номера кладёт Telegram-id в `registrat
   slug только валидируется как поддомен (`organization/domain/slug.ts`).
 - Роли сотрудников для отдельного приложения (курьеры, официанты, менеджеры). Таблица `employee` есть, не используется
   (операторы админки живут в `organization_member`, раздел «Сотрудники и права»).
-- Позже: POS, Web Push/WebSocket для админки, фискальные чеки, промокоды (поле `discount` всегда 0), заказ ко
+- Касса iiko, часть 2: отправка заказов, статусы, повторы и ручной ввод (`../docs/IIKO.md`); фейковый сервер iiko в
+  e2e. Другие кассы позже.
+- Позже: Web Push/WebSocket для админки, фискальные чеки, промокоды (поле `discount` всегда 0), заказ ко
   времени, меню по филиалам, ротация `PAYMENT_CONFIG_KEY`, rate limit на
   `POST /orders`.
 

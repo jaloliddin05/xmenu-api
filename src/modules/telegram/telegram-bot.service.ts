@@ -8,7 +8,7 @@ import {
 } from 'src/modules/payment/domain/payment-crypto';
 import { errorMessage } from 'src/infra/helper/error-text';
 import { RevalidateService } from 'src/modules/revalidate-queue/revalidate.service';
-import { hashWebhookSecret } from './domain/webhook-secret';
+import { hashWebhookSecret } from 'src/infra/http/webhook-secret';
 import type { BotSettingLeft } from './dto/telegram-bot-status.dto';
 import { TelegramClient, telegramErrorText } from './telegram-client';
 import {

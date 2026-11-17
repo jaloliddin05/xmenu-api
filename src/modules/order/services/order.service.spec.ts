@@ -287,6 +287,7 @@ describe('OrderService.create: delivery price, payment and change', () => {
       })),
     },
     product: { findMany: jest.fn(async () => []) },
+    pos_stop_item: { findMany: jest.fn(async () => []) },
     $transaction: jest.fn(async (fn: (t: typeof tx) => unknown) => fn(tx)),
   };
   const service = new OrderService(
@@ -393,6 +394,34 @@ describe('OrderService.create: delivery price, payment and change', () => {
     expect(await run({ ...dto('pickup') })).toBeNull();
     expect(created).toMatchObject({ branch_id: 'b1', delivery_fee: 0 });
     expect(choose).not.toHaveBeenCalled();
+  });
+
+  it('a dish in the POS stop list of the branch that cooks it: 409 item_unavailable (stop_list)', async () => {
+    prisma.pos_stop_item.findMany.mockResolvedValueOnce([
+      { product_id: 'p1' },
+    ] as never);
+    const r = await run(order());
+    expect(r?.code).toBe('item_unavailable');
+    expect(r?.body.details).toEqual({
+      items: [{ index: 0, itemId: 'p1', reason: 'stop_list' }],
+    });
+    expect(prisma.pos_stop_item.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          branch_id: 'near',
+          integration: { status: { not: 'draft' } },
+        }),
+      }),
+    );
+    expect(created).toBeUndefined();
+    // Pickup checks the chosen branch
+    prisma.pos_stop_item.findMany.mockResolvedValueOnce([]);
+    expect(await run(dto('pickup'))).toBeNull();
+    expect(prisma.pos_stop_item.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ branch_id: 'b1' }),
+      }),
+    );
   });
 
   it('delivery fee changed since the quote: 409 delivery_fee_changed with the new price', async () => {

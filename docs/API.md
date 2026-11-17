@@ -325,6 +325,18 @@ IP берётся из `X-Forwarded-For` только от локального 
 | GET | `/couriers/pay-rates` | `venue` |  | ✓ | — |
 | GET | `/external-services` | `orders` |  | ✓ | ✓ |
 | POST | `/file/upload` | `profile` |  | ✓ | ✓ |
+| DELETE | `/integrations/iiko` | `venue` |  | ✓ | — |
+| GET | `/integrations/iiko` | `venue` |  | ✓ | — |
+| POST | `/integrations/iiko/checks` | `venue` |  | ✓ | — |
+| PUT | `/integrations/iiko/couriers` | `venue` |  | ✓ | — |
+| GET | `/integrations/iiko/dictionaries` | `venue` |  | ✓ | — |
+| POST | `/integrations/iiko/enable` | `venue` |  | ✓ | — |
+| PUT | `/integrations/iiko/key` | `venue` |  | ✓ | — |
+| PUT | `/integrations/iiko/links` | `venue` |  | ✓ | — |
+| POST | `/integrations/iiko/menu/import` | `venue` |  | ✓ | — |
+| POST | `/integrations/iiko/menu/preview` | `venue` |  | ✓ | — |
+| PUT | `/integrations/iiko/organization` | `venue` |  | ✓ | — |
+| GET | `/integrations/iiko/organizations` | `venue` |  | ✓ | — |
 | GET | `/order` | `orders` |  | ✓ | ✓ |
 | GET | `/order-settings` | `venue` |  | ✓ | — |
 | PUT | `/order-settings` | `venue` |  | ✓ | — |
@@ -1179,6 +1191,117 @@ miniapp_required` / `miniapp_init_data_invalid`, «Mini App и режимы до
   (`route: "domains"`, `host`; `docs/REVALIDATE.md`). Добавление и удаление `pending` публично ничего не меняют.
 - Подтверждённые домены повторно не проверяются (TXT можно удалить после подтверждения). TLS и nginx для своих
   доменов бэкенд не настраивает.
+
+## Интеграция с кассой (iiko)
+
+Спецификация и решения: `../docs/IIKO.md`. Часть 1: подключение, связи, импорт внешнего меню, стоп-лист, вебхуки.
+Отправка заказов в iiko и статусы из iiko появятся во второй части; пока заказы идут как без кассы. Код:
+`src/modules/pos/` (интерфейс «POS-провайдер» `provider/pos-provider.ts`, адаптер `iiko/`).
+
+Приложение интегратора одно на платформу: `IIKO_APP_ID` и `IIKO_CLIENT_SECRET` в окружении бэкенда (без них все
+маршруты подключения отвечают `503 platform_misconfigured`, `details.feature: "pos"`; тот же ответ без годного
+`PAYMENT_CONFIG_KEY`, а включение ещё и без `PUBLIC_API_URL`). Адрес iiko: `IIKO_API_BASE_URL`, в production только
+`https://api-ru.iiko.services`. Ресторан вводит только свой ключ API из iikoWeb; ключ хранится зашифрованным
+(`PAYMENT_CONFIG_KEY`, как ключи оплаты) и не возвращается. Маркер iiko (1 час, без refresh) бэкенд получает сам и
+держит в памяти процесса.
+
+### Маршруты (только владелец, право `venue`; оператору `403`)
+
+Заведение берётся из токена. Ни ключ, ни адрес вебхука в ответы не попадают.
+
+| Запрос | Ответ |
+|---|---|
+| `GET /integrations/iiko` | `200` статус (ниже); без интеграции `connected: false`, `status: null`, `steps: null` |
+| `PUT /integrations/iiko/key { apiKey }` | `200` статус + `organizations: [{ id, name }]`. Ключ проверяется получением маркера; при одной организации она выбирается сразу. Повторный ввод заменяет ключ; у `needs_reconnect` рабочий ключ возвращает `active` |
+| `GET /integrations/iiko/organizations` | `200 { organizations }` |
+| `PUT /integrations/iiko/organization { externalOrgId }` | `200` статус; способ адреса организации читается сразу (`addressFormat`). Смена организации сбрасывает связи; у включённой интеграции смена запрещена (`pos_links_invalid`, поле `externalOrgId`, `disconnect_first`) |
+| `GET /integrations/iiko/dictionaries` | `200 { terminalGroups: [{ id, name, isAlive }], paymentTypes: [{ id, name, kind }], externalMenus: [{ id, name }], priceCategories: [{ id, name }], serviceItems: [{ itemId, name, sizes: [{ id, name }], openPrice }] }`. Пустой `externalMenus`: в iiko нет внешнего меню, дашборд показывает инструкцию по настройке. `serviceItems` (кандидаты для «Доставки») пусты, пока не выбрано внешнее меню |
+| `PUT /integrations/iiko/links` | `200` статус. Тело: `{ externalMenuId, priceCategoryId?, branches: [{ branchId, terminalGroupId, priceCategoryId? }], payments: [{ method: cash \| card \| online, paymentTypeId }], deliveryItem?: { itemId, sizeId? } }`; заменяет все связи |
+| `POST /integrations/iiko/menu/preview` | `200 { pairs: [{ productId, productTitle, itemId, itemName, byName }], newItems: [{ itemId, name }], unmatched: [{ productId, title }] }` |
+| `POST /integrations/iiko/checks` | `200` статус с новыми `checks` |
+| `POST /integrations/iiko/enable { matches?: [{ productId, itemId \| null }] }` | `200` статус (`active`) |
+| `POST /integrations/iiko/menu/import` | `202 { queued }` («Обновить меню»; итог в `menuImportedAt` / `menuImportError`) |
+| `PUT /integrations/iiko/couriers { mode: xmenu \| iiko }` | `200` статус |
+| `DELETE /integrations/iiko` | `200 { connected: false }` |
+
+Статус: `{ connected, status: draft | active | needs_reconnect, steps: { key, organization, branches, payments,
+menu: done | todo }, externalOrgId, addressFormat: city | legacy | unknown, courierMode, externalMenuId,
+priceCategoryId, deliveryItem: { itemId, sizeId } | null, branches: [{ branchId, terminalGroupId, priceCategoryId }],
+payments: [{ method, paymentTypeId, paymentTypeKind }], checks: [{ key, status, branchId?, code? }], checkedAt,
+menuImportedAt, menuImportError, stopListUpdatedAt, enabledAt }`.
+
+- **Шаги.** `organization`: выбрана организация и прочитан способ адреса. `branches`: хотя бы один филиал связан с
+  группой терминалов (филиал без связи заказы в iiko отправлять не будет). `payments`: связан `cash` (самовывоз за
+  наличные есть всегда), `card` и `online`, если заведение включило их для доставки, и выбрана позиция «Доставка».
+  `menu`: выбрано внешнее меню.
+- **Проверки** (`checks`): `key_access` (у ключа есть доступ к организации), `delivery_module` (модуль доставки:
+  метод доставки iiko не отвечает `402`), `terminal_alive` на каждый связанный филиал (касса на связи). `status`:
+  `ok` | `fail` | `unknown` (iiko не ответил); `code` у упавшей: `pos_module_missing`, `pos_access_denied`,
+  `pos_access_blocked`, `pos_key_invalid`, `pos_unavailable`.
+- **Связи.** Ценовая категория пока одна на все филиалы: `priceCategoryId` филиала, отличный от общего, даёт
+  `422 pos_links_invalid` (`fields[]`, код поля `price_category_differs`). Id, которых нет в справочниках iiko:
+  `unknown_terminal_group`, `unknown_payment_type`, `unknown_item`, `unknown_size` (у позиции с размерами размер
+  обязателен), `duplicate`; чужой филиал `404`; внешнего меню больше нет: `422 pos_external_menu_missing`. У включённой
+  интеграции смена меню, категории или позиции «Доставка» ставит импорт.
+- **Включение.** Все шаги `done` и все проверки `ok`, иначе `409 pos_setup_incomplete` с `details.missing`
+  (`step:<шаг>`, `check:<проверка>`, `check:terminal_alive:<branchId>`). Затем импорт меню с подтверждёнными парами
+  (не указанные блюда сопоставляются по точному названию; чужой `productId` → `404`), настройка вебхука в iiko
+  (новый секрет), стоп-лист и импорт по расписанию. Сбой импорта или настройки вебхука оставляет `draft`.
+- **Режим курьеров** меняется только без незавершённых заказов доставки, иначе `409 pos_courier_mode_locked`.
+- **Отключение**: вебхук снимается в iiko (сбой только в лог), интеграция, связи и стоп-лист удаляются, блюда остаются
+  обычными блюдами Xmenu и снова редактируются.
+- **Ключ отозван** (iiko не выдаёт маркер при импорте): `status: needs_reconnect`, `menuImportError:
+  pos_key_invalid`; владелец вводит ключ заново. Приём заказов это не останавливает.
+
+### Меню из iiko
+
+Источник только внешнее меню iiko (`/api/menu/v3/by_id`) с ценовой категорией связей; служебная позиция «Доставка»
+в меню гостя не попадает. Импорт раз в 30 минут, по кнопке, при включении и при смене меню в связях. Всё
+загружается и сопоставляется до записи, запись одной транзакцией: сбой (`menuImportError` = код ошибки) оставляет
+прошлое меню.
+
+- Группы iiko → категории, позиции → блюда, группы модификаторов → группы допов (минимум и максимум из iiko,
+  обязательность при минимуме больше нуля). Позиция с несколькими размерами получает обязательную группу «Размер»
+  (один выбор): цена блюда = самый дешёвый размер, у вариантов надбавка до цены размера.
+- Каждая строка меню связана с позицией iiko по её id (`pos_menu_link`): повторный импорт обновляет связанное, дублей
+  нет. Первое подключение: блюда и категории сопоставляются по точному названию на языке iiko (язык заведения по
+  умолчанию на момент импорта) или по парам владельца; блюда без пары скрываются (`is_active: false`), не удаляются;
+  позиции iiko без пары создаются.
+- Позиция пропала из внешнего меню или скрыта в iiko: блюдо (категория) не показывается и не заказывается, история
+  заказов сохраняется.
+- Фото копируется в хранилище Xmenu (не ссылка на iiko), один файл на одинаковое содержимое; та же ссылка не
+  скачивается повторно; фото, загруженное владельцем, важнее фото iiko. Неудачное фото пропускается.
+- Имя изменилось в iiko: перевод на языке iiko перезаписывается, остальные переводы получают `stale: true` («перевод
+  устарел»); сохранение перевода владельцем снимает `stale`.
+
+Ответы владельца по меню: у блюд и категорий поле `pos` (`null` у обычной строки, `{ managed: true, hiddenInPos }`
+у строки из iiko); переводы несут `stale` (`GET /product/:id`, `GET /category/:id`, `translation.stale` в
+`GET /category`, `translation_stale` в `GET /product`). Только для чтения у строк из iiko: имя на языке iiko, цена,
+вес и КБЖУ, категория блюда, группы допов и варианты (создание, правка, удаление), удаление блюда и категории:
+`409 pos_managed_field`, `fields[]` с кодом `pos_managed`. Редактируются: переводы на другие языки, описания, фото,
+порядок, скрытие.
+
+### Стоп-лист
+
+Вебхук `StopListUpdate` (только сигнал) ставит запрос стоп-листа `/api/1/stop_lists` по группам терминалов связанных
+филиалов; без вебхука стоп-лист обновляется вместе с меню, постоянного опроса нет. Позиция с остатком больше нуля в
+стоп-листе не считается остановленной; блюдо с размерами останавливается, только когда остановлены все размеры.
+
+- `GET /menu` (публичный) без `branchId` не показывает блюдо, только если оно в стоп-листе всех связанных филиалов;
+  `GET /menu?branchId=<uuid>` убирает стоп-лист этого филиала (неверный UUID → `400`).
+- `POST /orders` после выбора филиала проверяет его стоп-лист: `409 item_unavailable`,
+  `details.items: [{ index, itemId, reason: "stop_list" }]`; блюдо, пропавшее в iiko: `reason: "not_available"`.
+- Стоп-лист и импорт меню ставят ревалидацию QR и сайта доставки (`route: "menu"`).
+
+### Вебхук iiko
+
+`POST /pos/iiko/:integrationId/webhook` (публичный, без общего лимита публичных POST). Адрес на id интеграции, не на
+slug; ставится в iiko при включении (`/api/1/webhooks/update_settings`, фильтры: стоп-лист и ошибки заказов
+доставки) со случайным `authToken`, в БД только его sha256. Заголовок `Authorization` (допускается префикс
+`Bearer `) сравнивается за постоянное время; неизвестный id и неверный секрет дают одинаковый `401 unauthorized`.
+Тело: массив событий; событие другой организации iiko пропускается; повторно доставленное событие учитывается один
+раз (ключ события в Redis на 24 часа). Ответ `200 { ok: true }` сразу после постановки в очередь; сбой очереди →
+`503 unavailable`, iiko повторит. События заказов доставки пока только пишутся в лог.
 
 ## Доступ к данным админки
 

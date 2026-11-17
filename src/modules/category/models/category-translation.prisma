@@ -3,6 +3,8 @@ model category_translation {
   id         String    @id @default(uuid())
   lang       String   
   title    String
+  // The source name changed in the POS since this translation was written (cleared when it is edited)
+  stale      Boolean   @default(false)
   category    category  @relation(fields: [category_id], references: [id], onDelete: Cascade)
   category_id  String
   created_at  DateTime  @default(now())

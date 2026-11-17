@@ -11,7 +11,7 @@ model organization_telegram_bot {
   username        String
   token_encrypted String
   // sha256 (hex) of the secret_token given to setWebhook: webhook calls carry the secret in a
-  // header; only Telegram keeps it in the clear (domain/webhook-secret.ts)
+  // header; only Telegram keeps it in the clear (src/infra/http/webhook-secret.ts)
   webhook_secret_hash String
   is_enabled      Boolean      @default(true)
 

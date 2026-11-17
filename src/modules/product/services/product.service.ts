@@ -13,6 +13,14 @@ import {
   ownGroup,
   ownProduct,
 } from './menu-ownership';
+import {
+  assertNoManagedChanges,
+  assertNotManaged,
+  changedFields,
+  posMarker,
+  posSourceLang,
+  sourceTranslationProblems,
+} from './pos-managed';
 import { AppException } from 'src/infra/errors/app-exception';
 
 @Injectable()
@@ -89,8 +97,9 @@ export class ProductService {
       include: {
         translations: {
           where: { lang },
-          select: { title: true },
+          select: { title: true, stale: true },
         },
+        pos_link: { select: { hidden_in_pos: true } },
         category: {
           select: {
             id: true,
@@ -112,6 +121,9 @@ export class ProductService {
       is_active: p.is_active,
       price: p.price,
       product_title: p.translations[0]?.title || null,
+      // Another language was translated from an older POS name
+      translation_stale: p.translations[0]?.stale ?? false,
+      pos: posMarker(p.pos_link),
       category_id: p.category.id,
       category_title: p.category.translations[0]?.title || null,
       images: p.images.map((img) => img.url), // agar image modelida `url` maydoni bo‘lsa
@@ -125,6 +137,7 @@ export class ProductService {
         translations: true,
         category: true,
         images: true,
+        pos_link: { select: { hidden_in_pos: true } },
         additional_product_groups: {
           include: {
             translations: true,
@@ -137,7 +150,8 @@ export class ProductService {
     });
     if (!product)
       throw new AppException('not_found', { message: 'Product not found' });
-    return product;
+    const { pos_link, ...rest } = product;
+    return { ...rest, pos: posMarker(pos_link) };
   }
 
   async createProduct(
@@ -215,6 +229,27 @@ export class ProductService {
     assertOwnTranslations(existingProduct.translations, dto.translations);
     if (dto.category_id)
       await this.assertOwnCategory(dto.category_id, organizationId);
+    const sourceLang = await posSourceLang(this.prismaService, {
+      product_id: id,
+    });
+    if (sourceLang !== null)
+      assertNoManagedChanges([
+        ...changedFields(existingProduct, {
+          price: dto.price,
+          unit: dto.unit,
+          weight: dto.weight,
+          kcal: dto.kcal,
+          protein: dto.protein,
+          fat: dto.fat,
+          carbohydrate: dto.carbohydrate,
+          category_id: dto.category_id,
+        }),
+        ...sourceTranslationProblems(
+          sourceLang,
+          existingProduct.translations,
+          dto.translations,
+        ),
+      ]);
 
     const product = await this.prismaService.$transaction(async (prisma) => {
       // Translationlar yangilanishi
@@ -226,6 +261,8 @@ export class ProductService {
               lang: t.lang,
               title: t.title,
               description: t.description,
+              // Saved by the owner: no longer behind a name changed in the POS
+              stale: false,
             },
           });
         }
@@ -338,6 +375,9 @@ export class ProductService {
 
   async delete(id: string, organizationId: string, slug: string) {
     await this.findOwnProduct(id, organizationId);
+    assertNotManaged(
+      await posSourceLang(this.prismaService, { product_id: id }),
+    );
     const product = await this.prismaService.product.delete({ where: { id } });
     await this.revalidateService.addRevalidationJob({
       tenantId: organizationId,

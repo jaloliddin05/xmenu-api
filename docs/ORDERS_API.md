@@ -17,7 +17,7 @@ customer-эндпоинтов). Ошибки — общий формат API:
 | POST | `/orders` | создать заказ (заголовок `Idempotency-Key` обязателен) |
 | GET | `/orders/:id` | один заказ (его опрашивает экран отслеживания) |
 | GET | `/orders` | история, новые первыми |
-| GET | `/menu` | меню (публичный; язык из `?lang=`/`Accept-Language` среди языков заведения, иначе язык заведения; валюта из настроек заведения) |
+| GET | `/menu` | меню (публичный; язык из `?lang=`/`Accept-Language` среди языков заведения, иначе язык заведения; валюта из настроек заведения; `?branchId=` убирает стоп-лист кассы филиала, `API.md`, «Интеграция с кассой (iiko)») |
 | GET | `/checkout-config` | минимум самовывоза и способы оплаты для доставки и самовывоза (публичный) |
 | GET | `/delivery/quote?lat=&lng=&subtotal=` | цена и минимум доставки на адрес, филиал или причина недоступности (публичный, `API.md`, «Стоимость доставки») |
 | GET | `/orders?status=active` | только незавершённые (не `completed`/`cancelled`) — для плашки «активный заказ» на главной; если параметр не поддержан, клиент отфильтрует сам |
@@ -194,7 +194,7 @@ cash ─────────────────────▶ pending_
 | 503 | `telegram_unavailable` | — | режим Mini App без бота заведения: заказы недоступны |
 | 429 | `too_many_active_orders` | `retryAfter` | сообщение |
 | 422 | `invalid_modifiers` | `{ items: [{ index, itemId, reason, groupId? }] }` (`reason`: `missing_required`, `below_min`, `above_max`, `unknown_group`, `unknown_option`, `duplicate_group`, `duplicate_option`) | строки помечаются, «Убрать» |
-| 409 | `item_unavailable` | `{ items: [{ index, reason }] }` | то же |
+| 409 | `item_unavailable` | `{ items: [{ index, itemId, reason }] }` (`reason`: `not_available`, `stop_list`: в стоп-листе кассы у филиала) | то же |
 | 409 | `price_changed` | `{ items: [{ index, unitPrice }], subtotal, deliveryFee, total }` | цены в корзине обновляются, просим подтвердить |
 | 409 | `delivery_fee_changed` | `{ deliveryFee, freeFrom, minOrder, total }` | новая цена доставки в корзине, просим подтвердить |
 | 422 | `min_order_not_reached` | `{ minAmount, shortBy }` | сообщение «не хватает …» |

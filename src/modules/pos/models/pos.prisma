@@ -1,0 +1,166 @@
+// POS integration (iiko, ../docs/IIKO.md). One integration per venue; its id is the key of the
+// webhook address (POST /pos/iiko/:integrationId/webhook), never the slug.
+enum PosProviderKind {
+  iiko
+}
+
+enum PosIntegrationStatus {
+  // Steps in progress: orders and the menu work as without a POS
+  draft
+  // Enabled: the menu is imported, the stop list applied
+  active
+  // The POS rejected the key after it was enabled: the owner enters a new one
+  needs_reconnect
+}
+
+// How the iiko organization takes a delivery address (addressFormatType)
+enum PosAddressFormat {
+  // A line of text with coordinates
+  city
+  // A street from the iiko directory and a house
+  legacy
+  unknown
+}
+
+// Who moves a delivery order after "ready" (docs/IIKO.md, "Курьеры")
+enum PosCourierMode {
+  xmenu
+  iiko
+}
+
+enum PosPaymentMethod {
+  cash
+  card
+  online
+}
+
+enum PosMenuLinkKind {
+  category
+  product
+  modifier_group
+  modifier
+  // The required "size" group made from the item's sizes, and one option per size
+  size_group
+  size
+}
+
+model pos_integration {
+  id              String               @id @default(uuid())
+  organization_id String               @unique
+  organization    organization         @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  provider        PosProviderKind      @default(iiko)
+  status          PosIntegrationStatus @default(draft)
+
+  // The restaurant's API key: AES-256-GCM with PAYMENT_CONFIG_KEY (payment-crypto.ts), never returned or logged
+  api_key_encrypted String
+
+  // Step 2: the iiko organization and how it takes addresses
+  external_org_id   String?
+  address_format    PosAddressFormat?
+
+  // Step 4-5: the external menu, its price category (one for all branches for now) and the
+  // service item "Delivery" that carries the delivery fee into iiko
+  external_menu_id  String?
+  price_category_id String?
+  delivery_item_id  String?
+  delivery_size_id  String?
+
+  courier_mode      PosCourierMode   @default(xmenu)
+  // Language the iiko names are written to (the venue default language when the menu was first imported)
+  source_lang       String?
+
+  // sha256 (hex) of the authToken given to iiko in the webhook settings (iiko sends it in Authorization)
+  webhook_secret_hash String?
+
+  // Last connection checks: [{ key, status, branchId? }] (domain/pos-checks.ts)
+  checks            Json?
+  checked_at        DateTime?
+  menu_imported_at  DateTime?
+  // Neutral reason code of the last failed import (null after a success)
+  menu_import_error String?
+  stop_list_updated_at DateTime?
+  enabled_at        DateTime?
+
+  created_at        DateTime         @default(now())
+  updated_at        DateTime         @updatedAt
+
+  branch_links      pos_branch_link[]
+  payment_links     pos_payment_link[]
+  menu_links        pos_menu_link[]
+  stop_items        pos_stop_item[]
+}
+
+// A branch takes orders through one iiko terminal group
+model pos_branch_link {
+  id                String          @id @default(uuid())
+  integration_id    String
+  integration       pos_integration @relation(fields: [integration_id], references: [id], onDelete: Cascade)
+  branch_id         String          @unique
+  branch            branch          @relation(fields: [branch_id], references: [id], onDelete: Cascade)
+  terminal_group_id String
+  // Price category of the external menu for this branch (null = the integration's one)
+  price_category_id String?
+
+  @@index([integration_id])
+}
+
+// An Xmenu payment method is passed to iiko as one iiko payment type
+model pos_payment_link {
+  id                String           @id @default(uuid())
+  integration_id    String
+  integration       pos_integration  @relation(fields: [integration_id], references: [id], onDelete: Cascade)
+  method            PosPaymentMethod
+  payment_type_id   String
+  payment_type_kind String
+
+  @@unique([integration_id, method])
+}
+
+// An Xmenu menu row imported from (or matched to) an iiko position: the import updates the linked
+// row instead of creating another one. Removing the integration removes the links; the rows stay.
+model pos_menu_link {
+  id             String          @id @default(uuid())
+  integration_id String
+  integration    pos_integration @relation(fields: [integration_id], references: [id], onDelete: Cascade)
+  kind           PosMenuLinkKind
+  // iiko id: group, item, modifier group, modifier; `<itemId>` for a size group, `<itemId>:<sizeId>` for a size
+  external_id    String
+  size_id        String?
+
+  category_id    String?                   @unique
+  category       category?                 @relation(fields: [category_id], references: [id], onDelete: Cascade)
+  product_id     String?                   @unique
+  product        product?                  @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  group_id       String?                   @unique
+  group          additional_product_group? @relation(fields: [group_id], references: [id], onDelete: Cascade)
+  option_id      String?                   @unique
+  option         additional_product?       @relation(fields: [option_id], references: [id], onDelete: Cascade)
+
+  // Name in iiko at the last import: a change marks the other translations stale
+  source_name      String
+  // Image address in iiko the current picture came from (not downloaded again while it stays)
+  source_image_url String?
+  // Gone from the external menu or hidden in iiko: not shown, not orderable, order history kept
+  hidden_in_pos    Boolean @default(false)
+
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+
+  @@unique([integration_id, kind, external_id])
+}
+
+// Positions in the iiko stop list of a branch's terminal group; replaced per branch on every refresh
+model pos_stop_item {
+  id             String          @id @default(uuid())
+  integration_id String
+  integration    pos_integration @relation(fields: [integration_id], references: [id], onDelete: Cascade)
+  branch_id      String
+  branch         branch          @relation(fields: [branch_id], references: [id], onDelete: Cascade)
+  product_id     String
+  product        product         @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  balance        Float           @default(0)
+
+  @@unique([branch_id, product_id])
+  @@index([integration_id])
+  @@index([product_id])
+}

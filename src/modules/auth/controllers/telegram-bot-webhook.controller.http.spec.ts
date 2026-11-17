@@ -3,7 +3,7 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { createHttpApp } from 'src/infra/testing/http-app.fake';
 import { FakeRedis } from 'src/infra/redis/redis.fake';
-import { hashWebhookSecret } from 'src/modules/telegram/domain/webhook-secret';
+import { hashWebhookSecret } from 'src/infra/http/webhook-secret';
 import { TelegramBotService } from 'src/modules/telegram/telegram-bot.service';
 import { InProcessTelegramUpdateQueue } from '../services/telegram-update-queue.fake';
 import { processTelegramUpdate } from '../services/telegram-update.processor';

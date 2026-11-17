@@ -5,7 +5,14 @@
  * asserted. Supports the query shapes the menu services use; anything else throws loudly.
  */
 type Row = Record<string, any>;
-type Rel = { table: string; fk: string; many?: boolean };
+/** `reverse`: a to-one relation whose foreign key is on the other table (pos_link) */
+type Rel = { table: string; fk: string; many?: boolean; reverse?: boolean };
+
+const posLink = (fk: string): Rel => ({
+  table: 'pos_menu_link',
+  fk,
+  reverse: true,
+});
 
 const RELATIONS: Record<string, Record<string, Rel>> = {
   organization: {
@@ -29,6 +36,7 @@ const RELATIONS: Record<string, Record<string, Rel>> = {
       many: true,
     },
     products: { table: 'product', fk: 'category_id', many: true },
+    pos_link: posLink('category_id'),
   },
   category_translation: { category: { table: 'category', fk: 'category_id' } },
   product: {
@@ -44,6 +52,7 @@ const RELATIONS: Record<string, Record<string, Rel>> = {
       many: true,
     },
     images: { table: 'file', fk: 'product_id', many: true },
+    pos_link: posLink('product_id'),
   },
   product_translation: { product: { table: 'product', fk: 'product_id' } },
   additional_product_group: {
@@ -59,6 +68,7 @@ const RELATIONS: Record<string, Record<string, Rel>> = {
       fk: 'additional_product_group_id',
       many: true,
     },
+    pos_link: posLink('group_id'),
   },
   additional_product_group_translation: {
     additional_product_group: {
@@ -76,6 +86,7 @@ const RELATIONS: Record<string, Record<string, Rel>> = {
       fk: 'additional_product_id',
       many: true,
     },
+    pos_link: posLink('option_id'),
   },
   additional_product_translation: {
     additional_product: {
@@ -84,6 +95,20 @@ const RELATIONS: Record<string, Record<string, Rel>> = {
     },
   },
   file: { product: { table: 'product', fk: 'product_id' } },
+  // POS tables (modules/pos): empty unless a spec seeds them
+  pos_integration: {
+    branch_links: {
+      table: 'pos_branch_link',
+      fk: 'integration_id',
+      many: true,
+    },
+    stop_items: { table: 'pos_stop_item', fk: 'integration_id', many: true },
+  },
+  pos_branch_link: {},
+  pos_stop_item: {},
+  pos_menu_link: {
+    integration: { table: 'pos_integration', fk: 'integration_id' },
+  },
 };
 
 function matchScalar(value: unknown, cond: unknown): boolean {
@@ -92,6 +117,7 @@ function matchScalar(value: unknown, cond: unknown): boolean {
     const c = cond as Record<string, any>;
     if ('not' in c && value === c.not) return false;
     if ('in' in c && !c.in.includes(value)) return false;
+    if ('notIn' in c && c.notIn.includes(value)) return false;
     if ('gt' in c && !((value as number) > c.gt)) return false;
     if ('gte' in c && !((value as number) >= c.gte)) return false;
     if ('lt' in c && !((value as number) < c.lt)) return false;
@@ -160,6 +186,21 @@ class FakeTable {
     return { count: rows.length };
   };
 
+  deleteMany = async ({ where }: any = {}) => {
+    const gone = this.rows.filter((r) =>
+      this.db.matches(this.name, r, where ?? {}),
+    );
+    this.db.data[this.name] = this.rows.filter((r) => !gone.includes(r));
+    this.db.log.push({
+      table: this.name,
+      op: 'deleteMany',
+      ids: gone.map((r) => r.id),
+    });
+    return { count: gone.length };
+  };
+
+  count = async (args: any = {}) => (await this.findMany(args)).length;
+
   delete = async ({ where, ...rest }: any) => {
     const row = this.rows.find((r) => this.db.matches(this.name, r, where));
     if (!row) throw new Error(`${this.name} to delete not found`);
@@ -202,6 +243,14 @@ export class FakeMenuPrisma {
   matches(table: string, row: Row, where: Record<string, any>): boolean {
     for (const [key, cond] of Object.entries(where)) {
       if (cond === undefined) continue;
+      if (key === 'AND' || key === 'OR') {
+        const parts = (cond as Record<string, any>[]).map((c) =>
+          this.matches(table, row, c),
+        );
+        if (key === 'AND' ? parts.includes(false) : !parts.includes(true))
+          return false;
+        continue;
+      }
       const rel = RELATIONS[table][key];
       if (!rel) {
         if (!matchScalar(row[key], cond)) return false;
@@ -211,7 +260,7 @@ export class FakeMenuPrisma {
         throw new Error(
           `FakeMenuPrisma: filter on to-many ${table}.${key} not supported`,
         );
-      const parent = this.data[rel.table].find((r) => r.id === row[rel.fk]);
+      const parent = this.related(rel, row);
       if (cond === null) {
         if (parent) return false;
         continue;
@@ -219,6 +268,13 @@ export class FakeMenuPrisma {
       if (!parent || !this.matches(rel.table, parent, cond)) return false;
     }
     return true;
+  }
+
+  /** The row a to-one relation points at (or, reversed, the row pointing back). */
+  related(rel: Rel, row: Row): Row | undefined {
+    return rel.reverse
+      ? this.data[rel.table].find((r) => r[rel.fk] === row.id)
+      : this.data[rel.table].find((r) => r.id === row[rel.fk]);
   }
 
   shape(table: string, row: Row, args: { include?: any; select?: any }): Row {
@@ -243,7 +299,7 @@ export class FakeMenuPrisma {
           )
           .map((r) => this.shape(rel.table, r, subArgs));
       } else {
-        const parent = this.data[rel.table].find((r) => r.id === row[rel.fk]);
+        const parent = this.related(rel, row);
         out[key] = parent ? this.shape(rel.table, parent, subArgs) : null;
       }
     }

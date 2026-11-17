@@ -157,6 +157,8 @@ export class OrderService {
       branchId = (await this.choosePickupBranch(organizationId, dto.branchId))
         .id;
     }
+    // The POS stop list of the branch that will cook it (docs/API.md, "Интеграция с кассой (iiko)")
+    await this.assertNotStopped(dto.items, branchId);
 
     // 5. Payment method: delivery offers what the venue switched on (cash and card need own couriers, online
     // needs keys); pickup: cash always, online with keys (order/domain/delivery-payment.ts)
@@ -552,13 +554,54 @@ export class OrderService {
               },
             },
           },
-          category: { select: { is_active: true } },
+          category: {
+            select: {
+              is_active: true,
+              pos_link: { select: { hidden_in_pos: true } },
+            },
+          },
+          pos_link: { select: { hidden_in_pos: true } },
         },
       })
       .then(
         (rows) =>
-          new Map(rows.map((p) => [p.id, p as unknown as PricingProduct])),
+          new Map(
+            rows.map((p) => {
+              // Gone from the POS or hidden there: not orderable, like a hidden dish
+              const hidden =
+                p.pos_link?.hidden_in_pos || p.category.pos_link?.hidden_in_pos;
+              const row = hidden ? { ...p, is_active: false } : p;
+              return [p.id, row as unknown as PricingProduct];
+            }),
+          ),
       );
+  }
+
+  /** 409 item_unavailable (`reason: stop_list`) for dishes in the POS stop list of the branch. */
+  private async assertNotStopped(
+    items: { itemId: string }[],
+    branchId: string,
+  ): Promise<void> {
+    const stopped = await this.prisma.pos_stop_item.findMany({
+      where: {
+        branch_id: branchId,
+        product_id: { in: [...new Set(items.map((i) => i.itemId))] },
+        integration: { status: { not: 'draft' } },
+      },
+      select: { product_id: true },
+    });
+    if (!stopped.length) return;
+    const ids = new Set(stopped.map((s) => s.product_id));
+    throw new AppException('item_unavailable', {
+      message: 'Some items are unavailable',
+      details: {
+        items: items.flatMap((item, index) =>
+          ids.has(item.itemId)
+            ? [{ index, itemId: item.itemId, reason: 'stop_list' }]
+            : [],
+        ),
+      },
+    });
   }
 
   private async assertOrderingOpen(organizationId: string, initData?: string) {

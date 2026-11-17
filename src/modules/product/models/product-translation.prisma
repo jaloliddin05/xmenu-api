@@ -5,6 +5,8 @@ model product_translation {
   lang       String   
   title    String
   description    String?
+  // The source name changed in the POS since this translation was written (cleared when it is edited)
+  stale      Boolean   @default(false)
   product    product  @relation(fields: [product_id], references: [id], onDelete: Cascade)
   product_id  String
   created_at  DateTime  @default(now())
