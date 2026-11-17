@@ -219,7 +219,7 @@ translations [{ id, lang, description }] }`. Хеша пароля, `owner_id`, 
 | Вход по номеру | 5 неудач за 15 мин → блокировка 60 с, далее 120, 240... до 1 ч; уровень сбрасывается после суток без блокировок или после успешного входа |
 
 Счётчики входа ведутся и для несуществующих номеров: блокировка не выдаёт, есть ли аккаунт.
-IP берётся из `X-Forwarded-For` только от локального прокси (`trust proxy = loopback`).
+IP берётся из `X-Forwarded-For` только от доверенного прокси (`TRUST_PROXY`, по умолчанию `loopback`; за Caddy в Docker подсеть сети compose).
 
 ## Сотрудники и права
 
@@ -1268,6 +1268,24 @@ miniapp_required` / `miniapp_init_data_invalid`, «Mini App и режимы до
 Не считаются (вебхуки провайдеров приходят с их адресов): `POST /payments/click/:tenantId/prepare|complete`,
 `POST /payments/payme/:tenantId`, `POST /telegram/bot/:botKey/webhook`, `POST /telegram/orders/webhook`. Они защищены
 подписью или секретом. Общего лимита на остальные POST владельца нет: они требуют токен.
+
+## Служебные маршруты: здоровье и TLS
+
+Для среды запуска и прокси, не для фронтов: без токена, `Cache-Control: no-store`, общий лимит POST их не касается.
+
+| Маршрут | Ответ |
+|---|---|
+| `GET /health` | `200 { "status": "ok" }`: процесс отвечает; в базу и Redis не ходит (проверка живости, `HEALTHCHECK` образа) |
+| `GET /health/ready` | `200 { "status": "ok", "checks": { "database": "up", "redis": "up" } }`; если база или Redis не ответили за 2 с, `503` с тем же телом (`"status": "unavailable"`, упавшая зависимость `"down"`), причина только в логе |
+| `GET /internal/tls/allow?domain=<host>` | вопрос Caddy перед выпуском сертификата (on-demand TLS, `ask`): `200` без тела, если хост принадлежит активному заведению (`{slug}.PLATFORM_DOMAIN` или подтверждённый свой домен, то же правило, что у `GET /tenant/by-host`), иначе `404` без тела. В OpenAPI его нет |
+
+`/internal/tls/allow` отвечает только запросу изнутри сети сервера: адрес TCP-собеседника (не `X-Forwarded-For`)
+loopback или частный, и в запросе нет заголовков обратного прокси (`Forwarded`, `X-Forwarded-For`, `-Host`, `-Proto`,
+`X-Real-IP`; Caddy при `reverse_proxy` ставит их всегда, а запрос `ask` идёт напрямую без них). Запрос через
+публичный Caddy получает тот же пустой `404`, что и неизвестный хост. Код: `tenant/internal-tls.controller.ts`,
+`infra/http/internal-request.ts`. В Caddyfile дополнительно закрыт путь (`respond /internal/* 404` на `api.xmenu.uz`),
+пример в `CLAUDE.md`, «Продакшен». Ответ раскрывает лишь то, есть ли у хоста заведение, что и так отдаёт публичный
+`GET /tenant/by-host`, поэтому условие пересмотра CORS («эндпоинт, полагающийся на сетевое положение») он не задевает.
 
 ## CORS
 

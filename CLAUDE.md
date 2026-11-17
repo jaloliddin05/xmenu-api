@@ -13,7 +13,7 @@ Swagger (`/docs`), Jest. Prettier: одинарные кавычки, trailing c
 `npm run test:e2e` · `npm run openapi` · `npm run check:env` · `npm run check:user-texts`
 (`openapi` собирает проект и пишет `docs/openapi.json`, `docs/ERRORS.md` и матрицу прав в `docs/API.md` из сборки, без БД и Redis; остальной `docs/API.md` правится руками;
 `check:env` проверяет `.env` той же схемой, что старт, `-- --production` как production; `check:user-texts` см. «Ошибки»).
-Миграции: `npm run migrate` (собирает схему и запускает `prisma migrate dev`), на сервере `npx prisma migrate deploy`.
+Миграции: `npm run migrate` (собирает схему и запускает `prisma migrate dev`), на сервере контейнер `migrate` (`prisma migrate deploy`, «Продакшен»).
 `generate-schema` вызывает `cat`: под Windows (npm запускает скрипты через cmd) он падает и оставляет
 `prisma/schema.prisma` пустым. Собирай схему из Git Bash (`cat ./src/modules/*/*/*.prisma > prisma/schema.prisma`);
 порядок файлов в glob там другой, поэтому лишние перестановки моделей в диффе лучше не коммитить.
@@ -46,14 +46,14 @@ Env: см. `.env.example` (полный; тест сверяет его со с�
 провайдеры доставки), `report` (отчёты доставки для владельца), `payment` (Click, Payme, ключи тенанта, возвраты),
 `sms` (провайдеры eskiz, telegram, console), `telegram` (боты заведений: `TelegramBotService`, `TelegramClient`,
 `/telegram-bot`), `tenant-domain` (свои домены заведения, `/organization/:id/domains`), `file`, `translation`, `application`,
-`revalidate-queue` (`RevalidateModule`: ревалидация QR-меню и сайта доставки, `docs/REVALIDATE.md`), `guest-login` (способы входа
+`health` (`GET /health`, `/health/ready`), `revalidate-queue` (`RevalidateModule`: ревалидация QR-меню и сайта доставки, `docs/REVALIDATE.md`), `guest-login` (способы входа
 клиентов заведения: `GuestLoginService`).
 
 ## Контракт API
 Единое место: `docs/API.md` и `docs/openapi.json`. Подробности: `docs/ORDERS_API.md`, `docs/BRANCHES_API.md`,
 `docs/BACKEND_ORDERS.md`, `docs/TELEGRAM_VERIFICATION.md`. Меняешь контроллер или DTO: добавь `@ApiProperty` и
 `@ApiOperation`, запусти `npm run openapi`, закоммить результат вместе с кодом. `.github/workflows/ci.yml` (build,
-test, `npm run openapi` + `git diff --exit-code docs/`, `format:check`, `lint` и `check:user-texts` блокирующие) проверяет это на PR. Шаги: чистая БД `migrate deploy`, `migrate diff` без расхождений, `scripts/check-migration-upgrade.sh`, build, test, openapi); `deploy.yml` отдельный и без проверок, запускается только вручную (`workflow_dispatch`), см. «Деплой».
+test, `npm run openapi` + `git diff --exit-code docs/`, `format:check`, `lint` и `check:user-texts` блокирующие) проверяет это на PR. Шаги: чистая БД `migrate deploy`, `migrate diff` без расхождений, `scripts/check-migration-upgrade.sh`, build, test, openapi); `deploy.yml` отдельный и без проверок, запускается только вручную (`workflow_dispatch`), см. «Продакшен».
 Локально те же шаги: временные БД (`createdb xmenu_ci`, `xmenu_ci_shadow`, `xmenu_upgrade`), `DATABASE_URL=… npx prisma migrate deploy`, `npx prisma migrate diff --from-url $DATABASE_URL --to-schema-datamodel prisma/schema.prisma --exit-code`, `DATABASE_URL=<пустая БД> scripts/check-migration-upgrade.sh`, затем `npm run build`, `npm test`, `npm run openapi && git diff --exit-code docs/`. В Windows psql принимает URL только через `--dbname=`.
 
 ## Тенантность
@@ -80,7 +80,7 @@ test, `npm run openapi` + `git diff --exit-code docs/`, `format:check`, `lint` �
   Новый платформенный поддомен по-прежнему надо добавить в `RESERVED_SLUGS`; свои домены под `PLATFORM_DOMAIN`
   запрещены целиком.
 - Кэш тенанта (30 с, в памяти процесса) сбрасывают `PUT /organization/:id/settings`, `PUT` и `DELETE
-  /organization/:id`; кэш настроек заказа сбрасывает `PUT /order-settings`. Другие процессы pm2 видят старое до 30 с.
+  /organization/:id`; кэш настроек заказа сбрасывает `PUT /order-settings`. Другие процессы API видят старое до 30 с.
 - Публичные ответы только через маппер или DTO со списком полей, не строкой БД: `GET /tenant/config`, `GET /menu`
   собираются мапперами и DTO, `toStaffUser` для владельца. Новый публичный эндпоинт делай так же.
 - Slug: `organization/domain/slug.ts` (`slugify`: кириллица ru/uz транслитерируется, случайный `venue-xxxxxx` только если
@@ -307,7 +307,7 @@ App (`instant`) нового номера кладёт Telegram-id в `registrat
   bcrypt-проверка на любую неудачу (фиктивный хеш для неизвестного номера).
 - Токены staff принимаются только для существующего пользователя с `isActive=true` и активной строкой в
   `organization_member` (роль читается из БД на каждом запросе); хеш пароля не уходит в ответы.
-- IP клиента: `trust proxy = loopback` в `main.ts`, nginx должен передавать `X-Forwarded-For`.
+- IP клиента: `trust proxy` из `TRUST_PROXY` (`infra/http/trust-proxy.ts`, по умолчанию `loopback`), прокси передаёт `X-Forwarded-For`.
 - Владение данными: организация из `requireStaffOrganizationId(req)`; меню проверяется фрагментами из
   `product/services/menu-ownership.ts`; чужой id в пути или в теле → 404. Новые эндпоинты админки делай так же.
 
@@ -354,7 +354,7 @@ App (`instant`) нового номера кладёт Telegram-id в `registrat
   в очередь идут tenantId, route, oldSlug, актуальный slug читается при выполнении; при заданном адресе цели и пустом
   секрете production не стартует (`revalidate-config.ts`); без `CLIENT_REVALIDATE_URL` задания клиенту не ставятся. В
   `GET /application` читать могут только id из `PLATFORM_ADMIN_USER_IDS`.
-- Кэш тенанта и настроек заказа в памяти процесса (30 с): после `PUT` другие процессы pm2 видят старые имя, slug,
+- Кэш тенанта и настроек заказа в памяти процесса (30 с): после `PUT` другие процессы API видят старые имя, slug,
   язык, валюту, шаг цены доставки и `courier_mode` до 30 с. `is_active` через API не меняется (только в БД), сброса для него нет.
 - Форматирование и линт блокируют CI (`npm run format:check`, `npm run lint`; должны проходить без ошибок и предупреждений).
   Prettier по `.prettierrc`, `npm run format` перед коммитом; `lint:fix` только для автоисправляемого. `eslint-disable` на
@@ -368,21 +368,66 @@ App (`instant`) нового номера кладёт Telegram-id в `registrat
 - `.gitattributes` (`eol=lf`): рабочая копия, выгруженная раньше с `core.autocrlf=true`, остаётся в CRLF, пока файлы не
   перевыгрузить (`git rm --cached -r . && git reset --hard` на чистом дереве); иначе prettier видит `␍`.
 
-## Деплой
-`.github/workflows/deploy.yml` запускается только вручную (`workflow_dispatch`), не на `push` и не на `pull_request`. Для деплоя нужно:
-- Ключ вместо SSH-пароля: `SSH_PRIVATE_KEY` в секретах, `key:` в `appleboy/ssh-action`, отдельный пользователь без
-  `sudo -s`, пароль входа отключён.
-- Окружения GitHub (`staging`, `production`): свои секреты (`SSH_HOST`, `SSH_USER`, ключ), у `production` ручное
-  подтверждение; деплой запускается после зелёного `ci.yml` (`needs` или `workflow_run`), не на `pull_request`.
-- Порядок на сервере: бэкап (`pg_dump` в файл с датой, проверить, что файл не пустой) → `git fetch` и checkout нужного
-  коммита (без `git stash` и `git pull` поверх правок) → `npm ci` (не `npm i`) → `npm run build` →
-  `npx prisma migrate deploy` → `pm2 reload xmenu-backend` → проверка живости и откат на предыдущий коммит и дамп,
-  если проверка не прошла. Миграции только после бэкапа и только `migrate deploy`.
+## Продакшен
+Docker Compose на одном сервере, снаружи Caddy (TLS, `api.xmenu.uz` → `api:4000`); сервисы видят друг друга по
+внутренней сети compose. Образ собирается на сервере (`Dockerfile`, Node 22, Debian slim), `.dockerignore` не пускает в
+контекст `.env`, `node_modules`, `dist`, `uploads`, тесты и фейки.
+- Цели `Dockerfile`: `runtime` (по умолчанию: `node dist/main`, пользователь `node`, только production-зависимости и
+  сгенерированный Prisma-клиент, `prisma generate` при сборке) и `migrate` (разовый контейнер с Prisma CLI:
+  `prisma migrate deploy`). Приложение миграции при старте не применяет: сначала `docker compose run --rm migrate`, потом
+  перезапуск `api`. Миграции только после бэкапа (`pg_dump` в файл с датой, файл не пустой).
+- Порт `4000` (`PORT` задан в образе). `HEALTHCHECK` образа ходит в `GET /health`. Проверки: `GET /health` (жив процесс,
+  без базы и Redis), `GET /health/ready` (база и Redis, иначе `503`), контракт `docs/API.md`, «Служебные маршруты».
+- Загрузки: том на `/app/uploads` (владелец `node`), отдаются с корня сайта; `PUBLIC_FILES_URL` = публичный адрес API.
+- Переменные запуска: весь `.env.example` (production проверяется `validateEnv`, без ошибок не стартует; проверка без
+  запуска в контейнере: `node dist/config/env/check-env.cli.js`). Для Docker важны: `NODE_ENV=production`,
+  `DATABASE_URL` (хост сервиса базы), `REDIS_URL` (`redis://redis:6379`), `TRUST_PROXY` (подсеть сети compose или
+  `uniquelocal`, иначе все гости получат IP Caddy и общие лимиты), `NEXT_PUBLIC_URL=http://qr:3000` и
+  `CLIENT_REVALIDATE_URL=http://client:3000/api/revalidate` (ревалидация по внутренней сети, не через Caddy),
+  `PUBLIC_API_URL=https://api.xmenu.uz`, `PLATFORM_DOMAIN=xmenu.uz`, `DELIVERY_URL_TEMPLATE=https://{slug}.xmenu.uz`.
+- Сертификаты: поддомены `{slug}.xmenu.uz` под одним wildcard-сертификатом `*.xmenu.uz` (DNS-01 через Cloudflare,
+  API не спрашивается); свои домены заведений: on-demand TLS Caddy с вопросом к API `GET /internal/tls/allow?domain=…`
+  (200 только для `{slug}.PLATFORM_DOMAIN` и подтверждённого домена активного заведения, отвечает только изнутри сети,
+  без заголовков прокси: `tenant/internal-tls.controller.ts`, `infra/http/internal-request.ts`). Полный Caddyfile:
+  `../infra/caddy/Caddyfile` (корневой репозиторий), сокращённо:
+
+  ```caddyfile
+  {
+  	on_demand_tls {
+  		ask http://api:4000/internal/tls/allow
+  	}
+  }
+  api.xmenu.uz {
+  	respond /internal/* 404
+  	request_body {
+  		max_size 10MB
+  	}
+  	reverse_proxy api:4000
+  }
+  *.xmenu.uz {
+  	tls {
+  		dns cloudflare {env.CF_API_TOKEN}
+  	}
+  	reverse_proxy client:3000
+  }
+  https:// {
+  	tls {
+  		on_demand
+  	}
+  	reverse_proxy client:3000
+  }
+  ```
+  Caddy передаёт исходный `Host` и ставит `X-Forwarded-For`, `-Proto`, `-Host`; `api`, `dashboard`, `qr`, `app`
+  (редирект на `qr`) описаны отдельными сайтами, зарезервированные имена из `RESERVED_SLUGS` под `*.xmenu.uz` отдают
+  404 (список в Caddyfile ведётся вручную), всё прочее идёт в `client`. `TRUST_PROXY` = фиксированный адрес Caddy в
+  сети compose (`172.30.0.10`, `../infra/docker-compose.prod.yml`).
+- `.github/workflows/deploy.yml` (старый деплой через SSH, `git pull` и pm2) запускается только вручную и под Docker не
+  переделан; не запускай его.
 - Прод не стартует с `SMS_PROVIDER=console`, `OTP_DEV_MODE`, пустым `REVALIDATE_SECRET`, `DOMAIN_VERIFY_SKIP=true`, без
   `PLATFORM_DOMAIN`, с `TELEGRAM_API_BASE_URL` не на `https://api.telegram.org`, без https `PUBLIC_API_URL` и
-  `DELIVERY_URL_TEMPLATE` (с `{slug}`), без годного `PAYMENT_CONFIG_KEY` и без учётных данных выбранного SMS-провайдера
-  (`validateEnv`). Перед `pm2 reload` на сервере: `node dist/config/env/check-env.cli.js` (или `npm run check:env`); перед
-  первым запуском: staging, бэкапы по расписанию, чек-лист безопасности (корневой `CLAUDE.md`, очередь, п. 6).
+  `DELIVERY_URL_TEMPLATE` (с `{slug}`), без годного `PAYMENT_CONFIG_KEY`, с неразбираемым `TRUST_PROXY` и без учётных
+  данных выбранного SMS-провайдера (`validateEnv`). Перед первым запуском: staging, бэкапы по расписанию, чек-лист
+  безопасности (корневой `CLAUDE.md`, очередь, п. 6).
 
 ## Ошибки
 Контракт: `docs/API.md`, «Ошибки»; список кодов `docs/ERRORS.md` (генерируется).
