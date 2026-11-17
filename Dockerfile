@@ -4,7 +4,7 @@
 #   migrate            one-off: prisma migrate deploy (docker compose run --rm migrate)
 # Debian (glibc) rather than Alpine: Prisma engines and bcrypt need no musl builds this way.
 
-ARG NODE_IMAGE=node:22-bookworm-slim
+ARG NODE_IMAGE=node:22.23-bookworm-slim
 
 # Native modules (bcrypt) fall back to a source build when no prebuilt binary fits: tools only here
 FROM ${NODE_IMAGE} AS base
