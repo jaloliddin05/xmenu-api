@@ -17,6 +17,10 @@
  *   problem_at_door ─operator─▶ returned_to_restaurant | cancelled
  *   accepted | ready ─operator─▶ handed_to_external (closed at once)
  *
+ * POS (iiko, docs/IIKO.md "Путь заказа и статусы"): actor `pos` moves an order sent to iiko forward along
+ * the same path (cooked → ready; with iiko couriers on the way and delivered; closed → completed) and
+ * cancels it when iiko cancels it.
+ *
  *   cancelled — awaiting_payment / payment_failed / pending_acceptance dan mijoz
  *   (the guest never cancels an accepted order); pending_acceptance dan boshlab restoran (yakunlanguncha);
  *   tizim (vaqt tugashi) — faqat hali qabul qilinmagan holatlardan.
@@ -43,7 +47,8 @@ export type OrderActorName =
   | 'restaurant'
   | 'courier'
   | 'system'
-  | 'payment';
+  | 'payment'
+  | 'pos';
 export type FulfillmentName = 'delivery' | 'pickup';
 
 type Rule = {
@@ -70,28 +75,28 @@ const RULES: Record<OrderStatusName, Rule[]> = {
     },
   ],
   accepted: [
-    { to: 'preparing', actors: ['restaurant'], only: 'pickup' },
-    { to: 'ready', actors: ['restaurant'], only: 'delivery' },
+    { to: 'preparing', actors: ['restaurant', 'pos'], only: 'pickup' },
+    { to: 'ready', actors: ['restaurant', 'pos'], only: 'delivery' },
     { to: 'handed_to_external', actors: ['restaurant'], only: 'delivery' },
     // 'payment' — provayder (Payme) to'lovni o'zi qaytarganda
     // The guest cancels only until the restaurant accepts, pickup and delivery alike (docs/DELIVERY.md)
-    { to: 'cancelled', actors: ['restaurant', 'payment'] },
+    { to: 'cancelled', actors: ['restaurant', 'payment', 'pos'] },
   ],
   preparing: [
-    { to: 'ready', actors: ['restaurant'], only: 'pickup' },
-    { to: 'cancelled', actors: ['restaurant'], only: 'pickup' },
+    { to: 'ready', actors: ['restaurant', 'pos'], only: 'pickup' },
+    { to: 'cancelled', actors: ['restaurant', 'pos'], only: 'pickup' },
   ],
   ready: [
-    { to: 'completed', actors: ['restaurant'], only: 'pickup' },
-    { to: 'on_the_way', actors: ['courier'], only: 'delivery' },
+    { to: 'completed', actors: ['restaurant', 'pos'], only: 'pickup' },
+    { to: 'on_the_way', actors: ['courier', 'pos'], only: 'delivery' },
     { to: 'handed_to_external', actors: ['restaurant'], only: 'delivery' },
-    { to: 'cancelled', actors: ['restaurant'] },
+    { to: 'cancelled', actors: ['restaurant', 'pos'] },
   ],
   on_the_way: [
-    { to: 'completed', actors: ['courier'], only: 'delivery' },
+    { to: 'completed', actors: ['courier', 'pos'], only: 'delivery' },
     { to: 'ready', actors: ['courier', 'system'], only: 'delivery' },
     { to: 'problem_at_door', actors: ['courier'], only: 'delivery' },
-    { to: 'cancelled', actors: ['restaurant'], only: 'delivery' },
+    { to: 'cancelled', actors: ['restaurant', 'pos'], only: 'delivery' },
   ],
   problem_at_door: [
     { to: 'completed', actors: ['courier'], only: 'delivery' },

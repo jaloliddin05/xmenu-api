@@ -5,8 +5,11 @@ import type { DeliveryTimerKind } from '../domain/delivery-timers';
 import {
   buildDeliveryAlertText,
   buildDeliveryTimerText,
+  buildPosAlertText,
   buildRestaurantKeyboard,
   buildRestaurantText,
+  POS_RECONNECT_TEXT,
+  PosAlert,
 } from './order-messages';
 import type { OrderWithItems } from '../services/order-view';
 
@@ -116,6 +119,26 @@ export class RestaurantNotifierService {
     return this.alertDelivery(orderId, (number, courierName) =>
       buildDeliveryTimerText(number, kind, courierName),
     );
+  }
+
+  /** An order of a venue with iiko: a message to the branch chat (docs/IIKO.md, "Ошибки и сбои"). */
+  alertPos(orderId: string, alert: PosAlert): Promise<void> {
+    return this.alertDelivery(orderId, (number) =>
+      buildPosAlertText(number, alert),
+    );
+  }
+
+  /** The venue's iiko key stopped working: one message to every branch chat of the venue. */
+  async alertPosReconnect(organizationId: string): Promise<void> {
+    const branches = await this.prisma.branch.findMany({
+      where: {
+        organization_id: organizationId,
+        telegram_chat_id: { not: null },
+      },
+      select: { telegram_chat_id: true },
+    });
+    for (const chatId of new Set(branches.map((b) => b.telegram_chat_id!)))
+      await this.telegram.sendMessage(chatId, POS_RECONNECT_TEXT);
   }
 
   private async alertDelivery(

@@ -41,6 +41,7 @@ export const ORDER_INCLUDE = {
   items: { include: { options: true } },
   branch: { select: { id: true, title: true, address: true } },
   courier: { select: { id: true, name: true, phone: true } },
+  pos_order: { select: { courier_name: true } },
 } satisfies Prisma.customer_orderInclude;
 
 const IDEMPOTENCY_KEY = /^[A-Za-z0-9_-]{8,128}$/;
@@ -159,6 +160,14 @@ export class OrderService {
     }
     // The POS stop list of the branch that will cook it (docs/API.md, "Интеграция с кассой (iiko)")
     await this.assertNotStopped(dto.items, branchId);
+    // Prices of a venue with iiko change with every menu import: the guest confirms the total they saw,
+    // a changed price answers price_changed (docs/IIKO.md, "Стоп-лист и цены")
+    if (dto.expectedTotal == null && (await this.pricesFromPos(organizationId)))
+      throw fieldError(
+        'expectedTotal',
+        'required',
+        'expectedTotal is required: the venue takes prices from its POS',
+      );
 
     // 5. Payment method: delivery offers what the venue switched on (cash and card need own couriers, online
     // needs keys); pickup: cash always, online with keys (order/domain/delivery-payment.ts)
@@ -578,6 +587,14 @@ export class OrderService {
   }
 
   /** 409 item_unavailable (`reason: stop_list`) for dishes in the POS stop list of the branch. */
+  private async pricesFromPos(organizationId: string): Promise<boolean> {
+    const pos = await this.prisma.pos_integration.findUnique({
+      where: { organization_id: organizationId },
+      select: { status: true },
+    });
+    return !!pos && pos.status !== 'draft';
+  }
+
   private async assertNotStopped(
     items: { itemId: string }[],
     branchId: string,

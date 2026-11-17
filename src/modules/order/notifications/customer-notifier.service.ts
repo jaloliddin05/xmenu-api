@@ -59,6 +59,7 @@ export class CustomerNotifierService {
         fulfillment: true,
         door_problem: true,
         courier: { select: { name: true } },
+        pos_order: { select: { courier_name: true } },
         organization_id: true,
         channel: true,
         customer: { select: { language: true } },
@@ -75,7 +76,8 @@ export class CustomerNotifierService {
       order,
       from,
       lang,
-      order.courier?.name ?? null,
+      // With iiko couriers the name comes from iiko (docs/IIKO.md, "Курьеры")
+      order.courier?.name ?? order.pos_order?.courier_name ?? null,
     );
     if (text) await this.dispatch({ orderId, text });
   }

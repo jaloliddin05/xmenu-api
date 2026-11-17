@@ -249,3 +249,60 @@ export function buildDeliveryTimerText(
 Верните заказ в ресторан или отмените его.`;
   }
 }
+
+/** What the branch chat is told about an order of a venue with iiko (docs/IIKO.md, "Ошибки и сбои"). */
+export type PosAlert =
+  | { kind: 'retrying'; reason: string }
+  | { kind: 'failed'; reason: string }
+  | { kind: 'needs_street' }
+  | { kind: 'sent'; posNumber: string | null }
+  | { kind: 'cancelled' }
+  | { kind: 'conflict'; posStatus: string }
+  | { kind: 'delivered_push_failed' }
+  | { kind: 'cancel_in_pos' };
+
+/** Reasons a POS order failed (pos_order.error), as the operator reads them. */
+const POS_REASON: Record<string, string> = {
+  pos_unavailable: 'iiko не отвечает',
+  pos_not_taken: 'касса iiko не взяла заказ (проверьте, что касса включена)',
+  pos_rejected_stop_list: 'iiko отклонил заказ: позиция в стоп-листе',
+  pos_rejected_price: 'iiko не принял цену позиции (возможно, «Доставка»)',
+  pos_rejected_data: 'iiko отклонил данные заказа',
+  pos_key_invalid:
+    'ключ API iiko отозван или истёк: владельцу нужно переподключить iiko',
+  pos_module_missing: 'в iiko не подключён модуль доставки',
+  pos_access_denied: 'у ключа API iiko нет нужных прав',
+  pos_access_blocked: 'доступ к iiko заблокирован (подписка)',
+  unmapped_branch: 'филиал не связан с группой терминалов iiko',
+  unmapped_item: 'позиции заказа нет во внешнем меню iiko',
+  unmapped_payment: 'способ оплаты не связан с типом оплаты iiko',
+  unmapped_delivery_item: 'не выбрана позиция «Доставка» iiko',
+};
+
+export const posReasonText = (reason: string): string =>
+  POS_REASON[reason] ?? 'ошибка iiko';
+
+export function buildPosAlertText(number: number, alert: PosAlert): string {
+  switch (alert.kind) {
+    case 'retrying':
+      return `⚠️ <b>Заказ №${number} пока не передан в iiko</b>: ${posReasonText(alert.reason)}.\nПовторяем автоматически.`;
+    case 'failed':
+      return `🚨 <b>Заказ №${number} не передан в iiko</b>: ${posReasonText(alert.reason)}.\nНажмите «Повторить» в карточке заказа или внесите заказ в iiko вручную.`;
+    case 'needs_street':
+      return `📍 <b>Заказ №${number}: выберите улицу из справочника iiko</b> в карточке заказа, иначе он не уйдёт в iiko.`;
+    case 'sent':
+      return `✅ Заказ №${number} передан в iiko${alert.posNumber ? ` (№ ${esc(alert.posNumber)} в iiko)` : ''}.`;
+    case 'cancelled':
+      return `❌ <b>Заказ №${number} отменён в iiko.</b>\nСвяжитесь с гостем.`;
+    case 'conflict':
+      return `⚠️ <b>Заказ №${number}: статус в iiko (${esc(alert.posStatus)}) не совпадает со статусом в Xmenu.</b>\nПроверьте заказ в iiko.`;
+    case 'delivered_push_failed':
+      return `⚠️ <b>Заказ №${number}: iiko не принял статус «Доставлен».</b>\nОтметьте доставку в iiko вручную.`;
+    case 'cancel_in_pos':
+      return `⚠️ <b>Заказ №${number} отменён в Xmenu, но уже передан в iiko.</b>\nОтмените его в iiko вручную.`;
+  }
+}
+
+/** The iiko key of the venue stopped working: every branch chat is told once. */
+export const POS_RECONNECT_TEXT =
+  '🔌 <b>iiko не принимает ключ API заведения.</b>\nЗаказы принимаются, но в iiko не уходят. Владельцу нужно переподключить iiko в дашборде: «Интеграции → iiko».';

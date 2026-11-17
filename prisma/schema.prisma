@@ -390,6 +390,7 @@ model customer_order {
   payments        order_payment[]
   events          order_status_event[]
   courier_cards   courier_card[]
+  pos_order       pos_order?
 
   @@unique([organization_id, number])
   @@unique([customer_id, idempotency_key])
@@ -502,6 +503,8 @@ enum OrderActor {
   courier
   system
   payment
+  // The POS (iiko statuses, docs/IIKO.md)
+  pos
 }
 
 // Where the guest placed the order: the venue site, or its Telegram Mini App (initData checked by the venue bot).
@@ -1178,6 +1181,7 @@ model pos_integration {
   payment_links     pos_payment_link[]
   menu_links        pos_menu_link[]
   stop_items        pos_stop_item[]
+  orders            pos_order[]
 }
 
 // A branch takes orders through one iiko terminal group
@@ -1253,4 +1257,68 @@ model pos_stop_item {
   @@unique([branch_id, product_id])
   @@index([integration_id])
   @@index([product_id])
+}
+
+// How far an accepted order got into iiko (docs/IIKO.md, "Путь заказа и статусы", "Ошибки и сбои")
+enum PosOrderState {
+  // Waiting for the first attempt or for the next retry
+  queued
+  // Created in iiko, the result of the command is not known yet
+  sending
+  // iiko created the order (and it was confirmed)
+  sent
+  // Retries are over or iiko refused: the operator retries or enters the order by hand
+  failed
+  // The organization takes streets from the iiko directory and the address has none: the operator picks one
+  needs_street
+  // The operator entered the order into iiko by hand
+  manual
+}
+
+// Own couriers of the venue: "on the way" and "delivered" are passed to iiko after the courier's "delivered"
+enum PosDeliveredPush {
+  none
+  pending
+  // OnWay is accepted, Delivered is next
+  on_way
+  done
+  failed
+}
+
+// One accepted order of a branch linked to iiko. Created in the transaction that accepts the order;
+// its id in iiko is the order id (iiko does not create a duplicate for a repeated id)
+model pos_order {
+  id             String          @id @default(uuid())
+  order_id       String          @unique
+  order          customer_order  @relation(fields: [order_id], references: [id], onDelete: Cascade)
+  integration_id String
+  integration    pos_integration @relation(fields: [integration_id], references: [id], onDelete: Cascade)
+
+  state          PosOrderState   @default(queued)
+  // Attempts made in the current round (an operator's retry starts a new round)
+  attempts       Int             @default(0)
+  // The iiko command of the last attempt (POST /api/1/commands/status)
+  correlation_id String?
+  // Neutral reason of the last failure (pos_unavailable, pos_rejected_stop_list, ...; docs/API.md)
+  error          String?
+  // Order number in iiko (from iiko, or typed by the operator after entering it by hand)
+  pos_number     String?
+  // Last iiko DeliveryStatus seen (webhook or poll)
+  pos_status     String?
+  // iiko street id and house for a "legacy" address, picked by the operator
+  street_id      String?
+  house          String?
+  // Courier name from iiko (courier mode "iiko couriers")
+  courier_name   String?
+  delivered_push PosDeliveredPush @default(none)
+  // The last thing the operator was alerted about: one alert per state
+  alerted        String?
+
+  sent_at        DateTime?
+  manual_at      DateTime?
+  manual_by      String?
+  created_at     DateTime        @default(now())
+  updated_at     DateTime        @updatedAt
+
+  @@index([integration_id, state])
 }

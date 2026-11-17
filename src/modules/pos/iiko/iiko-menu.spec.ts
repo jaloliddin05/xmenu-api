@@ -168,6 +168,41 @@ describe('iikoMenuToPos', () => {
     ).toBe(false);
   });
 
+  it('the size an order names: one visible size is the default size, several sizes carry their own', () => {
+    const one = iikoMenuToPos({
+      itemsGroups: [
+        {
+          id: 'g',
+          name: 'G',
+          items: [
+            {
+              productId: 'p1',
+              name: 'Шаурма',
+              sizePrices: [
+                { sizeId: 's-std', price: 30000 },
+                { sizeId: 's-big', price: 40000, isHidden: true },
+              ],
+            },
+            {
+              productId: 'p2',
+              name: 'Чай',
+              sizePrices: [{ sizeId: null, price: 5000 }],
+            },
+          ],
+        },
+      ],
+    });
+    expect(one.items.map((i) => [i.externalId, i.defaultSizeId])).toEqual([
+      ['p1', 's-std'],
+      ['p2', null],
+    ]);
+    const marg = iikoMenuToPos(MENU).items.find(
+      (i) => i.externalId === 'p-marg',
+    )!;
+    expect(marg.defaultSizeId).toBeNull();
+    expect(marg.sizes.length).toBeGreaterThan(1);
+  });
+
   it('an empty answer is an empty menu', () => {
     expect(iikoMenuToPos({})).toEqual({ categories: [], items: [] });
   });

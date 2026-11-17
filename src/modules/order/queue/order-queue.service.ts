@@ -25,6 +25,20 @@ export interface DeliveryTimerJob {
   /** Start of the status episode, ms (domain/delivery-timers.ts, timerStillDue) */
   since: number;
 }
+/**
+ * Orders of venues with a POS (worker: pos module, PosOrderProcessor; docs/IIKO.md): `push` sends an
+ * accepted order, `check` reads the result of the command, `delivered` passes "on the way" and
+ * "delivered" of an own courier, `poll` asks the POS for the statuses of unfinished orders.
+ */
+export const POS_ORDER_QUEUE = 'pos-orders';
+export type PosOrderJobName = 'push' | 'check' | 'delivered' | 'poll';
+export interface PosOrderJob {
+  orderId?: string;
+  integrationId?: string;
+  correlationId?: string;
+  /** check: how many times the command was asked already */
+  polls?: number;
+}
 const deliveryTimerJobId = (orderId: string, kind: DeliveryTimerKind) =>
   `dlv-${kind}-${orderId}`;
 /** Temporary Telegram failures are retried: 10 s, 20 s, 40 s, 80 s after the first attempt. */
@@ -63,6 +77,7 @@ export class OrderQueueService implements OnModuleDestroy {
   private guestNotifications?: Queue;
   private courierCards?: Queue;
   private deliveryTimers?: Queue;
+  private posOrders?: Queue<PosOrderJob>;
 
   private get escalationQueue(): Queue {
     return (this.escalation ??= new Queue(ESCALATION_QUEUE, {
@@ -120,6 +135,20 @@ export class OrderQueueService implements OnModuleDestroy {
         removeOnFail: 100,
         attempts: 3,
         backoff: { type: 'exponential', delay: 5000 },
+      },
+    }));
+  }
+
+  /** Shared with the pos module (PosOrderProcessor), which adds the follow-up jobs itself. */
+  get posOrderQueue(): Queue<PosOrderJob> {
+    return (this.posOrders ??= new Queue<PosOrderJob>(POS_ORDER_QUEUE, {
+      connection: bullConnection(),
+      defaultJobOptions: {
+        removeOnComplete: true,
+        removeOnFail: 100,
+        // The handler counts the attempts of an order itself (pos_order.attempts); this one covers a crash
+        attempts: 2,
+        backoff: { type: 'fixed', delay: 10_000 },
       },
     }));
   }
@@ -218,6 +247,24 @@ export class OrderQueueService implements OnModuleDestroy {
     });
   }
 
+  /**
+   * An accepted order goes to the POS (`push`), or an own courier delivered an order the POS has
+   * (`delivered`). Without queues (ORDER_QUEUES=off) nothing goes to the POS: the order stays queued.
+   */
+  enqueuePosOrder(name: 'push' | 'delivered', orderId: string) {
+    if (!this.enabled)
+      this.logger.warn(
+        `ORDER_QUEUES=off: order ${orderId} is not passed to the POS (${name})`,
+      );
+    return this.safe('enqueuePosOrder', () =>
+      this.posOrderQueue.add(
+        name,
+        { orderId },
+        { jobId: `pos-${name}-${orderId}-0` },
+      ),
+    );
+  }
+
   /** False when there is no queue (ORDER_QUEUES=off) or it failed (logged): the caller sends at once. */
   async enqueueGuestNotification(data: {
     orderId: string;
@@ -242,6 +289,7 @@ export class OrderQueueService implements OnModuleDestroy {
       this.guestNotifications?.close(),
       this.courierCards?.close(),
       this.deliveryTimers?.close(),
+      this.posOrders?.close(),
     ]);
   }
 }

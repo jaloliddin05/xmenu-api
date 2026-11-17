@@ -93,6 +93,7 @@ model customer_order {
   payments        order_payment[]
   events          order_status_event[]
   courier_cards   courier_card[]
+  pos_order       pos_order?
 
   @@unique([organization_id, number])
   @@unique([customer_id, idempotency_key])

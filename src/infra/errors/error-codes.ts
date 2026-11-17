@@ -595,6 +595,16 @@ export const ERROR_CODES = spec({
     message: 'Courier mode cannot change now',
     when: 'Смена режима курьеров при незавершённых заказах доставки',
   },
+  pos_order_state_conflict: {
+    status: 409,
+    message: 'The order is not in a state for this action',
+    when: 'Действие с передачей заказа в iiko не подходит к её состоянию: «Повторить» не для `failed`, «Внесён вручную» для уже переданного, улица для заказа, который её не ждёт, или заказ уже завершён',
+  },
+  pos_couriers_managed: {
+    status: 409,
+    message: 'Couriers of this venue are managed in the POS',
+    when: 'Курьерская функция Xmenu (курьеры, смены, назначение, внешняя служба, отчёт по курьерам) у заведения в режиме «курьеры iiko»',
+  },
 });
 
 export type ErrorCode = keyof typeof ERROR_CODES;

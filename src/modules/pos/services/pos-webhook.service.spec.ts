@@ -17,6 +17,7 @@ const stopEvent = (correlationId = 'c1') => ({
 describe('PosWebhookService', () => {
   let row: any;
   let sync: { enqueue: jest.Mock };
+  let statuses: { apply: jest.Mock };
   let service: PosWebhookService;
 
   beforeEach(() => {
@@ -27,6 +28,7 @@ describe('PosWebhookService', () => {
       webhook_secret_hash: hashWebhookSecret(SECRET),
     };
     sync = { enqueue: jest.fn(async () => undefined) };
+    statuses = { apply: jest.fn(async () => undefined) };
     service = new PosWebhookService(
       {
         pos_integration: {
@@ -38,7 +40,46 @@ describe('PosWebhookService', () => {
       new IikoProvider({} as any),
       new FakeRedis() as any,
       sync as any,
+      statuses as any,
     );
+  });
+
+  it('delivery order events move the order once each; events without an order are skipped', async () => {
+    const update = {
+      eventType: 'DeliveryOrderUpdate',
+      eventTime: '2026-11-17 10:05:00.000',
+      organizationId: 'o1',
+      correlationId: 'c9',
+      eventInfo: {
+        id: 'order-1',
+        creationStatus: 'Success',
+        order: { status: 'CookingCompleted', number: 7 },
+      },
+    };
+    await service.receive(ID, SECRET, [
+      update,
+      update,
+      { ...update, eventType: 'DeliveryOrderError', eventInfo: {} },
+    ]);
+    expect(statuses.apply).toHaveBeenCalledTimes(1);
+    expect(statuses.apply).toHaveBeenCalledWith(
+      ID,
+      expect.objectContaining({ id: 'order-1', status: 'CookingCompleted' }),
+    );
+  });
+
+  it('a failure while applying an order event: 503, so iiko calls again and the event counts then', async () => {
+    const update = {
+      eventType: 'DeliveryOrderUpdate',
+      organizationId: 'o1',
+      eventInfo: { id: 'order-1', order: { status: 'Cancelled' } },
+    };
+    statuses.apply.mockRejectedValueOnce(new Error('db down'));
+    await expect(service.receive(ID, SECRET, [update])).rejects.toMatchObject({
+      code: 'unavailable',
+    });
+    await service.receive(ID, SECRET, [update]);
+    expect(statuses.apply).toHaveBeenCalledTimes(2);
   });
 
   it('a stop list signal queues a refresh', async () => {

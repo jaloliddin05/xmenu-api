@@ -60,7 +60,9 @@ Webhook'и Click/Payme переводят заказ `awaiting_payment → pendi
   `payme`; доставка — способы из `deliveryPayment` заведения, `GET /checkout-config`).
 * `expectedDeliveryFee` — цена доставки, которую клиент видел в корзине (`deliveryFee` из `GET /delivery/quote`).
   Правила изменились → `409 delivery_fee_changed` с новой ценой; клиент показывает её и просит подтвердить.
-* `expectedTotal` — сумма, которую видел клиент. Не совпала → `409 price_changed`.
+* `expectedTotal` — сумма, которую видел клиент. Не совпала → `409 price_changed`. У заведения с кассой iiko
+  обязательна: цены меняются с каждым импортом меню (`400 validation_error`, поле `expectedTotal`, код `required`;
+  `docs/API.md`, «Передача заказа в iiko»).
 * `cashChangeFrom` — необязательно, только при `paymentMethod: cash`: с какой суммы нужна сдача, не меньше суммы к
   оплате (с доставкой). Иначе `400 validation_error`, поле `cashChangeFrom` (`cash_only` или `below_total`).
 * `branchId`: id из `GET /branches` (см. `BRANCHES_API.md`). pickup — филиал самовывоза (обязателен); delivery — не
@@ -131,7 +133,8 @@ Webhook'и Click/Payme переводят заказ `awaiting_payment → pendi
 }
 ```
 
-`courier`: `{ "name": "Bekzod" }`, пока свой курьер везёт заказ (`on_the_way`, `problem_at_door`), иначе `null`;
+`courier`: `{ "name": "Bekzod" }`, пока свой курьер везёт заказ (`on_the_way`, `problem_at_door`), иначе `null`
+(у заведения с курьерами iiko — имя, которое передал iiko, если передал);
 телефона курьера гость не получает. `doorProblem`: `no_answer` (курьер у двери и не может дозвониться; таймлайн:
 «Курьер у двери и не может до вас дозвониться») или `refused` (гость отказался; решает оператор), иначе `null`.
 `externalService`: название службы у заказа `handed_to_external` («Передан в службу доставки <название>»), иначе
@@ -161,12 +164,13 @@ cash ─────────────────────▶ pending_
 
 Конечные статусы: `completed`, `cancelled`, `returned_to_restaurant`, `handed_to_external`. У доставки нет шага
 `preparing`; «В пути» и «Доставлен» отмечает только назначенный заказу курьер в боте заведения (`docs/API.md`,
-«Курьеры»). Полная таблица переходов: `src/modules/order/domain/order-state-machine.ts` (тест сверяет её со схемой
+«Курьеры»), у заведения с курьерами iiko — статусы iiko. Заказ, переданный в iiko, двигают и статусы iiko
+(исполнитель `pos`: «Готов», у самовывоза «Выдан», отмена; `docs/API.md`, «Передача заказа в iiko»). Полная таблица переходов: `src/modules/order/domain/order-state-machine.ts` (тест сверяет её со схемой
 `../docs/DELIVERY.md`).
 
-`cancelled`: `cancelledBy` = `customer | restaurant | system`;
+`cancelled`: `cancelledBy` = `customer | restaurant | system | pos`;
 `cancelReason`, напр. `declined`, `no_response` (авто-отмена, если ресторан
-не принял за 5 мин — по ранее спроектированной эскалации).
+не принял за 5 мин — по ранее спроектированной эскалации), `pos_cancelled` (отменён в iiko).
 Клиент может отменить заказ (доставку и самовывоз) только из `awaiting_payment`, `payment_failed`,
 `pending_acceptance` (до принятия рестораном); иначе `409 cancel_not_allowed`.
 Повторная отмена уже отменённого — не ошибка.
@@ -247,12 +251,13 @@ external`, `click`/`payme` при включённом онлайне и клю�
 
 В ответе персоналу дополнительно: `courier` `{ id, name, phone } | null` (назначенный сейчас, в любом статусе),
 `courierAssignedAt`, `doorProblemReason` (`changed_mind | wrong_order | quality | other` при `refused`), `readyAt`,
-`pickedUpAt`, `doorWaitEndsAt`, `cashCollected` (`cash | card`), `external` (передача службе; `API.md`, «Курьеры») и в журнале
+`pickedUpAt`, `doorWaitEndsAt`, `cashCollected` (`cash | card`), `external` (передача службе; `API.md`, «Курьеры»),
+`pos` (передача в iiko или `null`; `API.md`, «Передача заказа в iiko») и в журнале
 `events[]` имя исполнителя (`actorName`, `actorRole`: `API.md`, «История заказа»), исполнитель `courier` (с `actorId` =
 id курьера) и записи без смены статуса (`from = to`, `note`:
 `courier_assigned:<id>`, `courier_reassigned:<id>`, `courier_unassigned:<id>`, `external_cash_received`,
 `external_cash_not_received`; `courier_disabled:<id>` у перехода `on_the_way → ready` от `system`; `delivered_card` у
-доставки, оплаченной курьеру картой у двери).
+доставки, оплаченной курьеру картой у двери; `iiko:*` у передачи в iiko и у исполнителя `pos`).
 
 ## Проверка сценариев без бэкенда
 

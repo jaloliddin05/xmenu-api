@@ -3698,6 +3698,15 @@
             }
           },
           {
+            "name": "posState",
+            "required": false,
+            "in": "query",
+            "description": "Comma-separated states of the transfer to iiko: failed,needs_street (docs/API.md, \"Передача заказа в iiko\")",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "cursor",
             "required": false,
             "in": "query",
@@ -5625,6 +5634,203 @@
         "x-permission": "venue"
       }
     },
+    "/order/{id}/pos/retry": {
+      "post": {
+        "operationId": "PosOrderController_retry",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosOrderViewDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "«Повторить»: a new round of attempts for an order not sent to iiko",
+        "tags": [
+          "POS (iiko)"
+        ],
+        "x-permission": "orders"
+      }
+    },
+    "/order/{id}/pos/manual": {
+      "post": {
+        "operationId": "PosOrderController_manual",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosManualDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosOrderViewDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "«Внесён вручную»: the operator entered the order into iiko",
+        "tags": [
+          "POS (iiko)"
+        ],
+        "x-permission": "orders"
+      }
+    },
+    "/order/{id}/pos/streets": {
+      "get": {
+        "operationId": "PosOrderController_streets",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Part of the name",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosStreetsDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Streets of the iiko directory for an order waiting for a street",
+        "tags": [
+          "POS (iiko)"
+        ],
+        "x-permission": "orders"
+      }
+    },
+    "/order/{id}/pos/street": {
+      "put": {
+        "operationId": "PosOrderController_setStreet",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosStreetDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosOrderViewDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "The street and house for iiko; the order is sent again",
+        "tags": [
+          "POS (iiko)"
+        ],
+        "x-permission": "orders"
+      }
+    },
     "/product": {
       "get": {
         "operationId": "ProductController_findAll",
@@ -7422,7 +7628,9 @@
           "pos_links_invalid",
           "pos_setup_incomplete",
           "pos_managed_field",
-          "pos_courier_mode_locked"
+          "pos_courier_mode_locked",
+          "pos_order_state_conflict",
+          "pos_couriers_managed"
         ],
         "description": "Stable code (never renamed or reused), docs/ERRORS.md"
       },
@@ -9994,6 +10202,82 @@
           "paymentMarkPending"
         ]
       },
+      "PosOrderViewDto": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "sending",
+              "sent",
+              "failed",
+              "needs_street",
+              "manual"
+            ],
+            "description": "queued: waiting for an attempt; sending: iiko is creating it; sent: in iiko; failed: not sent («Повторить» or «Внесён вручную»); needs_street: the operator picks a street of the iiko directory; manual: entered into iiko by hand"
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "pos_unavailable",
+              "pos_not_taken",
+              "pos_rejected_stop_list",
+              "pos_rejected_price",
+              "pos_rejected_data",
+              "pos_key_invalid",
+              "pos_module_missing",
+              "pos_access_denied",
+              "pos_access_blocked",
+              "unmapped_branch",
+              "unmapped_item",
+              "unmapped_payment",
+              "unmapped_delivery_item"
+            ],
+            "nullable": true,
+            "description": "Why the last attempt failed (null after a success)"
+          },
+          "posNumber": {
+            "type": "string",
+            "nullable": true,
+            "description": "Number in iiko"
+          },
+          "posStatus": {
+            "type": "string",
+            "nullable": true,
+            "description": "Last iiko delivery status (CookingStarted, OnWay, ...)"
+          },
+          "courierName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Courier named by iiko (courier mode \"iiko\")"
+          },
+          "attempts": {
+            "type": "number",
+            "description": "Attempts of the current round (up to 5)"
+          },
+          "sentAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "manualAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "state",
+          "error",
+          "posNumber",
+          "posStatus",
+          "courierName",
+          "attempts",
+          "sentAt",
+          "manualAt"
+        ]
+      },
       "OrderEventDto": {
         "type": "object",
         "properties": {
@@ -10039,7 +10323,8 @@
               "restaurant",
               "courier",
               "system",
-              "payment"
+              "payment",
+              "pos"
             ]
           },
           "actorId": {
@@ -10065,7 +10350,7 @@
           "note": {
             "type": "string",
             "nullable": true,
-            "description": "With from = to the entry is not a status change: courier_assigned:<id>, courier_reassigned:<id>, courier_unassigned:<id>"
+            "description": "With from = to the entry is not a status change: courier_assigned:<id>, courier_reassigned:<id>, courier_unassigned:<id>, iiko:<event> (docs/API.md, \"Передача заказа в iiko\"); actor pos: iiko:<DeliveryStatus>"
           },
           "at": {
             "type": "string",
@@ -10285,6 +10570,16 @@
               }
             ]
           },
+          "pos": {
+            "nullable": true,
+            "description": "Transfer to iiko; null when the branch is not linked to iiko or the order was not accepted",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PosOrderViewDto"
+              }
+            ]
+          },
           "events": {
             "type": "array",
             "items": {
@@ -10326,6 +10621,7 @@
           "doorWaitEndsAt",
           "cashCollected",
           "external",
+          "pos",
           "events"
         ]
       },
@@ -10667,12 +10963,28 @@
             "type": "number",
             "example": 10,
             "description": "Wait at the door after \"no answer\""
+          },
+          "posFailed": {
+            "type": "number",
+            "example": 0,
+            "description": "Unfinished orders not sent to iiko or waiting for a street (0 without iiko)"
+          },
+          "posReconnect": {
+            "type": "boolean",
+            "description": "iiko does not take the venue key: the owner reconnects iiko"
+          },
+          "posCouriers": {
+            "type": "boolean",
+            "description": "Couriers of the venue work in iiko: courier functions of Xmenu answer 409 pos_couriers_managed"
           }
         },
         "required": [
           "pickupReminderMinutes",
           "onTheWayAlertMinutes",
-          "doorWaitMinutes"
+          "doorWaitMinutes",
+          "posFailed",
+          "posReconnect",
+          "posCouriers"
         ]
       },
       "StaffOrderListDto": {
@@ -12518,6 +12830,69 @@
         },
         "required": [
           "connected"
+        ]
+      },
+      "PosManualDto": {
+        "type": "object",
+        "properties": {
+          "posNumber": {
+            "type": "string",
+            "nullable": true,
+            "description": "Order number in iiko, if the operator has it",
+            "example": "1042"
+          }
+        }
+      },
+      "PosStreetViewDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string",
+            "description": "City of the street in iiko"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "city"
+        ]
+      },
+      "PosStreetsDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosStreetViewDto"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "PosStreetDto": {
+        "type": "object",
+        "properties": {
+          "streetId": {
+            "type": "string",
+            "description": "Street id from GET .../pos/streets"
+          },
+          "house": {
+            "type": "string",
+            "description": "House number as iiko takes it",
+            "example": "12А"
+          }
+        },
+        "required": [
+          "streetId",
+          "house"
         ]
       },
       "CreateProductDto": {

@@ -288,6 +288,9 @@ describe('OrderService.create: delivery price, payment and change', () => {
     },
     product: { findMany: jest.fn(async () => []) },
     pos_stop_item: { findMany: jest.fn(async () => []) },
+    pos_integration: {
+      findUnique: jest.fn(async (): Promise<{ status: string } | null> => null),
+    },
     $transaction: jest.fn(async (fn: (t: typeof tx) => unknown) => fn(tx)),
   };
   const service = new OrderService(
@@ -458,6 +461,41 @@ describe('OrderService.create: delivery price, payment and change', () => {
       subtotal: SUBTOTAL,
       deliveryFee: 12000,
       total: SUBTOTAL + 12000,
+    });
+  });
+
+  describe('a venue with iiko (docs/IIKO.md, "Стоп-лист и цены")', () => {
+    beforeEach(() => {
+      prisma.pos_integration.findUnique.mockResolvedValue({ status: 'active' });
+    });
+    afterEach(() => {
+      prisma.pos_integration.findUnique.mockResolvedValue(null);
+    });
+
+    it('the total the guest saw is required: prices change with every import', async () => {
+      const r = await run(order());
+      expect(r?.code).toBe('validation_error');
+      expect(r?.body.fields).toEqual([
+        expect.objectContaining({ field: 'expectedTotal', code: 'required' }),
+      ]);
+      expect(created).toBeUndefined();
+      // A venue whose integration is not enabled yet keeps the old contract
+      prisma.pos_integration.findUnique.mockResolvedValue({ status: 'draft' });
+      expect(await run(order())).toBeNull();
+    });
+
+    it('a price changed by the import between the cart and the order: price_changed with the new prices', async () => {
+      // The cart was built before the import: the dish cost 5 000 less
+      const r = await run(order({ expectedTotal: SUBTOTAL - 5000 + 12000 }));
+      expect(r?.code).toBe('price_changed');
+      expect(r?.status).toBe(409);
+      expect(r?.body.details).toMatchObject({
+        subtotal: SUBTOTAL,
+        total: SUBTOTAL + 12000,
+      });
+      expect(created).toBeUndefined();
+      // Confirmed with the new total: placed
+      expect(await run(order({ expectedTotal: SUBTOTAL + 12000 }))).toBeNull();
     });
   });
 

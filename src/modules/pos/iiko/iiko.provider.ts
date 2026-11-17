@@ -3,19 +3,39 @@ import { AppException } from 'src/infra/errors/app-exception';
 import type {
   PosAddressFormat,
   PosCheck,
+  PosCommandState,
   PosCredentials,
   PosDictionaries,
   PosMenu,
+  PosOrderDraft,
+  PosOrderInfo,
   PosOrganization,
   PosProvider,
   PosStopList,
+  PosStreet,
   PosWebhookEvent,
 } from '../provider/pos-provider';
 import { IikoApiClient, IikoApiError } from './iiko-api.client';
 import { IikoMenuV3, iikoMenuToPos } from './iiko-menu';
+import { iikoCreateBody, iikoOrderInfo } from './iiko-order';
 import { parseIikoWebhook } from './iiko-webhook';
 
 const MENU_TIMEOUT_MS = 60_000;
+/** Streets returned for one query */
+const STREETS_LIMIT = 20;
+/** Delivery statuses the webhook reports (deliveryOrderFilter.orderStatuses) */
+const WEBHOOK_ORDER_STATUSES = [
+  'Unconfirmed',
+  'WaitCooking',
+  'ReadyForCooking',
+  'CookingStarted',
+  'CookingCompleted',
+  'Waiting',
+  'OnWay',
+  'Delivered',
+  'Closed',
+  'Cancelled',
+];
 
 interface Named {
   id: string;
@@ -263,7 +283,10 @@ export class IikoProvider implements PosProvider {
       webHooksUri: url,
       authToken,
       webHooksFilter: {
-        deliveryOrderFilter: { errors: true },
+        deliveryOrderFilter: {
+          orderStatuses: WEBHOOK_ORDER_STATUSES,
+          errors: true,
+        },
         stopListUpdateFilter: { updates: true },
       },
     });
@@ -281,4 +304,135 @@ export class IikoProvider implements PosProvider {
   parseWebhook(body: unknown): PosWebhookEvent[] {
     return parseIikoWebhook(body);
   }
+
+  async createOrder(
+    cred: PosCredentials,
+    orgId: string,
+    order: PosOrderDraft,
+  ): Promise<{ correlationId: string; info: PosOrderInfo | null }> {
+    const data = await this.api.call<{
+      correlationId?: unknown;
+      orderInfo?: unknown;
+    }>(cred, '/api/1/deliveries/create', iikoCreateBody(orgId, order));
+    return {
+      correlationId: commandId(data, '/api/1/deliveries/create'),
+      info: iikoOrderInfo(data?.orderInfo),
+    };
+  }
+
+  async commandStatus(
+    cred: PosCredentials,
+    orgId: string,
+    correlationId: string,
+  ): Promise<PosCommandState> {
+    let data: { state?: unknown; exception?: { code?: unknown } | null };
+    try {
+      data = await this.api.call(cred, '/api/1/commands/status', {
+        organizationId: orgId,
+        correlationId,
+      });
+    } catch (e) {
+      // 410: iiko no longer keeps this command
+      if (e instanceof IikoApiError && e.status === 410)
+        return { state: 'unknown' };
+      throw e;
+    }
+    switch (data?.state) {
+      case 'InProgress':
+        return { state: 'in_progress' };
+      case 'Success':
+        return { state: 'success' };
+      case 'Error': {
+        const code = data.exception?.code;
+        return {
+          state: 'error',
+          errorCode: typeof code === 'string' ? code.slice(0, 80) : null,
+        };
+      }
+      default:
+        return { state: 'unknown' };
+    }
+  }
+
+  async confirmOrder(
+    cred: PosCredentials,
+    orgId: string,
+    orderId: string,
+  ): Promise<string> {
+    const path = '/api/1/deliveries/confirm';
+    return commandId(
+      await this.api.call(cred, path, { organizationId: orgId, orderId }),
+      path,
+    );
+  }
+
+  async setDeliveryStatus(
+    cred: PosCredentials,
+    orgId: string,
+    orderId: string,
+    status: 'OnWay' | 'Delivered',
+  ): Promise<string> {
+    const path = '/api/1/deliveries/update_order_delivery_status';
+    return commandId(
+      await this.api.call(cred, path, {
+        organizationId: orgId,
+        orderId,
+        deliveryStatus: status,
+      }),
+      path,
+    );
+  }
+
+  async orders(
+    cred: PosCredentials,
+    orgId: string,
+    orderIds: string[],
+  ): Promise<PosOrderInfo[]> {
+    if (!orderIds.length) return [];
+    const { orders } = await this.api.call<{ orders?: unknown[] | null }>(
+      cred,
+      '/api/1/deliveries/by_id',
+      { organizationId: orgId, orderIds },
+    );
+    return (orders ?? []).flatMap((o) => {
+      const info = iikoOrderInfo(o);
+      return info ? [info] : [];
+    });
+  }
+
+  async streets(
+    cred: PosCredentials,
+    orgId: string,
+    query: string,
+  ): Promise<PosStreet[]> {
+    const q = query.trim().toLocaleLowerCase();
+    const { cities } = await this.api.call<{
+      cities?: { items?: (Named & { isDeleted?: boolean })[] | null }[] | null;
+    }>(cred, '/api/1/cities', { organizationIds: [orgId] });
+    const out: PosStreet[] = [];
+    for (const city of (cities ?? []).flatMap((c) => c?.items ?? [])) {
+      if (!city?.id || city.isDeleted) continue;
+      const { streets } = await this.api.call<{
+        streets?: (Named & { isDeleted?: boolean })[] | null;
+      }>(cred, '/api/1/streets/by_city', {
+        organizationId: orgId,
+        cityId: city.id,
+      });
+      for (const st of streets ?? []) {
+        if (!st?.id || st.isDeleted || !st.name) continue;
+        if (q && !st.name.toLocaleLowerCase().includes(q)) continue;
+        out.push({ id: st.id, name: st.name, city: city.name ?? '' });
+        if (out.length >= STREETS_LIMIT) return out;
+      }
+    }
+    return out;
+  }
+}
+
+/** The command id of an iiko command answer; an answer without one is a failed call. */
+function commandId(data: unknown, path: string): string {
+  const id = (data as { correlationId?: unknown } | null)?.correlationId;
+  if (typeof id !== 'string' || !id)
+    throw new IikoApiError(path, 200, null, 'pos_unavailable');
+  return id;
 }

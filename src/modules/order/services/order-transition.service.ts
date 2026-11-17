@@ -18,6 +18,7 @@ import {
   checkTransition,
 } from '../domain/order-state-machine';
 import { CustomerNotifierService } from '../notifications/customer-notifier.service';
+import type { PosAlert } from '../notifications/order-messages';
 import { RestaurantNotifierService } from '../notifications/restaurant-notifier.service';
 import { OrderQueueService } from '../queue/order-queue.service';
 import { OrderSettingsService } from './order-settings.service';
@@ -72,7 +73,11 @@ export type Effect =
   | { type: 'courier_card'; courierId: string }
   | { type: 'operator_alert'; kind: OperatorAlertKind }
   /** A delivery changed status: drop its pending timers, schedule the one of the new status */
-  | { type: 'delivery_timers' };
+  | { type: 'delivery_timers' }
+  /** The order goes to the POS (accepted) or the POS hears that an own courier delivered it */
+  | { type: 'pos_job'; name: 'push' | 'delivered' }
+  /** A message to the branch chat about the order in the POS */
+  | { type: 'pos_alert'; alert: PosAlert };
 
 export interface TransitionResult {
   order: customer_order;
@@ -155,11 +160,26 @@ export class OrderTransitionService {
         break;
       case 'accepted':
         data.accepted_at = now;
+        if (await this.queueForPos(tx, order))
+          effects.push({ type: 'pos_job', name: 'push' });
         break;
       case 'completed':
         data.completed_at = now;
         if (order.fulfillment === 'delivery' && order.courier_id)
           Object.assign(data, await this.deliveredByCourier(tx, order, input));
+        // Own couriers of a venue with iiko: iiko hears "on the way" and "delivered" (docs/IIKO.md, "Курьеры")
+        if (input.actor === 'courier') {
+          const handed = await tx.pos_order.updateMany({
+            where: {
+              order_id: order.id,
+              state: 'sent',
+              delivered_push: 'none',
+            },
+            data: { delivered_push: 'pending' },
+          });
+          if (handed.count)
+            effects.push({ type: 'pos_job', name: 'delivered' });
+        }
         break;
       case 'on_the_way':
         data.picked_up_at = now;
@@ -219,6 +239,14 @@ export class OrderTransitionService {
         } else if (order.payment_status === 'pending') {
           data.payment_status = 'cancelled';
         }
+        // Changing an order already in iiko is out of the MVP: the operator cancels it there by hand
+        if (
+          input.actor !== 'pos' &&
+          (await tx.pos_order.count({
+            where: { order_id: order.id, state: { in: ['sending', 'sent'] } },
+          }))
+        )
+          effects.push({ type: 'pos_alert', alert: { kind: 'cancel_in_pos' } });
         break;
     }
 
@@ -295,6 +323,30 @@ export class OrderTransitionService {
       courier_distance_km: Math.round(km * 1000) / 1000,
       courier_pay: courierPay(rate, km),
     };
+  }
+
+  /**
+   * An accepted order of a branch linked to an enabled POS integration gets its pos_order row in the
+   * same transaction (docs/IIKO.md, "Путь заказа и статусы"); a branch without a link sends nothing.
+   */
+  private async queueForPos(
+    tx: Prisma.TransactionClient,
+    order: customer_order,
+  ): Promise<boolean> {
+    const link = await tx.pos_branch_link.findUnique({
+      where: { branch_id: order.branch_id },
+      select: {
+        integration_id: true,
+        integration: { select: { status: true } },
+      },
+    });
+    if (!link || link.integration.status === 'draft') return false;
+    await tx.pos_order.upsert({
+      where: { order_id: order.id },
+      create: { order_id: order.id, integration_id: link.integration_id },
+      update: {},
+    });
+    return true;
   }
 
   /**
@@ -406,6 +458,12 @@ export class OrderTransitionService {
             break;
           case 'operator_alert':
             await this.restaurant.alertDeliveryProblem(order.id, effect.kind);
+            break;
+          case 'pos_job':
+            await this.queues.enqueuePosOrder(effect.name, order.id);
+            break;
+          case 'pos_alert':
+            await this.restaurant.alertPos(order.id, effect.alert);
             break;
           case 'delivery_timers': {
             const s = await this.settings.get(order.organization_id);

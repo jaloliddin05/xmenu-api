@@ -1,7 +1,6 @@
 /**
  * A POS (cash register system) behind one interface: the integration code talks to it and never to
- * a vendor API directly. MVP has one adapter, iiko (../iiko/iiko.provider.ts). Order sending and
- * statuses join the interface in part 2 (../docs/IIKO.md).
+ * a vendor API directly. MVP has one adapter, iiko (../iiko/iiko.provider.ts); docs/IIKO.md.
  *
  * Every method takes the restaurant's own credentials: adapters keep no state per venue except a
  * short-lived access token cache.
@@ -79,6 +78,8 @@ export interface PosMenuItem {
   price: number;
   /** Two or more visible sizes: imported as a required "size" option group */
   sizes: PosMenuSize[];
+  /** One size only: its POS id, passed with every order of the item (null: the item has no sizes) */
+  defaultSizeId: string | null;
   modifierGroups: PosModifierGroup[];
   weight: number | null;
   unit: 'gr' | 'ml';
@@ -129,6 +130,95 @@ export interface PosWebhookEvent {
   externalOrgId: string | null;
   /** StopListUpdate: the terminal groups whose stop list changed */
   terminalGroupIds: string[];
+  /** DeliveryOrderUpdate / DeliveryOrderError: the order as iiko reports it */
+  order: PosOrderInfo | null;
+}
+
+/** An order as Xmenu passes it to the POS (domain/pos-order-draft.ts builds it from an accepted order). */
+export interface PosOrderDraft {
+  /** The Xmenu order id: the POS creates no duplicate for a repeated id */
+  id: string;
+  externalNumber: string;
+  terminalGroupId: string;
+  kind: 'delivery' | 'pickup';
+  phone: string;
+  customerName: string;
+  comment: string | null;
+  items: PosOrderLine[];
+  payment: {
+    paymentTypeId: string;
+    paymentTypeKind: string;
+    sum: number;
+    /** Paid online before the POS got the order */
+    processedExternally: boolean;
+  };
+  /** Delivery only */
+  address: PosOrderAddress | null;
+}
+
+export interface PosOrderLine {
+  productId: string;
+  sizeId: string | null;
+  amount: number;
+  /** Price of one unit without modifiers */
+  price: number;
+  modifiers: {
+    productId: string;
+    groupId: string;
+    amount: number;
+    price: number;
+  }[];
+}
+
+export type PosOrderAddress = {
+  latitude: number | null;
+  longitude: number | null;
+  entrance: string | null;
+  floor: string | null;
+  flat: string | null;
+  comment: string | null;
+} & (
+  | { format: 'city'; line: string }
+  | { format: 'legacy'; streetId: string; house: string }
+);
+
+/** Delivery statuses of the POS (iiko DeliveryStatus). */
+export type PosDeliveryStatus =
+  | 'Unconfirmed'
+  | 'WaitCooking'
+  | 'ReadyForCooking'
+  | 'CookingStarted'
+  | 'CookingCompleted'
+  | 'Waiting'
+  | 'OnWay'
+  | 'Delivered'
+  | 'Closed'
+  | 'Cancelled';
+
+/** What the POS knows about one order. */
+export interface PosOrderInfo {
+  /** The Xmenu order id */
+  id: string;
+  creation: 'in_progress' | 'success' | 'error' | null;
+  /** The POS error code of a failed creation (iiko errorInfo.code) */
+  errorCode: string | null;
+  status: PosDeliveryStatus | null;
+  number: string | null;
+  courierName: string | null;
+}
+
+/** Result of a POS command (create, confirm, delivery status). */
+export type PosCommandState =
+  | { state: 'in_progress' }
+  | { state: 'success' }
+  | { state: 'error'; errorCode: string | null }
+  /** The POS no longer knows the command */
+  | { state: 'unknown' };
+
+export interface PosStreet {
+  id: string;
+  name: string;
+  city: string;
 }
 
 export interface PosProvider {
@@ -170,6 +260,42 @@ export interface PosProvider {
   clearWebhook(cred: PosCredentials, orgId: string): Promise<void>;
   /** Events of one webhook call; unknown shapes are skipped. */
   parseWebhook(body: unknown): PosWebhookEvent[];
+  /** Sends an order; the result comes later through commandStatus or a webhook. */
+  createOrder(
+    cred: PosCredentials,
+    orgId: string,
+    order: PosOrderDraft,
+  ): Promise<{ correlationId: string; info: PosOrderInfo | null }>;
+  commandStatus(
+    cred: PosCredentials,
+    orgId: string,
+    correlationId: string,
+  ): Promise<PosCommandState>;
+  /** Confirms an order that waits for confirmation in the POS; returns the command id. */
+  confirmOrder(
+    cred: PosCredentials,
+    orgId: string,
+    orderId: string,
+  ): Promise<string>;
+  /** Moves a delivery forward (own couriers of the venue); returns the command id. */
+  setDeliveryStatus(
+    cred: PosCredentials,
+    orgId: string,
+    orderId: string,
+    status: 'OnWay' | 'Delivered',
+  ): Promise<string>;
+  /** Orders by Xmenu id; orders the POS does not know are left out. */
+  orders(
+    cred: PosCredentials,
+    orgId: string,
+    orderIds: string[],
+  ): Promise<PosOrderInfo[]>;
+  /** Streets of the POS directory whose name contains the query (legacy address format). */
+  streets(
+    cred: PosCredentials,
+    orgId: string,
+    query: string,
+  ): Promise<PosStreet[]>;
 }
 
 export const POS_PROVIDER = Symbol('POS_PROVIDER');

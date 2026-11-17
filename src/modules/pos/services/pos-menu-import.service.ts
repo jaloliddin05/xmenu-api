@@ -373,6 +373,8 @@ export class PosMenuImportService {
       await this.link(tx, row.id, p.linkId, {
         kind: 'product',
         external_id: item.externalId,
+        // The single size an order of this item names (several sizes: the size option carries it)
+        size_id: item.defaultSizeId,
         product_id: id,
         source_name: item.name,
         hidden_in_pos: item.hidden,

@@ -9,6 +9,7 @@ import { bullConnection } from 'src/infra/redis/bull-connection';
 import { errorMessage } from 'src/infra/helper/error-text';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
 import { PosMenuImportService } from './pos-menu-import.service';
+import { PosOrderQueue } from './pos-order.queue';
 import { PosStopListService } from './pos-stop-list.service';
 
 export const POS_SYNC_QUEUE = 'pos-sync';
@@ -38,6 +39,7 @@ export class PosSyncQueue implements OnModuleInit, OnModuleDestroy {
     private readonly prisma: PrismaService,
     private readonly menu: PosMenuImportService,
     private readonly stopList: PosStopListService,
+    private readonly orders: PosOrderQueue,
   ) {}
 
   private get q(): Queue<PosSyncJob> {
@@ -95,6 +97,7 @@ export class PosSyncQueue implements OnModuleInit, OnModuleDestroy {
     );
   }
 
+  /** The menu import every 30 minutes and the poll of unfinished orders (pos-order.queue.ts). */
   async schedule(integrationId: string): Promise<void> {
     if (!this.enabled) return;
     await this.q.upsertJobScheduler(
@@ -102,10 +105,12 @@ export class PosSyncQueue implements OnModuleInit, OnModuleDestroy {
       { every: MENU_IMPORT_EVERY_MS },
       { name: 'menu', data: { integrationId } },
     );
+    await this.orders.schedulePoll(integrationId);
   }
 
   async unschedule(integrationId: string): Promise<void> {
     if (!this.enabled) return;
     await this.q.removeJobScheduler(schedulerId(integrationId));
+    await this.orders.unschedulePoll(integrationId);
   }
 }

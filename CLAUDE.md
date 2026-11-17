@@ -49,7 +49,7 @@ Env: см. `.env.example` (полный; тест сверяет его со с�
 `sms` (провайдеры eskiz, telegram, console), `telegram` (боты заведений: `TelegramBotService`, `TelegramClient`,
 `/telegram-bot`), `tenant-domain` (свои домены заведения, `/organization/:id/domains`), `file`, `translation`, `application`,
 `revalidate-queue` (`RevalidateModule`: ревалидация QR-меню и сайта доставки, `docs/REVALIDATE.md`), `guest-login` (способы входа
-клиентов заведения: `GuestLoginService`), `pos` (интеграция с кассой iiko: подключение, меню, стоп-лист, вебхук; раздел
+клиентов заведения: `GuestLoginService`), `pos` (интеграция с кассой iiko: подключение, меню, стоп-лист, вебхук, отправка заказов и статусы; раздел
 «Интеграция с кассой»).
 
 ## Контракт API
@@ -179,15 +179,15 @@ test, `npm run openapi` + `git diff --exit-code docs/`, `format:check`, `lint` �
 возврат. Робозвонка в цепочке нет: задачи `esc-call`, оставшиеся в Redis, молча пропускаются. Click возвращает автоматически,
 Payme вручную через ops-чат.
 - Автомат различает тип заказа (`only` в правилах `order-state-machine.ts`): у доставки нет `preparing`, «В пути» и
-  «Доставлен» ставит только исполнитель `courier`, и `transitionInTx` проверяет, что это назначенный заказу курьер
-  (`CourierNotAssignedError`). Тест сверяет весь список переходов со схемой `../docs/DELIVERY.md`.
+  «Доставлен» ставит исполнитель `courier` (`transitionInTx` проверяет, что это назначенный заказу курьер,
+  `CourierNotAssignedError`) или `pos` (статусы iiko, раздел «Интеграция с кассой»). Тест сверяет весь список переходов со схемой `../docs/DELIVERY.md`.
 - Действия без смены статуса (назначение, снятие курьера) пишутся в журнал `recordInTx` (`from = to`, `note`).
-- Эффекты после коммита: `courier_card` (очередь `courier-cards`, ключ задания с `version` заказа) и `operator_alert`
-  (срочное сообщение в чат филиала, `RestaurantNotifierService.alertDeliveryProblem`).
+- Эффекты после коммита: `courier_card` (очередь `courier-cards`, ключ задания с `version` заказа), `operator_alert`
+  (срочное сообщение в чат филиала, `RestaurantNotifierService.alertDeliveryProblem`), `pos_job` и `pos_alert` (iiko).
 
 ## Интеграция с кассой (iiko)
-Контракт: `docs/API.md`, «Интеграция с кассой (iiko)»; спецификация `../docs/IIKO.md`. Модуль `pos`. Часть 1:
-подключение, связи, меню, стоп-лист, вебхук; отправка заказов и статусы iiko ещё не сделаны.
+Контракт: `docs/API.md`, «Интеграция с кассой (iiko)» и «Передача заказа в iiko»; спецификация `../docs/IIKO.md`.
+Модуль `pos`: подключение, связи, меню, стоп-лист, вебхук, отправка принятых заказов, статусы iiko, режим курьеров.
 - Интерфейс `provider/pos-provider.ts` (`POS_PROVIDER`), адаптер `iiko/iiko.provider.ts`; транспорт `IikoApiClient`
   (маркер v2 по `appId` + `clientSecret` из env и ключу ресторана, в памяти процесса до `exp − 5 мин`, при 401 один
   повтор; ошибки без ключа, маркера и тела ответа, в лог `iikoErrorText`; HTTP-статусы → коды `pos_*`). Нормализация
@@ -211,8 +211,31 @@ Payme вручную через ops-чат.
   заведения могут совпасть, второй упрётся в уникальный индекс `pos_menu_link` и запишет `menu_import_error`.
 - Вебхук `PosWebhookService`: `Authorization` против sha256 (`infra/http/webhook-secret.ts`, общий с ботом заведения),
   одинаковый 401, дедупликация событий в Redis (`pos:evt:<id>:<sha256 события>`, 24 ч).
+- Передача заказа: `pos_order` (одна строка на заказ, `state`: `queued | sending | sent | failed | needs_street |
+  manual`, причина `error`, `alerted` — одна тревога на состояние) создаёт `OrderTransitionService` при `accepted` в той
+  же транзакции, если филиал связан с не-`draft` интеграцией; эффект `pos_job` ставит задание `push` в очередь
+  `pos-orders` (имя и тип в `order/queue/order-queue.service.ts`, обработчик `PosOrderProcessor` в `pos`, как у
+  `courier-cards`). Без очередей заказ остаётся `queued`.
+- `PosOrderService`: сборка заказа чистой `domain/pos-order-draft.ts` по `pos_menu_link` (размер: `size_id` у связи
+  опции, у позиции с одним размером у связи блюда; модификатор: `<itemId>/<groupId>/<modifierId>` в `external_id`),
+  попытка с захватом условным `updateMany` (`state`, `attempts`), итог команды заданием `check` (3 с, до 20 раз),
+  классификация `domain/pos-order-errors.ts` (повтор или сразу `failed`; 5 попыток, паузы 1–4 минуты), `confirm` после
+  создания. `401` переводит интеграцию в `needs_reconnect` (одно сообщение в чаты филиалов), `402/403/423` красят
+  `checks`. Действия оператора `PosOrderController` (`/order/:id/pos/*`, право `orders`).
+- Статусы: чистая таблица `domain/pos-status-map.ts` (только вперёд, противоречие → журнал и тревога),
+  `PosOrderStatusService.apply` для вебхука (`DeliveryOrderUpdate/Error` в `PosWebhookService`) и опроса (задание
+  `poll` каждые 5 минут, расписание `pos-poll-<id>` ставит и снимает `PosSyncQueue` вместе с импортом меню); последний
+  статус iiko меняется условным `updateMany` (одно событие учитывается один раз). Исполнитель `pos` в автомате заказа.
+- Курьеры Xmenu: `completed` от `courier` у переданного заказа ставит `delivered_push: pending` и задание
+  `delivered` (`OnWay`, затем `Delivered`). Курьеры iiko: `OwnCouriersGuard` (`courier/own-couriers.guard.ts`) на
+  курьерских маршрутах и отчёте по курьерам → `409 pos_couriers_managed`; имя курьера iiko в `pos_order.courier_name`
+  (гостю в `courier`). Отмена в Xmenu переданного заказа: только тревога (изменение после отправки не входит в MVP).
+- Тревоги: `RestaurantNotifierService.alertPos` / `alertPosReconnect`, тексты `buildPosAlertText` в
+  `order/notifications/order-messages.ts`. В списке заказов `posState`, `reminders.posFailed|posReconnect|posCouriers`.
+- `POST /orders` у заведения с не-`draft` интеграцией требует `expectedTotal` (цены меняются с импортом).
 - Тесты: ответы iiko подменяет `iiko/iiko-server.fake.ts` (HTTP-сервер в процессе), сервисы меню на
-  `menu-prisma.fake.ts` (поддерживает `pos_*`, обратные связи `pos_link`, `AND`/`OR`, `notIn`).
+  `menu-prisma.fake.ts` (поддерживает `pos_*`, обратные связи `pos_link`, `AND`/`OR`, `notIn`), сервисы заказов на
+  `services/pos-order.fake.ts` (заказ, интеграция и `pos_order` с условными обновлениями).
 
 ## Курьеры
 Контракт: `docs/API.md`, «Курьеры»; спецификация `../docs/DELIVERY.md`. Модуль `courier`.
@@ -373,8 +396,8 @@ App (`instant`) нового номера кладёт Telegram-id в `registrat
   slug только валидируется как поддомен (`organization/domain/slug.ts`).
 - Роли сотрудников для отдельного приложения (курьеры, официанты, менеджеры). Таблица `employee` есть, не используется
   (операторы админки живут в `organization_member`, раздел «Сотрудники и права»).
-- Касса iiko, часть 2: отправка заказов, статусы, повторы и ручной ввод (`../docs/IIKO.md`); фейковый сервер iiko в
-  e2e. Другие кассы позже.
+- Касса iiko: фейковый сервер iiko в e2e, экраны дашборда (передача заказа, улица, ручной ввод), проверка на живом
+  iiko (`../docs/IIKO.md`, «Перед пилотом»). Другие кассы позже.
 - Позже: Web Push/WebSocket для админки, фискальные чеки, промокоды (поле `discount` всегда 0), заказ ко
   времени, меню по филиалам, ротация `PAYMENT_CONFIG_KEY`, rate limit на
   `POST /orders`.

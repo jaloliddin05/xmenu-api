@@ -47,6 +47,8 @@ enum OrderActor {
   courier
   system
   payment
+  // The POS (iiko statuses, docs/IIKO.md)
+  pos
 }
 
 // Where the guest placed the order: the venue site, or its Telegram Mini App (initData checked by the venue bot).

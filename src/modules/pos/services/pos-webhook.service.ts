@@ -7,6 +7,7 @@ import { webhookSecretMatches } from 'src/infra/http/webhook-secret';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
 import { POS_PROVIDER } from '../provider/pos-provider';
 import type { PosProvider, PosWebhookEvent } from '../provider/pos-provider';
+import { PosOrderStatusService } from './pos-order-status.service';
 import { PosSyncQueue } from './pos-sync.queue';
 
 const UUID_RE =
@@ -22,7 +23,7 @@ const eventKey = (integrationId: string, key: string) =>
  * Authorization header must match the secret given to iiko (sha256 in the database, compared in
  * constant time); an unknown id and a wrong secret answer the same 401. The body is an array of
  * events, each counted once (Redis SET NX). StopListUpdate queues a stop list refresh; delivery order
- * events are logged until orders go to iiko (part 2).
+ * events move the order (PosOrderStatusService).
  */
 @Injectable()
 export class PosWebhookService {
@@ -33,6 +34,7 @@ export class PosWebhookService {
     @Inject(POS_PROVIDER) private readonly provider: PosProvider,
     @Inject(REDIS) private readonly redis: Redis,
     private readonly sync: PosSyncQueue,
+    private readonly statuses: PosOrderStatusService,
   ) {}
 
   async receive(
@@ -93,10 +95,7 @@ export class PosWebhookService {
         return;
       case 'DeliveryOrderUpdate':
       case 'DeliveryOrderError':
-        // Orders are not sent to iiko yet (part 2): nothing of ours can be in the event
-        this.logger.log(
-          `${event.type} for integration ${integrationId} ignored`,
-        );
+        if (event.order) await this.statuses.apply(integrationId, event.order);
         return;
       default:
         return;

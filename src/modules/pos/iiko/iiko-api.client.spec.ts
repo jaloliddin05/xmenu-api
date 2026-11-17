@@ -292,7 +292,7 @@ describe('IikoProvider', () => {
     });
   });
 
-  it('the webhook is set with the authToken and the stop list and order error filters', async () => {
+  it('the webhook is set with the authToken, the stop list, order status and order error filters', async () => {
     iiko.on('/api/1/webhooks/update_settings', {
       body: { correlationId: 'c' },
     });
@@ -307,7 +307,21 @@ describe('IikoProvider', () => {
       webHooksUri: 'https://api.x/pos/iiko/i/webhook',
       authToken: 'secret',
       webHooksFilter: {
-        deliveryOrderFilter: { errors: true },
+        deliveryOrderFilter: {
+          orderStatuses: [
+            'Unconfirmed',
+            'WaitCooking',
+            'ReadyForCooking',
+            'CookingStarted',
+            'CookingCompleted',
+            'Waiting',
+            'OnWay',
+            'Delivered',
+            'Closed',
+            'Cancelled',
+          ],
+          errors: true,
+        },
         stopListUpdateFilter: { updates: true },
       },
     });

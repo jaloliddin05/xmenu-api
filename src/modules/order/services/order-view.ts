@@ -9,6 +9,8 @@ export type OrderWithItems = customer_order & {
   items: (customer_order_item & { options: customer_order_item_option[] })[];
   branch: { id: string; title: string; address: string };
   courier?: { id: string; name: string; phone: string } | null;
+  /** iiko couriers: the courier named by iiko (docs/IIKO.md, "Курьеры") */
+  pos_order?: { courier_name: string | null } | null;
 };
 
 /** The guest sees the courier's name (never the phone) while the courier has the order. */
@@ -85,10 +87,13 @@ export function toOrderView(
         ? order.cancelled_by
         : null,
     cancelReason: order.cancel_reason,
-    courier:
-      order.courier && GUEST_SEES_COURIER.has(order.status)
+    courier: GUEST_SEES_COURIER.has(order.status)
+      ? order.courier
         ? { name: order.courier.name }
-        : null,
+        : order.pos_order?.courier_name
+          ? { name: order.pos_order.courier_name }
+          : null
+      : null,
     // At the door: no_answer is shown to the guest ("the courier cannot reach you"); refused goes to the operator
     doorProblem: order.door_problem,
     // "Handed to the delivery service <name>" (the cost is for the staff only)
@@ -119,3 +124,34 @@ function groupModifiers(options: customer_order_item_option[]) {
   }
   return [...groups.values()];
 }
+
+/** States of the transfer of an order to iiko (pos_order.state) */
+export const POS_ORDER_STATES = [
+  'queued',
+  'sending',
+  'sent',
+  'failed',
+  'needs_street',
+  'manual',
+] as const;
+
+/** What the staff sees about an order in iiko (docs/API.md, "Передача заказа в iiko"). */
+export const toPosView = (row: {
+  state: string;
+  error: string | null;
+  pos_number: string | null;
+  pos_status: string | null;
+  courier_name: string | null;
+  attempts: number;
+  sent_at: Date | null;
+  manual_at: Date | null;
+}) => ({
+  state: row.state,
+  error: row.error,
+  posNumber: row.pos_number,
+  posStatus: row.pos_status,
+  courierName: row.courier_name,
+  attempts: row.attempts,
+  sentAt: row.sent_at?.toISOString() ?? null,
+  manualAt: row.manual_at?.toISOString() ?? null,
+});

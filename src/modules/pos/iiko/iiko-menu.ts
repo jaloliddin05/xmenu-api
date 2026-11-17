@@ -194,6 +194,7 @@ export function iikoMenuToPos(
               isDefault: Boolean(s.isDefault),
             }))
           : [],
+        defaultSizeId: sized ? null : (def?.sizeId ?? null),
         modifierGroups: groupsOf(item, productId, refs, def?.sizeId ?? null),
         weight,
         unit,

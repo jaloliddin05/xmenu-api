@@ -14,6 +14,7 @@ const ACTORS: OrderActorName[] = [
   'courier',
   'system',
   'payment',
+  'pos',
 ];
 
 const ok = (
@@ -75,11 +76,18 @@ describe('order state machine', () => {
         'problem_at_door -> completed by courier',
         'problem_at_door -> returned_to_restaurant by restaurant',
         'problem_at_door -> cancelled by restaurant',
+        // iiko statuses (docs/IIKO.md, "Путь заказа и статусы"): cooked, on the way, delivered or closed, cancelled
+        'accepted -> ready by pos',
+        'accepted -> cancelled by pos',
+        'ready -> on_the_way by pos',
+        'ready -> cancelled by pos',
+        'on_the_way -> completed by pos',
+        'on_the_way -> cancelled by pos',
       ].sort(),
     );
   });
 
-  it('pickup keeps its kitchen flow, all by the restaurant', () => {
+  it('pickup keeps its kitchen flow, by the restaurant or iiko', () => {
     expect(allowed('pickup')).toEqual(
       [
         ...PAYMENT_STEPS,
@@ -90,6 +98,13 @@ describe('order state machine', () => {
         'preparing -> cancelled by restaurant',
         'ready -> completed by restaurant',
         'ready -> cancelled by restaurant',
+        // iiko statuses: cooking completed, closed (handed over), cancelled
+        'accepted -> preparing by pos',
+        'accepted -> cancelled by pos',
+        'preparing -> ready by pos',
+        'preparing -> cancelled by pos',
+        'ready -> completed by pos',
+        'ready -> cancelled by pos',
       ].sort(),
     );
   });
