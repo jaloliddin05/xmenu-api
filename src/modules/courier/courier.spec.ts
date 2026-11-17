@@ -83,13 +83,13 @@ describe('courier invitation', () => {
     );
     const rows = s.db.courier_invitation.rows;
     expect(rows.filter((r) => !r.revoked_at)).toHaveLength(1);
-    expect(JSON.stringify(rows)).not.toContain(second.link.split('c_')[1]);
+    expect(JSON.stringify(rows)).not.toContain(second.link.split('start=c_')[1]);
     // the older link no longer works
     expect(
-      (await s.say('9001', `/start c_${first.link.split('c_')[1]}`)).replies,
+      (await s.say('9001', `/start c_${first.link.split('start=c_')[1]}`)).replies,
     ).toEqual([t.inviteInvalid]);
     expect(
-      (await s.say('9001', `/start c_${second.link.split('c_')[1]}`)).replies,
+      (await s.say('9001', `/start c_${second.link.split('start=c_')[1]}`)).replies,
     ).toEqual([t.linked('Mant')]);
   });
 
