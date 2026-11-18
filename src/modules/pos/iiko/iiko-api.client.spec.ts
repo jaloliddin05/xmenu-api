@@ -47,6 +47,19 @@ describe('IikoApiClient', () => {
     );
   });
 
+  it('remembers when a token was last issued (the integrator application works)', async () => {
+    iiko
+      .on('/api/v2/access_token', {
+        body: { token: fakeIikoToken(hourFromNow()) },
+      })
+      .on('/api/2/menu', { body: {} });
+    const client = new IikoApiClient();
+    expect(client.lastTokenIssuedAt).toBe(0);
+    const before = Date.now();
+    await client.call(cred, '/api/2/menu', {});
+    expect(client.lastTokenIssuedAt).toBeGreaterThanOrEqual(before);
+  });
+
   it('keeps the token until shortly before exp, and asks again for a new key', async () => {
     iiko
       .on('/api/v2/access_token', {

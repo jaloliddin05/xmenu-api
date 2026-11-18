@@ -5,6 +5,7 @@ import { errorMessage } from 'src/infra/helper/error-text';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
 import { OpsNotifierService } from 'src/modules/order/notifications/ops-notifier.service';
 import { RestaurantNotifierService } from 'src/modules/order/notifications/restaurant-notifier.service';
+import { IikoApiClient } from '../iiko/iiko-api.client';
 
 /** What the owner is warned about (pos_integration.alert; the POS screen shows a banner). */
 export type PosIntegrationAlert = 'menu_import_failed' | 'key_revoked';
@@ -32,6 +33,7 @@ export class PosAlertService {
     private readonly restaurant: RestaurantNotifierService,
     private readonly ops: OpsNotifierService,
     @Inject(REDIS) private readonly redis: Redis,
+    private readonly api: IikoApiClient,
   ) {}
 
   async raise(
@@ -68,14 +70,17 @@ export class PosAlertService {
 
   /**
    * iiko rejected the key of a venue on the token call. True when keys of two or more venues were
-   * rejected within 10 minutes: then the platform's application is the likely cause, venues marked
-   * "needs reconnect" within the window go back to active, and the ops chat is told.
+   * rejected within 10 minutes and this process got no token at all in that time: then the platform's
+   * application is the likely cause, venues marked "needs reconnect" within the window go back to
+   * active, and the ops chat is told. A token issued in the window proves the application works:
+   * the rejections are the venues' own keys.
    */
   async keyRejected(integrationId: string): Promise<boolean> {
     const now = Date.now();
     await this.redis.hset(KEY_REJECTED, integrationId, String(now));
     await this.redis.expire(KEY_REJECTED, KEY_REJECTED_WINDOW_SECONDS);
     const since = now - KEY_REJECTED_WINDOW_SECONDS * 1000;
+    if (this.api.lastTokenIssuedAt >= since) return false;
     const ids = Object.entries(await this.redis.hgetall(KEY_REJECTED))
       .filter(([, at]) => Number(at) >= since)
       .map(([id]) => id);

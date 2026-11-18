@@ -96,6 +96,12 @@ interface CachedToken {
 @Injectable()
 export class IikoApiClient {
   private readonly tokens = new Map<string, CachedToken>();
+  private lastTokenAt = 0;
+
+  /** When this process last got a token (ms; 0: never): the integrator application works then. */
+  get lastTokenIssuedAt(): number {
+    return this.lastTokenAt;
+  }
 
   private app(): { appId: string; clientSecret: string } {
     const appId = process.env.IIKO_APP_ID?.trim();
@@ -148,6 +154,7 @@ export class IikoApiClient {
       keyHash,
       renewAt: exp - TOKEN_MARGIN_MS,
     });
+    this.lastTokenAt = Date.now();
     return token;
   }
 

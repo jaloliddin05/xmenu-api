@@ -7,6 +7,7 @@ describe('PosAlertService', () => {
   let restaurant: Record<string, jest.Mock>;
   let ops: { alert: jest.Mock };
   let redis: FakeRedis;
+  let api: { lastTokenIssuedAt: number };
   let service: PosAlertService;
 
   const matches = (row: any, where: any): boolean =>
@@ -39,11 +40,14 @@ describe('PosAlertService', () => {
     };
     ops = { alert: jest.fn(async () => undefined) };
     redis = new FakeRedis();
+    // No token issued by this process yet
+    api = { lastTokenIssuedAt: 0 };
     service = new PosAlertService(
       prisma,
       restaurant as any,
       ops as any,
       redis as any,
+      api as any,
     );
   });
 
@@ -83,6 +87,16 @@ describe('PosAlertService', () => {
     // The venue marked in the window is not asked to reconnect after all
     expect(rows.a).toMatchObject({ status: 'active', alert: null });
     expect(ops.alert).toHaveBeenCalledTimes(1);
+    now.mockRestore();
+  });
+
+  it("a token issued within the window: the application works, two rejected keys are the venues' own", async () => {
+    const now = jest.spyOn(Date, 'now').mockReturnValue(1_000_000);
+    expect(await service.keyRejected('a')).toBe(false);
+    api.lastTokenIssuedAt = 1_000_000 + 60_000;
+    now.mockReturnValue(1_000_000 + 2 * 60_000);
+    expect(await service.keyRejected('b')).toBe(false);
+    expect(ops.alert).not.toHaveBeenCalled();
     now.mockRestore();
   });
 
