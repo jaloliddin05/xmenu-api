@@ -139,6 +139,7 @@ const EXPECTED: Record<string, string> = {
   'POST /integrations/iiko/checks': 'venue',
   'POST /integrations/iiko/enable': 'venue',
   'POST /integrations/iiko/menu/import': 'venue',
+  'POST /integrations/iiko/menu/rematch': 'venue',
   'PUT /integrations/iiko/couriers': 'venue',
   'DELETE /integrations/iiko': 'venue',
   'POST /pos/iiko/:integrationId/webhook': 'public',

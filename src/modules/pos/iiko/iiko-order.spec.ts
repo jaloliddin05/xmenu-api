@@ -9,6 +9,7 @@ const draft = {
   id: 'order-1',
   externalNumber: '12',
   terminalGroupId: 'tg1',
+  priceCategoryId: 'pc-delivery',
   kind: 'delivery' as const,
   phone: '+998901234567',
   customerName: 'Aziz',
@@ -88,6 +89,8 @@ describe('IikoProvider: orders', () => {
       order: {
         id: 'order-1',
         externalNumber: '12',
+        // The price category of the branch (decision 4)
+        priceCategoryId: 'pc-delivery',
         phone: '+998901234567',
         orderServiceType: 'DeliveryByCourier',
         customer: { type: 'one-time', name: 'Aziz' },
@@ -266,7 +269,7 @@ describe('IikoProvider: orders', () => {
     expect(iiko.callsTo('/api/1/deliveries/by_id')).toHaveLength(1);
   });
 
-  it('streets: by name across the cities of the organization, deleted ones left out', async () => {
+  it('streets: the whole directory across the cities of the organization, deleted ones left out', async () => {
     iiko
       .on('/api/1/cities', {
         body: {
@@ -290,8 +293,9 @@ describe('IikoProvider: orders', () => {
           ],
         },
       });
-    expect(await provider.streets(cred, 'o1', 'temur')).toEqual([
+    expect(await provider.streets(cred, 'o1')).toEqual([
       { id: 's1', name: 'Amir Temur', city: 'Tashkent' },
+      { id: 's2', name: 'Navoi', city: 'Tashkent' },
     ]);
     expect(iiko.callsTo('/api/1/streets/by_city')).toHaveLength(1);
     expect(iiko.callsTo('/api/1/streets/by_city')[0].body).toEqual({

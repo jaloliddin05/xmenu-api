@@ -5311,7 +5311,7 @@
             }
           }
         },
-        "summary": "Disconnect: the webhook is removed in iiko, dishes stay as ordinary Xmenu dishes",
+        "summary": "Disconnect: the webhook is removed in iiko, dishes stay as ordinary Xmenu dishes, the history of sent orders stays; waits up to 10 s for a running menu import (409 pos_busy after)",
         "tags": [
           "POS (iiko)"
         ],
@@ -5539,7 +5539,7 @@
             }
           }
         },
-        "summary": "What the first import does: pairs by name, new iiko positions, dishes to hide",
+        "summary": "What enabling (or \"match again\") does: pairs by name, new iiko positions, dishes to hide",
         "tags": [
           "POS (iiko)"
         ],
@@ -5649,6 +5649,49 @@
           }
         },
         "summary": "\"Обновить меню\": queues an import (the result shows in GET: menuImportedAt, menuImportError)",
+        "tags": [
+          "POS (iiko)"
+        ],
+        "x-permission": "venue"
+      }
+    },
+    "/integrations/iiko/menu/rematch": {
+      "post": {
+        "operationId": "PosIikoController_rematch",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosRematchDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosStatusDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "\"Сопоставить заново\": imports the menu now pairing the dishes without a link (as on enabling); dishes left without a pair are hidden",
         "tags": [
           "POS (iiko)"
         ],
@@ -7694,7 +7737,9 @@
           "pos_managed_field",
           "pos_courier_mode_locked",
           "pos_order_state_conflict",
-          "pos_couriers_managed"
+          "pos_couriers_managed",
+          "pos_menu_locked",
+          "pos_busy"
         ],
         "description": "Stable code (never renamed or reused), docs/ERRORS.md"
       },
@@ -10329,6 +10374,17 @@
             "type": "string",
             "nullable": true,
             "format": "date-time"
+          },
+          "deliveredPush": {
+            "type": "string",
+            "enum": [
+              "none",
+              "pending",
+              "on_way",
+              "done",
+              "failed"
+            ],
+            "description": "Own couriers: \"on the way\" and \"delivered\" passed to iiko after the courier delivered. failed: the status in iiko was not updated (iiko refused, or its status did not allow it); the operator was alerted and closes it in iiko"
           }
         },
         "required": [
@@ -10339,7 +10395,8 @@
           "courierName",
           "attempts",
           "sentAt",
-          "manualAt"
+          "manualAt",
+          "deliveredPush"
         ]
       },
       "OrderEventDto": {
@@ -12043,12 +12100,17 @@
             "type": "number",
             "example": 3500,
             "description": "Whole sums, rounded"
+          },
+          "unavailable": {
+            "type": "boolean",
+            "description": "A size of the dish is in the POS stop list (in every linked branch, or in the requested branchId): the dish can be ordered in its other sizes only. Always false without a POS"
           }
         },
         "required": [
           "id",
           "name",
-          "price"
+          "price",
+          "unavailable"
         ]
       },
       "MenuOptionGroupDto": {
@@ -12203,6 +12265,27 @@
           "items"
         ]
       },
+      "PosAlertDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "menu_import_failed",
+              "key_revoked"
+            ],
+            "description": "menu_import_failed: the last menu import failed (menuImportError tells why); key_revoked: iiko rejects the key, the owner reconnects"
+          },
+          "at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "at"
+        ]
+      },
       "PosStepsDto": {
         "type": "object",
         "properties": {
@@ -12280,7 +12363,7 @@
           "priceCategoryId": {
             "type": "string",
             "nullable": true,
-            "description": "Price category of this branch; for now it must equal `priceCategoryId` (null takes it)"
+            "description": "Price category of the external menu for this branch: it goes into the orders of the branch (deliveries/create priceCategoryId); null takes `priceCategoryId` of the integration"
           }
         },
         "required": [
@@ -12346,8 +12429,13 @@
       "PosStatusDto": {
         "type": "object",
         "properties": {
+          "available": {
+            "type": "boolean",
+            "description": "The platform can connect iiko (its iiko application and key storage are set up); false: the connection form is not shown, connecting answers 503 platform_misconfigured"
+          },
           "connected": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "False without an integration and after disconnecting"
           },
           "status": {
             "type": "string",
@@ -12356,6 +12444,16 @@
               "draft",
               "active",
               "needs_reconnect"
+            ]
+          },
+          "alert": {
+            "nullable": true,
+            "description": "What the owner is warned about (a banner); the branch chats got one message when it was raised",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PosAlertDto"
+              }
             ]
           },
           "steps": {
@@ -12377,9 +12475,11 @@
             "enum": [
               "city",
               "legacy",
+              "international",
+              "int_no_postcode",
               "unknown"
             ],
-            "description": "How the iiko organization takes addresses: a line with coordinates, or a street from the iiko directory"
+            "description": "How the iiko organization takes addresses (addressFormatType): city = a line with coordinates; the others = a street from the iiko directory and a house (matched from the address when it can be, otherwise the operator picks it)"
           },
           "courierMode": {
             "type": "string",
@@ -12450,8 +12550,10 @@
           }
         },
         "required": [
+          "available",
           "connected",
           "status",
+          "alert",
           "steps",
           "externalOrgId",
           "addressFormat",
@@ -12500,8 +12602,13 @@
       "PosKeyResultDto": {
         "type": "object",
         "properties": {
+          "available": {
+            "type": "boolean",
+            "description": "The platform can connect iiko (its iiko application and key storage are set up); false: the connection form is not shown, connecting answers 503 platform_misconfigured"
+          },
           "connected": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "False without an integration and after disconnecting"
           },
           "status": {
             "type": "string",
@@ -12510,6 +12617,16 @@
               "draft",
               "active",
               "needs_reconnect"
+            ]
+          },
+          "alert": {
+            "nullable": true,
+            "description": "What the owner is warned about (a banner); the branch chats got one message when it was raised",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PosAlertDto"
+              }
             ]
           },
           "steps": {
@@ -12531,9 +12648,11 @@
             "enum": [
               "city",
               "legacy",
+              "international",
+              "int_no_postcode",
               "unknown"
             ],
-            "description": "How the iiko organization takes addresses: a line with coordinates, or a street from the iiko directory"
+            "description": "How the iiko organization takes addresses (addressFormatType): city = a line with coordinates; the others = a street from the iiko directory and a house (matched from the address when it can be, otherwise the operator picks it)"
           },
           "courierMode": {
             "type": "string",
@@ -12610,8 +12729,10 @@
           }
         },
         "required": [
+          "available",
           "connected",
           "status",
+          "alert",
           "steps",
           "externalOrgId",
           "addressFormat",
@@ -12779,7 +12900,7 @@
           "priceCategoryId": {
             "type": "string",
             "nullable": true,
-            "description": "Price category of the external menu; null = iiko default"
+            "description": "Price category of the external menu: the default of the branches and the one the menu prices are imported in; null = iiko default"
           },
           "branches": {
             "type": "array",
@@ -12930,6 +13051,18 @@
           "queued"
         ]
       },
+      "PosRematchDto": {
+        "type": "object",
+        "properties": {
+          "matches": {
+            "description": "Pairs the owner confirmed in the preview; dishes without a link not listed pair by exact name, the rest are hidden",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosMatchDto"
+            }
+          }
+        }
+      },
       "PosCourierModeDto": {
         "type": "object",
         "properties": {
@@ -12951,10 +13084,16 @@
           "connected": {
             "type": "boolean",
             "example": false
+          },
+          "unfinishedOrders": {
+            "type": "number",
+            "example": 0,
+            "description": "Orders already in iiko (being sent or sent) that are not finished yet: their statuses no longer come from iiko, the dashboard warns about them. The history of sent orders stays"
           }
         },
         "required": [
-          "connected"
+          "connected",
+          "unfinishedOrders"
         ]
       },
       "PosManualDto": {

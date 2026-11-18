@@ -605,6 +605,16 @@ export const ERROR_CODES = spec({
     message: 'Couriers of this venue are managed in the POS',
     when: 'Курьерская функция Xmenu (курьеры, смены, назначение, внешняя служба, отчёт по курьерам) у заведения в режиме «курьеры iiko»',
   },
+  pos_menu_locked: {
+    status: 409,
+    message: 'The menu comes from the POS',
+    when: 'Создание блюда, категории, группы допов или опции в группе из iiko, пока iiko подключён (включён или ждёт переподключения): меню приходит из iiko',
+  },
+  pos_busy: {
+    status: 409,
+    message: 'The POS integration is busy, try again shortly',
+    when: 'Отключение iiko, пока идёт импорт меню или обновление стоп-листа и он не закончился за 10 с',
+  },
 });
 
 export type ErrorCode = keyof typeof ERROR_CODES;

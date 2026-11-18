@@ -1,6 +1,7 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { AppException } from 'src/infra/errors/app-exception';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
+import { isPosLive } from 'src/modules/pos/domain/pos-steps';
 
 /**
  * Courier functions of Xmenu (couriers, shifts and cash, assignment, external service, courier
@@ -32,5 +33,5 @@ export async function couriersInPos(
     where: { organization_id: organizationId },
     select: { status: true, courier_mode: true },
   });
-  return !!row && row.status !== 'draft' && row.courier_mode === 'iiko';
+  return !!row && isPosLive(row.status) && row.courier_mode === 'iiko';
 }

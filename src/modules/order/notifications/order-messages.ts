@@ -303,6 +303,10 @@ export function buildPosAlertText(number: number, alert: PosAlert): string {
   }
 }
 
+/** The menu could not be imported from iiko: every branch chat is told once per failure episode. */
+export const POS_MENU_IMPORT_TEXT =
+  '⚠️ <b>Меню из iiko не обновилось.</b>\nГости видят прошлое меню. Проверьте внешнее меню и доступ к iiko; владелец может обновить меню вручную в дашборде: «Интеграции → iiko».';
+
 /** The iiko key of the venue stopped working: every branch chat is told once. */
 export const POS_RECONNECT_TEXT =
   '🔌 <b>iiko не принимает ключ API заведения.</b>\nЗаказы принимаются, но в iiko не уходят. Владельцу нужно переподключить iiko в дашборде: «Интеграции → iiko».';

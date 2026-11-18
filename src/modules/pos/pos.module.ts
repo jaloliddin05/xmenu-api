@@ -8,6 +8,7 @@ import { PosWebhookController } from './controllers/pos-webhook.controller';
 import { IikoApiClient } from './iiko/iiko-api.client';
 import { IikoProvider } from './iiko/iiko.provider';
 import { POS_PROVIDER } from './provider/pos-provider';
+import { PosAlertService } from './services/pos-alert.service';
 import { PosImageStore } from './services/pos-image.store';
 import { PosIntegrationService } from './services/pos-integration.service';
 import { PosKeyring } from './services/pos-keyring';
@@ -17,6 +18,7 @@ import { PosOrderProcessor } from './services/pos-order.processor';
 import { PosOrderQueue } from './services/pos-order.queue';
 import { PosOrderService } from './services/pos-order.service';
 import { PosStopListService } from './services/pos-stop-list.service';
+import { PosStreetsCache } from './services/pos-streets.cache';
 import { PosSyncQueue } from './services/pos-sync.queue';
 import { PosWebhookService } from './services/pos-webhook.service';
 
@@ -32,6 +34,8 @@ import { PosWebhookService } from './services/pos-webhook.service';
     IikoProvider,
     { provide: POS_PROVIDER, useExisting: IikoProvider },
     PosKeyring,
+    PosAlertService,
+    PosStreetsCache,
     PosImageStore,
     PosMenuImportService,
     PosStopListService,

@@ -1,5 +1,7 @@
 import type { PrismaService } from 'src/modules/_prisma/prisma.service';
+import { AppException } from 'src/infra/errors/app-exception';
 import type { FieldError } from 'src/infra/errors/app-exception';
+import { isPosLive } from 'src/modules/pos/domain/pos-steps';
 import { fieldErrorsException } from 'src/infra/validators/validation-errors';
 
 /**
@@ -13,6 +15,25 @@ export type MenuLinkTarget =
   | { product_id: string }
   | { group_id: string }
   | { option_id: string };
+
+/**
+ * While a POS is connected (enabled, or waiting for the owner to reconnect) dishes, categories and
+ * option groups come from it: creating one in Xmenu is 409 pos_menu_locked (audit W15-02). Before
+ * enabling and after disconnecting the menu is the owner's.
+ */
+export async function assertPosMenuOpen(
+  prisma: Pick<PrismaService, 'pos_integration'>,
+  organizationId: string,
+): Promise<void> {
+  const pos = await prisma.pos_integration.findUnique({
+    where: { organization_id: organizationId },
+    select: { status: true },
+  });
+  if (isPosLive(pos?.status))
+    throw new AppException('pos_menu_locked', {
+      message: 'Dishes, categories and option groups come from the POS',
+    });
+}
 
 /** Language of the POS names when the row is linked to a POS, otherwise null. */
 export async function posSourceLang(

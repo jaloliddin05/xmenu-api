@@ -35,6 +35,7 @@ const base = (over: Partial<PlanInput>): PlanInput => ({
   unlinkedProducts: [],
   unlinkedCategories: [],
   ownerImageProductIds: new Set(),
+  pairing: true,
   ...over,
 });
 
@@ -216,5 +217,60 @@ describe('planMenuImport', () => {
       );
       expect(paired.products[0].downloadImage).toBeNull();
     });
+  });
+
+  it('a regular import (no pairing) neither pairs by name nor hides a dish the owner added', () => {
+    const plan = planMenuImport(
+      base({
+        pairing: false,
+        menu: menu([item('i-plov', 'Плов'), item('i-lag', 'Лагман')]),
+        links: [
+          {
+            id: 'l-plov',
+            kind: 'product',
+            externalId: 'i-plov',
+            rowId: 'p-plov',
+            sourceName: 'Плов',
+            sourceImageUrl: null,
+          },
+        ],
+        unlinkedProducts: [
+          { id: 'p-new', title: 'Лагман', hasOwnerImage: false },
+        ],
+        unlinkedCategories: [{ id: 'c1', title: 'Горячее' }],
+        matches: [{ productId: 'p-new', itemId: 'i-lag' }],
+      }),
+    );
+    expect(plan.pairs).toEqual([]);
+    expect(plan.hideProducts).toEqual([]);
+    expect(plan.products.map((p) => [p.source.externalId, p.targetId])).toEqual(
+      [
+        ['i-plov', 'p-plov'],
+        ['i-lag', null],
+      ],
+    );
+    expect(plan.categories[0].targetId).toBeNull();
+  });
+
+  it('a regular import still hides a linked position gone from the POS', () => {
+    const plan = planMenuImport(
+      base({
+        pairing: false,
+        menu: menu([]),
+        links: [
+          {
+            id: 'l-cola',
+            kind: 'product',
+            externalId: 'i-cola',
+            rowId: 'p-cola',
+            sourceName: 'Cola',
+            sourceImageUrl: null,
+          },
+        ],
+        unlinkedProducts: [{ id: 'p-new', title: 'X', hasOwnerImage: false }],
+      }),
+    );
+    expect(plan.goneLinks).toEqual(['l-cola']);
+    expect(plan.hideProducts).toEqual([]);
   });
 });

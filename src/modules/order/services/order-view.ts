@@ -145,6 +145,7 @@ export const toPosView = (row: {
   attempts: number;
   sent_at: Date | null;
   manual_at: Date | null;
+  delivered_push: string;
 }) => ({
   state: row.state,
   error: row.error,
@@ -154,4 +155,5 @@ export const toPosView = (row: {
   attempts: row.attempts,
   sentAt: row.sent_at?.toISOString() ?? null,
   manualAt: row.manual_at?.toISOString() ?? null,
+  deliveredPush: row.delivered_push,
 });

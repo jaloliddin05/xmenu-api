@@ -399,6 +399,25 @@ describe('OrderService.create: delivery price, payment and change', () => {
     expect(choose).not.toHaveBeenCalled();
   });
 
+  it('a stopped size: only the order line with that size is refused', async () => {
+    prisma.pos_stop_item.findMany.mockResolvedValueOnce([
+      { product_id: 'p1', option_id: 'o-large' },
+    ] as never);
+    const r = await run(
+      order({
+        items: [
+          { itemId: 'p1', quantity: 1, optionIds: ['o-small'] },
+          { itemId: 'p1', quantity: 1, optionIds: ['o-large'] },
+        ],
+      }),
+    );
+    expect(r?.code).toBe('item_unavailable');
+    expect(r?.body.details).toEqual({
+      items: [{ index: 1, itemId: 'p1', reason: 'stop_list' }],
+    });
+    expect(created).toBeUndefined();
+  });
+
   it('a dish in the POS stop list of the branch that cooks it: 409 item_unavailable (stop_list)', async () => {
     prisma.pos_stop_item.findMany.mockResolvedValueOnce([
       { product_id: 'p1' },
@@ -412,7 +431,7 @@ describe('OrderService.create: delivery price, payment and change', () => {
       expect.objectContaining({
         where: expect.objectContaining({
           branch_id: 'near',
-          integration: { status: { not: 'draft' } },
+          integration: { status: { in: ['active', 'needs_reconnect'] } },
         }),
       }),
     );

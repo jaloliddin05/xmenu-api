@@ -14,6 +14,7 @@ import {
   ownProduct,
 } from './menu-ownership';
 import {
+  assertPosMenuOpen,
   assertNoManagedChanges,
   assertNotManaged,
   changedFields,
@@ -164,6 +165,7 @@ export class ProductService {
       dto.additional_product_group_ids,
       organizationId,
     );
+    await assertPosMenuOpen(this.prismaService, organizationId);
 
     const product = await this.prismaService.$transaction(async (prisma) => {
       const lastProduct = await prisma.product.findFirst({

@@ -11,14 +11,18 @@ enum PosIntegrationStatus {
   active
   // The POS rejected the key after it was enabled: the owner enters a new one
   needs_reconnect
+  // The owner disconnected the POS: links and the key are gone, the history of sent orders stays
+  disconnected
 }
 
-// How the iiko organization takes a delivery address (addressFormatType)
+// How the iiko organization takes a delivery address (addressFormatType). Only `city` takes a line
+// of text with coordinates; every other format is sent as an iiko "legacy" address with a street
+// from the iiko directory and a house
 enum PosAddressFormat {
-  // A line of text with coordinates
   city
-  // A street from the iiko directory and a house
   legacy
+  international
+  int_no_postcode
   unknown
 }
 
@@ -51,8 +55,9 @@ model pos_integration {
   provider        PosProviderKind      @default(iiko)
   status          PosIntegrationStatus @default(draft)
 
-  // The restaurant's API key: AES-256-GCM with PAYMENT_CONFIG_KEY (payment-crypto.ts), never returned or logged
-  api_key_encrypted String
+  // The restaurant's API key: AES-256-GCM with PAYMENT_CONFIG_KEY (payment-crypto.ts), never returned or logged;
+  // wiped when the POS is disconnected
+  api_key_encrypted String?
 
   // Step 2: the iiko organization and how it takes addresses
   external_org_id   String?
@@ -80,6 +85,11 @@ model pos_integration {
   menu_import_error String?
   stop_list_updated_at DateTime?
   enabled_at        DateTime?
+  disconnected_at   DateTime?
+  // What the owner is warned about on the POS screen and in the branch chats: menu_import_failed |
+  // key_revoked (null when all is well); one message per episode
+  alert             String?
+  alert_at          DateTime?
 
   created_at        DateTime         @default(now())
   updated_at        DateTime         @updatedAt
@@ -150,18 +160,22 @@ model pos_menu_link {
   @@unique([integration_id, kind, external_id])
 }
 
-// Positions in the iiko stop list of a branch's terminal group; replaced per branch on every refresh
+// Positions in the iiko stop list of a branch's terminal group; replaced per branch on every refresh.
+// Without option_id the whole dish is stopped, with it one size (the "size" option). One row per
+// branch, dish and size: two partial unique indexes in the migration
 model pos_stop_item {
-  id             String          @id @default(uuid())
+  id             String              @id @default(uuid())
   integration_id String
-  integration    pos_integration @relation(fields: [integration_id], references: [id], onDelete: Cascade)
+  integration    pos_integration     @relation(fields: [integration_id], references: [id], onDelete: Cascade)
   branch_id      String
-  branch         branch          @relation(fields: [branch_id], references: [id], onDelete: Cascade)
+  branch         branch              @relation(fields: [branch_id], references: [id], onDelete: Cascade)
   product_id     String
-  product        product         @relation(fields: [product_id], references: [id], onDelete: Cascade)
-  balance        Float           @default(0)
+  product        product             @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  option_id      String?
+  option         additional_product? @relation(fields: [option_id], references: [id], onDelete: Cascade)
+  balance        Float               @default(0)
 
-  @@unique([branch_id, product_id])
+  @@index([branch_id, product_id])
   @@index([integration_id])
   @@index([product_id])
 }
@@ -218,6 +232,8 @@ model pos_order {
   // Courier name from iiko (courier mode "iiko couriers")
   courier_name   String?
   delivered_push PosDeliveredPush @default(none)
+  // deliveries/confirm went through: the order is confirmed once (decision 6)
+  confirmed_at   DateTime?
   // The last thing the operator was alerted about: one alert per state
   alerted        String?
 

@@ -14,6 +14,9 @@ const DEFAULT_TIMEOUT_MS = 15_000;
 const TOKEN_MARGIN_MS = 5 * 60_000;
 /** Lifetime when the token carries no readable `exp` (iiko: 1 hour) */
 const TOKEN_FALLBACK_MS = 60 * 60_000;
+const TOKEN_PATH = '/api/v2/access_token';
+/** A token refusal naming the integrator application, not the restaurant's key */
+const APP_REJECTED = /app\s*id|client\s*secret|application|приложени/i;
 
 /**
  * Why an iiko call failed, safe to log: the HTTP status and iiko's own error code, never the request
@@ -120,18 +123,25 @@ export class IikoApiClient {
       cached.renewAt > Date.now()
     )
       return cached.token;
-    const { token } = await this.send<{ token?: unknown }>(
-      '/api/v2/access_token',
-      { ...this.app(), apiKey: cred.apiKey },
-      null,
-    );
-    if (typeof token !== 'string' || !token)
-      throw new IikoApiError(
-        '/api/v2/access_token',
-        200,
+    let data: { token?: unknown };
+    try {
+      data = await this.send<{ token?: unknown }>(
+        TOKEN_PATH,
+        { ...this.app(), apiKey: cred.apiKey },
         null,
-        'pos_unavailable',
       );
+    } catch (e) {
+      // The Xmenu application is rejected, not the venue: no venue is asked to reconnect
+      if (e instanceof IikoApiError && e.code === 'platform_misconfigured')
+        throw platformMisconfigured(
+          'pos',
+          `iiko rejected the integrator application (${e.message})`,
+        );
+      throw e;
+    }
+    const { token } = data;
+    if (typeof token !== 'string' || !token)
+      throw new IikoApiError(TOKEN_PATH, 200, null, 'pos_unavailable');
     const exp = jwtExpiry(token) ?? Date.now() + TOKEN_FALLBACK_MS;
     this.tokens.set(cred.integrationId, {
       token,
@@ -183,11 +193,18 @@ export class IikoApiClient {
         data && typeof data === 'object' && 'error' in data
           ? String((data as { error: unknown }).error).slice(0, 80)
           : null;
-      // A rejected key on the token call is a 401 or a 400 (iiko answers 400 to an unknown key)
-      const code =
-        path === '/api/v2/access_token' && (status === 400 || status === 401)
-          ? 'pos_key_invalid'
-          : iikoStatusCode(status);
+      // A rejected key on the token call is a 401 or a 400 (iiko answers 400 to an unknown key);
+      // a refusal that names the application is the platform's (its text is read, never logged)
+      const description =
+        data && typeof data === 'object' && 'errorDescription' in data
+          ? String((data as { errorDescription: unknown }).errorDescription)
+          : '';
+      const refused = path === TOKEN_PATH && (status === 400 || status === 401);
+      const code = !refused
+        ? iikoStatusCode(status)
+        : APP_REJECTED.test(`${iikoCode ?? ''} ${description}`)
+          ? 'platform_misconfigured'
+          : 'pos_key_invalid';
       throw new IikoApiError(path, status, iikoCode, code);
     }
   }

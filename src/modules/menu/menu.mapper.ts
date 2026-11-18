@@ -92,18 +92,24 @@ export function groupLimits(
   };
 }
 
-/** `stopped`: ids of dishes in the POS stop list; they stay in the menu, flagged `unavailable`. */
+/**
+ * `stopped`: ids of dishes in the POS stop list, `stoppedOptions`: ids of stopped sizes; they stay in
+ * the menu, flagged `unavailable`.
+ */
 export function toMenuView(
   categories: MenuCategoryRow[],
   locale: MenuLocale,
   stopped: ReadonlySet<string> = new Set(),
+  stoppedOptions: ReadonlySet<string> = new Set(),
 ) {
   const { lang, fallback } = locale;
   return categories
     .map((c) => ({
       id: c.id,
       title: pickTranslation(c.translations, lang, fallback)?.title ?? '',
-      items: c.products.map((p) => toItemView(p, locale, stopped.has(p.id))),
+      items: c.products.map((p) =>
+        toItemView(p, locale, stopped.has(p.id), stoppedOptions),
+      ),
     }))
     .filter((c) => c.items.length > 0);
 }
@@ -112,6 +118,7 @@ function toItemView(
   p: MenuProductRow,
   { lang, fallback, currency }: MenuLocale,
   unavailable: boolean,
+  stoppedOptions: ReadonlySet<string>,
 ) {
   const t = pickTranslation(p.translations, lang, fallback);
   const g = UNIT.gr[lang];
@@ -149,6 +156,7 @@ function toItemView(
             id: o.id,
             name: pickTranslation(o.translations, lang, fallback)?.title ?? '',
             price: toSum(o.price),
+            unavailable: stoppedOptions.has(o.id),
           })),
         };
       }),

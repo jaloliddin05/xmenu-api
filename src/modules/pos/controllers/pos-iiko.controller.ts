@@ -27,6 +27,7 @@ import {
   PosOrganizationDto,
   PosOrganizationsDto,
   PosPreviewDto,
+  PosRematchDto,
   PosStatusDto,
 } from '../dto/pos-iiko.dto';
 import { PosIntegrationService } from '../services/pos-integration.service';
@@ -108,7 +109,7 @@ export class PosIikoController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
-      'What the first import does: pairs by name, new iiko positions, dishes to hide',
+      'What enabling (or "match again") does: pairs by name, new iiko positions, dishes to hide',
   })
   @ApiOkResponse({ type: PosPreviewDto })
   preview(@Req() req: StaffRequest) {
@@ -151,6 +152,18 @@ export class PosIikoController {
   }
 
   @StaffAccess('venue')
+  @Post('menu/rematch')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      '"Сопоставить заново": imports the menu now pairing the dishes without a link (as on enabling); dishes left without a pair are hidden',
+  })
+  @ApiOkResponse({ type: PosStatusDto })
+  rematch(@Body() dto: PosRematchDto, @Req() req: StaffRequest) {
+    return this.pos.rematch(requireStaffOrganizationId(req), dto.matches);
+  }
+
+  @StaffAccess('venue')
   @Put('couriers')
   @ApiOperation({
     summary:
@@ -165,7 +178,7 @@ export class PosIikoController {
   @Delete()
   @ApiOperation({
     summary:
-      'Disconnect: the webhook is removed in iiko, dishes stay as ordinary Xmenu dishes',
+      'Disconnect: the webhook is removed in iiko, dishes stay as ordinary Xmenu dishes, the history of sent orders stays; waits up to 10 s for a running menu import (409 pos_busy after)',
   })
   @ApiOkResponse({ type: PosDisconnectedDto })
   disconnect(@Req() req: StaffRequest) {

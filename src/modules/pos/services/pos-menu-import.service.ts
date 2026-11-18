@@ -13,8 +13,11 @@ import {
 import { iikoErrorText, toAppException } from '../iiko/iiko-api.client';
 import { POS_PROVIDER, PosMenu, PosMenuItem } from '../provider/pos-provider';
 import type { PosProvider } from '../provider/pos-provider';
+import { isPosLive } from '../domain/pos-steps';
+import { PosAlertService } from './pos-alert.service';
 import { PosImageStore, StoredImage } from './pos-image.store';
 import { PosKeyring } from './pos-keyring';
+import { lockPosIntegration } from './pos-lock';
 
 type Tx = Prisma.TransactionClient;
 
@@ -30,13 +33,26 @@ const TX_TIMEOUT_MS = 120_000;
 export interface ImportedIntegration {
   id: string;
   organization_id: string;
-  api_key_encrypted: string;
+  status: string;
+  api_key_encrypted: string | null;
   external_org_id: string | null;
   external_menu_id: string | null;
   price_category_id: string | null;
   delivery_item_id: string | null;
   source_lang: string | null;
 }
+
+/**
+ * How an import treats the rows without a link: paired by name (or by the owner's pairs) and the rest
+ * hidden only on the first connection and on the owner's "match again" (audit W15-02).
+ */
+export interface ImportOptions {
+  pairing?: boolean;
+  matches?: MenuMatch[];
+}
+
+/** The integration was disconnected while its menu was being fetched: nothing is written. */
+class DisconnectedDuringImport extends Error {}
 
 /** What the owner sees before enabling: pairs, new positions, dishes that will be hidden. */
 export interface ImportPreview {
@@ -53,8 +69,8 @@ export interface ImportPreview {
 
 /**
  * Imports the POS external menu (docs/IIKO.md, "Меню"). Everything is fetched and planned first,
- * then written in one transaction: a failure leaves the previous menu as it was and records the
- * reason on the integration.
+ * then written in one transaction under the integration lock (pos-lock.ts): a failure leaves the
+ * previous menu as it was, records the reason on the integration and alerts the owner once.
  */
 @Injectable()
 export class PosMenuImportService {
@@ -66,6 +82,7 @@ export class PosMenuImportService {
     private readonly keyring: PosKeyring,
     private readonly images: PosImageStore,
     private readonly revalidate: RevalidateService,
+    private readonly alerts: PosAlertService,
   ) {}
 
   private async sourceLang(row: ImportedIntegration): Promise<string> {
@@ -102,7 +119,7 @@ export class PosMenuImportService {
     row: ImportedIntegration,
     menu: PosMenu,
     lang: string,
-    matches?: MenuMatch[],
+    { pairing = false, matches }: ImportOptions,
   ): Promise<ImportPlan> {
     const orgId = row.organization_id;
     const [links, products, categories] = await Promise.all([
@@ -130,18 +147,23 @@ export class PosMenuImportService {
           images: { select: { from_pos: true } },
         },
       }),
-      this.prisma.category.findMany({
-        where: { organization_id: orgId, pos_link: null },
-        select: {
-          id: true,
-          translations: { where: { lang }, select: { title: true } },
-        },
-      }),
+      pairing
+        ? this.prisma.category.findMany({
+            where: { organization_id: orgId, pos_link: null },
+            select: {
+              id: true,
+              translations: { where: { lang }, select: { title: true } },
+            },
+          })
+        : Promise.resolve(
+            [] as { id: string; translations: { title: string }[] }[],
+          ),
     ]);
     const ownerImage = (p: (typeof products)[number]) =>
       p.images.some((i) => !i.from_pos);
     return planMenuImport({
       menu,
+      pairing,
       serviceItemId: row.delivery_item_id,
       links: links.map((l) => ({
         id: l.id,
@@ -173,7 +195,7 @@ export class PosMenuImportService {
   async preview(row: ImportedIntegration): Promise<ImportPreview> {
     const menu = await this.fetchMenu(row);
     const lang = await this.sourceLang(row);
-    const plan = await this.plan(row, menu, lang);
+    const plan = await this.plan(row, menu, lang, { pairing: true });
     const titles = new Map(
       (
         await this.prisma.product_translation.findMany({
@@ -208,44 +230,84 @@ export class PosMenuImportService {
 
   /**
    * Imports the menu. On failure the previous menu stays, the reason code is stored on the
-   * integration and the error is rethrown.
+   * integration, the owner is alerted (an enabled integration only) and the error is rethrown.
    */
-  async import(row: ImportedIntegration, matches?: MenuMatch[]): Promise<void> {
+  async import(
+    row: ImportedIntegration,
+    options: ImportOptions = {},
+  ): Promise<void> {
     try {
       const menu = await this.fetchMenu(row);
       const lang = await this.sourceLang(row);
-      const plan = await this.plan(row, menu, lang, matches);
+      const plan = await this.plan(row, menu, lang, options);
       const pictures = await this.download(plan.products);
       await this.prisma.$transaction(
-        (tx) => this.apply(tx, row, plan, pictures, lang),
+        async (tx) => {
+          await lockPosIntegration(tx, row.id);
+          const now = await tx.pos_integration.findUnique({
+            where: { id: row.id },
+            select: { status: true },
+          });
+          if (!now || now.status === 'disconnected')
+            throw new DisconnectedDuringImport();
+          await this.apply(tx, row, plan, pictures, lang);
+        },
         { timeout: TX_TIMEOUT_MS },
       );
     } catch (e) {
-      const err = toAppException(e);
-      this.logger.warn(
-        `menu import of integration ${row.id} failed: ${err.code} (${iikoErrorText(e)})`,
-      );
-      await this.prisma.pos_integration
-        .update({
-          where: { id: row.id },
-          data: { menu_import_error: err.code },
-        })
-        .catch(() => undefined);
-      // The key was revoked or expired: the owner has to reconnect, orders keep coming
-      if (err.code === 'pos_key_invalid')
-        await this.prisma.pos_integration
-          .updateMany({
-            where: { id: row.id, status: 'active' },
-            data: { status: 'needs_reconnect' },
-          })
-          .catch(() => undefined);
-      throw err;
+      if (e instanceof DisconnectedDuringImport) {
+        this.logger.log(`integration ${row.id} disconnected during the import`);
+        return;
+      }
+      await this.failed(row, e);
     }
+    await this.alerts
+      .clear(row.id, 'menu_import_failed')
+      .catch(() => undefined);
     await this.revalidate
       .addRevalidationJob({ tenantId: row.organization_id, route: 'menu' })
       .catch((e: unknown) =>
         this.logger.warn(`revalidation not queued: ${errorMessage(e)}`),
       );
+  }
+
+  private async failed(row: ImportedIntegration, e: unknown): Promise<never> {
+    const err = toAppException(e);
+    this.logger.warn(
+      `menu import of integration ${row.id} failed: ${err.code} (${iikoErrorText(e)})`,
+    );
+    await this.prisma.pos_integration
+      .update({
+        where: { id: row.id },
+        data: { menu_import_error: err.code },
+      })
+      .catch(() => undefined);
+    // Before enabling the owner sees the error in the answer itself
+    if (!isPosLive(row.status)) throw err;
+    try {
+      if (err.code === 'platform_misconfigured') {
+        // The platform's iiko application: no venue is asked to reconnect
+        await this.alerts.platform(
+          `menu import of integration ${row.id}: ${iikoErrorText(e)}`,
+        );
+      } else if (err.code === 'pos_key_invalid') {
+        // The key was revoked or expired: the owner has to reconnect, orders keep coming
+        if (!(await this.alerts.keyRejected(row.id))) {
+          await this.prisma.pos_integration.updateMany({
+            where: { id: row.id, status: 'active' },
+            data: { status: 'needs_reconnect' },
+          });
+          await this.alerts.raise(row, 'key_revoked');
+        }
+      } else {
+        await this.alerts.raise(row, 'menu_import_failed');
+      }
+    } catch (alertError) {
+      this.logger.warn(
+        `alert of integration ${row.id} not raised: ${errorMessage(alertError)}`,
+      );
+    }
+    throw err;
   }
 
   /** POS pictures that changed; a picture that fails stays as it was and is tried next time. */

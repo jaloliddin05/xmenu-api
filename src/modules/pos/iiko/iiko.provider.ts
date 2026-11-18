@@ -21,8 +21,6 @@ import { iikoCreateBody, iikoOrderInfo } from './iiko-order';
 import { parseIikoWebhook } from './iiko-webhook';
 
 const MENU_TIMEOUT_MS = 60_000;
-/** Streets returned for one query */
-const STREETS_LIMIT = 20;
 /** Delivery statuses the webhook reports (deliveryOrderFilter.orderStatuses) */
 const WEBHOOK_ORDER_STATUSES = [
   'Unconfirmed',
@@ -42,11 +40,24 @@ interface Named {
   name?: string | null;
 }
 
-/** iiko addressFormatType → how Xmenu passes a delivery address (docs/IIKO.md, decision 8). */
+/**
+ * iiko addressFormatType (Legacy, City, International, IntNoPostcode) → how Xmenu passes a delivery
+ * address (docs/IIKO.md, decision 8). The iiko order address has two kinds only: `city` (a line),
+ * allowed when the format is City, and `legacy` (a street and a house) for the others.
+ */
 export function iikoAddressFormat(raw: unknown): PosAddressFormat {
-  if (raw === 'City') return 'city';
-  if (raw === 'Legacy') return 'legacy';
-  return 'unknown';
+  switch (raw) {
+    case 'City':
+      return 'city';
+    case 'Legacy':
+      return 'legacy';
+    case 'International':
+      return 'international';
+    case 'IntNoPostcode':
+      return 'int_no_postcode';
+    default:
+      return 'unknown';
+  }
 }
 
 /** iiko Cloud API adapter (docs/IIKO.md, "Проверка документации"). */
@@ -251,6 +262,8 @@ export class IikoProvider implements PosProvider {
     }>(cred, '/api/1/stop_lists', {
       organizationIds: [orgId],
       terminalGroupsIds: terminalGroupIds,
+      // Without it iiko leaves sizeId out and one stopped size would read as the whole dish
+      returnSize: true,
     });
     const lists = new Map<string, PosStopList>();
     for (const wrapper of terminalGroupStopLists ?? [])
@@ -400,12 +413,7 @@ export class IikoProvider implements PosProvider {
     });
   }
 
-  async streets(
-    cred: PosCredentials,
-    orgId: string,
-    query: string,
-  ): Promise<PosStreet[]> {
-    const q = query.trim().toLocaleLowerCase();
+  async streets(cred: PosCredentials, orgId: string): Promise<PosStreet[]> {
     const { cities } = await this.api.call<{
       cities?: { items?: (Named & { isDeleted?: boolean })[] | null }[] | null;
     }>(cred, '/api/1/cities', { organizationIds: [orgId] });
@@ -420,9 +428,7 @@ export class IikoProvider implements PosProvider {
       });
       for (const st of streets ?? []) {
         if (!st?.id || st.isDeleted || !st.name) continue;
-        if (q && !st.name.toLocaleLowerCase().includes(q)) continue;
         out.push({ id: st.id, name: st.name, city: city.name ?? '' });
-        if (out.length >= STREETS_LIMIT) return out;
       }
     }
     return out;

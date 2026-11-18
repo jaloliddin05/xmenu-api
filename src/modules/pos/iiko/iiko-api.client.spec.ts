@@ -116,6 +116,31 @@ describe('IikoApiClient', () => {
   });
 
   it.each([
+    [
+      401,
+      {
+        error: 'Unauthorized',
+        errorDescription: 'Invalid appId or clientSecret',
+      },
+    ],
+    [400, { errorDescription: 'Application not found' }],
+  ])(
+    'a token refused with %s naming the application is a platform failure, not a venue key',
+    async (status, body) => {
+      iiko.on('/api/v2/access_token', { status, body });
+      const e = await new IikoApiClient()
+        .call(cred, '/api/2/menu', {})
+        .catch((x: unknown) => x);
+      expect(e).toBeInstanceOf(AppException);
+      expect(e).toMatchObject({
+        code: 'platform_misconfigured',
+        details: { feature: 'pos' },
+      });
+      expect(iikoErrorText(e)).not.toContain(KEY);
+    },
+  );
+
+  it.each([
     [402, 'pos_module_missing'],
     [403, 'pos_access_denied'],
     [423, 'pos_access_blocked'],
@@ -184,10 +209,12 @@ describe('IikoProvider', () => {
     await iiko.stop();
   });
 
-  it('address format: City and Legacy are known, the rest is unknown', async () => {
+  it('address format: the four iiko formats are known, the rest is unknown', async () => {
     expect(iikoAddressFormat('City')).toBe('city');
     expect(iikoAddressFormat('Legacy')).toBe('legacy');
-    expect(iikoAddressFormat('International')).toBe('unknown');
+    expect(iikoAddressFormat('International')).toBe('international');
+    expect(iikoAddressFormat('IntNoPostcode')).toBe('int_no_postcode');
+    expect(iikoAddressFormat('Other')).toBe('unknown');
     iiko.on('/api/1/organizations', {
       body: {
         organizations: [{ id: 'o1', name: 'A', addressFormatType: 'Legacy' }],
@@ -289,6 +316,8 @@ describe('IikoProvider', () => {
     expect(iiko.callsTo('/api/1/stop_lists')[0].body).toEqual({
       organizationIds: ['o1'],
       terminalGroupsIds: ['tg1'],
+      // Sizes are asked for: one stopped size must not stop the whole dish
+      returnSize: true,
     });
   });
 

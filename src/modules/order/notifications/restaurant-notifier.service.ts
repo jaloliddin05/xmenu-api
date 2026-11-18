@@ -8,6 +8,7 @@ import {
   buildPosAlertText,
   buildRestaurantKeyboard,
   buildRestaurantText,
+  POS_MENU_IMPORT_TEXT,
   POS_RECONNECT_TEXT,
   PosAlert,
 } from './order-messages';
@@ -129,7 +130,16 @@ export class RestaurantNotifierService {
   }
 
   /** The venue's iiko key stopped working: one message to every branch chat of the venue. */
-  async alertPosReconnect(organizationId: string): Promise<void> {
+  alertPosReconnect(organizationId: string): Promise<void> {
+    return this.alertVenue(organizationId, POS_RECONNECT_TEXT);
+  }
+
+  /** The menu import from iiko failed: one message to every branch chat of the venue. */
+  alertPosMenuImport(organizationId: string): Promise<void> {
+    return this.alertVenue(organizationId, POS_MENU_IMPORT_TEXT);
+  }
+
+  private async alertVenue(organizationId: string, text: string) {
     const branches = await this.prisma.branch.findMany({
       where: {
         organization_id: organizationId,
@@ -138,7 +148,7 @@ export class RestaurantNotifierService {
       select: { telegram_chat_id: true },
     });
     for (const chatId of new Set(branches.map((b) => b.telegram_chat_id!)))
-      await this.telegram.sendMessage(chatId, POS_RECONNECT_TEXT);
+      await this.telegram.sendMessage(chatId, text);
   }
 
   private async alertDelivery(

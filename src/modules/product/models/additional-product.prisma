@@ -11,4 +11,5 @@ model additional_product {
   additional_product_group_id  String
 
   pos_link pos_menu_link?
+  pos_stop_items pos_stop_item[]
 }

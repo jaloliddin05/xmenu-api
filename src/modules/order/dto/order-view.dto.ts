@@ -264,6 +264,13 @@ export class PosOrderViewDto {
 
   @ApiProperty({ type: String, nullable: true, format: 'date-time' })
   manualAt: string | null;
+
+  @ApiProperty({
+    enum: ['none', 'pending', 'on_way', 'done', 'failed'],
+    description:
+      'Own couriers: "on the way" and "delivered" passed to iiko after the courier delivered. failed: the status in iiko was not updated (iiko refused, or its status did not allow it); the operator was alerted and closes it in iiko',
+  })
+  deliveredPush: string;
 }
 
 /** GET /order/:id and the result of staff actions: the order plus customer and status history. */

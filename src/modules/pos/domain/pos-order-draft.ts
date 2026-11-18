@@ -1,4 +1,5 @@
 import type {
+  PosAddressFormat,
   PosOrderAddress,
   PosOrderDraft,
   PosOrderLine,
@@ -28,7 +29,9 @@ export interface DraftSource {
 /** The integration's links an order needs (pos_branch_link, pos_payment_link, pos_menu_link). */
 export interface DraftLinks {
   terminalGroupId: string;
-  addressFormat: 'city' | 'legacy' | 'unknown' | null;
+  /** Price category of the branch, else of the integration */
+  priceCategoryId: string | null;
+  addressFormat: PosAddressFormat | null;
   /** Picked by the operator when the organization takes streets from the iiko directory */
   street: { id: string; house: string } | null;
   /** product id → iiko item and its single size */
@@ -150,7 +153,8 @@ export function buildPosOrder(
         streetId: links.street.id,
         house: links.street.house,
       };
-    // A street from the iiko directory (or a format that could not be read): the operator picks it
+    // Every other format takes a street from the iiko directory: matched from the address before
+    // (pos-order.service.ts), otherwise the operator picks it
     else return { ok: false, problem: 'needs_street' };
   }
 
@@ -160,6 +164,7 @@ export function buildPosOrder(
       id: order.id,
       externalNumber: String(order.number),
       terminalGroupId: links.terminalGroupId,
+      priceCategoryId: links.priceCategoryId,
       kind: order.fulfillment,
       phone: order.phone,
       customerName: text(order.customerName) ?? `Xmenu #${order.number}`,

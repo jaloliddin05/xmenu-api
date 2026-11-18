@@ -33,6 +33,7 @@ export function fakePosOrderWorld() {
     api_key_encrypted: keyring.encrypt('restaurant-key'),
     external_org_id: 'iiko-org',
     address_format: 'city',
+    price_category_id: null,
     delivery_item_id: 'i-delivery',
     delivery_size_id: null,
     courier_mode: 'xmenu',
@@ -84,6 +85,7 @@ export function fakePosOrderWorld() {
     house: null,
     courier_name: null,
     delivered_push: 'none',
+    confirmed_at: null,
     alerted: null,
     sent_at: null,
     manual_at: null,
@@ -93,6 +95,7 @@ export function fakePosOrderWorld() {
     branch_id: 'b1',
     integration_id: INTEGRATION,
     terminal_group_id: 'tg1',
+    price_category_id: null,
   };
   const world = { integration, order, pos, branchLink, keyring };
 
@@ -153,8 +156,7 @@ export function fakePosOrderWorld() {
     commandStatus: jest.fn(),
     confirmOrder: jest.fn(async () => 'confirm-cid'),
     setDeliveryStatus: jest.fn(),
-    orders: jest.fn(async () => []),
-    streets: jest.fn(async () => []),
+    orders: jest.fn(async (): Promise<unknown[]> => []),
   };
   const journal: string[] = [];
   const transitions = {
@@ -176,6 +178,16 @@ export function fakePosOrderWorld() {
     push: jest.fn(async () => undefined),
     check: jest.fn(async () => undefined),
   };
+  const alerts = {
+    raise: jest.fn(async () => undefined),
+    keyRejected: jest.fn(async () => false),
+    platform: jest.fn(async () => undefined),
+  };
+  /** The iiko street directory (PosStreetsCache) */
+  const streets = {
+    streets: jest.fn(async (): Promise<unknown[]> => []),
+    search: jest.fn(async (): Promise<unknown[]> => []),
+  };
   return {
     world,
     prisma,
@@ -183,6 +195,8 @@ export function fakePosOrderWorld() {
     transitions,
     restaurant,
     queue,
+    alerts,
+    streets,
     journal,
     keyring,
   };

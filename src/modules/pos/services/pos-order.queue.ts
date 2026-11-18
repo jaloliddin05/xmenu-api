@@ -3,11 +3,15 @@ import {
   OrderQueueService,
   PosOrderJob,
 } from 'src/modules/order/queue/order-queue.service';
+import type { PosOrderInfo } from '../provider/pos-provider';
 
 /** How often the statuses of unfinished orders are asked when no webhook came (docs/IIKO.md) */
 export const POS_POLL_EVERY_MS = 5 * 60_000;
 /** Pause between two questions about one command (deliveries/create) */
 export const POS_CHECK_EVERY_MS = 3_000;
+/** Tries of one webhook order event (confirm, Telegram), the first pause 5 s, then doubled */
+export const POS_EVENT_ATTEMPTS = 5;
+const POS_EVENT_BACKOFF_MS = 5_000;
 
 const pollSchedulerId = (integrationId: string) => `pos-poll-${integrationId}`;
 
@@ -45,6 +49,29 @@ export class PosOrderQueue {
       `pos-check-${orderId}-${correlationId}-${polls}`,
       POS_CHECK_EVERY_MS,
     );
+  }
+
+  /**
+   * An order event of the iiko webhook, handled in the background with retries (audit W15-04): the
+   * webhook answers 200 once the event is queued. `key` is the event's dedup key. False without
+   * queues (ORDER_QUEUES=off): the caller handles it at once.
+   */
+  async event(
+    integrationId: string,
+    info: PosOrderInfo,
+    key: string,
+  ): Promise<boolean> {
+    if (!this.enabled) return false;
+    await this.queues.posOrderQueue.add(
+      'event',
+      { integrationId, event: info },
+      {
+        jobId: `pos-event-${integrationId}-${key}`,
+        attempts: POS_EVENT_ATTEMPTS,
+        backoff: { type: 'exponential', delay: POS_EVENT_BACKOFF_MS },
+      },
+    );
+    return true;
   }
 
   async schedulePoll(integrationId: string): Promise<void> {

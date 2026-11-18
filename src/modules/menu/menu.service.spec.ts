@@ -105,4 +105,60 @@ describe('MenuService: dishes the POS takes out of the menu', () => {
     expect(await dishes()).toEqual(['Mine dish', 'Чай']);
     expect(await stoppedDishes()).toEqual([]);
   });
+
+  it('a disconnected integration changes nothing', async () => {
+    pos.status = 'disconnected';
+    for (const branch of ['b1', 'b2'])
+      db.seed('pos_stop_item', {
+        integration_id: pos.id,
+        branch_id: branch,
+        product_id: second.id,
+      });
+    expect(await stoppedDishes()).toEqual([]);
+  });
+
+  it('a stopped size flags the size option, the dish stays orderable', async () => {
+    const group = db.seed('additional_product_group', {
+      product_id: second.id,
+      is_required: true,
+      min: 1,
+      max: 1,
+    });
+    const sizes = ['0,3', '0,5'].map((title) => {
+      const o = db.seed('additional_product', {
+        additional_product_group_id: group.id,
+        price: 0,
+      });
+      db.seed('additional_product_translation', {
+        additional_product_id: o.id,
+        lang: 'ru',
+        title,
+      });
+      return o;
+    });
+    db.seed('pos_stop_item', {
+      integration_id: pos.id,
+      branch_id: 'b1',
+      product_id: second.id,
+      option_id: sizes[0].id,
+    });
+    const options = async (branchId?: string) =>
+      (await service.getMenu(t.mine.org.id, LOCALE as any, branchId))
+        .flatMap((c: any) => c.items)
+        .flatMap((p: any) => p.optionGroups)
+        .flatMap((g: any) => g.options)
+        .map((o: any) => `${o.name}:${o.unavailable}`);
+    expect(await stoppedDishes('b1')).toEqual([]);
+    expect(await options('b1')).toEqual([
+      'Mine ketchup:false',
+      '0,3:true',
+      '0,5:false',
+    ]);
+    // Venue-wide: b2 still has it
+    expect(await options()).toEqual([
+      'Mine ketchup:false',
+      '0,3:false',
+      '0,5:false',
+    ]);
+  });
 });

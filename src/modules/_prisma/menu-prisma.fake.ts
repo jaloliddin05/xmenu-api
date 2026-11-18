@@ -240,6 +240,19 @@ export class FakeMenuPrisma {
     return Promise.all(arg);
   }
 
+  /** Raw statements (the POS integration lock): recorded, not executed. */
+  raw: { sql: string; values: unknown[] }[] = [];
+
+  async $executeRaw(strings: TemplateStringsArray, ...values: unknown[]) {
+    this.raw.push({ sql: strings.join('?'), values });
+    return 0;
+  }
+
+  async $executeRawUnsafe(sql: string) {
+    this.raw.push({ sql, values: [] });
+    return 0;
+  }
+
   matches(table: string, row: Row, where: Record<string, any>): boolean {
     for (const [key, cond] of Object.entries(where)) {
       if (cond === undefined) continue;

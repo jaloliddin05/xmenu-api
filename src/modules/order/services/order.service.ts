@@ -36,6 +36,7 @@ import {
 import { OrderWithItems, toOrderView } from './order-view';
 import { orderSource } from '../notifications/guest-notification';
 import { AppException } from 'src/infra/errors/app-exception';
+import { isPosLive } from 'src/modules/pos/domain/pos-steps';
 
 export const ORDER_INCLUDE = {
   items: { include: { options: true } },
@@ -592,32 +593,39 @@ export class OrderService {
       where: { organization_id: organizationId },
       select: { status: true },
     });
-    return !!pos && pos.status !== 'draft';
+    return isPosLive(pos?.status);
   }
 
   private async assertNotStopped(
-    items: { itemId: string }[],
+    items: { itemId: string; optionIds?: string[] }[],
     branchId: string,
   ): Promise<void> {
     const stopped = await this.prisma.pos_stop_item.findMany({
       where: {
         branch_id: branchId,
         product_id: { in: [...new Set(items.map((i) => i.itemId))] },
-        integration: { status: { not: 'draft' } },
+        integration: { status: { in: ['active', 'needs_reconnect'] } },
       },
-      select: { product_id: true },
+      select: { product_id: true, option_id: true },
     });
     if (!stopped.length) return;
-    const ids = new Set(stopped.map((s) => s.product_id));
+    // A row without an option stops the dish; with one, that size of it (the "size" option)
+    const dishes = new Set(
+      stopped.filter((s) => !s.option_id).map((s) => s.product_id),
+    );
+    const sizes = new Set(
+      stopped.filter((s) => s.option_id).map((s) => s.option_id!),
+    );
+    const refused = items.flatMap((item, index) =>
+      dishes.has(item.itemId) ||
+      (item.optionIds ?? []).some((id) => sizes.has(id))
+        ? [{ index, itemId: item.itemId, reason: 'stop_list' }]
+        : [],
+    );
+    if (!refused.length) return;
     throw new AppException('item_unavailable', {
       message: 'Some items are unavailable',
-      details: {
-        items: items.flatMap((item, index) =>
-          ids.has(item.itemId)
-            ? [{ index, itemId: item.itemId, reason: 'stop_list' }]
-            : [],
-        ),
-      },
+      details: { items: refused },
     });
   }
 

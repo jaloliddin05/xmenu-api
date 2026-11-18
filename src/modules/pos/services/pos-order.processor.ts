@@ -13,6 +13,7 @@ import {
   PosOrderJob,
   PosOrderJobName,
 } from 'src/modules/order/queue/order-queue.service';
+import type { PosOrderInfo } from '../provider/pos-provider';
 import { PosOrderStatusService } from './pos-order-status.service';
 import { PosOrderService } from './pos-order.service';
 
@@ -57,6 +58,11 @@ export class PosOrderProcessor implements OnModuleInit, OnModuleDestroy {
         return this.orders.delivered(orderId!);
       case 'poll':
         return this.statuses.poll(integrationId!);
+      case 'event':
+        return this.statuses.apply(
+          integrationId!,
+          job.data.event as PosOrderInfo,
+        );
       default:
         return Promise.resolve();
     }

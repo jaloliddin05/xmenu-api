@@ -27,7 +27,8 @@ Env: см. `.env.example` (полный; тест сверяет его со с�
 `TELEGRAM_API_BASE_URL` (база всех вызовов Bot API, `infra/telegram/telegram-api-url.ts`; фейк в тестах и e2e, в production только
 `https://api.telegram.org`), `IIKO_APP_ID` + `IIKO_CLIENT_SECRET` (приложение интегратора iiko, одно на платформу; без
 них `platform_misconfigured`, `feature: pos`), `IIKO_API_BASE_URL` (`infra/iiko/iiko-api-url.ts`; фейк в тестах, в production
-только `https://api-ru.iiko.services`), `OPS_CHAT_ID`, `ORDER_QUEUES`,
+только `https://` на хосте из `IIKO_OFFICIAL_API_HOSTS`), `IIKO_MENU_IMPORT_MINUTES` (интервал импорта меню, 30 по
+умолчанию), `OPS_CHAT_ID`, `ORDER_QUEUES`,
 `MINIAPP_URL`, `UPLOAD_MAX_BYTES`, `PLATFORM_ADMIN_USER_IDS`, `TRANSLATION_*`, `OPENAI_API_KEY` (необязателен: без него
 `/translation` → `503 platform_misconfigured`, `feature: translation`), `NEXT_PUBLIC_URL` + `REVALIDATE_SECRET` (QR),
 `CLIENT_REVALIDATE_URL` + `CLIENT_REVALIDATE_SECRET` (сайт доставки), `DELIVERY_URL_TEMPLATE` (адрес Mini App для кнопки бота),
@@ -193,11 +194,24 @@ Payme вручную через ops-чат.
   повтор; ошибки без ключа, маркера и тела ответа, в лог `iikoErrorText`; HTTP-статусы → коды `pos_*`). Нормализация
   меню `iiko/iiko-menu.ts` (поля по OpenAPI iiko: `itemsGroups`, `sizePrices`, модификаторы по id).
 - Модели `pos/models/pos.prisma`: `pos_integration` (одна на заведение, ключ `AES-256-GCM` `PAYMENT_CONFIG_KEY` через
-  `PosKeyring`, `webhook_secret_hash`), `pos_branch_link`, `pos_payment_link`, `pos_menu_link` (строка меню ↔ позиция
-  iiko, `@@unique([integration_id, kind, external_id])`, FK с cascade на строку меню; удаление интеграции снимает
-  связи, строки остаются), `pos_stop_item` (по филиалу). У переводов меню `stale`, у `file` `content_hash` и `from_pos`.
+  `PosKeyring`, `webhook_secret_hash`, тревога владельцу `alert`/`alert_at`), `pos_branch_link` (группа терминалов и
+  своя ценовая категория филиала), `pos_payment_link`, `pos_menu_link` (строка меню ↔ позиция iiko,
+  `@@unique([integration_id, kind, external_id])`, FK с cascade на строку меню), `pos_stop_item` (по филиалу; `option_id`
+  = остановленный размер, без него блюдо целиком; уникальность двумя частичными индексами в миграции). У переводов
+  меню `stale`, у `file` `content_hash` и `from_pos`. «Работает» = `active` или `needs_reconnect` (`isPosLive`,
+  `domain/pos-steps.ts`); `draft` и `disconnected` в заказах, меню и курьерах не участвуют.
+- Отключение (`PosIntegrationService.disconnect`) интеграцию не удаляет: под блокировкой снимает связи, связи меню,
+  стоп-лист и ключ, ставит `disconnected`; `pos_order` остаются (история передачи), ответ считает `unfinishedOrders`.
+  Новый ключ после отключения начинает шаги заново на той же строке. Блокировка интеграции `pos/services/pos-lock.ts`
+  (`pg_advisory_xact_lock` по id): её берут транзакции импорта меню, стоп-листа и отключения, импорт и стоп-лист под
+  ней перечитывают статус; отключение ждёт до 10 с (`lock_timeout`), затем `409 pos_busy`. Тест на настоящем
+  PostgreSQL `pos-lock.db.spec.ts` (идёт при заданном `DATABASE_URL`, в CI всегда).
 - Импорт `PosMenuImportService`: чистый план `domain/menu-import-plan.ts`, затем одна транзакция; сбой оставляет меню
-  и пишет код в `menu_import_error`, `pos_key_invalid` переводит `active` в `needs_reconnect`. Размеры → обязательная
+  и пишет код в `menu_import_error`, у работающей интеграции тревога владельцу (`PosAlertService`: `alert` и одно
+  сообщение в чаты филиалов на эпизод), `pos_key_invalid` переводит `active` в `needs_reconnect`. Сопоставление по
+  названию и скрытие блюд без пары только с `pairing: true` (включение, `POST /integrations/iiko/menu/rematch`);
+  обычный импорт строки без связи не трогает. Пока интеграция работает, создание блюд, категорий и групп допов
+  отвечает `409 pos_menu_locked` (`assertPosMenuOpen` в `product/services/pos-managed.ts`). Размеры → обязательная
   группа «Размер» (`size_group`/`size`). Фото `PosImageStore` (файл по sha256 в `uploads/image/products/pos`;
   `FileService.removeFile` не удаляет файл с диска, пока на путь ссылается другая строка).
 - Только чтение у связанных строк: `product/services/pos-managed.ts` (`posSourceLang`, `pos_managed_field`) в сервисах
@@ -206,28 +220,37 @@ Payme вручную через ops-чат.
   (`assertNotStopped` после выбора филиала, `reason: stop_list`) читают `pos_stop_item`, скрытое в iiko исключают
   через `pos_link.hidden_in_pos` (`SHOWN_BY_POS` в `menu.service.ts`, `loadProducts` в заказе).
 - Очередь `pos-sync` (`PosSyncQueue`): задания `menu` (один ожидающий на интеграцию) и `stop-list`, расписание
-  импорта каждые 30 минут (`upsertJobScheduler`, `pos-menu-<id>`); при `ORDER_QUEUES=off` работа идёт в запросе.
+  импорта каждые `IIKO_MENU_IMPORT_MINUTES` (`upsertJobScheduler`, `pos-menu-<id>`; при старте процесса расписания
+  работающих интеграций ставятся заново, так новое значение применяется); при `ORDER_QUEUES=off` работа идёт в
+  запросе.
   Обработчик берёт одно задание за раз, но в каждом процессе pm2 свой: при нескольких процессах два импорта одного
   заведения могут совпасть, второй упрётся в уникальный индекс `pos_menu_link` и запишет `menu_import_error`.
 - Вебхук `PosWebhookService`: `Authorization` против sha256 (`infra/http/webhook-secret.ts`, общий с ботом заведения),
-  одинаковый 401, дедупликация событий в Redis (`pos:evt:<id>:<sha256 события>`, 24 ч).
+  одинаковый 401, дедупликация событий в Redis (`pos:evt:<id>:<sha256 события>`, 24 ч). Ответ сразу после записи
+  событий: события заказов идут заданием `event` в `pos-orders` (5 попыток), без очередей обрабатываются в запросе.
 - Передача заказа: `pos_order` (одна строка на заказ, `state`: `queued | sending | sent | failed | needs_street |
   manual`, причина `error`, `alerted` — одна тревога на состояние) создаёт `OrderTransitionService` при `accepted` в той
-  же транзакции, если филиал связан с не-`draft` интеграцией; эффект `pos_job` ставит задание `push` в очередь
+  же транзакции, если филиал связан с работающей интеграцией; эффект `pos_job` ставит задание `push` в очередь
   `pos-orders` (имя и тип в `order/queue/order-queue.service.ts`, обработчик `PosOrderProcessor` в `pos`, как у
   `courier-cards`). Без очередей заказ остаётся `queued`.
 - `PosOrderService`: сборка заказа чистой `domain/pos-order-draft.ts` по `pos_menu_link` (размер: `size_id` у связи
   опции, у позиции с одним размером у связи блюда; модификатор: `<itemId>/<groupId>/<modifierId>` в `external_id`),
   попытка с захватом условным `updateMany` (`state`, `attempts`), итог команды заданием `check` (3 с, до 20 раз),
   классификация `domain/pos-order-errors.ts` (повтор или сразу `failed`; 5 попыток, паузы 1–4 минуты), `confirm` после
-  создания. `401` переводит интеграцию в `needs_reconnect` (одно сообщение в чаты филиалов), `402/403/423` красят
-  `checks`. Действия оператора `PosOrderController` (`/order/:id/pos/*`, право `orders`).
+  создания, один раз (`pos_order.confirmed_at`, захват условным `updateMany`). `401` переводит интеграцию в
+  `needs_reconnect` (тревога `key_revoked`), `402/403/423` красят `checks`. Отказ приложения платформы (текст iiko
+  называет приложение или ключи двух заведений отклонены за 10 минут, `PosAlertService.keyRejected`) =
+  `platform_misconfigured`: заведения не переподключаются, тревога в ops-чат. Ценовая категория филиала уходит в
+  `deliveries/create`. Адрес не `city`: улица и дом сначала сопоставляются со строкой адреса (`domain/street-match.ts`
+  по справочнику `PosStreetsCache`: города и улицы организации в Redis на сутки), иначе `needs_street`. Действия
+  оператора `PosOrderController` (`/order/:id/pos/*`, право `orders`).
 - Статусы: чистая таблица `domain/pos-status-map.ts` (только вперёд, противоречие → журнал и тревога),
   `PosOrderStatusService.apply` для вебхука (`DeliveryOrderUpdate/Error` в `PosWebhookService`) и опроса (задание
   `poll` каждые 5 минут, расписание `pos-poll-<id>` ставит и снимает `PosSyncQueue` вместе с импортом меню); последний
   статус iiko меняется условным `updateMany` (одно событие учитывается один раз). Исполнитель `pos` в автомате заказа.
 - Курьеры Xmenu: `completed` от `courier` у переданного заказа ставит `delivered_push: pending` и задание
-  `delivered` (`OnWay`, затем `Delivered`). Курьеры iiko: `OwnCouriersGuard` (`courier/own-couriers.guard.ts`) на
+  `delivered`: шаги по текущему статусу iiko (`domain/delivered-push.ts`: из `Waiting` `OnWay` и `Delivered`, из
+  `OnWay` `Delivered`), из недопустимого статуса ничего не шлётся, `delivered_push: failed` и тревога, без повторов. Курьеры iiko: `OwnCouriersGuard` (`courier/own-couriers.guard.ts`) на
   курьерских маршрутах и отчёте по курьерам → `409 pos_couriers_managed`; имя курьера iiko в `pos_order.courier_name`
   (гостю в `courier`). Отмена в Xmenu переданного заказа: только тревога (изменение после отправки не входит в MVP).
 - Тревоги: `RestaurantNotifierService.alertPos` / `alertPosReconnect`, тексты `buildPosAlertText` в
@@ -396,8 +419,7 @@ App (`instant`) нового номера кладёт Telegram-id в `registrat
   slug только валидируется как поддомен (`organization/domain/slug.ts`).
 - Роли сотрудников для отдельного приложения (курьеры, официанты, менеджеры). Таблица `employee` есть, не используется
   (операторы админки живут в `organization_member`, раздел «Сотрудники и права»).
-- Касса iiko: фейковый сервер iiko в e2e, экраны дашборда (передача заказа, улица, ручной ввод), проверка на живом
-  iiko (`../docs/IIKO.md`, «Перед пилотом»). Другие кассы позже.
+- Касса iiko: проверка на живом iiko (`../docs/IIKO.md`, «Перед пилотом»). Другие кассы позже.
 - Позже: Web Push/WebSocket для админки, фискальные чеки, промокоды (поле `discount` всегда 0), заказ ко
   времени, меню по филиалам, ротация `PAYMENT_CONFIG_KEY`, rate limit на
   `POST /orders`.

@@ -19,6 +19,7 @@ import {
   doorWaitEndsAt,
 } from '../domain/delivery-timers';
 import { AppException } from 'src/infra/errors/app-exception';
+import { isPosLive } from 'src/modules/pos/domain/pos-steps';
 
 const INCLUDE = {
   items: { include: { options: true } },
@@ -243,6 +244,8 @@ export class OrderStaffService {
       this.prisma.pos_order.count({
         where: {
           state: { in: ['failed', 'needs_street'] },
+          // A disconnected POS no longer takes these orders: nothing to retry
+          integration: { status: { in: ['active', 'needs_reconnect'] } },
           order: {
             organization_id: organizationId,
             status: { in: [...LIVE_STATUSES] },
@@ -259,9 +262,7 @@ export class OrderStaffService {
       posReconnect: integration?.status === 'needs_reconnect',
       // Courier functions of Xmenu are off: the dashboard hides them (docs/IIKO.md, "Курьеры")
       posCouriers:
-        !!integration &&
-        integration.status !== 'draft' &&
-        integration.courier_mode === 'iiko',
+        isPosLive(integration?.status) && integration?.courier_mode === 'iiko',
     };
   }
 

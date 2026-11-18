@@ -8,6 +8,7 @@ import { PrismaService } from 'src/modules/_prisma/prisma.service';
 import { POS_PROVIDER } from '../provider/pos-provider';
 import type { PosProvider, PosWebhookEvent } from '../provider/pos-provider';
 import { PosOrderStatusService } from './pos-order-status.service';
+import { PosOrderQueue } from './pos-order.queue';
 import { PosSyncQueue } from './pos-sync.queue';
 
 const UUID_RE =
@@ -22,8 +23,10 @@ const eventKey = (integrationId: string, key: string) =>
  * POS webhook calls (docs/IIKO.md, "Вебхуки"): the address carries the integration id; the
  * Authorization header must match the secret given to iiko (sha256 in the database, compared in
  * constant time); an unknown id and a wrong secret answer the same 401. The body is an array of
- * events, each counted once (Redis SET NX). StopListUpdate queues a stop list refresh; delivery order
- * events move the order (PosOrderStatusService).
+ * events, each counted once (Redis SET NX). The answer comes as soon as the events are recorded and
+ * queued (iiko blocks slow webhooks, audit W15-04): StopListUpdate queues a stop list refresh, a
+ * delivery order event queues its handling (PosOrderStatusService: status, confirm, alerts) with
+ * retries. Without queues (ORDER_QUEUES=off) the order event is handled in the request.
  */
 @Injectable()
 export class PosWebhookService {
@@ -35,6 +38,7 @@ export class PosWebhookService {
     @Inject(REDIS) private readonly redis: Redis,
     private readonly sync: PosSyncQueue,
     private readonly statuses: PosOrderStatusService,
+    private readonly orderQueue: PosOrderQueue,
   ) {}
 
   async receive(
@@ -95,7 +99,10 @@ export class PosWebhookService {
         return;
       case 'DeliveryOrderUpdate':
       case 'DeliveryOrderError':
-        if (event.order) await this.statuses.apply(integrationId, event.order);
+        if (!event.order) return;
+        if (await this.orderQueue.event(integrationId, event.order, event.key))
+          return;
+        await this.statuses.apply(integrationId, event.order);
         return;
       default:
         return;

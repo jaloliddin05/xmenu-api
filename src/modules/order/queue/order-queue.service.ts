@@ -31,13 +31,15 @@ export interface DeliveryTimerJob {
  * "delivered" of an own courier, `poll` asks the POS for the statuses of unfinished orders.
  */
 export const POS_ORDER_QUEUE = 'pos-orders';
-export type PosOrderJobName = 'push' | 'check' | 'delivered' | 'poll';
+export type PosOrderJobName = 'push' | 'check' | 'delivered' | 'poll' | 'event';
 export interface PosOrderJob {
   orderId?: string;
   integrationId?: string;
   correlationId?: string;
   /** check: how many times the command was asked already */
   polls?: number;
+  /** event: what the iiko webhook reported about one order (PosOrderInfo of the pos module) */
+  event?: unknown;
 }
 const deliveryTimerJobId = (orderId: string, kind: DeliveryTimerKind) =>
   `dlv-${kind}-${orderId}`;

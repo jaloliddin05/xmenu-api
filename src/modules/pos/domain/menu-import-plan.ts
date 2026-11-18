@@ -7,9 +7,11 @@ import type {
 /**
  * What a menu import does, decided before anything is written (docs/IIKO.md, "Меню"):
  * - a linked row (pos_menu_link) is updated, never duplicated;
- * - on the first import dishes and categories are paired with the POS by exact name, or by the pairs
- *   the owner confirmed; paired rows get linked, the POS positions without a pair are created, dishes
- *   without a pair are hidden (is_active = false), not deleted;
+ * - only when pairing (the first connection, or the owner's "match again"), dishes and categories
+ *   without a link are paired with the POS by exact name, or by the pairs the owner confirmed; paired
+ *   rows get linked, dishes without a pair are hidden (is_active = false), not deleted. A regular
+ *   import (schedule, button) leaves rows without a link alone (audit W15-02);
+ * - POS positions without a link are created;
  * - a linked position gone from the POS (or hidden there) is hidden through its link;
  * - a name changed in the POS marks the other translations stale;
  * - a POS picture is copied only when it changed and the owner has not uploaded one.
@@ -42,6 +44,8 @@ export interface MenuMatch {
 
 export interface PlanInput {
   menu: PosMenu;
+  /** Pair and hide the rows without a link (first connection, "match again") */
+  pairing: boolean;
   /** The "Delivery" service item: never shown to guests */
   serviceItemId: string | null;
   links: CurrentLink[];
@@ -123,7 +127,16 @@ function pairByName<R extends CurrentRow>(
   return pairs;
 }
 
-export function planMenuImport(input: PlanInput): ImportPlan {
+export function planMenuImport(planInput: PlanInput): ImportPlan {
+  // Without pairing the rows without a link are not looked at
+  const input: PlanInput = planInput.pairing
+    ? planInput
+    : {
+        ...planInput,
+        unlinkedProducts: [],
+        unlinkedCategories: [],
+        matches: [],
+      };
   const items = input.menu.items.filter(
     (i) => i.externalId !== input.serviceItemId,
   );

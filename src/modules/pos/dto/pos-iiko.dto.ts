@@ -48,7 +48,7 @@ export class PosBranchLinkDto {
     type: String,
     nullable: true,
     description:
-      'Price category of this branch; for now it must equal `priceCategoryId` (null takes it)',
+      'Price category of the external menu for this branch: it goes into the orders of the branch (deliveries/create priceCategoryId); null takes `priceCategoryId` of the integration',
   })
   @IsOptional()
   @IsString()
@@ -89,7 +89,8 @@ export class PosLinksDto {
   @ApiPropertyOptional({
     type: String,
     nullable: true,
-    description: 'Price category of the external menu; null = iiko default',
+    description:
+      'Price category of the external menu: the default of the branches and the one the menu prices are imported in; null = iiko default',
   })
   @IsOptional()
   @IsString()
@@ -152,6 +153,20 @@ export class PosEnableDto {
   readonly matches?: PosMatchDto[];
 }
 
+export class PosRematchDto {
+  @ApiPropertyOptional({
+    type: [PosMatchDto],
+    description:
+      'Pairs the owner confirmed in the preview; dishes without a link not listed pair by exact name, the rest are hidden',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(5000)
+  @ValidateNested({ each: true })
+  @Type(() => PosMatchDto)
+  readonly matches?: PosMatchDto[];
+}
+
 export class PosCourierModeDto {
   @ApiProperty({ enum: ['xmenu', 'iiko'] })
   @IsIn(['xmenu', 'iiko'])
@@ -185,8 +200,29 @@ export class PosStepsDto {
   @ApiProperty({ enum: ['done', 'todo'] }) menu: string;
 }
 
+export class PosAlertDto {
+  @ApiProperty({
+    enum: ['menu_import_failed', 'key_revoked'],
+    description:
+      'menu_import_failed: the last menu import failed (menuImportError tells why); key_revoked: iiko rejects the key, the owner reconnects',
+  })
+  code: string;
+
+  @ApiProperty({ format: 'date-time' })
+  at: Date;
+}
+
 export class PosStatusDto {
-  @ApiProperty() connected: boolean;
+  @ApiProperty({
+    description:
+      'The platform can connect iiko (its iiko application and key storage are set up); false: the connection form is not shown, connecting answers 503 platform_misconfigured',
+  })
+  available: boolean;
+
+  @ApiProperty({
+    description: 'False without an integration and after disconnecting',
+  })
+  connected: boolean;
 
   @ApiProperty({
     type: String,
@@ -194,6 +230,14 @@ export class PosStatusDto {
     enum: ['draft', 'active', 'needs_reconnect'],
   })
   status: string | null;
+
+  @ApiProperty({
+    type: PosAlertDto,
+    nullable: true,
+    description:
+      'What the owner is warned about (a banner); the branch chats got one message when it was raised',
+  })
+  alert: PosAlertDto | null;
 
   @ApiProperty({ type: PosStepsDto, nullable: true })
   steps: PosStepsDto | null;
@@ -204,9 +248,9 @@ export class PosStatusDto {
   @ApiProperty({
     type: String,
     nullable: true,
-    enum: ['city', 'legacy', 'unknown'],
+    enum: ['city', 'legacy', 'international', 'int_no_postcode', 'unknown'],
     description:
-      'How the iiko organization takes addresses: a line with coordinates, or a street from the iiko directory',
+      'How the iiko organization takes addresses (addressFormatType): city = a line with coordinates; the others = a street from the iiko directory and a house (matched from the address when it can be, otherwise the operator picks it)',
   })
   addressFormat: string | null;
 
@@ -357,6 +401,13 @@ export class PosPreviewDto {
 export class PosDisconnectedDto {
   @ApiProperty({ example: false })
   connected: false;
+
+  @ApiProperty({
+    example: 0,
+    description:
+      'Orders already in iiko (being sent or sent) that are not finished yet: their statuses no longer come from iiko, the dashboard warns about them. The history of sent orders stays',
+  })
+  unfinishedOrders: number;
 }
 
 export class PosAcceptedDto {

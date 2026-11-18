@@ -183,6 +183,24 @@ describe('ProductService: organization ownership (IDOR)', () => {
     ).toBe(dish.id);
   });
 
+  it.each([
+    ['active', 'pos_menu_locked'],
+    ['needs_reconnect', 'pos_menu_locked'],
+    ['draft', null],
+    ['disconnected', null],
+  ])('a new dish with iiko %s: %s', async (status, code) => {
+    db.seed('pos_integration', { organization_id: ORG, status });
+    const create = service.createProduct(
+      { ...NEW_DISH, category_id: t.mine.category.id },
+      ORG,
+      'mine',
+    );
+    if (code) {
+      await expect(create).rejects.toMatchObject({ code, status: 409 });
+      expect(db.log).toEqual([]);
+    } else await expect(create).resolves.toHaveProperty('id');
+  });
+
   it('refuses to update, toggle, move or delete their dish', async () => {
     await refused(
       service.updateProduct(t.theirs.product.id, { price: 1 }, ORG, 'mine'),

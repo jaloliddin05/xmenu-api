@@ -1,5 +1,12 @@
 import type { PosCheck } from '../provider/pos-provider';
 
+/**
+ * The integration works: enabled, or enabled with a key iiko rejected (orders keep being accepted and
+ * sent once the owner reconnects). A draft and a disconnected integration do not take part.
+ */
+export const isPosLive = (status: string | null | undefined): boolean =>
+  status === 'active' || status === 'needs_reconnect';
+
 /** Connection steps (docs/IIKO.md, "Подключение заведения"); the key step is done once a row exists. */
 export const POS_STEPS = [
   'key',

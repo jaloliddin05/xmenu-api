@@ -16,7 +16,16 @@ export interface PosOrganization {
   name: string;
 }
 
-export type PosAddressFormat = 'city' | 'legacy' | 'unknown';
+/**
+ * How the POS organization takes a delivery address (iiko addressFormatType). Only `city` takes a line
+ * of text; every other format takes a street of the POS directory and a house.
+ */
+export type PosAddressFormat =
+  | 'city'
+  | 'legacy'
+  | 'international'
+  | 'int_no_postcode'
+  | 'unknown';
 
 export interface PosTerminalGroup {
   id: string;
@@ -140,6 +149,8 @@ export interface PosOrderDraft {
   id: string;
   externalNumber: string;
   terminalGroupId: string;
+  /** Price category of the branch (or of the integration); null: the POS default */
+  priceCategoryId: string | null;
   kind: 'delivery' | 'pickup';
   phone: string;
   customerName: string;
@@ -290,12 +301,8 @@ export interface PosProvider {
     orgId: string,
     orderIds: string[],
   ): Promise<PosOrderInfo[]>;
-  /** Streets of the POS directory whose name contains the query (legacy address format). */
-  streets(
-    cred: PosCredentials,
-    orgId: string,
-    query: string,
-  ): Promise<PosStreet[]>;
+  /** Every street of the POS directory with its city (kept for a day, pos-streets.cache.ts). */
+  streets(cred: PosCredentials, orgId: string): Promise<PosStreet[]>;
 }
 
 export const POS_PROVIDER = Symbol('POS_PROVIDER');

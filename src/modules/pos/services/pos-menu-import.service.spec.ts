@@ -35,6 +35,7 @@ describe('PosMenuImportService', () => {
   let provider: { fetchMenu: jest.Mock };
   let images: { fetch: jest.Mock };
   let revalidate: { addRevalidationJob: jest.Mock };
+  let alerts: Record<string, jest.Mock>;
   let service: PosMenuImportService;
   let row: any;
 
@@ -83,14 +84,24 @@ describe('PosMenuImportService', () => {
       })),
     };
     revalidate = { addRevalidationJob: jest.fn(async () => undefined) };
+    alerts = {
+      raise: jest.fn(async () => undefined),
+      clear: jest.fn(async () => undefined),
+      keyRejected: jest.fn(async () => false),
+      platform: jest.fn(async () => undefined),
+    };
     service = new PosMenuImportService(
       db as any,
       provider as any,
       { credentials: () => ({ integrationId: row.id, apiKey: 'k' }) } as any,
       images as any,
       revalidate as any,
+      alerts as any,
     );
   });
+
+  /** The first connection (enable) pairs; the schedule and the button do not */
+  const firstImport = () => service.import(row, { pairing: true });
 
   const links = (kind: string) =>
     db.data.pos_menu_link.filter((l) => l.kind === kind);
@@ -102,7 +113,7 @@ describe('PosMenuImportService', () => {
     );
 
   it('first import: pairs by name, creates the new dish, keeps the service item out, revalidates', async () => {
-    await service.import(row);
+    await firstImport();
     expect(links('product').map((l) => [l.external_id, l.product_id])).toEqual([
       ['i-mine', t.mine.product.id],
       ['i-new', expect.any(String)],
@@ -126,7 +137,7 @@ describe('PosMenuImportService', () => {
   });
 
   it('sizes become a required single-choice group priced as surcharges; the old groups of a paired dish go', async () => {
-    await service.import(row);
+    await firstImport();
     const groups = db.data.additional_product_group.filter(
       (g) => g.product_id === t.mine.product.id,
     );
@@ -158,7 +169,7 @@ describe('PosMenuImportService', () => {
   });
 
   it('a second import updates the linked rows and creates nothing new', async () => {
-    await service.import(row);
+    await firstImport();
     const counts = () => [
       db.data.product.length,
       db.data.category.length,
@@ -177,7 +188,7 @@ describe('PosMenuImportService', () => {
   });
 
   it('a name changed in the POS rewrites the POS language and marks the other translations stale', async () => {
-    await service.import(row);
+    await firstImport();
     const id = t.mine.product.id;
     db.seed('product_translation', {
       product_id: id,
@@ -203,7 +214,7 @@ describe('PosMenuImportService', () => {
       lang: 'ru',
       title: 'Нет в iiko',
     });
-    await service.import(row);
+    await firstImport();
     expect(db.data.product.find((p) => p.id === extra.id)!.is_active).toBe(
       false,
     );
@@ -216,7 +227,7 @@ describe('PosMenuImportService', () => {
   });
 
   it('pictures: copied once, not again for the same address, never over the owner picture', async () => {
-    await service.import(row);
+    await firstImport();
     expect(images.fetch).toHaveBeenCalledTimes(1);
     const lagman = links('product').find((l) => l.external_id === 'i-new')!;
     expect(lagman.source_image_url).toBe('https://img/lagman.jpg');
@@ -236,7 +247,7 @@ describe('PosMenuImportService', () => {
 
   it('a picture that fails is skipped; the import still succeeds', async () => {
     images.fetch.mockRejectedValueOnce(new Error('timeout'));
-    await service.import(row);
+    await firstImport();
     const lagman = links('product').find((l) => l.external_id === 'i-new')!;
     expect(lagman.source_image_url).toBeUndefined();
     expect(row.menu_import_error).toBeNull();
@@ -257,7 +268,7 @@ describe('PosMenuImportService', () => {
     expect(revalidate.addRevalidationJob).not.toHaveBeenCalled();
   });
 
-  it('a revoked key marks an enabled integration for reconnecting', async () => {
+  it('a revoked key marks an enabled integration for reconnecting and alerts the owner', async () => {
     row.status = 'active';
     provider.fetchMenu.mockRejectedValueOnce(
       new AppException('pos_key_invalid'),
@@ -266,6 +277,115 @@ describe('PosMenuImportService', () => {
       code: 'pos_key_invalid',
     });
     expect(row.status).toBe('needs_reconnect');
+    expect(alerts.raise).toHaveBeenCalledWith(row, 'key_revoked');
+  });
+
+  it('keys of several venues rejected at once: the platform, no venue reconnects', async () => {
+    row.status = 'active';
+    alerts.keyRejected.mockResolvedValueOnce(true);
+    provider.fetchMenu.mockRejectedValueOnce(
+      new AppException('pos_key_invalid'),
+    );
+    await expect(service.import(row)).rejects.toMatchObject({
+      code: 'pos_key_invalid',
+    });
+    expect(row.status).toBe('active');
+    expect(alerts.raise).not.toHaveBeenCalled();
+  });
+
+  it('the platform application rejected: the platform alarm, the venue keeps its status', async () => {
+    row.status = 'active';
+    provider.fetchMenu.mockRejectedValueOnce(
+      new AppException('platform_misconfigured', {
+        details: { feature: 'pos' },
+      }),
+    );
+    await expect(service.import(row)).rejects.toMatchObject({
+      code: 'platform_misconfigured',
+    });
+    expect(row.status).toBe('active');
+    expect(alerts.platform).toHaveBeenCalledTimes(1);
+    expect(alerts.raise).not.toHaveBeenCalled();
+    expect(alerts.keyRejected).not.toHaveBeenCalled();
+  });
+
+  it('a failed import of an enabled integration alerts the owner; a success ends the alert', async () => {
+    row.status = 'active';
+    provider.fetchMenu.mockRejectedValueOnce(
+      new AppException('pos_unavailable'),
+    );
+    await expect(service.import(row)).rejects.toMatchObject({
+      code: 'pos_unavailable',
+    });
+    expect(alerts.raise).toHaveBeenCalledWith(row, 'menu_import_failed');
+    await service.import(row);
+    expect(alerts.clear).toHaveBeenCalledWith(row.id, 'menu_import_failed');
+  });
+
+  it('before enabling a failure is only answered: no alert', async () => {
+    provider.fetchMenu.mockRejectedValueOnce(
+      new AppException('pos_unavailable'),
+    );
+    await expect(firstImport()).rejects.toMatchObject({
+      code: 'pos_unavailable',
+    });
+    expect(alerts.raise).not.toHaveBeenCalled();
+  });
+
+  it('a regular import leaves a dish the owner has without a link: not hidden, not paired by name', async () => {
+    row.status = 'active';
+    await firstImport();
+    const own = db.seed('product', {
+      category_id: t.mine.category.id,
+      price: 1,
+      is_active: true,
+    });
+    db.seed('product_translation', {
+      product_id: own.id,
+      lang: 'ru',
+      title: 'Шурпа',
+    });
+    menu.items.push(item('i-shurpa', 'Шурпа'));
+    await service.import(row);
+    expect(db.data.product.find((p) => p.id === own.id)!.is_active).toBe(true);
+    const shurpa = links('product').find((l) => l.external_id === 'i-shurpa')!;
+    expect(shurpa.product_id).not.toBe(own.id);
+  });
+
+  it('"match again" pairs by name as on the first connection', async () => {
+    row.status = 'active';
+    await firstImport();
+    const own = db.seed('product', {
+      category_id: t.mine.category.id,
+      price: 1,
+      is_active: true,
+    });
+    db.seed('product_translation', {
+      product_id: own.id,
+      lang: 'ru',
+      title: 'Шурпа',
+    });
+    menu.items.push(item('i-shurpa', 'Шурпа'));
+    await service.import(row, { pairing: true });
+    expect(
+      links('product').find((l) => l.external_id === 'i-shurpa')!.product_id,
+    ).toBe(own.id);
+  });
+
+  it('writes under the integration lock; disconnected while the menu was fetched: nothing is written', async () => {
+    await firstImport();
+    expect(db.raw.map((r) => r.values)).toEqual([[`pos:${row.id}`]]);
+
+    row.status = 'active';
+    provider.fetchMenu.mockImplementationOnce(async () => {
+      row.status = 'disconnected';
+      return menu;
+    });
+    menu.items[1] = { ...menu.items[1], price: 99000 };
+    const writes = db.log.length;
+    await service.import(row);
+    expect(db.log.slice(writes)).toEqual([]);
+    expect(revalidate.addRevalidationJob).toHaveBeenCalledTimes(1);
   });
 
   it('preview: the pairs, the new positions and the dishes that will be hidden', async () => {

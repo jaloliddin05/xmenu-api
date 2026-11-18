@@ -22,6 +22,7 @@ import type { PosAlert } from '../notifications/order-messages';
 import { RestaurantNotifierService } from '../notifications/restaurant-notifier.service';
 import { OrderQueueService } from '../queue/order-queue.service';
 import { OrderSettingsService } from './order-settings.service';
+import { isPosLive } from 'src/modules/pos/domain/pos-steps';
 
 export class InvalidTransitionError extends Error {
   constructor(
@@ -340,7 +341,7 @@ export class OrderTransitionService {
         integration: { select: { status: true } },
       },
     });
-    if (!link || link.integration.status === 'draft') return false;
+    if (!link || !isPosLive(link.integration.status)) return false;
     await tx.pos_order.upsert({
       where: { order_id: order.id },
       create: { order_id: order.id, integration_id: link.integration_id },

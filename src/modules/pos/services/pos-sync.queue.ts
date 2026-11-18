@@ -11,10 +11,24 @@ import { PrismaService } from 'src/modules/_prisma/prisma.service';
 import { PosMenuImportService } from './pos-menu-import.service';
 import { PosOrderQueue } from './pos-order.queue';
 import { PosStopListService } from './pos-stop-list.service';
+import { isPosLive } from '../domain/pos-steps';
 
 export const POS_SYNC_QUEUE = 'pos-sync';
-/** Menu import interval (docs/IIKO.md: no webhook announces a changed external menu) */
-export const MENU_IMPORT_EVERY_MS = 30 * 60_000;
+/** Menu import interval by default, minutes (docs/IIKO.md: no webhook announces a changed menu) */
+export const MENU_IMPORT_DEFAULT_MINUTES = 30;
+const MENU_IMPORT_MIN_MINUTES = 5;
+const MENU_IMPORT_MAX_MINUTES = 24 * 60;
+
+/** IIKO_MENU_IMPORT_MINUTES (env-schema.ts) in ms, kept within 5 minutes .. a day. */
+export function menuImportEveryMs(
+  env: NodeJS.ProcessEnv = process.env,
+): number {
+  const raw = Number.parseInt(env.IIKO_MENU_IMPORT_MINUTES ?? '', 10);
+  const minutes = Number.isFinite(raw)
+    ? Math.min(MENU_IMPORT_MAX_MINUTES, Math.max(MENU_IMPORT_MIN_MINUTES, raw))
+    : MENU_IMPORT_DEFAULT_MINUTES;
+  return minutes * 60_000;
+}
 
 export type PosSyncJobName = 'menu' | 'stop-list';
 export interface PosSyncJob {
@@ -25,8 +39,8 @@ const schedulerId = (integrationId: string) => `pos-menu-${integrationId}`;
 
 /**
  * Menu imports and stop list refreshes run here (one pending menu import per integration). Every
- * active integration has a scheduler that imports its menu every 30
- * minutes. With ORDER_QUEUES=off (local run without Redis) the work runs in the calling request.
+ * active integration has a scheduler that imports its menu every IIKO_MENU_IMPORT_MINUTES (30 by
+ * default; a changed interval applies after a restart, rescheduleAll). With ORDER_QUEUES=off (local run without Redis) the work runs in the calling request.
  */
 @Injectable()
 export class PosSyncQueue implements OnModuleInit, OnModuleDestroy {
@@ -67,6 +81,26 @@ export class PosSyncQueue implements OnModuleInit, OnModuleDestroy {
         `${job?.name} of integration ${job?.data.integrationId} failed: ${errorMessage(e)}`,
       ),
     );
+    // A changed IIKO_MENU_IMPORT_MINUTES applies after a restart: the schedulers are set again
+    void this.rescheduleAll().catch((e: unknown) =>
+      this.logger.warn(
+        `menu import schedulers not updated: ${errorMessage(e)}`,
+      ),
+    );
+  }
+
+  /** The menu import scheduler of every working integration, with the current interval. */
+  async rescheduleAll(): Promise<void> {
+    const live = await this.prisma.pos_integration.findMany({
+      where: { status: { in: ['active', 'needs_reconnect'] } },
+      select: { id: true },
+    });
+    for (const { id } of live)
+      await this.q.upsertJobScheduler(
+        schedulerId(id),
+        { every: menuImportEveryMs() },
+        { name: 'menu', data: { integrationId: id } },
+      );
   }
 
   async onModuleDestroy() {
@@ -81,7 +115,7 @@ export class PosSyncQueue implements OnModuleInit, OnModuleDestroy {
       where: { id: integrationId },
     });
     // Removed or not enabled yet: a leftover scheduled job does nothing
-    if (!row || row.status === 'draft') return;
+    if (!row || !isPosLive(row.status)) return;
     await this.menu.import(row);
     await this.stopList.refresh(integrationId);
   }
@@ -97,12 +131,12 @@ export class PosSyncQueue implements OnModuleInit, OnModuleDestroy {
     );
   }
 
-  /** The menu import every 30 minutes and the poll of unfinished orders (pos-order.queue.ts). */
+  /** The menu import every IIKO_MENU_IMPORT_MINUTES and the poll of unfinished orders (pos-order.queue.ts). */
   async schedule(integrationId: string): Promise<void> {
     if (!this.enabled) return;
     await this.q.upsertJobScheduler(
       schedulerId(integrationId),
-      { every: MENU_IMPORT_EVERY_MS },
+      { every: menuImportEveryMs() },
       { name: 'menu', data: { integrationId } },
     );
     await this.orders.schedulePoll(integrationId);

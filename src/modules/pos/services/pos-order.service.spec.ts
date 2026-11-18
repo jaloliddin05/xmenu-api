@@ -33,6 +33,8 @@ describe('PosOrderService', () => {
       t.transitions as any,
       t.restaurant as any,
       t.queue as any,
+      t.alerts as any,
+      t.streets as any,
     );
     service.sleep = async () => undefined;
   });
@@ -204,7 +206,7 @@ describe('PosOrderService', () => {
       },
     );
 
-    it('the key was revoked: "needs reconnect", the venue alerted once; orders keep being accepted', async () => {
+    it('the key was revoked: "needs reconnect" and the owner alert (once per episode, PosAlertService); orders keep being accepted', async () => {
       t.provider.createOrder.mockRejectedValue(
         httpError(401, 'pos_key_invalid'),
       );
@@ -214,12 +216,115 @@ describe('PosOrderService', () => {
         error: 'pos_key_invalid',
       });
       expect(t.world.integration.status).toBe('needs_reconnect');
-      expect(t.restaurant.alertPosReconnect).toHaveBeenCalledWith(ORG);
+      expect(t.alerts.raise).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'int-1', organization_id: ORG }),
+        'key_revoked',
+      );
       expect(t.world.order.status).toBe('accepted');
-      // A second order failing the same way does not alert the venue again
-      t.world.pos.state = 'queued';
+    });
+
+    it('keys of several venues rejected at once: the platform, the venue is not asked to reconnect', async () => {
+      t.alerts.keyRejected.mockResolvedValueOnce(true);
+      t.provider.createOrder.mockRejectedValue(
+        httpError(401, 'pos_key_invalid'),
+      );
       await service.push(ORDER);
-      expect(t.restaurant.alertPosReconnect).toHaveBeenCalledTimes(1);
+      expect(t.world.integration.status).toBe('active');
+      expect(t.alerts.raise).not.toHaveBeenCalled();
+    });
+
+    it('the platform iiko application rejected: retried like an outage, the platform alarm, the venue keeps its status', async () => {
+      t.provider.createOrder.mockRejectedValue(
+        new AppException('platform_misconfigured', {
+          details: { feature: 'pos' },
+        }),
+      );
+      await service.push(ORDER);
+      expect(pos()).toMatchObject({
+        state: 'queued',
+        error: 'pos_unavailable',
+      });
+      expect(t.alerts.platform).toHaveBeenCalledTimes(1);
+      expect(t.world.integration.status).toBe('active');
+    });
+
+    it('a disconnected integration sends nothing', async () => {
+      t.world.integration.status = 'disconnected';
+      await service.push(ORDER);
+      expect(t.provider.createOrder).not.toHaveBeenCalled();
+      expect(pos().state).toBe('queued');
+    });
+
+    it('confirmed once: the Unconfirmed status after creation does not confirm again', async () => {
+      t.provider.createOrder.mockResolvedValue(success());
+      await service.push(ORDER);
+      expect(pos().confirmed_at).toBeInstanceOf(Date);
+      await service.confirm({
+        ...t.world.pos,
+        integration: t.world.integration,
+      } as any);
+      expect(t.provider.confirmOrder).toHaveBeenCalledTimes(1);
+    });
+
+    it('a confirm that failed is released: the next Unconfirmed tries again', async () => {
+      t.provider.createOrder.mockResolvedValue(success());
+      t.provider.confirmOrder.mockRejectedValueOnce(new Error('down'));
+      await service.push(ORDER);
+      expect(pos().state).toBe('sent');
+      expect(pos().confirmed_at).toBeNull();
+      await service.confirm({
+        ...t.world.pos,
+        integration: t.world.integration,
+      } as any);
+      expect(t.provider.confirmOrder).toHaveBeenCalledTimes(2);
+      expect(pos().confirmed_at).toBeInstanceOf(Date);
+    });
+
+    it('the price category of the branch, else of the integration, goes into the order', async () => {
+      t.provider.createOrder.mockResolvedValue(success());
+      t.world.integration.price_category_id = 'pc-venue';
+      await service.push(ORDER);
+      expect(t.provider.createOrder.mock.calls[0][2].priceCategoryId).toBe(
+        'pc-venue',
+      );
+      t.world.pos.state = 'queued';
+      t.world.branchLink.price_category_id = 'pc-branch';
+      await service.push(ORDER);
+      expect(t.provider.createOrder.mock.calls[1][2].priceCategoryId).toBe(
+        'pc-branch',
+      );
+    });
+
+    it('a street from the directory: matched from the address and sent without the operator', async () => {
+      t.world.integration.address_format = 'international';
+      t.world.order.address_snapshot = {
+        ...t.world.order.address_snapshot,
+        address: 'Ташкент, улица Навои, 10',
+      };
+      t.streets.streets.mockResolvedValue([
+        { id: 'st-navoi', name: 'улица Навои', city: 'Ташкент' },
+      ]);
+      t.provider.createOrder.mockResolvedValue(success());
+      await service.push(ORDER);
+      expect(t.provider.createOrder.mock.calls[0][2].address).toMatchObject({
+        format: 'legacy',
+        streetId: 'st-navoi',
+        house: '10',
+      });
+      expect(t.journal).toContain('iiko:street:auto');
+      expect(alerts()).not.toContain('needs_street');
+    });
+
+    it('no single street matches (or the directory fails): the operator picks it', async () => {
+      t.world.integration.address_format = 'legacy';
+      t.streets.streets.mockResolvedValue([]);
+      await service.push(ORDER);
+      expect(pos().state).toBe('needs_street');
+      t.world.pos.state = 'queued';
+      t.streets.streets.mockRejectedValue(new Error('down'));
+      await service.push(ORDER);
+      expect(pos().state).toBe('needs_street');
+      expect(t.provider.createOrder).not.toHaveBeenCalled();
     });
 
     it('a dish without a link or an unlinked branch: "not sent", no call to iiko', async () => {
@@ -346,10 +451,14 @@ describe('PosOrderService', () => {
         code: 'pos_order_state_conflict',
       });
       t.world.pos.state = 'needs_street';
-      t.provider.streets.mockResolvedValue([
+      t.streets.search.mockResolvedValue([
         { id: 'st-1', name: 'Amir Temur', city: 'Tashkent' },
-      ] as never);
+      ]);
       expect(await service.streets(ORG, ORDER, 'tem')).toHaveLength(1);
+      expect(t.streets.search).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'int-1' }),
+        'tem',
+      );
       await service.setStreet(
         ORG,
         ORDER,
@@ -377,7 +486,7 @@ describe('PosOrderService', () => {
 
     it('the street list keeps iiko failures neutral', async () => {
       t.world.pos.state = 'needs_street';
-      t.provider.streets.mockRejectedValue(
+      t.streets.search.mockRejectedValue(
         new IikoApiError('/api/1/cities', 503, null, 'pos_unavailable'),
       );
       await expect(service.streets(ORG, ORDER, '')).rejects.toMatchObject({
@@ -392,7 +501,21 @@ describe('PosOrderService', () => {
       t.world.order.status = 'completed';
     });
 
-    it('OnWay, then Delivered, each waiting for its command', async () => {
+    /** The status iiko reports now (deliveries/by_id) */
+    const iikoStatus = (status: string | null) =>
+      t.provider.orders.mockResolvedValue([
+        {
+          id: ORDER,
+          creation: 'success',
+          errorCode: null,
+          status,
+          number: '1042',
+          courierName: null,
+        },
+      ]);
+
+    it('iiko Waiting: OnWay, then Delivered, each waiting for its command', async () => {
+      iikoStatus('Waiting');
       t.provider.setDeliveryStatus
         .mockResolvedValueOnce('c-onway')
         .mockResolvedValueOnce('c-delivered');
@@ -408,6 +531,7 @@ describe('PosOrderService', () => {
     });
 
     it('iiko refuses Delivered: journal and alert, a retry goes on from there', async () => {
+      iikoStatus('Waiting');
       t.provider.setDeliveryStatus.mockResolvedValue('c');
       t.provider.commandStatus
         .mockResolvedValueOnce({ state: 'success' })
@@ -420,6 +544,7 @@ describe('PosOrderService', () => {
 
       // Continues from "on the way" if asked again
       t.world.pos.delivered_push = 'on_way';
+      iikoStatus('OnWay');
       t.provider.setDeliveryStatus.mockClear();
       t.provider.commandStatus.mockResolvedValue({ state: 'success' });
       await service.delivered(ORDER);
@@ -427,6 +552,52 @@ describe('PosOrderService', () => {
         t.provider.setDeliveryStatus.mock.calls.map((c: any[]) => c[3]),
       ).toEqual(['Delivered']);
       expect(pos().delivered_push).toBe('done');
+    });
+
+    it.each(['CookingStarted', 'WaitCooking', 'CookingCompleted', null])(
+      'iiko %s would refuse OnWay: nothing is sent, "status in iiko not updated" and one alert',
+      async (status) => {
+        iikoStatus(status);
+        await service.delivered(ORDER);
+        expect(t.provider.setDeliveryStatus).not.toHaveBeenCalled();
+        expect(pos().delivered_push).toBe('failed');
+        expect(t.journal).toEqual([
+          `iiko:delivered_push:blocked:${status ?? 'unknown'}`,
+        ]);
+        expect(alerts()).toEqual(['delivered_push_failed']);
+        // No blind retry: a second call does nothing
+        await service.delivered(ORDER);
+        expect(alerts()).toHaveLength(1);
+      },
+    );
+
+    it('iiko already OnWay: only Delivered; already Delivered: nothing to send', async () => {
+      iikoStatus('OnWay');
+      t.provider.setDeliveryStatus.mockResolvedValue('c');
+      t.provider.commandStatus.mockResolvedValue({ state: 'success' });
+      await service.delivered(ORDER);
+      expect(
+        t.provider.setDeliveryStatus.mock.calls.map((c: any[]) => c[3]),
+      ).toEqual(['Delivered']);
+      expect(pos().delivered_push).toBe('done');
+
+      t.world.pos.delivered_push = 'pending';
+      t.provider.setDeliveryStatus.mockClear();
+      iikoStatus('Delivered');
+      await service.delivered(ORDER);
+      expect(t.provider.setDeliveryStatus).not.toHaveBeenCalled();
+      expect(pos().delivered_push).toBe('done');
+    });
+
+    it('iiko not answering: the last status seen decides', async () => {
+      t.provider.orders.mockRejectedValue(new Error('down'));
+      t.world.pos.pos_status = 'Waiting';
+      t.provider.setDeliveryStatus.mockResolvedValue('c');
+      t.provider.commandStatus.mockResolvedValue({ state: 'success' });
+      await service.delivered(ORDER);
+      expect(
+        t.provider.setDeliveryStatus.mock.calls.map((c: any[]) => c[3]),
+      ).toEqual(['OnWay', 'Delivered']);
     });
 
     it('an order that is not in iiko is left alone', async () => {

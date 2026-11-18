@@ -6,6 +6,7 @@ import { RevalidateService } from 'src/modules/revalidate-queue/revalidate.servi
 import { ownCategory } from 'src/modules/product/services/menu-ownership';
 import { AppException } from 'src/infra/errors/app-exception';
 import {
+  assertPosMenuOpen,
   assertNoManagedChanges,
   assertNotManaged,
   posMarker,
@@ -47,6 +48,7 @@ export class CategoryService {
     slug: string,
   ) {
     this.assertSameOrganization(dto.organization_id, organizationId);
+    await assertPosMenuOpen(this.prismaService, organizationId);
 
     const category = await this.prismaService.$transaction(async (prisma) => {
       const lastCategory = await prisma.category.findFirst({

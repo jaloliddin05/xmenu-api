@@ -4,7 +4,10 @@ import {
   encryptConfig,
   parsePaymentConfigKey,
 } from 'src/modules/payment/domain/payment-crypto';
-import { platformMisconfigured } from 'src/infra/errors/app-exception';
+import {
+  AppException,
+  platformMisconfigured,
+} from 'src/infra/errors/app-exception';
 import type { PosCredentials } from '../provider/pos-provider';
 
 /**
@@ -34,7 +37,12 @@ export class PosKeyring {
     return encryptConfig({ apiKey }, this.key);
   }
 
-  credentials(row: { id: string; api_key_encrypted: string }): PosCredentials {
+  credentials(row: {
+    id: string;
+    api_key_encrypted: string | null;
+  }): PosCredentials {
+    // A disconnected integration has no key
+    if (!row.api_key_encrypted) throw new AppException('pos_not_connected');
     const key = this.key;
     try {
       const { apiKey } = decryptConfig<{ apiKey: string }>(

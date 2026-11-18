@@ -45,6 +45,7 @@ const order = (over: Partial<DraftSource> = {}): DraftSource => ({
 
 const links = (over: Partial<DraftLinks> = {}): DraftLinks => ({
   terminalGroupId: 'tg1',
+  priceCategoryId: null,
   addressFormat: 'city',
   street: null,
   products: new Map([['pizza', { externalId: 'i-pizza', sizeId: null }]]),
@@ -83,6 +84,7 @@ describe('buildPosOrder', () => {
       id: 'order-1',
       externalNumber: '12',
       terminalGroupId: 'tg1',
+      priceCategoryId: null,
       kind: 'delivery',
       phone: '+998901234567',
       customerName: 'Aziz',
@@ -250,24 +252,31 @@ describe('buildPosOrder', () => {
     });
   });
 
-  it('streets from the iiko directory: without a picked street the operator picks one', () => {
-    expect(buildPosOrder(order(), links({ addressFormat: 'legacy' }))).toEqual({
-      ok: false,
-      problem: 'needs_street',
-    });
-    expect(buildPosOrder(order(), links({ addressFormat: 'unknown' }))).toEqual(
-      { ok: false, problem: 'needs_street' },
-    );
-    const d = built(
-      order(),
-      links({ addressFormat: 'legacy', street: { id: 'st-1', house: '12A' } }),
-    );
-    expect(d.address).toMatchObject({
-      format: 'legacy',
-      streetId: 'st-1',
-      house: '12A',
-      flat: '15',
-    });
+  it.each(['legacy', 'international', 'int_no_postcode', 'unknown'] as const)(
+    'format %s takes a street of the iiko directory: without one the operator picks it',
+    (addressFormat) => {
+      expect(buildPosOrder(order(), links({ addressFormat }))).toEqual({
+        ok: false,
+        problem: 'needs_street',
+      });
+      const d = built(
+        order(),
+        links({ addressFormat, street: { id: 'st-1', house: '12A' } }),
+      );
+      // iiko has two address kinds; only City takes a line
+      expect(d.address).toMatchObject({
+        format: 'legacy',
+        streetId: 'st-1',
+        house: '12A',
+        flat: '15',
+      });
+    },
+  );
+
+  it('the price category of the branch goes with the order', () => {
+    expect(
+      built(order(), links({ priceCategoryId: 'pc-2' })).priceCategoryId,
+    ).toBe('pc-2');
   });
 
   it('a guest without a name goes under the order number', () => {

@@ -34,6 +34,8 @@ describe('PosOrderStatusService', () => {
       t.transitions as any,
       t.restaurant as any,
       t.queue as any,
+      t.alerts as any,
+      t.streets as any,
     );
     service = new PosOrderStatusService(
       t.prisma as any,

@@ -13,6 +13,7 @@ import { errorMessage } from 'src/infra/helper/error-text';
 import { hashWebhookSecret } from 'src/infra/http/webhook-secret';
 import { LIVE_STATUSES } from 'src/modules/order/domain/order-state-machine';
 import {
+  isPosLive,
   missingForEnable,
   requiredPaymentMethods,
   stepStatus,
@@ -30,7 +31,13 @@ import type {
   PosMatchDto,
   PosStatusDto,
 } from '../dto/pos-iiko.dto';
+import { PosAlertService } from './pos-alert.service';
 import { PosKeyring } from './pos-keyring';
+import {
+  isPosLockTimeout,
+  lockPosIntegration,
+  POS_LOCK_WAIT_MS,
+} from './pos-lock';
 import { PosMenuImportService } from './pos-menu-import.service';
 import { PosStopListService } from './pos-stop-list.service';
 import { PosSyncQueue } from './pos-sync.queue';
@@ -48,6 +55,29 @@ const publicApiUrl = () =>
 /** Address iiko calls: keyed by the integration id, never the slug. Logged only, never returned. */
 export const posWebhookUrl = (integrationId: string) =>
   `${publicApiUrl()}/pos/iiko/${integrationId}/webhook`;
+
+/** A disconnected integration connected again: back to the first steps */
+const FRESH_DRAFT = {
+  status: 'draft',
+  external_org_id: null,
+  address_format: null,
+  external_menu_id: null,
+  price_category_id: null,
+  delivery_item_id: null,
+  delivery_size_id: null,
+  courier_mode: 'xmenu',
+  source_lang: null,
+  webhook_secret_hash: null,
+  checks: Prisma.DbNull,
+  checked_at: null,
+  menu_imported_at: null,
+  menu_import_error: null,
+  stop_list_updated_at: null,
+  enabled_at: null,
+  disconnected_at: null,
+  alert: null,
+  alert_at: null,
+} satisfies Prisma.pos_integrationUpdateInput;
 
 const notConnected = () =>
   new AppException('pos_not_connected', {
@@ -72,6 +102,7 @@ export class PosIntegrationService {
     private readonly stopList: PosStopListService,
     private readonly sync: PosSyncQueue,
     private readonly revalidate: RevalidateService,
+    private readonly alerts: PosAlertService,
   ) {}
 
   /** The platform has the integrator application and can keep keys: otherwise 503 platform_misconfigured (pos). */
@@ -87,6 +118,16 @@ export class PosIntegrationService {
     this.keyring.encrypt('probe');
   }
 
+  /** GET answers `available: false` instead of letting the owner find out after typing the key. */
+  private available(): boolean {
+    try {
+      this.assertConfigured();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   private async row(orgId: string): Promise<Row | null> {
     return this.prisma.pos_integration.findUnique({
       where: { organization_id: orgId },
@@ -96,7 +137,7 @@ export class PosIntegrationService {
 
   private async requireRow(orgId: string): Promise<Row> {
     const row = await this.row(orgId);
-    if (!row) throw notConnected();
+    if (!row || row.status === 'disconnected') throw notConnected();
     return row;
   }
 
@@ -137,10 +178,13 @@ export class PosIntegrationService {
   }
 
   private async view(row: Row | null): Promise<PosStatusDto> {
-    if (!row)
+    const available = this.available();
+    if (!row || row.status === 'disconnected')
       return {
+        available,
         connected: false,
         status: null,
+        alert: null,
         steps: null,
         externalOrgId: null,
         addressFormat: null,
@@ -158,8 +202,13 @@ export class PosIntegrationService {
         enabledAt: null,
       };
     return {
+      available,
       connected: true,
       status: row.status,
+      alert:
+        row.alert && row.alert_at
+          ? { code: row.alert, at: row.alert_at }
+          : null,
       steps: await this.stepsOf(row),
       externalOrgId: row.external_org_id,
       addressFormat: row.address_format,
@@ -207,16 +256,20 @@ export class PosIntegrationService {
       this.provider.listOrganizations(cred),
     );
     const encrypted = this.keyring.encrypt(cred.apiKey);
+    const restart = existing?.status === 'disconnected';
     await this.prisma.pos_integration.upsert({
       where: { organization_id: orgId },
       create: { id, organization_id: orgId, api_key_encrypted: encrypted },
       update: {
         api_key_encrypted: encrypted,
         ...(existing?.status === 'needs_reconnect' ? { status: 'active' } : {}),
+        // Connecting again after disconnecting: the steps start over (orders sent before stay)
+        ...(restart ? FRESH_DRAFT : {}),
       },
     });
+    await this.alerts.clear(id, 'key_revoked');
     const sole =
-      organizations.length === 1 && !existing?.external_org_id
+      organizations.length === 1 && (restart || !existing?.external_org_id)
         ? organizations[0].id
         : null;
     if (sole) await this.setOrganization(orgId, sole);
@@ -343,8 +396,9 @@ export class PosIntegrationService {
   }
 
   /**
-   * Steps 3–5 in one document (PUT replaces all links): checked against the iiko dictionaries. One
-   * price category for all branches until the menu is per branch.
+   * Steps 3–5 in one document (PUT replaces all links): checked against the iiko dictionaries. Each
+   * branch may have its own price category (decision 4 b); it goes into the orders of the branch,
+   * the menu prices are imported in the integration's one.
    */
   async setLinks(orgId: string, dto: PosLinksDto) {
     const row = await this.requireRow(orgId);
@@ -362,7 +416,9 @@ export class PosIntegrationService {
         cause: 'the chosen external menu is not in iiko',
       });
     const category = dto.priceCategoryId ?? null;
-    if (category && !dict.priceCategories.some((c) => c.id === category))
+    const knownCategory = (id: string) =>
+      dict.priceCategories.some((c) => c.id === id);
+    if (category && !knownCategory(category))
       bad(
         'priceCategoryId',
         'unknown_price_category',
@@ -388,11 +444,11 @@ export class PosIntegrationService {
           'unknown_terminal_group',
           'No such terminal group',
         );
-      if ((b.priceCategoryId ?? category) !== category)
+      if (b.priceCategoryId && !knownCategory(b.priceCategoryId))
         bad(
           `branches[${i}].priceCategoryId`,
-          'price_category_differs',
-          'All branches use one price category for now',
+          'unknown_price_category',
+          'No such price category',
         );
     });
 
@@ -471,7 +527,7 @@ export class PosIntegrationService {
         },
       });
     });
-    if (row.status !== 'draft') {
+    if (isPosLive(row.status)) {
       if (menuChanged) await this.sync.enqueue('menu', row.id);
       else await this.sync.enqueue('stop-list', row.id);
     }
@@ -515,7 +571,7 @@ export class PosIntegrationService {
   /**
    * Enabling: every step done and every check green, otherwise 409 pos_setup_incomplete with the
    * list. Then the menu is imported with the confirmed pairs, the webhook set in iiko (a new random
-   * authToken; the database keeps its hash), the stop list fetched and the 30-minute import scheduled.
+   * authToken; the database keeps its hash), the stop list fetched and the menu import scheduled (IIKO_MENU_IMPORT_MINUTES).
    */
   async enable(orgId: string, matches: PosMatchDto[] = []) {
     this.assertConfigured();
@@ -531,20 +587,14 @@ export class PosIntegrationService {
     if (missing.length)
       throw new AppException('pos_setup_incomplete', { details: { missing } });
 
-    const productIds = [...new Set(matches.map((m) => m.productId))];
-    const own = await this.prisma.product.count({
-      where: { id: { in: productIds }, category: { organization_id: orgId } },
-    });
-    if (own !== productIds.length)
-      throw new AppException('not_found', { message: 'Product not found' });
-
-    await this.menu.import(
-      row,
-      matches.map((m) => ({
+    await this.ownProducts(orgId, matches);
+    await this.menu.import(row, {
+      pairing: true,
+      matches: matches.map((m) => ({
         productId: m.productId,
         itemId: m.itemId ?? null,
       })),
-    );
+    });
     const secret = randomBytes(32).toString('hex');
     const cred = this.keyring.credentials(row);
     await this.call(() =>
@@ -577,10 +627,47 @@ export class PosIntegrationService {
     return this.status(orgId);
   }
 
+  private async ownProducts(orgId: string, matches: PosMatchDto[]) {
+    const productIds = [...new Set(matches.map((m) => m.productId))];
+    const own = await this.prisma.product.count({
+      where: { id: { in: productIds }, category: { organization_id: orgId } },
+    });
+    if (own !== productIds.length)
+      throw new AppException('not_found', { message: 'Product not found' });
+  }
+
+  /**
+   * "Сопоставить заново": the dishes without a link are paired (the owner's pairs, then exact name)
+   * and the rest hidden, as on enabling. Runs in the request, so the owner sees the result.
+   */
+  async rematch(orgId: string, matches: PosMatchDto[] = []) {
+    const row = await this.requireRow(orgId);
+    if (!isPosLive(row.status))
+      throw new AppException('pos_setup_incomplete', {
+        details: { missing: ['enabled'] },
+      });
+    await this.ownProducts(orgId, matches);
+    await this.menu.import(row, {
+      pairing: true,
+      matches: matches.map((m) => ({
+        productId: m.productId,
+        itemId: m.itemId ?? null,
+      })),
+    });
+    await this.stopList
+      .refresh(row.id)
+      .catch((e: unknown) =>
+        this.logger.warn(
+          `stop list of ${row.id} not fetched: ${iikoErrorText(e)}`,
+        ),
+      );
+    return this.status(orgId);
+  }
+
   /** "Обновить меню": queued; the result shows in GET (menuImportedAt / menuImportError). */
   async importNow(orgId: string) {
     const row = await this.requireRow(orgId);
-    if (row.status === 'draft')
+    if (!isPosLive(row.status))
       throw new AppException('pos_setup_incomplete', {
         details: { missing: ['enabled'] },
       });
@@ -612,18 +699,63 @@ export class PosIntegrationService {
   }
 
   /**
-   * Disconnecting: the webhook is removed in iiko (a failure is only logged), the integration and
-   * its links and stop list go; dishes stay as ordinary Xmenu dishes and become editable again.
+   * Disconnecting (audit W15-03, W15-05): under the integration lock (a running menu import or stop
+   * list refresh is waited for up to 10 s, then 409 pos_busy) the links, the menu links (dishes stay
+   * as ordinary Xmenu dishes and become editable again), the stop list and the key go and the
+   * integration is marked disconnected. The orders sent to iiko keep their history. Then the webhook
+   * is removed in iiko (a failure is only logged) and the schedules stop. The answer counts the
+   * orders already in iiko that are not finished: their statuses no longer come from iiko.
    */
   async disconnect(orgId: string) {
     const row = await this.row(orgId);
-    if (!row) return { connected: false as const };
-    if (row.external_org_id && row.webhook_secret_hash) {
+    if (!row || row.status === 'disconnected')
+      return { connected: false as const, unfinishedOrders: 0 };
+    // Read before the row changes: the webhook is removed with the old key
+    const webhookOrg = row.webhook_secret_hash ? row.external_org_id : null;
+    let cred: ReturnType<PosKeyring['credentials']> | null = null;
+    try {
+      cred = this.keyring.credentials(row);
+    } catch (e) {
+      this.logger.warn(
+        `key of ${row.id} unreadable, the webhook stays in iiko: ${errorMessage(e)}`,
+      );
+    }
+    try {
+      await this.prisma.$transaction(
+        async (tx) => {
+          await lockPosIntegration(tx, row.id, POS_LOCK_WAIT_MS);
+          const where = { integration_id: row.id };
+          await tx.pos_menu_link.deleteMany({ where });
+          await tx.pos_stop_item.deleteMany({ where });
+          await tx.pos_branch_link.deleteMany({ where });
+          await tx.pos_payment_link.deleteMany({ where });
+          await tx.pos_integration.update({
+            where: { id: row.id },
+            data: {
+              status: 'disconnected',
+              disconnected_at: new Date(),
+              api_key_encrypted: null,
+              webhook_secret_hash: null,
+              enabled_at: null,
+              checks: Prisma.DbNull,
+              checked_at: null,
+              alert: null,
+              alert_at: null,
+            },
+          });
+        },
+        { timeout: POS_LOCK_WAIT_MS + 30_000 },
+      );
+    } catch (e) {
+      if (isPosLockTimeout(e))
+        throw new AppException('pos_busy', {
+          cause: `integration ${row.id} is busy with a menu import`,
+        });
+      throw e;
+    }
+    if (cred && webhookOrg) {
       try {
-        await this.provider.clearWebhook(
-          this.keyring.credentials(row),
-          row.external_org_id,
-        );
+        await this.provider.clearWebhook(cred, webhookOrg);
       } catch (e) {
         this.logger.warn(
           `webhook of ${row.id} not removed in iiko: ${iikoErrorText(e)}`,
@@ -637,13 +769,19 @@ export class PosIntegrationService {
           `scheduler of ${row.id} not removed: ${errorMessage(e)}`,
         ),
       );
-    await this.prisma.pos_integration.delete({ where: { id: row.id } });
     this.api.forget(row.id);
     await this.revalidate
       .addRevalidationJob({ tenantId: orgId, route: 'menu' })
       .catch((e: unknown) =>
         this.logger.warn(`revalidation not queued: ${errorMessage(e)}`),
       );
-    return { connected: false as const };
+    const unfinishedOrders = await this.prisma.pos_order.count({
+      where: {
+        integration_id: row.id,
+        state: { in: ['sending', 'sent'] },
+        order: { status: { in: [...LIVE_STATUSES] } },
+      },
+    });
+    return { connected: false as const, unfinishedOrders };
   }
 }

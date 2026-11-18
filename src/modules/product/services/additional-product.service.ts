@@ -19,6 +19,7 @@ import {
 } from './menu-ownership';
 import { AppException } from 'src/infra/errors/app-exception';
 import {
+  assertPosMenuOpen,
   assertNoManagedChanges,
   assertNotManaged,
   changedFields,
@@ -92,6 +93,7 @@ export class AdditionalProductService {
       )
         assertNoManagedChanges([managedProblem('product_id')]);
     }
+    await assertPosMenuOpen(this.prismaService, organizationId);
 
     const data: Prisma.additional_product_groupCreateInput = {
       is_multiple: dto.is_multiple ?? false,

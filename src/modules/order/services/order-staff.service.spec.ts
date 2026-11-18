@@ -202,6 +202,8 @@ describe('OrderStaffService: iiko in the list (docs/IIKO.md, "Ошибки и с
     expect(prisma.pos_order.count).toHaveBeenCalledWith({
       where: {
         state: { in: ['failed', 'needs_street'] },
+        // Orders of a disconnected iiko are not to act on
+        integration: { status: { in: ['active', 'needs_reconnect'] } },
         order: {
           organization_id: ORG,
           status: { in: expect.arrayContaining(['accepted', 'ready']) },

@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { AppException } from 'src/infra/errors/app-exception';
 import { hashWebhookSecret } from 'src/infra/http/webhook-secret';
 import { IikoApiError } from '../iiko/iiko-api.client';
@@ -25,6 +26,8 @@ describe('PosIntegrationService', () => {
   let menu: { import: jest.Mock; preview: jest.Mock };
   let sync: Record<string, jest.Mock | boolean>;
   let api: { forget: jest.Mock };
+  let alerts: Record<string, jest.Mock>;
+  let stopList: { refresh: jest.Mock };
   let service: PosIntegrationService;
 
   const ready = () => {
@@ -87,8 +90,13 @@ describe('PosIntegrationService', () => {
       branch: { findMany: jest.fn(async () => [{ id: 'b1' }]) },
       product: { count: jest.fn(async () => 0) },
       customer_order: { count: jest.fn(async () => 0) },
+      pos_order: { count: jest.fn(async () => 0) },
       pos_branch_link: { deleteMany: jest.fn(), createMany: jest.fn() },
       pos_payment_link: { deleteMany: jest.fn(), createMany: jest.fn() },
+      pos_menu_link: { deleteMany: jest.fn() },
+      pos_stop_item: { deleteMany: jest.fn() },
+      $executeRaw: jest.fn(async () => 0),
+      $executeRawUnsafe: jest.fn(async () => 0),
       $transaction: jest.fn(async (fn: any) => fn(prisma)),
     };
     provider = {
@@ -119,6 +127,8 @@ describe('PosIntegrationService', () => {
       unschedule: jest.fn(async () => undefined),
     };
     api = { forget: jest.fn() };
+    alerts = { clear: jest.fn(async () => undefined) };
+    stopList = { refresh: jest.fn(async () => undefined) };
     const keyring = new PosKeyring();
     service = new PosIntegrationService(
       prisma,
@@ -126,9 +136,10 @@ describe('PosIntegrationService', () => {
       api as any,
       keyring,
       menu as any,
-      { refresh: jest.fn(async () => undefined) } as any,
+      stopList as any,
       sync as any,
       { addRevalidationJob: jest.fn(async () => undefined) } as any,
+      alerts as any,
     );
   });
 
@@ -170,6 +181,41 @@ describe('PosIntegrationService', () => {
       expect(JSON.stringify(res)).not.toContain('plain-key');
       expect(res.organizations).toEqual([{ id: 'o1', name: 'Mant' }]);
     });
+
+    it('a new key ends the "key revoked" alert', async () => {
+      row.status = 'needs_reconnect';
+      row.external_org_id = 'o1';
+      await service.setKey(ORG, 'new-key');
+      expect(prisma.pos_integration.upsert.mock.calls[0][0].update.status).toBe(
+        'active',
+      );
+      expect(alerts.clear).toHaveBeenCalledWith('int-1', 'key_revoked');
+    });
+
+    it('connecting again after disconnecting starts the steps over on the same row', async () => {
+      Object.assign(row, {
+        status: 'disconnected',
+        external_org_id: 'o-old',
+        address_format: 'legacy',
+        courier_mode: 'iiko',
+        api_key_encrypted: null,
+        disconnected_at: new Date(),
+      });
+      prisma.pos_integration.upsert.mockImplementationOnce(
+        async ({ update }: any) => Object.assign(row, update),
+      );
+      const res = await service.setKey(ORG, 'k2');
+      const update = prisma.pos_integration.upsert.mock.calls[0][0].update;
+      expect(update).toMatchObject({
+        status: 'draft',
+        courier_mode: 'xmenu',
+        disconnected_at: null,
+        enabled_at: null,
+      });
+      // The only organization of the key is chosen again
+      expect(row.external_org_id).toBe('o1');
+      expect(res).toMatchObject({ connected: true, status: 'draft' });
+    });
   });
 
   describe('links', () => {
@@ -187,7 +233,34 @@ describe('PosIntegrationService', () => {
       ...over,
     });
 
-    it('one price category for all branches for now', async () => {
+    it('a price category per branch; one iiko does not know is a field error', async () => {
+      prisma.branch.findMany.mockResolvedValue([{ id: 'b1' }, { id: 'b2' }]);
+      await service.setLinks(
+        ORG,
+        links({
+          branches: [
+            { branchId: 'b1', terminalGroupId: 'tg1', priceCategoryId: 'pc2' },
+            { branchId: 'b2', terminalGroupId: 'tg1' },
+          ],
+        }),
+      );
+      expect(prisma.pos_branch_link.createMany).toHaveBeenCalledWith({
+        data: [
+          {
+            integration_id: 'int-1',
+            branch_id: 'b1',
+            terminal_group_id: 'tg1',
+            price_category_id: 'pc2',
+          },
+          {
+            integration_id: 'int-1',
+            branch_id: 'b2',
+            terminal_group_id: 'tg1',
+            price_category_id: null,
+          },
+        ],
+      });
+      prisma.branch.findMany.mockResolvedValue([{ id: 'b1' }]);
       await expect(
         service.setLinks(
           ORG,
@@ -196,7 +269,7 @@ describe('PosIntegrationService', () => {
               {
                 branchId: 'b1',
                 terminalGroupId: 'tg1',
-                priceCategoryId: 'pc2',
+                priceCategoryId: 'pc-x',
               },
             ],
           }),
@@ -206,7 +279,7 @@ describe('PosIntegrationService', () => {
         fields: [
           expect.objectContaining({
             field: 'branches[0].priceCategoryId',
-            code: 'price_category_differs',
+            code: 'unknown_price_category',
           }),
         ],
       });
@@ -305,9 +378,11 @@ describe('PosIntegrationService', () => {
       const res = await service.enable(ORG, [
         { productId: 'p1', itemId: null },
       ]);
-      expect(menu.import).toHaveBeenCalledWith(expect.anything(), [
-        { productId: 'p1', itemId: null },
-      ]);
+      // The first connection pairs (a regular import does not)
+      expect(menu.import).toHaveBeenCalledWith(expect.anything(), {
+        pairing: true,
+        matches: [{ productId: 'p1', itemId: null }],
+      });
       const [, orgId, url, secret] = provider.setWebhook.mock.calls[0];
       expect(orgId).toBe('o1');
       expect(url).toBe('https://api.xmenu.uz/pos/iiko/int-1/webhook');
@@ -340,19 +415,144 @@ describe('PosIntegrationService', () => {
     expect(row.courier_mode).toBe('iiko');
   });
 
-  it('disconnect: a failing iiko does not stop it; the integration and its token go', async () => {
-    ready();
-    row.api_key_encrypted = new PosKeyring().encrypt('k');
-    row.webhook_secret_hash = 'h';
-    provider.clearWebhook.mockRejectedValue(new Error('down'));
-    await expect(service.disconnect(ORG)).resolves.toEqual({
-      connected: false,
+  describe('disconnect', () => {
+    beforeEach(() => {
+      ready();
+      row.status = 'active';
+      row.api_key_encrypted = new PosKeyring().encrypt('k');
+      row.webhook_secret_hash = 'h';
     });
-    expect(prisma.pos_integration.delete).toHaveBeenCalledWith({
-      where: { id: 'int-1' },
+
+    it('keeps the integration and its orders: links, menu links, stop list and key go; iiko failing does not stop it', async () => {
+      provider.clearWebhook.mockRejectedValue(new Error('down'));
+      prisma.pos_order.count.mockResolvedValue(2);
+      await expect(service.disconnect(ORG)).resolves.toEqual({
+        connected: false,
+        unfinishedOrders: 2,
+      });
+      expect(prisma.pos_integration.delete).not.toHaveBeenCalled();
+      const where = { where: { integration_id: 'int-1' } };
+      expect(prisma.pos_menu_link.deleteMany).toHaveBeenCalledWith(where);
+      expect(prisma.pos_stop_item.deleteMany).toHaveBeenCalledWith(where);
+      expect(prisma.pos_branch_link.deleteMany).toHaveBeenCalledWith(where);
+      expect(prisma.pos_payment_link.deleteMany).toHaveBeenCalledWith(where);
+      expect(row).toMatchObject({
+        status: 'disconnected',
+        api_key_encrypted: null,
+        webhook_secret_hash: null,
+      });
+      expect(row.disconnected_at).toBeInstanceOf(Date);
+      // Unfinished = already in iiko (being sent or sent), order not finished
+      expect(prisma.pos_order.count).toHaveBeenCalledWith({
+        where: {
+          integration_id: 'int-1',
+          state: { in: ['sending', 'sent'] },
+          order: { status: { in: expect.any(Array) } },
+        },
+      });
+      expect(provider.clearWebhook).toHaveBeenCalledWith(
+        { integrationId: 'int-1', apiKey: 'k' },
+        'o1',
+      );
+      expect(sync.unschedule).toHaveBeenCalledWith('int-1');
+      expect(api.forget).toHaveBeenCalledWith('int-1');
     });
-    expect(sync.unschedule).toHaveBeenCalledWith('int-1');
-    expect(api.forget).toHaveBeenCalledWith('int-1');
+
+    it('waits for the integration lock up to 10 s; still busy: 409 pos_busy and nothing changes', async () => {
+      prisma.$executeRaw.mockRejectedValueOnce(
+        new Prisma.PrismaClientKnownRequestError('lock timeout', {
+          code: 'P2010',
+          clientVersion: 'test',
+          meta: {
+            code: '55P03',
+            message: 'canceling statement due to lock timeout',
+          },
+        }),
+      );
+      await expect(service.disconnect(ORG)).rejects.toMatchObject({
+        code: 'pos_busy',
+      });
+      expect(prisma.$executeRawUnsafe).toHaveBeenCalledWith(
+        'SET LOCAL lock_timeout = 10000',
+      );
+      expect(prisma.pos_menu_link.deleteMany).not.toHaveBeenCalled();
+      expect(row.status).toBe('active');
+      expect(provider.clearWebhook).not.toHaveBeenCalled();
+      expect(sync.unschedule).not.toHaveBeenCalled();
+    });
+
+    it('a disconnected integration reads as not connected; disconnecting again is a no-op', async () => {
+      await service.disconnect(ORG);
+      await expect(service.status(ORG)).resolves.toMatchObject({
+        connected: false,
+        status: null,
+      });
+      await expect(service.disconnect(ORG)).resolves.toEqual({
+        connected: false,
+        unfinishedOrders: 0,
+      });
+      expect(provider.clearWebhook).toHaveBeenCalledTimes(1);
+      await expect(service.importNow(ORG)).rejects.toMatchObject({
+        code: 'pos_not_connected',
+      });
+    });
+  });
+
+  describe('match again', () => {
+    beforeEach(() => {
+      ready();
+      row.api_key_encrypted = new PosKeyring().encrypt('k');
+    });
+
+    it('imports pairing the dishes without a link, then refreshes the stop list', async () => {
+      row.status = 'active';
+      prisma.product.count.mockResolvedValue(1);
+      await service.rematch(ORG, [{ productId: 'p1', itemId: 'i1' }]);
+      expect(menu.import).toHaveBeenCalledWith(expect.anything(), {
+        pairing: true,
+        matches: [{ productId: 'p1', itemId: 'i1' }],
+      });
+      expect(stopList.refresh).toHaveBeenCalledWith('int-1');
+    });
+
+    it("not enabled yet: 409; another venue's dish: 404", async () => {
+      await expect(service.rematch(ORG, [])).rejects.toMatchObject({
+        code: 'pos_setup_incomplete',
+      });
+      row.status = 'active';
+      await expect(
+        service.rematch(ORG, [{ productId: 'p-theirs', itemId: null }]),
+      ).rejects.toMatchObject({ code: 'not_found' });
+      expect(menu.import).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('alert and availability', () => {
+    it('the alert of the integration is in the status', async () => {
+      const at = new Date();
+      Object.assign(row, { alert: 'menu_import_failed', alert_at: at });
+      await expect(service.status(ORG)).resolves.toMatchObject({
+        available: true,
+        alert: { code: 'menu_import_failed', at },
+      });
+    });
+
+    it('without the platform iiko application: available false before the owner types a key', async () => {
+      delete process.env.IIKO_CLIENT_SECRET;
+      prisma.pos_integration.findUnique.mockResolvedValue(null);
+      await expect(service.status(ORG)).resolves.toMatchObject({
+        available: false,
+        connected: false,
+      });
+    });
+
+    it('without a usable key storage: available false', async () => {
+      process.env.PAYMENT_CONFIG_KEY = 'short';
+      prisma.pos_integration.findUnique.mockResolvedValue(null);
+      await expect(service.status(ORG)).resolves.toMatchObject({
+        available: false,
+      });
+    });
   });
 
   it('status without an integration', async () => {

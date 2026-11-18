@@ -18,6 +18,7 @@ describe('PosWebhookService', () => {
   let row: any;
   let sync: { enqueue: jest.Mock };
   let statuses: { apply: jest.Mock };
+  let orderQueue: { event: jest.Mock };
   let service: PosWebhookService;
 
   beforeEach(() => {
@@ -29,6 +30,8 @@ describe('PosWebhookService', () => {
     };
     sync = { enqueue: jest.fn(async () => undefined) };
     statuses = { apply: jest.fn(async () => undefined) };
+    // Without queues (ORDER_QUEUES=off) the order event is handled in the request
+    orderQueue = { event: jest.fn(async () => false) };
     service = new PosWebhookService(
       {
         pos_integration: {
@@ -41,7 +44,47 @@ describe('PosWebhookService', () => {
       new FakeRedis() as any,
       sync as any,
       statuses as any,
+      orderQueue as any,
     );
+  });
+
+  const orderUpdate = {
+    eventType: 'DeliveryOrderUpdate',
+    organizationId: 'o1',
+    correlationId: 'c7',
+    eventInfo: {
+      id: 'order-1',
+      creationStatus: 'Success',
+      order: { status: 'Unconfirmed', number: 7 },
+    },
+  };
+
+  it('order events go to the queue: the answer does not wait for iiko or Telegram', async () => {
+    orderQueue.event.mockResolvedValue(true);
+    // A slow iiko (confirm hangs): handling would never finish in the request
+    statuses.apply.mockImplementation(() => new Promise(() => undefined));
+    const started = Date.now();
+    await service.receive(ID, SECRET, [orderUpdate, orderUpdate]);
+    expect(Date.now() - started).toBeLessThan(1000);
+    expect(statuses.apply).not.toHaveBeenCalled();
+    // Recorded once (the repeat is skipped), with its dedup key for the job id
+    expect(orderQueue.event).toHaveBeenCalledTimes(1);
+    expect(orderQueue.event).toHaveBeenCalledWith(
+      ID,
+      expect.objectContaining({ id: 'order-1', status: 'Unconfirmed' }),
+      expect.stringMatching(/^[0-9a-f]{64}$/),
+    );
+  });
+
+  it('the queue failing: 503, and the event is accepted again on the retry', async () => {
+    orderQueue.event
+      .mockRejectedValueOnce(new Error('redis down'))
+      .mockResolvedValue(true);
+    await expect(
+      service.receive(ID, SECRET, [orderUpdate]),
+    ).rejects.toMatchObject({ code: 'unavailable' });
+    await service.receive(ID, SECRET, [orderUpdate]);
+    expect(orderQueue.event).toHaveBeenCalledTimes(2);
   });
 
   it('delivery order events move the order once each; events without an order are skipped', async () => {

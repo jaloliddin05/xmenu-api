@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, type PosDeliveredPush } from '@prisma/client';
 import { AppException } from 'src/infra/errors/app-exception';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
 import {
@@ -10,6 +10,7 @@ import type { PosAlert } from 'src/modules/order/notifications/order-messages';
 import { RestaurantNotifierService } from 'src/modules/order/notifications/restaurant-notifier.service';
 import { OrderTransitionService } from 'src/modules/order/services/order-transition.service';
 import { toPosView } from 'src/modules/order/services/order-view';
+import { deliveredPushSteps } from '../domain/delivered-push';
 import { buildPosOrder, type DraftResult } from '../domain/pos-order-draft';
 import {
   callFailure,
@@ -18,17 +19,22 @@ import {
   type PosFailure,
   type PosOrderReason,
 } from '../domain/pos-order-errors';
+import { isPosLive } from '../domain/pos-steps';
+import { matchStreet } from '../domain/street-match';
 import { iikoErrorText, toAppException } from '../iiko/iiko-api.client';
 import { POS_PROVIDER } from '../provider/pos-provider';
 import type {
   PosCheck,
   PosCommandState,
+  PosDeliveryStatus,
   PosOrderInfo,
   PosProvider,
   PosStreet,
 } from '../provider/pos-provider';
+import { PosAlertService } from './pos-alert.service';
 import { PosKeyring } from './pos-keyring';
 import { PosOrderQueue } from './pos-order.queue';
+import { PosStreetsCache } from './pos-streets.cache';
 
 /** Questions about one deliveries/create command before the attempt counts as failed (~1 minute) */
 export const POS_CHECK_POLLS = 20;
@@ -83,6 +89,8 @@ export class PosOrderService {
     private readonly transitions: OrderTransitionService,
     private readonly restaurant: RestaurantNotifierService,
     private readonly queue: PosOrderQueue,
+    private readonly alerts: PosAlertService,
+    private readonly streetsCache: PosStreetsCache,
   ) {}
 
   private load(orderId: string): Promise<PosOrderRow | null> {
@@ -96,9 +104,12 @@ export class PosOrderService {
   async push(orderId: string): Promise<void> {
     const row = await this.load(orderId);
     if (!row || row.state !== 'queued') return;
+    // Disconnected while waiting: the operator enters it by hand if needed
+    if (!isPosLive(row.integration.status)) return;
     // Cancelled or finished while waiting: nothing to cook
     if (!LIVE_STATUSES.includes(row.order.status as OrderStatusName)) return;
 
+    await this.matchStreet(row);
     const built = await this.build(row);
     if (!built.ok) {
       if (built.problem === 'needs_street') {
@@ -141,6 +152,12 @@ export class PosOrderService {
       this.logger.warn(
         `order ${row.order.number} of integration ${row.integration_id}, attempt ${attempt}: ${iikoErrorText(e)}`,
       );
+      if (codeOf(e) === 'platform_misconfigured')
+        await this.alerts
+          .platform(
+            `order of integration ${row.integration_id}: ${iikoErrorText(e)}`,
+          )
+          .catch(() => undefined);
       return this.fail(row, sending, callFailure(codeOf(e)), attempt);
     }
     await this.prisma.pos_order.updateMany({
@@ -169,6 +186,7 @@ export class PosOrderService {
     const row = await this.load(orderId);
     if (!row || row.state !== 'sending' || row.correlation_id !== correlationId)
       return;
+    if (!isPosLive(row.integration.status)) return;
     const where = {
       id: row.id,
       state: 'sending' as const,
@@ -251,7 +269,11 @@ export class PosOrderService {
     const [branch, products, options] = await Promise.all([
       this.prisma.pos_branch_link.findUnique({
         where: { branch_id: order.branch_id },
-        select: { integration_id: true, terminal_group_id: true },
+        select: {
+          integration_id: true,
+          terminal_group_id: true,
+          price_category_id: true,
+        },
       }),
       this.prisma.pos_menu_link.findMany({
         where: {
@@ -304,6 +326,8 @@ export class PosOrderService {
       },
       {
         terminalGroupId: branch.terminal_group_id,
+        priceCategoryId:
+          branch.price_category_id ?? integration.price_category_id,
         addressFormat: integration.address_format,
         street:
           row.street_id && row.house
@@ -368,15 +392,25 @@ export class PosOrderService {
       });
   }
 
-  /** deliveries/confirm; an order already confirmed or a failure is only logged. */
+  /**
+   * deliveries/confirm, once per order (audit W15-15): the confirmation is claimed by a conditional
+   * update, so the Unconfirmed status reported after creation does not confirm again. A failure is
+   * logged and releases the claim: the next Unconfirmed from iiko tries again.
+   */
   async confirm(row: {
     order_id: string;
     integration: {
       id: string;
-      api_key_encrypted: string;
+      api_key_encrypted: string | null;
       external_org_id: string | null;
     };
   }): Promise<void> {
+    const at = new Date();
+    const claimed = await this.prisma.pos_order.updateMany({
+      where: { order_id: row.order_id, confirmed_at: null },
+      data: { confirmed_at: at },
+    });
+    if (!claimed.count) return;
     try {
       await this.provider.confirmOrder(
         this.keyring.credentials(row.integration),
@@ -387,6 +421,10 @@ export class PosOrderService {
       this.logger.warn(
         `confirm of order ${row.order_id} failed: ${iikoErrorText(e)}`,
       );
+      await this.prisma.pos_order.updateMany({
+        where: { order_id: row.order_id, confirmed_at: at },
+        data: { confirmed_at: null },
+      });
     }
   }
 
@@ -449,14 +487,49 @@ export class PosOrderService {
       },
     });
     if (reason !== 'pos_key_invalid') return;
-    const marked = await this.prisma.pos_integration.updateMany({
+    // Keys of several venues rejected at once: the platform's application, not this key
+    if (await this.alerts.keyRejected(row.integration_id)) return;
+    await this.prisma.pos_integration.updateMany({
       where: { id: row.integration_id, status: 'active' },
       data: { status: 'needs_reconnect' },
     });
-    if (marked.count)
-      await this.restaurant
-        .alertPosReconnect(row.integration.organization_id)
-        .catch(() => undefined);
+    await this.alerts.raise(row.integration, 'key_revoked');
+  }
+
+  /**
+   * The organization takes streets from the iiko directory (every format but city): the street and
+   * the house are matched from the guest's address line before the order is built (decision 8). No
+   * single match leaves the order to the operator (needs_street), as before.
+   */
+  private async matchStreet(row: PosOrderRow): Promise<void> {
+    if (
+      row.order.fulfillment !== 'delivery' ||
+      row.integration.address_format === 'city' ||
+      (row.street_id && row.house)
+    )
+      return;
+    const address = (row.order.address_snapshot ?? {}) as { address?: unknown };
+    if (typeof address.address !== 'string') return;
+    let match: { streetId: string; house: string } | null = null;
+    try {
+      match = matchStreet(
+        address.address,
+        await this.streetsCache.streets(row.integration),
+      );
+    } catch (e) {
+      this.logger.warn(
+        `streets of integration ${row.integration_id} not read: ${iikoErrorText(e)}`,
+      );
+    }
+    if (!match) return;
+    const set = await this.prisma.pos_order.updateMany({
+      where: { id: row.id, state: 'queued', street_id: null },
+      data: { street_id: match.streetId, house: match.house },
+    });
+    if (!set.count) return;
+    row.street_id = match.streetId;
+    row.house = match.house;
+    await this.journal(row.order_id, row.order.status, 'iiko:street:auto');
   }
 
   private async alertOnce(row: PosOrderRow, key: string, alert: PosAlert) {
@@ -580,11 +653,7 @@ export class PosOrderService {
         message: 'The order does not wait for a street',
       });
     try {
-      return await this.provider.streets(
-        this.keyring.credentials(row.integration),
-        row.integration.external_org_id!,
-        query,
-      );
+      return await this.streetsCache.search(row.integration, query);
     } catch (e) {
       throw toAppException(e);
     }
@@ -636,28 +705,69 @@ export class PosOrderService {
   // ---- Own couriers (docs/IIKO.md, "Курьеры") ----
 
   /**
-   * An own courier delivered an order iiko has: iiko gets "on the way", then "delivered" (it moves
-   * only between neighbouring statuses); closing the order stays with the cash desk. A step iiko
-   * refuses is written to the journal and alerts the operator; the Xmenu status stays.
+   * An own courier delivered an order iiko has: iiko gets "on the way", then "delivered"; closing the
+   * order stays with the cash desk. iiko moves only between neighbouring statuses (Waiting, OnWay,
+   * Delivered), so the status iiko has now is read first (domain/delivered-push.ts): from a status
+   * iiko would refuse nothing is sent (audit W15-06). A refused or impossible step marks "status in
+   * iiko not updated" (delivered_push failed), goes to the journal and alerts the operator once; no
+   * blind retries. The Xmenu status stays.
    */
   async delivered(orderId: string): Promise<void> {
     const row = await this.load(orderId);
-    if (!row || row.state !== 'sent') return;
+    if (!row || row.state !== 'sent' || !isPosLive(row.integration.status))
+      return;
     if (row.delivered_push !== 'pending' && row.delivered_push !== 'on_way')
       return;
     const cred = this.keyring.credentials(row.integration);
     const orgId = row.integration.external_org_id!;
-    const steps: {
-      status: 'OnWay' | 'Delivered';
-      from: 'pending' | 'on_way';
-      to: 'on_way' | 'done';
-    }[] = [
-      { status: 'OnWay', from: 'pending', to: 'on_way' },
-      { status: 'Delivered', from: 'on_way', to: 'done' },
-    ];
-    let at: string = row.delivered_push;
+    const now = await this.provider
+      .orders(cred, orgId, [orderId])
+      .then((list) => list[0]?.status ?? null)
+      .catch((e: unknown) => {
+        this.logger.warn(
+          `status of order ${row.order.number} not read: ${iikoErrorText(e)}`,
+        );
+        return null;
+      });
+    const current = (now ?? row.pos_status) as PosDeliveryStatus | null;
+    const plan = deliveredPushSteps(current);
+    if (plan === 'blocked') {
+      await this.prisma.pos_order.updateMany({
+        where: { id: row.id, delivered_push: row.delivered_push },
+        data: { delivered_push: 'failed' },
+      });
+      await this.journal(
+        orderId,
+        row.order.status,
+        `iiko:delivered_push:blocked:${current ?? 'unknown'}`,
+      );
+      await this.alert(row, { kind: 'delivered_push_failed' });
+      return;
+    }
+    const steps = (
+      [
+        { status: 'OnWay', from: 'pending', to: 'on_way' },
+        { status: 'Delivered', from: 'on_way', to: 'done' },
+      ] as const
+    ).filter((step) => plan.includes(step.status));
+    if (!steps.length) {
+      // iiko is already past "delivered": nothing to send
+      await this.prisma.pos_order.updateMany({
+        where: { id: row.id, delivered_push: row.delivered_push },
+        data: { delivered_push: 'done' },
+      });
+      return;
+    }
+    let at: PosDeliveredPush = row.delivered_push;
     for (const step of steps) {
-      if (at !== step.from) continue;
+      // iiko is on its way already: the Delivered step starts from "on_way"
+      if (at !== step.from) {
+        await this.prisma.pos_order.updateMany({
+          where: { id: row.id, delivered_push: at },
+          data: { delivered_push: step.from },
+        });
+        at = step.from;
+      }
       let ok = false;
       try {
         const cid = await this.provider.setDeliveryStatus(

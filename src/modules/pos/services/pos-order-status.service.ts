@@ -15,6 +15,7 @@ import { POS_PROVIDER } from '../provider/pos-provider';
 import type { PosOrderInfo, PosProvider } from '../provider/pos-provider';
 import { PosKeyring } from './pos-keyring';
 import { PosOrderService } from './pos-order.service';
+import { isPosLive } from '../domain/pos-steps';
 
 /** Orders asked about in one deliveries/by_id call */
 const POLL_BATCH = 50;
@@ -161,7 +162,7 @@ export class PosOrderStatusService {
         external_org_id: true,
       },
     });
-    if (!integration?.external_org_id || integration.status === 'draft') return;
+    if (!integration?.external_org_id || !isPosLive(integration.status)) return;
     const rows = await this.prisma.pos_order.findMany({
       where: {
         integration_id: integrationId,

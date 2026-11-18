@@ -125,8 +125,10 @@ export const ENV_SCHEMA: readonly EnvVarSpec[] = [
   // POS (iiko): one integrator application for the whole platform
   secret('IIKO_APP_ID'),
   secret('IIKO_CLIENT_SECRET'),
-  // format and production rule: iikoApiEnvIssues
+  // format and production rule (official hosts, IIKO_OFFICIAL_API_HOSTS): iikoApiEnvIssues
   str('IIKO_API_BASE_URL'),
+  // Menu import interval in minutes (default 30; 5 at least, a day at most: pos-sync.queue.ts)
+  int('IIKO_MENU_IMPORT_MINUTES', 5),
   // Revalidation
   url('NEXT_PUBLIC_URL'),
   secret('REVALIDATE_SECRET'),
