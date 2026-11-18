@@ -92,13 +92,24 @@ export function groupLimits(
   };
 }
 
-export function toMenuView(categories: MenuCategoryRow[], locale: MenuLocale) {
+/**
+ * `stopped`: ids of dishes in the POS stop list, `stoppedOptions`: ids of stopped sizes; they stay in
+ * the menu, flagged `unavailable`.
+ */
+export function toMenuView(
+  categories: MenuCategoryRow[],
+  locale: MenuLocale,
+  stopped: ReadonlySet<string> = new Set(),
+  stoppedOptions: ReadonlySet<string> = new Set(),
+) {
   const { lang, fallback } = locale;
   return categories
     .map((c) => ({
       id: c.id,
       title: pickTranslation(c.translations, lang, fallback)?.title ?? '',
-      items: c.products.map((p) => toItemView(p, locale)),
+      items: c.products.map((p) =>
+        toItemView(p, locale, stopped.has(p.id), stoppedOptions),
+      ),
     }))
     .filter((c) => c.items.length > 0);
 }
@@ -106,6 +117,8 @@ export function toMenuView(categories: MenuCategoryRow[], locale: MenuLocale) {
 function toItemView(
   p: MenuProductRow,
   { lang, fallback, currency }: MenuLocale,
+  unavailable: boolean,
+  stoppedOptions: ReadonlySet<string>,
 ) {
   const t = pickTranslation(p.translations, lang, fallback);
   const g = UNIT.gr[lang];
@@ -123,6 +136,7 @@ function toItemView(
     images: p.images.map((i) => publicFileUrl(i.url) as string),
     price: toSum(p.price),
     currency,
+    unavailable,
     weight: formatWeight(p.weight, p.unit, lang),
     nutrition: Object.keys(nutrition).length ? nutrition : null,
     optionGroups: p.additional_product_groups
@@ -142,6 +156,7 @@ function toItemView(
             id: o.id,
             name: pickTranslation(o.translations, lang, fallback)?.title ?? '',
             price: toSum(o.price),
+            unavailable: stoppedOptions.has(o.id),
           })),
         };
       }),

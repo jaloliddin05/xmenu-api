@@ -287,6 +287,10 @@ describe('OrderService.create: delivery price, payment and change', () => {
       })),
     },
     product: { findMany: jest.fn(async () => []) },
+    pos_stop_item: { findMany: jest.fn(async () => []) },
+    pos_integration: {
+      findUnique: jest.fn(async (): Promise<{ status: string } | null> => null),
+    },
     $transaction: jest.fn(async (fn: (t: typeof tx) => unknown) => fn(tx)),
   };
   const service = new OrderService(
@@ -395,6 +399,61 @@ describe('OrderService.create: delivery price, payment and change', () => {
     expect(choose).not.toHaveBeenCalled();
   });
 
+  it('a stopped size: only the order line with that size is refused', async () => {
+    prisma.pos_stop_item.findMany.mockResolvedValueOnce([
+      { product_id: 'p1', option_id: 'o-large' },
+    ] as never);
+    const r = await run(
+      order({
+        items: [
+          {
+            itemId: 'p1',
+            quantity: 1,
+            modifiers: [{ groupId: 'g-size', optionIds: ['o-small'] }],
+          },
+          {
+            itemId: 'p1',
+            quantity: 1,
+            modifiers: [{ groupId: 'g-size', optionIds: ['o-large'] }],
+          },
+        ],
+      }),
+    );
+    expect(r?.code).toBe('item_unavailable');
+    expect(r?.body.details).toEqual({
+      items: [{ index: 1, itemId: 'p1', reason: 'stop_list' }],
+    });
+    expect(created).toBeUndefined();
+  });
+
+  it('a dish in the POS stop list of the branch that cooks it: 409 item_unavailable (stop_list)', async () => {
+    prisma.pos_stop_item.findMany.mockResolvedValueOnce([
+      { product_id: 'p1' },
+    ] as never);
+    const r = await run(order());
+    expect(r?.code).toBe('item_unavailable');
+    expect(r?.body.details).toEqual({
+      items: [{ index: 0, itemId: 'p1', reason: 'stop_list' }],
+    });
+    expect(prisma.pos_stop_item.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          branch_id: 'near',
+          integration: { status: { in: ['active', 'needs_reconnect'] } },
+        }),
+      }),
+    );
+    expect(created).toBeUndefined();
+    // Pickup checks the chosen branch
+    prisma.pos_stop_item.findMany.mockResolvedValueOnce([]);
+    expect(await run(dto('pickup'))).toBeNull();
+    expect(prisma.pos_stop_item.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ branch_id: 'b1' }),
+      }),
+    );
+  });
+
   it('delivery fee changed since the quote: 409 delivery_fee_changed with the new price', async () => {
     const r = await run(order({ expectedDeliveryFee: 10000 }));
     expect(r?.status).toBe(409);
@@ -429,6 +488,41 @@ describe('OrderService.create: delivery price, payment and change', () => {
       subtotal: SUBTOTAL,
       deliveryFee: 12000,
       total: SUBTOTAL + 12000,
+    });
+  });
+
+  describe('a venue with iiko (docs/IIKO.md, "Стоп-лист и цены")', () => {
+    beforeEach(() => {
+      prisma.pos_integration.findUnique.mockResolvedValue({ status: 'active' });
+    });
+    afterEach(() => {
+      prisma.pos_integration.findUnique.mockResolvedValue(null);
+    });
+
+    it('the total the guest saw is required: prices change with every import', async () => {
+      const r = await run(order());
+      expect(r?.code).toBe('validation_error');
+      expect(r?.body.fields).toEqual([
+        expect.objectContaining({ field: 'expectedTotal', code: 'required' }),
+      ]);
+      expect(created).toBeUndefined();
+      // A venue whose integration is not enabled yet keeps the old contract
+      prisma.pos_integration.findUnique.mockResolvedValue({ status: 'draft' });
+      expect(await run(order())).toBeNull();
+    });
+
+    it('a price changed by the import between the cart and the order: price_changed with the new prices', async () => {
+      // The cart was built before the import: the dish cost 5 000 less
+      const r = await run(order({ expectedTotal: SUBTOTAL - 5000 + 12000 }));
+      expect(r?.code).toBe('price_changed');
+      expect(r?.status).toBe(409);
+      expect(r?.body.details).toMatchObject({
+        subtotal: SUBTOTAL,
+        total: SUBTOTAL + 12000,
+      });
+      expect(created).toBeUndefined();
+      // Confirmed with the new total: placed
+      expect(await run(order({ expectedTotal: SUBTOTAL + 12000 }))).toBeNull();
     });
   });
 

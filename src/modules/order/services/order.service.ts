@@ -36,11 +36,13 @@ import {
 import { OrderWithItems, toOrderView } from './order-view';
 import { orderSource } from '../notifications/guest-notification';
 import { AppException } from 'src/infra/errors/app-exception';
+import { isPosLive } from 'src/modules/pos/domain/pos-steps';
 
 export const ORDER_INCLUDE = {
   items: { include: { options: true } },
   branch: { select: { id: true, title: true, address: true } },
   courier: { select: { id: true, name: true, phone: true } },
+  pos_order: { select: { courier_name: true } },
 } satisfies Prisma.customer_orderInclude;
 
 const IDEMPOTENCY_KEY = /^[A-Za-z0-9_-]{8,128}$/;
@@ -157,6 +159,23 @@ export class OrderService {
       branchId = (await this.choosePickupBranch(organizationId, dto.branchId))
         .id;
     }
+    // The POS stop list of the branch that will cook it (docs/API.md, "Интеграция с кассой (iiko)")
+    await this.assertNotStopped(
+      dto.items.map((item) => ({
+        itemId: item.itemId,
+        // the chosen size is an option of the size group, sent among the modifiers
+        optionIds: (item.modifiers ?? []).flatMap((m) => m.optionIds),
+      })),
+      branchId,
+    );
+    // Prices of a venue with iiko change with every menu import: the guest confirms the total they saw,
+    // a changed price answers price_changed (docs/IIKO.md, "Стоп-лист и цены")
+    if (dto.expectedTotal == null && (await this.pricesFromPos(organizationId)))
+      throw fieldError(
+        'expectedTotal',
+        'required',
+        'expectedTotal is required: the venue takes prices from its POS',
+      );
 
     // 5. Payment method: delivery offers what the venue switched on (cash and card need own couriers, online
     // needs keys); pickup: cash always, online with keys (order/domain/delivery-payment.ts)
@@ -552,13 +571,69 @@ export class OrderService {
               },
             },
           },
-          category: { select: { is_active: true } },
+          category: {
+            select: {
+              is_active: true,
+              pos_link: { select: { hidden_in_pos: true } },
+            },
+          },
+          pos_link: { select: { hidden_in_pos: true } },
         },
       })
       .then(
         (rows) =>
-          new Map(rows.map((p) => [p.id, p as unknown as PricingProduct])),
+          new Map(
+            rows.map((p) => {
+              // Gone from the POS or hidden there: not orderable, like a hidden dish
+              const hidden =
+                p.pos_link?.hidden_in_pos || p.category.pos_link?.hidden_in_pos;
+              const row = hidden ? { ...p, is_active: false } : p;
+              return [p.id, row as unknown as PricingProduct];
+            }),
+          ),
       );
+  }
+
+  /** 409 item_unavailable (`reason: stop_list`) for dishes in the POS stop list of the branch. */
+  private async pricesFromPos(organizationId: string): Promise<boolean> {
+    const pos = await this.prisma.pos_integration.findUnique({
+      where: { organization_id: organizationId },
+      select: { status: true },
+    });
+    return isPosLive(pos?.status);
+  }
+
+  private async assertNotStopped(
+    items: { itemId: string; optionIds?: string[] }[],
+    branchId: string,
+  ): Promise<void> {
+    const stopped = await this.prisma.pos_stop_item.findMany({
+      where: {
+        branch_id: branchId,
+        product_id: { in: [...new Set(items.map((i) => i.itemId))] },
+        integration: { status: { in: ['active', 'needs_reconnect'] } },
+      },
+      select: { product_id: true, option_id: true },
+    });
+    if (!stopped.length) return;
+    // A row without an option stops the dish; with one, that size of it (the "size" option)
+    const dishes = new Set(
+      stopped.filter((s) => !s.option_id).map((s) => s.product_id),
+    );
+    const sizes = new Set(
+      stopped.filter((s) => s.option_id).map((s) => s.option_id!),
+    );
+    const refused = items.flatMap((item, index) =>
+      dishes.has(item.itemId) ||
+      (item.optionIds ?? []).some((id) => sizes.has(id))
+        ? [{ index, itemId: item.itemId, reason: 'stop_list' }]
+        : [],
+    );
+    if (!refused.length) return;
+    throw new AppException('item_unavailable', {
+      message: 'Some items are unavailable',
+      details: { items: refused },
+    });
   }
 
   private async assertOrderingOpen(organizationId: string, initData?: string) {

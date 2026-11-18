@@ -3,6 +3,10 @@ model file {
   url                    String
   path                   String
   created_at             DateTime         @default(now())
+  // sha256 (hex) of the content; set for pictures copied from the POS, which share one file on disk
+  content_hash           String?
+  // Copied from the POS (an owner upload is false and wins over the POS picture)
+  from_pos               Boolean          @default(false)
 
   user                   user?
 

@@ -5,6 +5,13 @@ import { CreateCategoryDto, MoveCategoryDto, UpdateCategoryDto } from '../dto';
 import { RevalidateService } from 'src/modules/revalidate-queue/revalidate.service';
 import { ownCategory } from 'src/modules/product/services/menu-ownership';
 import { AppException } from 'src/infra/errors/app-exception';
+import {
+  assertPosMenuOpen,
+  assertNoManagedChanges,
+  assertNotManaged,
+  posMarker,
+  posSourceLang,
+} from 'src/modules/product/services/pos-managed';
 
 @Injectable()
 export class CategoryService {
@@ -41,6 +48,7 @@ export class CategoryService {
     slug: string,
   ) {
     this.assertSameOrganization(dto.organization_id, organizationId);
+    await assertPosMenuOpen(this.prismaService, organizationId);
 
     const category = await this.prismaService.$transaction(async (prisma) => {
       const lastCategory = await prisma.category.findFirst({
@@ -90,8 +98,9 @@ export class CategoryService {
       include: {
         translations: {
           where: { lang }, // faqat berilgan til bo‘yicha translation
-          select: { id: true, lang: true, title: true },
+          select: { id: true, lang: true, title: true, stale: true },
         },
+        pos_link: { select: { hidden_in_pos: true } },
       },
       orderBy: { index: 'asc' },
     });
@@ -101,6 +110,7 @@ export class CategoryService {
       is_active: c.is_active,
       index: c.index,
       translation: c.translations[0] || null,
+      pos: posMarker(c.pos_link),
     }));
   }
 
@@ -130,7 +140,10 @@ export class CategoryService {
   async findOne(id: string, organizationId: string) {
     const category = await this.prismaService.category.findFirst({
       where: { id, ...ownCategory(organizationId) },
-      include: { translations: true },
+      include: {
+        translations: true,
+        pos_link: { select: { hidden_in_pos: true } },
+      },
     });
     if (!category)
       throw new AppException('not_found', { message: 'Category not found' });
@@ -145,6 +158,29 @@ export class CategoryService {
   ) {
     await this.findOwnCategory(id, organizationId);
     const { translations } = data;
+    const sourceLang = await posSourceLang(this.prismaService, {
+      category_id: id,
+    });
+    if (sourceLang !== null && translations?.length) {
+      // The name in the language of the POS names follows the POS
+      const current = await this.prismaService.category_translation.findFirst({
+        where: { category_id: id, lang: sourceLang },
+        select: { title: true },
+      });
+      assertNoManagedChanges(
+        translations.flatMap((tr, i) =>
+          tr.lang === sourceLang && tr.title !== current?.title
+            ? [
+                {
+                  field: `translations[${i}].title`,
+                  code: 'pos_managed',
+                  message: 'Managed by the POS',
+                },
+              ]
+            : [],
+        ),
+      );
+    }
 
     if (!translations || translations.length === 0) {
       return await this.prismaService.category.findUnique({
@@ -167,7 +203,7 @@ export class CategoryService {
         if (existing) {
           await this.prismaService.category_translation.update({
             where: { id: existing.id },
-            data: { title: tr.title },
+            data: { title: tr.title, stale: false },
           });
         } else {
           await this.prismaService.category_translation.create({
@@ -267,6 +303,9 @@ export class CategoryService {
 
   async delete(id: string, organizationId: string, slug: string) {
     await this.findOwnCategory(id, organizationId);
+    assertNotManaged(
+      await posSourceLang(this.prismaService, { category_id: id }),
+    );
     const category = await this.prismaService.category.delete({
       where: { id },
     });

@@ -90,6 +90,8 @@ model branch {
   orders          customer_order[]
   delivery_zones    branch_delivery_zone[]
   delivery_distance branch_delivery_distance?
+  pos_link          pos_branch_link?
+  pos_stop_items    pos_stop_item[]
 
   @@index([organization_id, is_active, sort_order])
 }
@@ -130,6 +132,8 @@ model category_translation {
   id         String    @id @default(uuid())
   lang       String   
   title    String
+  // The source name changed in the POS since this translation was written (cleared when it is edited)
+  stale      Boolean   @default(false)
   category    category  @relation(fields: [category_id], references: [id], onDelete: Cascade)
   category_id  String
   created_at  DateTime  @default(now())
@@ -146,6 +150,8 @@ model category {
   organization_id  String
 
   products product[]
+
+  pos_link pos_menu_link?
 }// Mijozning saqlangan yetkazib berish manzillari. Tenant alohida ustun emas:
 // customer_id orqali customer.organization_id ga bog'langan, shuning uchun
 // har bir so'rov customer orqali tenantni ham tekshiradi.
@@ -275,6 +281,10 @@ model employee {
   url                    String
   path                   String
   created_at             DateTime         @default(now())
+  // sha256 (hex) of the content; set for pictures copied from the POS, which share one file on disk
+  content_hash           String?
+  // Copied from the POS (an owner upload is false and wins over the POS picture)
+  from_pos               Boolean          @default(false)
 
   user                   user?
 
@@ -380,6 +390,7 @@ model customer_order {
   payments        order_payment[]
   events          order_status_event[]
   courier_cards   courier_card[]
+  pos_order       pos_order?
 
   @@unique([organization_id, number])
   @@unique([customer_id, idempotency_key])
@@ -492,6 +503,8 @@ enum OrderActor {
   courier
   system
   payment
+  // The POS (iiko statuses, docs/IIKO.md)
+  pos
 }
 
 // Where the guest placed the order: the venue site, or its Telegram Mini App (initData checked by the venue bot).
@@ -639,6 +652,7 @@ model organization {
   order_settings    organization_order_settings?
   payment_providers organization_payment_provider[]
   telegram_bot      organization_telegram_bot?
+  pos_integration   pos_integration?
   domains           tenant_domain[]
   additional_product_groups additional_product_group[]
   // Tenant ichidagi buyurtma raqami hisoblagichi (atomik UPDATE ... RETURNING)
@@ -726,6 +740,8 @@ model additional_product_group_translation {
   id         String    @id @default(uuid())
   lang       String   
   title    String
+  // The source name changed in the POS since this translation was written (cleared when it is edited)
+  stale      Boolean   @default(false)
   additional_product_group    additional_product_group  @relation(fields: [additional_product_group_id], references: [id], onDelete: Cascade)
   additional_product_group_id  String
   created_at  DateTime  @default(now())
@@ -752,6 +768,8 @@ model additional_product_group {
   organization    organization? @relation(fields: [organization_id], references: [id], onDelete: Cascade)
   organization_id String?
 
+  pos_link pos_menu_link?
+
   @@index([organization_id])
 }
 
@@ -759,6 +777,8 @@ model additional_product_translation {
   id         String    @id @default(uuid())
   lang       String   
   title    String
+  // The source name changed in the POS since this translation was written (cleared when it is edited)
+  stale      Boolean   @default(false)
   additional_product    additional_product  @relation(fields: [additional_product_id], references: [id], onDelete: Cascade)
   additional_product_id  String
   created_at  DateTime  @default(now())
@@ -773,6 +793,9 @@ model additional_product {
 
   additional_product_group    additional_product_group   @relation(fields: [additional_product_group_id], references: [id], onDelete: Cascade)
   additional_product_group_id  String
+
+  pos_link pos_menu_link?
+  pos_stop_items pos_stop_item[]
 }
 
 model product_translation {
@@ -780,6 +803,8 @@ model product_translation {
   lang       String   
   title    String
   description    String?
+  // The source name changed in the POS since this translation was written (cleared when it is edited)
+  stale      Boolean   @default(false)
   product    product  @relation(fields: [product_id], references: [id], onDelete: Cascade)
   product_id  String
   created_at  DateTime  @default(now())
@@ -813,6 +838,9 @@ model product {
   images       file[]
 
   order_items  customer_order_item[]
+
+  pos_link       pos_menu_link?
+  pos_stop_items pos_stop_item[]
 }
 
 // The venue's own Telegram bot: created in @BotFather, token entered in the dashboard.
@@ -827,7 +855,7 @@ model organization_telegram_bot {
   username        String
   token_encrypted String
   // sha256 (hex) of the secret_token given to setWebhook: webhook calls carry the secret in a
-  // header; only Telegram keeps it in the clear (domain/webhook-secret.ts)
+  // header; only Telegram keeps it in the clear (src/infra/http/webhook-secret.ts)
   webhook_secret_hash String
   is_enabled      Boolean      @default(true)
 
@@ -1063,4 +1091,251 @@ model courier_card {
   updated_at  DateTime @updatedAt
 
   @@unique([order_id, courier_id])
+}
+// POS integration (iiko, ../docs/IIKO.md). One integration per venue; its id is the key of the
+// webhook address (POST /pos/iiko/:integrationId/webhook), never the slug.
+enum PosProviderKind {
+  iiko
+}
+
+enum PosIntegrationStatus {
+  // Steps in progress: orders and the menu work as without a POS
+  draft
+  // Enabled: the menu is imported, the stop list applied
+  active
+  // The POS rejected the key after it was enabled: the owner enters a new one
+  needs_reconnect
+  // The owner disconnected the POS: links and the key are gone, the history of sent orders stays
+  disconnected
+}
+
+// How the iiko organization takes a delivery address (addressFormatType). Only `city` takes a line
+// of text with coordinates; every other format is sent as an iiko "legacy" address with a street
+// from the iiko directory and a house
+enum PosAddressFormat {
+  city
+  legacy
+  international
+  int_no_postcode
+  unknown
+}
+
+// Who moves a delivery order after "ready" (docs/IIKO.md, "Курьеры")
+enum PosCourierMode {
+  xmenu
+  iiko
+}
+
+enum PosPaymentMethod {
+  cash
+  card
+  online
+}
+
+enum PosMenuLinkKind {
+  category
+  product
+  modifier_group
+  modifier
+  // The required "size" group made from the item's sizes, and one option per size
+  size_group
+  size
+}
+
+model pos_integration {
+  id              String               @id @default(uuid())
+  organization_id String               @unique
+  organization    organization         @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  provider        PosProviderKind      @default(iiko)
+  status          PosIntegrationStatus @default(draft)
+
+  // The restaurant's API key: AES-256-GCM with PAYMENT_CONFIG_KEY (payment-crypto.ts), never returned or logged;
+  // wiped when the POS is disconnected
+  api_key_encrypted String?
+
+  // Step 2: the iiko organization and how it takes addresses
+  external_org_id   String?
+  address_format    PosAddressFormat?
+
+  // Step 4-5: the external menu, its price category (one for all branches for now) and the
+  // service item "Delivery" that carries the delivery fee into iiko
+  external_menu_id  String?
+  price_category_id String?
+  delivery_item_id  String?
+  delivery_size_id  String?
+
+  courier_mode      PosCourierMode   @default(xmenu)
+  // Language the iiko names are written to (the venue default language when the menu was first imported)
+  source_lang       String?
+
+  // sha256 (hex) of the authToken given to iiko in the webhook settings (iiko sends it in Authorization)
+  webhook_secret_hash String?
+
+  // Last connection checks: [{ key, status, branchId? }] (domain/pos-checks.ts)
+  checks            Json?
+  checked_at        DateTime?
+  menu_imported_at  DateTime?
+  // Neutral reason code of the last failed import (null after a success)
+  menu_import_error String?
+  stop_list_updated_at DateTime?
+  enabled_at        DateTime?
+  disconnected_at   DateTime?
+  // What the owner is warned about on the POS screen and in the branch chats: menu_import_failed |
+  // key_revoked (null when all is well); one message per episode
+  alert             String?
+  alert_at          DateTime?
+
+  created_at        DateTime         @default(now())
+  updated_at        DateTime         @updatedAt
+
+  branch_links      pos_branch_link[]
+  payment_links     pos_payment_link[]
+  menu_links        pos_menu_link[]
+  stop_items        pos_stop_item[]
+  orders            pos_order[]
+}
+
+// A branch takes orders through one iiko terminal group
+model pos_branch_link {
+  id                String          @id @default(uuid())
+  integration_id    String
+  integration       pos_integration @relation(fields: [integration_id], references: [id], onDelete: Cascade)
+  branch_id         String          @unique
+  branch            branch          @relation(fields: [branch_id], references: [id], onDelete: Cascade)
+  terminal_group_id String
+  // Price category of the external menu for this branch (null = the integration's one)
+  price_category_id String?
+
+  @@index([integration_id])
+}
+
+// An Xmenu payment method is passed to iiko as one iiko payment type
+model pos_payment_link {
+  id                String           @id @default(uuid())
+  integration_id    String
+  integration       pos_integration  @relation(fields: [integration_id], references: [id], onDelete: Cascade)
+  method            PosPaymentMethod
+  payment_type_id   String
+  payment_type_kind String
+
+  @@unique([integration_id, method])
+}
+
+// An Xmenu menu row imported from (or matched to) an iiko position: the import updates the linked
+// row instead of creating another one. Removing the integration removes the links; the rows stay.
+model pos_menu_link {
+  id             String          @id @default(uuid())
+  integration_id String
+  integration    pos_integration @relation(fields: [integration_id], references: [id], onDelete: Cascade)
+  kind           PosMenuLinkKind
+  // iiko id: group, item, modifier group, modifier; `<itemId>` for a size group, `<itemId>:<sizeId>` for a size
+  external_id    String
+  size_id        String?
+
+  category_id    String?                   @unique
+  category       category?                 @relation(fields: [category_id], references: [id], onDelete: Cascade)
+  product_id     String?                   @unique
+  product        product?                  @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  group_id       String?                   @unique
+  group          additional_product_group? @relation(fields: [group_id], references: [id], onDelete: Cascade)
+  option_id      String?                   @unique
+  option         additional_product?       @relation(fields: [option_id], references: [id], onDelete: Cascade)
+
+  // Name in iiko at the last import: a change marks the other translations stale
+  source_name      String
+  // Image address in iiko the current picture came from (not downloaded again while it stays)
+  source_image_url String?
+  // Gone from the external menu or hidden in iiko: not shown, not orderable, order history kept
+  hidden_in_pos    Boolean @default(false)
+
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+
+  @@unique([integration_id, kind, external_id])
+}
+
+// Positions in the iiko stop list of a branch's terminal group; replaced per branch on every refresh.
+// Without option_id the whole dish is stopped, with it one size (the "size" option). One row per
+// branch, dish and size: two partial unique indexes in the migration
+model pos_stop_item {
+  id             String              @id @default(uuid())
+  integration_id String
+  integration    pos_integration     @relation(fields: [integration_id], references: [id], onDelete: Cascade)
+  branch_id      String
+  branch         branch              @relation(fields: [branch_id], references: [id], onDelete: Cascade)
+  product_id     String
+  product        product             @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  option_id      String?
+  option         additional_product? @relation(fields: [option_id], references: [id], onDelete: Cascade)
+  balance        Float               @default(0)
+
+  @@index([branch_id, product_id])
+  @@index([integration_id])
+  @@index([product_id])
+}
+
+// How far an accepted order got into iiko (docs/IIKO.md, "Путь заказа и статусы", "Ошибки и сбои")
+enum PosOrderState {
+  // Waiting for the first attempt or for the next retry
+  queued
+  // Created in iiko, the result of the command is not known yet
+  sending
+  // iiko created the order (and it was confirmed)
+  sent
+  // Retries are over or iiko refused: the operator retries or enters the order by hand
+  failed
+  // The organization takes streets from the iiko directory and the address has none: the operator picks one
+  needs_street
+  // The operator entered the order into iiko by hand
+  manual
+}
+
+// Own couriers of the venue: "on the way" and "delivered" are passed to iiko after the courier's "delivered"
+enum PosDeliveredPush {
+  none
+  pending
+  // OnWay is accepted, Delivered is next
+  on_way
+  done
+  failed
+}
+
+// One accepted order of a branch linked to iiko. Created in the transaction that accepts the order;
+// its id in iiko is the order id (iiko does not create a duplicate for a repeated id)
+model pos_order {
+  id             String          @id @default(uuid())
+  order_id       String          @unique
+  order          customer_order  @relation(fields: [order_id], references: [id], onDelete: Cascade)
+  integration_id String
+  integration    pos_integration @relation(fields: [integration_id], references: [id], onDelete: Cascade)
+
+  state          PosOrderState   @default(queued)
+  // Attempts made in the current round (an operator's retry starts a new round)
+  attempts       Int             @default(0)
+  // The iiko command of the last attempt (POST /api/1/commands/status)
+  correlation_id String?
+  // Neutral reason of the last failure (pos_unavailable, pos_rejected_stop_list, ...; docs/API.md)
+  error          String?
+  // Order number in iiko (from iiko, or typed by the operator after entering it by hand)
+  pos_number     String?
+  // Last iiko DeliveryStatus seen (webhook or poll)
+  pos_status     String?
+  // iiko street id and house for a "legacy" address, picked by the operator
+  street_id      String?
+  house          String?
+  // Courier name from iiko (courier mode "iiko couriers")
+  courier_name   String?
+  delivered_push PosDeliveredPush @default(none)
+  // deliveries/confirm went through: the order is confirmed once (decision 6)
+  confirmed_at   DateTime?
+  // The last thing the operator was alerted about: one alert per state
+  alerted        String?
+
+  sent_at        DateTime?
+  manual_at      DateTime?
+  manual_by      String?
+  created_at     DateTime        @default(now())
+  updated_at     DateTime        @updatedAt
+
+  @@index([integration_id, state])
 }

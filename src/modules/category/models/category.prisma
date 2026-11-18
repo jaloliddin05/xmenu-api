@@ -11,4 +11,6 @@ model category {
   organization_id  String
 
   products product[]
+
+  pos_link pos_menu_link?
 }

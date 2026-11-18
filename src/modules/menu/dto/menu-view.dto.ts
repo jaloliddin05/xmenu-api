@@ -7,6 +7,11 @@ export class MenuOptionDto {
   @ApiProperty({ example: 'Extra cheese' }) name: string;
   @ApiProperty({ example: 3500, description: 'Whole sums, rounded' })
   price: number;
+  @ApiProperty({
+    description:
+      'A size of the dish is in the POS stop list (in every linked branch, or in the requested branchId): the dish can be ordered in its other sizes only. Always false without a POS',
+  })
+  unavailable: boolean;
 }
 
 export class MenuOptionGroupDto {
@@ -51,6 +56,11 @@ export class MenuItemDto {
   price: number;
   @ApiProperty({ example: 'UZS', description: "The venue's currency" })
   currency: string;
+  @ApiProperty({
+    description:
+      'The POS stop list has the dish (in every linked branch, or in the requested branchId): it is shown but cannot be ordered. Always false without a POS',
+  })
+  unavailable: boolean;
   @ApiProperty({ example: '800 g', description: 'Empty string when unknown' })
   weight: string;
   @ApiProperty({ type: MenuNutritionDto, nullable: true })

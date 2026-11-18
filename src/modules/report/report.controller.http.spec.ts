@@ -44,6 +44,8 @@ function fakePrisma() {
     total: 50_000,
   }));
   return {
+    // No iiko: the courier report is open (OwnCouriersGuard)
+    pos_integration: { findUnique: jest.fn(async () => null) },
     courier_shift: {
       findMany: jest.fn(async ({ where }) =>
         shifts.filter(

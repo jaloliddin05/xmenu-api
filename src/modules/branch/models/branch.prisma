@@ -32,6 +32,8 @@ model branch {
   orders          customer_order[]
   delivery_zones    branch_delivery_zone[]
   delivery_distance branch_delivery_distance?
+  pos_link          pos_branch_link?
+  pos_stop_items    pos_stop_item[]
 
   @@index([organization_id, is_active, sort_order])
 }

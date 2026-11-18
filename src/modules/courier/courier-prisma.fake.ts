@@ -208,6 +208,13 @@ export function makeCourierDb() {
   }));
   let eventId = 0;
   const order_status_event = new Table(() => ({ id: ++eventId }));
+  // POS (iiko): empty unless a test seeds it; accepted orders of a linked branch get a pos_order
+  const pos_branch_link = new Table();
+  const pos_order = new Table(() => ({
+    state: 'queued',
+    delivered_push: 'none',
+  }));
+  const pos_integration = new Table();
 
   const db = {
     organization,
@@ -218,6 +225,9 @@ export function makeCourierDb() {
     branch,
     customer_order,
     order_status_event,
+    pos_branch_link,
+    pos_order,
+    pos_integration,
     $transaction: async (arg: any) =>
       typeof arg === 'function' ? arg(db) : Promise.all(arg),
   };

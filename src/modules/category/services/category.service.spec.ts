@@ -27,6 +27,19 @@ describe('CategoryService: organization ownership (IDOR)', () => {
     expect(revalidate.addRevalidationJob).not.toHaveBeenCalled();
   }
 
+  it.each([
+    ['active', 'pos_menu_locked'],
+    ['draft', null],
+    ['disconnected', null],
+  ])('a new category with iiko %s: %s', async (status, code) => {
+    db.seed('pos_integration', { organization_id: ORG, status });
+    const create = service.createCategory({ translations: TR }, ORG, 'mine');
+    if (code) {
+      await expect(create).rejects.toMatchObject({ code, status: 409 });
+      expect(db.log).toEqual([]);
+    } else await expect(create).resolves.toHaveProperty('id');
+  });
+
   it('creates in my organization, with or without the legacy organization_id', async () => {
     const a = await service.createCategory({ translations: TR }, ORG, 'mine');
     const b = await service.createCategory(

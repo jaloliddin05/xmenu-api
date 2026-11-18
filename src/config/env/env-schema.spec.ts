@@ -28,6 +28,8 @@ const prodOk = {
   CLIENT_REVALIDATE_URL: 'http://127.0.0.1:3002/api/revalidate',
   CLIENT_REVALIDATE_SECRET: 'c',
   TELEGRAM_BOT_TOKEN: 't',
+  IIKO_APP_ID: 'app',
+  IIKO_CLIENT_SECRET: 'cs',
 };
 
 /** The smallest development environment that starts. */
@@ -65,6 +67,7 @@ describe('validateEnv', () => {
     ['OTP_DEV_MODE', 'true', /OTP_DEV_MODE/],
     ['DOMAIN_VERIFY_SKIP', 'true', /DOMAIN_VERIFY_SKIP/],
     ['TELEGRAM_API_BASE_URL', 'http://fake:1', /TELEGRAM_API_BASE_URL/],
+    ['IIKO_API_BASE_URL', 'http://fake:1', /IIKO_API_BASE_URL/],
     ['JWT_CUSTOMER_ACCESS_SECRET', 'short', /32 characters/],
     ['REVALIDATE_SECRET', '', /REVALIDATE_SECRET/],
   ])('production refuses %s=%s', (name, value, error) => {

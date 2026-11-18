@@ -112,6 +112,13 @@ function setup(rows: ReturnType<typeof orderRow>[]) {
         inScope(couriers, where, 'id', where.id.in),
       ),
     },
+    pos_order: { count: jest.fn(async () => 0) },
+    pos_integration: {
+      findUnique: jest.fn(
+        async (): Promise<{ status: string; courier_mode: string } | null> =>
+          null,
+      ),
+    },
   };
   const service = new OrderStaffService(
     prisma as any,
@@ -167,6 +174,58 @@ describe('OrderStaffService: reminder thresholds in the list (W13-06)', () => {
   it('carries the venue timers, and nothing else of the settings', async () => {
     const { service } = setup([]);
     const list = await service.list(ORG, {});
-    expect(list.reminders).toEqual(TIMERS);
+    expect(list.reminders).toEqual({
+      ...TIMERS,
+      posFailed: 0,
+      posReconnect: false,
+      posCouriers: false,
+    });
+  });
+});
+
+describe('OrderStaffService: iiko in the list (docs/IIKO.md, "Ошибки и сбои")', () => {
+  it('orders to act on, a key to reconnect and couriers in iiko; the filter by transfer state', async () => {
+    const { service, prisma } = setup([]);
+    prisma.pos_order.count.mockResolvedValue(2);
+    prisma.pos_integration.findUnique.mockResolvedValue({
+      status: 'needs_reconnect',
+      courier_mode: 'iiko',
+    });
+    const list = await service.list(ORG, {
+      posStates: ['failed', 'needs_street'],
+    });
+    expect(list.reminders).toMatchObject({
+      posFailed: 2,
+      posReconnect: true,
+      posCouriers: true,
+    });
+    expect(prisma.pos_order.count).toHaveBeenCalledWith({
+      where: {
+        state: { in: ['failed', 'needs_street'] },
+        // Orders of a disconnected iiko are not to act on
+        integration: { status: { in: ['active', 'needs_reconnect'] } },
+        order: {
+          organization_id: ORG,
+          status: { in: expect.arrayContaining(['accepted', 'ready']) },
+        },
+      },
+    });
+    expect(prisma.customer_order.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          pos_order: { state: { in: ['failed', 'needs_street'] } },
+        }),
+      }),
+    );
+  });
+
+  it('a draft integration: couriers stay in Xmenu', async () => {
+    const { service, prisma } = setup([]);
+    prisma.pos_integration.findUnique.mockResolvedValue({
+      status: 'draft',
+      courier_mode: 'iiko',
+    });
+    const list = await service.list(ORG, {});
+    expect(list.reminders.posCouriers).toBe(false);
   });
 });

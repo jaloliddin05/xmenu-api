@@ -3,7 +3,7 @@ import { randomBytes } from 'crypto';
 import {
   hashWebhookSecret,
   webhookSecretMatches,
-} from './domain/webhook-secret';
+} from 'src/infra/http/webhook-secret';
 import { TelegramApiError } from './telegram-client';
 import { TelegramBotService } from './telegram-bot.service';
 

@@ -1,8 +1,9 @@
 import { paidAtDoor } from '../domain/delivery-payment';
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { PosOrderState, Prisma } from '@prisma/client';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
 import {
+  LIVE_STATUSES,
   nextRestaurantStatus,
   OrderStatusName,
 } from '../domain/order-state-machine';
@@ -11,19 +12,21 @@ import {
   OrderNotFoundError,
   OrderTransitionService,
 } from './order-transition.service';
-import { OrderWithItems, toOrderView } from './order-view';
+import { OrderWithItems, toOrderView, toPosView } from './order-view';
 import { OrderSettingsService } from './order-settings.service';
 import {
   DeliveryTimerSettings,
   doorWaitEndsAt,
 } from '../domain/delivery-timers';
 import { AppException } from 'src/infra/errors/app-exception';
+import { isPosLive } from 'src/modules/pos/domain/pos-steps';
 
 const INCLUDE = {
   items: { include: { options: true } },
   branch: { select: { id: true, title: true, address: true } },
   customer: { select: { id: true, name: true, phone: true } },
   courier: { select: { id: true, name: true, phone: true } },
+  pos_order: true,
   events: { orderBy: { id: 'asc' } },
 } satisfies Prisma.customer_orderInclude;
 
@@ -139,6 +142,8 @@ export class OrderStaffService {
       pickedUpAt: order.picked_up_at?.toISOString() ?? null,
       doorWaitEndsAt: doorEnds?.toISOString() ?? null,
       cashCollected: order.cash_collected,
+      // The order in iiko (docs/API.md, "Передача заказа в iiko"); null when the branch has no iiko
+      pos: order.pos_order ? toPosView(order.pos_order) : null,
       external:
         order.external_service && order.external_handed_at
           ? {
@@ -178,6 +183,8 @@ export class OrderStaffService {
       courierId?: string;
       /** Delivery orders waiting for a courier (accepted or ready, nobody assigned) */
       unassigned?: boolean;
+      /** Orders in this state of the transfer to iiko (failed, needs_street, ...) */
+      posStates?: string[];
       cursor?: string;
       limit?: number;
     },
@@ -197,6 +204,13 @@ export class OrderStaffService {
               status: { in: ['accepted', 'ready'] as OrderStatusName[] },
             }
           : {}),
+        ...(q.posStates?.length
+          ? {
+              pos_order: {
+                state: { in: q.posStates as PosOrderState[] },
+              },
+            }
+          : {}),
       },
       orderBy: [{ created_at: 'desc' }, { id: 'desc' }],
       take: limit + 1,
@@ -204,7 +218,10 @@ export class OrderStaffService {
       include: INCLUDE,
     });
     const page = rows.slice(0, limit);
-    const actors = await this.eventActors(organizationId, page);
+    const [actors, pos] = await Promise.all([
+      this.eventActors(organizationId, page),
+      this.posReminders(organizationId),
+    ]);
     return {
       items: page.map((o) => this.toStaffView(o, timers, actors)),
       nextCursor: rows.length > limit ? page[page.length - 1].id : null,
@@ -213,7 +230,39 @@ export class OrderStaffService {
         pickupReminderMinutes: timers.pickupReminderMinutes,
         onTheWayAlertMinutes: timers.onTheWayAlertMinutes,
         doorWaitMinutes: timers.doorWaitMinutes,
+        ...pos,
       },
+    };
+  }
+
+  /**
+   * iiko (docs/IIKO.md, "Ошибки и сбои"): unfinished orders the operator has to act on (not sent, a
+   * street to pick) and whether the owner has to reconnect iiko; zeros and false without iiko.
+   */
+  private async posReminders(organizationId: string) {
+    const [posFailed, integration] = await Promise.all([
+      this.prisma.pos_order.count({
+        where: {
+          state: { in: ['failed', 'needs_street'] },
+          // A disconnected POS no longer takes these orders: nothing to retry
+          integration: { status: { in: ['active', 'needs_reconnect'] } },
+          order: {
+            organization_id: organizationId,
+            status: { in: [...LIVE_STATUSES] },
+          },
+        },
+      }),
+      this.prisma.pos_integration.findUnique({
+        where: { organization_id: organizationId },
+        select: { status: true, courier_mode: true },
+      }),
+    ]);
+    return {
+      posFailed,
+      posReconnect: integration?.status === 'needs_reconnect',
+      // Courier functions of Xmenu are off: the dashboard hides them (docs/IIKO.md, "Курьеры")
+      posCouriers:
+        isPosLive(integration?.status) && integration?.courier_mode === 'iiko',
     };
   }
 

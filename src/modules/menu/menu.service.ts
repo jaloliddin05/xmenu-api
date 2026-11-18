@@ -1,27 +1,69 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../_prisma/prisma.service';
+import { hiddenByStopList, stoppedOptions } from '../pos/domain/stop-list';
 import {
   MenuCategoryRow,
   MenuLocale,
   MenuView,
   toMenuView,
 } from './menu.mapper';
+import { isPosLive } from 'src/modules/pos/domain/pos-steps';
 
 /** is_active: Boolean? @default(true) — NULL ham "faol" hisoblanadi (eski yozuvlar). */
 export const ACTIVE = { OR: [{ is_active: true }, { is_active: null }] };
+
+/** Not hidden by the POS: rows without a POS link, or linked to a position that is still offered there. */
+export const SHOWN_BY_POS = {
+  OR: [{ pos_link: null }, { pos_link: { hidden_in_pos: false } }],
+};
+
+/**
+ * Dishes and sizes in the POS stop list (the menu keeps them, flagged `unavailable`): stopped in every
+ * branch linked to the POS, or in `branchId` when given (docs/API.md, "Интеграция с кассой (iiko)").
+ */
+export async function stoppedInMenu(
+  prisma: PrismaService,
+  organizationId: string,
+  branchId?: string,
+): Promise<{ products: Set<string>; options: Set<string> }> {
+  const pos = await prisma.pos_integration.findUnique({
+    where: { organization_id: organizationId },
+    select: {
+      status: true,
+      branch_links: { select: { branch_id: true } },
+      stop_items: {
+        select: { product_id: true, option_id: true, branch_id: true },
+      },
+    },
+  });
+  if (!pos || !isPosLive(pos.status))
+    return { products: new Set<string>(), options: new Set<string>() };
+  const linked = pos.branch_links.map((b) => b.branch_id);
+  return {
+    products: hiddenByStopList(pos.stop_items, linked, branchId),
+    options: stoppedOptions(pos.stop_items, linked, branchId),
+  };
+}
 
 @Injectable()
 export class MenuService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getMenu(organizationId: string, locale: MenuLocale): Promise<MenuView> {
+  async getMenu(
+    organizationId: string,
+    locale: MenuLocale,
+    branchId?: string,
+  ): Promise<MenuView> {
+    const stopped = await stoppedInMenu(this.prisma, organizationId, branchId);
     const rows = await this.prisma.category.findMany({
-      where: { organization_id: organizationId, ...ACTIVE },
+      where: { organization_id: organizationId, AND: [ACTIVE, SHOWN_BY_POS] },
       orderBy: [{ index: 'asc' }, { created_at: 'asc' }],
       include: {
         translations: true,
         products: {
-          where: ACTIVE,
+          where: {
+            AND: [ACTIVE, SHOWN_BY_POS],
+          },
           orderBy: [{ index: 'asc' }, { created_at: 'asc' }],
           include: {
             translations: true,
@@ -40,6 +82,11 @@ export class MenuService {
         },
       },
     });
-    return toMenuView(rows as MenuCategoryRow[], locale);
+    return toMenuView(
+      rows as MenuCategoryRow[],
+      locale,
+      stopped.products,
+      stopped.options,
+    );
   }
 }

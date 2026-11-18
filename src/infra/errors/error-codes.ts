@@ -87,7 +87,7 @@ export const ERROR_CODES = spec({
   platform_misconfigured: {
     status: 503,
     message: 'This feature is not configured on the platform',
-    when: 'Функция выключена настройкой платформы (не заведения); `details.feature`: `telegram_bot`, `delivery_link`, `sms`, `domains`, `payments`, `translation`, `order_notifications`',
+    when: 'Функция выключена настройкой платформы (не заведения); `details.feature`: `telegram_bot`, `delivery_link`, `sms`, `domains`, `payments`, `translation`, `order_notifications`, `pos`',
     details: ['feature'],
   },
 
@@ -246,7 +246,7 @@ export const ERROR_CODES = spec({
   item_unavailable: {
     status: 409,
     message: 'Some items are unavailable',
-    when: 'Блюда нет или оно скрыто; `details.items`',
+    when: 'Блюда нет, оно скрыто или в стоп-листе кассы у филиала; `details.items` (`reason`: `not_available` | `stop_list`)',
     details: ['items'],
   },
   price_changed: {
@@ -535,6 +535,86 @@ export const ERROR_CODES = spec({
     when: 'Перевод не настроен на платформе',
     deprecated: 'platform_misconfigured',
   },
+
+  // POS integration (iiko, docs/API.md, "Интеграция с кассой (iiko)")
+  pos_not_connected: {
+    status: 404,
+    message: 'The POS is not connected',
+    when: 'Интеграция с кассой не начата (нет ключа) или шаг требует предыдущего',
+  },
+  pos_key_invalid: {
+    status: 422,
+    message: 'The POS rejected the API key',
+    when: 'iiko не выдал маркер по ключу ресторана (неверный, отозван или истёк)',
+  },
+  pos_access_denied: {
+    status: 422,
+    message: 'The POS key has no access',
+    when: 'У ключа iiko нет прав на метод или организацию, либо адрес сервера не разрешён (ответ iiko 403)',
+  },
+  pos_module_missing: {
+    status: 422,
+    message: 'The POS delivery module is not enabled',
+    when: 'В организации iiko не подключён модуль доставки (ответ iiko 402 или нет лицензии)',
+  },
+  pos_access_blocked: {
+    status: 422,
+    message: 'The POS account is blocked',
+    when: 'Доступ к iiko заблокирован (подписка, ответ iiko 423)',
+  },
+  pos_unavailable: {
+    status: 502,
+    message: 'The POS did not answer',
+    when: 'iiko не ответил, ответил не по формату, ограничил частоту запросов или вернул ошибку сервера; повторить позже',
+  },
+  pos_external_menu_missing: {
+    status: 422,
+    message: 'The POS has no external menu',
+    when: 'В iiko не настроено внешнее меню (или выбранного больше нет): подключение на шаге «Меню» не завершается',
+  },
+  pos_links_invalid: {
+    status: 422,
+    message: 'Invalid POS links',
+    when: 'Связи с iiko не сходятся со справочниками iiko или правилами; `fields[]`',
+    fields: true,
+  },
+  pos_setup_incomplete: {
+    status: 409,
+    message: 'The POS setup is incomplete',
+    when: 'Включение интеграции до прохождения всех шагов и проверок; `details.missing` (шаги и проверки)',
+    details: ['missing'],
+  },
+  pos_managed_field: {
+    status: 409,
+    message: 'This field is managed by the POS',
+    when: 'Правка поля, которое ведёт iiko (имя на языке iiko, цена, допы, категория), или удаление позиции из iiko; `fields[]`',
+    fields: true,
+  },
+  pos_courier_mode_locked: {
+    status: 409,
+    message: 'Courier mode cannot change now',
+    when: 'Смена режима курьеров при незавершённых заказах доставки',
+  },
+  pos_order_state_conflict: {
+    status: 409,
+    message: 'The order is not in a state for this action',
+    when: 'Действие с передачей заказа в iiko не подходит к её состоянию: «Повторить» не для `failed`, «Внесён вручную» для уже переданного, улица для заказа, который её не ждёт, или заказ уже завершён',
+  },
+  pos_couriers_managed: {
+    status: 409,
+    message: 'Couriers of this venue are managed in the POS',
+    when: 'Курьерская функция Xmenu (курьеры, смены, назначение, внешняя служба, отчёт по курьерам) у заведения в режиме «курьеры iiko»',
+  },
+  pos_menu_locked: {
+    status: 409,
+    message: 'The menu comes from the POS',
+    when: 'Создание блюда, категории, группы допов или опции в группе из iiko, пока iiko подключён (включён или ждёт переподключения): меню приходит из iiko',
+  },
+  pos_busy: {
+    status: 409,
+    message: 'The POS integration is busy, try again shortly',
+    when: 'Отключение iiko, пока идёт импорт меню или обновление стоп-листа и он не закончился за 10 с',
+  },
 });
 
 export type ErrorCode = keyof typeof ERROR_CODES;
@@ -549,7 +629,8 @@ export type MisconfiguredFeature =
   | 'domains'
   | 'payments'
   | 'translation'
-  | 'order_notifications';
+  | 'order_notifications'
+  | 'pos';
 
 export const isErrorCode = (code: unknown): code is ErrorCode =>
   typeof code === 'string' && Object.hasOwn(ERROR_CODES, code);

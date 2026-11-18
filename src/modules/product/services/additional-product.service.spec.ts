@@ -27,6 +27,19 @@ describe('AdditionalProductService: organization ownership (IDOR)', () => {
     expect(revalidate.addRevalidationJob).not.toHaveBeenCalled();
   }
 
+  it.each([
+    ['active', 'pos_menu_locked'],
+    ['draft', null],
+    ['disconnected', null],
+  ])('a new option group with iiko %s: %s', async (status, code) => {
+    db.seed('pos_integration', { organization_id: ORG, status });
+    const create = service.createGroup({ translations: TR }, ORG, 'mine');
+    if (code) {
+      await expect(create).rejects.toMatchObject({ code, status: 409 });
+      expect(db.log).toEqual([]);
+    } else await expect(create).resolves.toHaveProperty('id');
+  });
+
   describe('groups', () => {
     it('creates a group on my product', async () => {
       const g = await service.createGroup(

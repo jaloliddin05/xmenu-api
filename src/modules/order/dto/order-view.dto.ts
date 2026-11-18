@@ -1,6 +1,7 @@
 import { PAYMENT_METHODS } from '../domain/delivery-payment';
 import { ApiProperty } from '@nestjs/swagger';
 import { ORDER_STATUSES } from '../domain/order-state-machine';
+import { POS_ORDER_STATES } from '../services/order-view';
 
 /** Customer and staff order object (docs/ORDERS_API.md, "Объект заказа"). */
 
@@ -169,7 +170,7 @@ class OrderEventDto {
   @ApiProperty({ enum: ORDER_STATUSES, nullable: true }) from: string | null;
   @ApiProperty({ enum: ORDER_STATUSES }) to: string;
   @ApiProperty({
-    enum: ['customer', 'restaurant', 'courier', 'system', 'payment'],
+    enum: ['customer', 'restaurant', 'courier', 'system', 'payment', 'pos'],
   })
   actor: string;
   @ApiProperty({
@@ -196,10 +197,80 @@ class OrderEventDto {
     type: String,
     nullable: true,
     description:
-      'With from = to the entry is not a status change: courier_assigned:<id>, courier_reassigned:<id>, courier_unassigned:<id>',
+      'With from = to the entry is not a status change: courier_assigned:<id>, courier_reassigned:<id>, courier_unassigned:<id>, iiko:<event> (docs/API.md, "Передача заказа в iiko"); actor pos: iiko:<DeliveryStatus>',
   })
   note: string | null;
   @ApiProperty({ format: 'date-time' }) at: string;
+}
+
+/** Why an order did not get into iiko (pos_order.error) */
+export const POS_ORDER_REASONS = [
+  'pos_unavailable',
+  'pos_not_taken',
+  'pos_rejected_stop_list',
+  'pos_rejected_price',
+  'pos_rejected_data',
+  'pos_key_invalid',
+  'pos_module_missing',
+  'pos_access_denied',
+  'pos_access_blocked',
+  'unmapped_branch',
+  'unmapped_item',
+  'unmapped_payment',
+  'unmapped_delivery_item',
+] as const;
+
+/** The order in iiko (docs/API.md, "Передача заказа в iiko") */
+export class PosOrderViewDto {
+  @ApiProperty({
+    enum: POS_ORDER_STATES,
+    description:
+      'queued: waiting for an attempt; sending: iiko is creating it; sent: in iiko; failed: not sent ' +
+      '(«Повторить» or «Внесён вручную»); needs_street: the operator picks a street of the iiko directory; ' +
+      'manual: entered into iiko by hand',
+  })
+  state: string;
+
+  @ApiProperty({
+    enum: POS_ORDER_REASONS,
+    nullable: true,
+    type: String,
+    description: 'Why the last attempt failed (null after a success)',
+  })
+  error: string | null;
+
+  @ApiProperty({ type: String, nullable: true, description: 'Number in iiko' })
+  posNumber: string | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Last iiko delivery status (CookingStarted, OnWay, ...)',
+  })
+  posStatus: string | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Courier named by iiko (courier mode "iiko")',
+  })
+  courierName: string | null;
+
+  @ApiProperty({ description: 'Attempts of the current round (up to 5)' })
+  attempts: number;
+
+  @ApiProperty({ type: String, nullable: true, format: 'date-time' })
+  sentAt: string | null;
+
+  @ApiProperty({ type: String, nullable: true, format: 'date-time' })
+  manualAt: string | null;
+
+  @ApiProperty({
+    enum: ['none', 'pending', 'on_way', 'done', 'failed'],
+    description:
+      'Own couriers: "on the way" and "delivered" passed to iiko after the courier delivered. failed: the status in iiko was not updated (iiko refused, or its status did not allow it); the operator was alerted and closes it in iiko',
+  })
+  deliveredPush: string;
 }
 
 /** GET /order/:id and the result of staff actions: the order plus customer and status history. */
@@ -246,6 +317,13 @@ export class StaffOrderViewDto extends OrderViewDto {
   cashCollected: 'cash' | 'card' | null;
   @ApiProperty({ type: OrderExternalDto, nullable: true })
   external: OrderExternalDto | null;
+  @ApiProperty({
+    type: PosOrderViewDto,
+    nullable: true,
+    description:
+      'Transfer to iiko; null when the branch is not linked to iiko or the order was not accepted',
+  })
+  pos: PosOrderViewDto | null;
   @ApiProperty({ type: [OrderEventDto] }) events: OrderEventDto[];
 }
 
@@ -263,6 +341,21 @@ export class OrderRemindersDto {
     description: 'Wait at the door after "no answer"',
   })
   doorWaitMinutes: number;
+  @ApiProperty({
+    example: 0,
+    description:
+      'Unfinished orders not sent to iiko or waiting for a street (0 without iiko)',
+  })
+  posFailed: number;
+  @ApiProperty({
+    description: 'iiko does not take the venue key: the owner reconnects iiko',
+  })
+  posReconnect: boolean;
+  @ApiProperty({
+    description:
+      'Couriers of the venue work in iiko: courier functions of Xmenu answer 409 pos_couriers_managed',
+  })
+  posCouriers: boolean;
 }
 
 export class StaffOrderListDto {

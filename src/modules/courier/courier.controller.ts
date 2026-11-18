@@ -12,7 +12,9 @@ import {
   Put,
   Query,
   Req,
+  UseGuards,
 } from '@nestjs/common';
+import { OwnCouriersGuard } from './own-couriers.guard';
 import {
   ApiBearerAuth,
   ApiOkResponse,
@@ -50,6 +52,7 @@ import { CourierService } from './services/courier.service';
 /** Couriers of the venue (owner and operator): docs/API.md, "Курьеры". */
 @ApiTags('Couriers (staff)')
 @ApiBearerAuth('access-token')
+@UseGuards(OwnCouriersGuard)
 @Controller('couriers')
 export class CourierController {
   constructor(
@@ -151,6 +154,7 @@ export class CourierController {
 /** Courier shifts (owner and operator). */
 @ApiTags('Couriers (staff)')
 @ApiBearerAuth('access-token')
+@UseGuards(OwnCouriersGuard)
 @Controller('shifts')
 export class CourierShiftController {
   constructor(private readonly shifts: CourierShiftService) {}
@@ -224,6 +228,7 @@ export class OrderCourierController {
   ) {}
 
   @StaffAccess('orders')
+  @UseGuards(OwnCouriersGuard)
   @Post(':id/external')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -245,6 +250,7 @@ export class OrderCourierController {
   }
 
   @StaffAccess('orders')
+  @UseGuards(OwnCouriersGuard)
   @Post(':id/external-payment')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -263,6 +269,7 @@ export class OrderCourierController {
   }
 
   @StaffAccess('orders')
+  @UseGuards(OwnCouriersGuard)
   @Put(':id/courier')
   @ApiOperation({
     summary:
@@ -280,6 +287,7 @@ export class OrderCourierController {
   }
 
   @StaffAccess('orders')
+  @UseGuards(OwnCouriersGuard)
   @Delete(':id/courier')
   @ApiOperation({ summary: 'Take the courier off the order until "picked up"' })
   @ApiOkResponse({ type: StaffOrderViewDto })
@@ -296,6 +304,7 @@ export class OrderCourierController {
 /** Names of external services the venue used before (owner and operator). */
 @ApiTags('Orders (staff)')
 @ApiBearerAuth('access-token')
+@UseGuards(OwnCouriersGuard)
 @Controller('external-services')
 export class ExternalServiceController {
   constructor(private readonly external: ExternalDeliveryService) {}

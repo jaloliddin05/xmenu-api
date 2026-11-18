@@ -6,7 +6,9 @@ import {
   Req,
   Res,
   StreamableFile,
+  UseGuards,
 } from '@nestjs/common';
+import { OwnCouriersGuard } from '../courier/own-couriers.guard';
 import {
   ApiBearerAuth,
   ApiOkResponse,
@@ -49,6 +51,7 @@ export class ReportController {
   constructor(private readonly reports: ReportService) {}
 
   @StaffAccess('reports')
+  @UseGuards(OwnCouriersGuard)
   @Get('couriers')
   @ApiOperation({
     summary:

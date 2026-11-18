@@ -15,10 +15,16 @@ export class FileService {
 
   async removeFile(id: string) {
     const file = await this.prismaService.file.findUnique({ where: { id } });
-    if (file?.path) {
+    await this.prismaService.file.delete({ where: { id } });
+    // Pictures copied from the POS share one file on disk (by content hash): keep it while used
+    if (file?.path && !(await this.pathInUse(file.path))) {
       this.deleteFileWithFs(file.path);
     }
-    await this.prismaService.file.delete({ where: { id } });
+  }
+
+  /** Another file row still points at this path. */
+  async pathInUse(path: string): Promise<boolean> {
+    return (await this.prismaService.file.count({ where: { path } })) > 0;
   }
 
   async updateFile(id: string, file: Express.Multer.File) {

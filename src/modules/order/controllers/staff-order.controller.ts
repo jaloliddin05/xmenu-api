@@ -22,6 +22,7 @@ import {
   type StaffRequest,
 } from 'src/infra/http/request-helpers';
 import { ORDER_STATUSES, OrderStatusName } from '../domain/order-state-machine';
+import { POS_ORDER_STATES } from '../services/order-view';
 import { RejectOrderDto, SetOrderStatusDto } from '../dto/staff-order.dto';
 import { OrderStaffService } from '../services/order-staff.service';
 import { StaffAccess } from 'src/modules/auth/access/staff-access.decorator';
@@ -50,6 +51,12 @@ export class StaffOrderController {
     required: false,
     description: 'true: delivery orders accepted or ready without a courier',
   })
+  @ApiQuery({
+    name: 'posState',
+    required: false,
+    description:
+      'Comma-separated states of the transfer to iiko: failed,needs_street (docs/API.md, "Передача заказа в iiko")',
+  })
   @ApiQuery({ name: 'cursor', required: false })
   @ApiQuery({ name: 'limit', required: false })
   list(
@@ -58,6 +65,7 @@ export class StaffOrderController {
     @Query('branchId') branchId?: string,
     @Query('courierId') courierId?: string,
     @Query('unassigned') unassigned?: string,
+    @Query('posState') posState?: string,
     @Query('cursor') cursor?: string,
     @Query('limit') limit?: string,
   ) {
@@ -72,6 +80,10 @@ export class StaffOrderController {
       branchId,
       courierId,
       unassigned: unassigned === 'true',
+      posStates: (posState ?? '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter((s) => (POS_ORDER_STATES as readonly string[]).includes(s)),
       cursor,
       limit: limit ? Number(limit) : undefined,
     });
