@@ -42,6 +42,7 @@ describe('MenuService: dishes the POS takes out of the menu', () => {
 
   it('without a POS the menu is as before', async () => {
     expect(await dishes()).toEqual(['Mine dish', 'Чай']);
+    expect(await stoppedDishes()).toEqual([]);
   });
 
   it('a dish gone from the POS (or hidden there) is not shown', async () => {
@@ -64,25 +65,33 @@ describe('MenuService: dishes the POS takes out of the menu', () => {
     expect(await dishes()).toEqual([]);
   });
 
-  it('stopped in one branch: still in the venue menu, not in that branch', async () => {
+  const stoppedDishes = async (branchId?: string) =>
+    (await service.getMenu(t.mine.org.id, LOCALE as any, branchId))
+      .flatMap((c: any) => c.items)
+      .filter((p: any) => p.unavailable)
+      .map((p: any) => p.name);
+
+  it('stopped in one branch: available in the venue menu, unavailable for that branch', async () => {
     db.seed('pos_stop_item', {
       integration_id: pos.id,
       branch_id: 'b1',
       product_id: second.id,
     });
     expect(await dishes()).toEqual(['Mine dish', 'Чай']);
-    expect(await dishes('b1')).toEqual(['Mine dish']);
-    expect(await dishes('b2')).toEqual(['Mine dish', 'Чай']);
+    expect(await stoppedDishes()).toEqual([]);
+    expect(await stoppedDishes('b1')).toEqual(['Чай']);
+    expect(await stoppedDishes('b2')).toEqual([]);
   });
 
-  it('stopped in every linked branch: out of the venue menu', async () => {
+  it('stopped in every linked branch: stays in the venue menu, flagged unavailable', async () => {
     for (const branch of ['b1', 'b2'])
       db.seed('pos_stop_item', {
         integration_id: pos.id,
         branch_id: branch,
         product_id: second.id,
       });
-    expect(await dishes()).toEqual(['Mine dish']);
+    expect(await dishes()).toEqual(['Mine dish', 'Чай']);
+    expect(await stoppedDishes()).toEqual(['Чай']);
   });
 
   it('a draft integration (not enabled) changes nothing', async () => {
@@ -94,5 +103,6 @@ describe('MenuService: dishes the POS takes out of the menu', () => {
         product_id: second.id,
       });
     expect(await dishes()).toEqual(['Mine dish', 'Чай']);
+    expect(await stoppedDishes()).toEqual([]);
   });
 });

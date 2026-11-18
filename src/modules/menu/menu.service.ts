@@ -17,7 +17,7 @@ export const SHOWN_BY_POS = {
 };
 
 /**
- * Dishes the POS stop list takes out of the menu: stopped in every branch linked to the POS, or in
+ * Dishes in the POS stop list (the menu keeps them, flagged `unavailable`): stopped in every branch linked to the POS, or in
  * `branchId` when given (docs/API.md, "Интеграция с кассой (iiko)").
  */
 export async function stoppedProductIds(
@@ -65,7 +65,6 @@ export class MenuService {
         products: {
           where: {
             AND: [ACTIVE, SHOWN_BY_POS],
-            ...(stopped.length ? { id: { notIn: stopped } } : {}),
           },
           orderBy: [{ index: 'asc' }, { created_at: 'asc' }],
           include: {
@@ -85,6 +84,6 @@ export class MenuService {
         },
       },
     });
-    return toMenuView(rows as MenuCategoryRow[], locale);
+    return toMenuView(rows as MenuCategoryRow[], locale, new Set(stopped));
   }
 }

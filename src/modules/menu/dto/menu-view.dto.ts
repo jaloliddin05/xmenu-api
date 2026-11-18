@@ -51,6 +51,11 @@ export class MenuItemDto {
   price: number;
   @ApiProperty({ example: 'UZS', description: "The venue's currency" })
   currency: string;
+  @ApiProperty({
+    description:
+      'The POS stop list has the dish (in every linked branch, or in the requested branchId): it is shown but cannot be ordered. Always false without a POS',
+  })
+  unavailable: boolean;
   @ApiProperty({ example: '800 g', description: 'Empty string when unknown' })
   weight: string;
   @ApiProperty({ type: MenuNutritionDto, nullable: true })
