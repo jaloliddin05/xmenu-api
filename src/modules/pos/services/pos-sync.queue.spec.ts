@@ -66,4 +66,25 @@ describe('PosSyncQueue schedulers', () => {
       ['pos-menu-int-2', { every: 45 * 60_000 }],
     ]);
   });
+
+  it('a requested menu import has one id and does not keep it after it failed', async () => {
+    const { sync } = setup();
+    const add = jest.fn(async () => undefined);
+    (sync as any).queue = { add };
+    await sync.enqueue('menu', 'int-1');
+    await sync.enqueue('stop-list', 'int-1');
+    expect(add).toHaveBeenNthCalledWith(
+      1,
+      'menu',
+      { integrationId: 'int-1' },
+      { jobId: 'pos-menu-now-int-1', removeOnFail: true },
+    );
+    // a stop list job is never collapsed
+    expect(add).toHaveBeenNthCalledWith(
+      2,
+      'stop-list',
+      { integrationId: 'int-1' },
+      {},
+    );
+  });
 });

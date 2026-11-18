@@ -81,6 +81,16 @@ describe('PosOrderStatusService', () => {
     expect(t.transitions.transition).not.toHaveBeenCalled();
   });
 
+  it('Unconfirmed again: asks again only when the first confirmation failed', async () => {
+    t.provider.confirmOrder.mockRejectedValueOnce(new Error('503'));
+    await service.apply(INTEGRATION, info('Unconfirmed'));
+    await service.apply(INTEGRATION, info('Unconfirmed'));
+    expect(t.provider.confirmOrder).toHaveBeenCalledTimes(2);
+    // confirmed now: a third report changes nothing
+    await service.apply(INTEGRATION, info('Unconfirmed'));
+    expect(t.provider.confirmOrder).toHaveBeenCalledTimes(2);
+  });
+
   it('iiko couriers: on the way with the courier name, then delivered', async () => {
     t.world.integration.courier_mode = 'iiko';
     t.world.order.status = 'ready';

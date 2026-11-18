@@ -406,8 +406,16 @@ describe('OrderService.create: delivery price, payment and change', () => {
     const r = await run(
       order({
         items: [
-          { itemId: 'p1', quantity: 1, optionIds: ['o-small'] },
-          { itemId: 'p1', quantity: 1, optionIds: ['o-large'] },
+          {
+            itemId: 'p1',
+            quantity: 1,
+            modifiers: [{ groupId: 'g-size', optionIds: ['o-small'] }],
+          },
+          {
+            itemId: 'p1',
+            quantity: 1,
+            modifiers: [{ groupId: 'g-size', optionIds: ['o-large'] }],
+          },
         ],
       }),
     );

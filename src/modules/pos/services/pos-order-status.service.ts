@@ -76,7 +76,11 @@ export class PosOrderStatusService {
       order,
       courierMode: row.integration.courier_mode,
     });
-    if (decision.repeat) return;
+    if (decision.repeat) {
+      // A confirmation that failed released its claim: the next report of Unconfirmed (the poll too) asks again
+      if (info.status === 'Unconfirmed') await this.orders.confirm(row);
+      return;
+    }
     const note = `iiko:${info.status}`;
 
     if (decision.alert === 'conflict') {

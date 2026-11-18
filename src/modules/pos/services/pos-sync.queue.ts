@@ -127,7 +127,11 @@ export class PosSyncQueue implements OnModuleInit, OnModuleDestroy {
     await this.q.add(
       name,
       { integrationId },
-      name === 'menu' ? { jobId: `pos-menu-now-${integrationId}` } : {},
+      // Fixed id so that requests collapse; a job that used up its attempts is dropped, or it would keep the id
+      // taken and every later request of the owner would be ignored
+      name === 'menu'
+        ? { jobId: `pos-menu-now-${integrationId}`, removeOnFail: true }
+        : {},
     );
   }
 

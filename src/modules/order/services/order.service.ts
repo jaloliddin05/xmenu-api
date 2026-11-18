@@ -160,7 +160,14 @@ export class OrderService {
         .id;
     }
     // The POS stop list of the branch that will cook it (docs/API.md, "Интеграция с кассой (iiko)")
-    await this.assertNotStopped(dto.items, branchId);
+    await this.assertNotStopped(
+      dto.items.map((item) => ({
+        itemId: item.itemId,
+        // the chosen size is an option of the size group, sent among the modifiers
+        optionIds: (item.modifiers ?? []).flatMap((m) => m.optionIds),
+      })),
+      branchId,
+    );
     // Prices of a venue with iiko change with every menu import: the guest confirms the total they saw,
     // a changed price answers price_changed (docs/IIKO.md, "Стоп-лист и цены")
     if (dto.expectedTotal == null && (await this.pricesFromPos(organizationId)))
