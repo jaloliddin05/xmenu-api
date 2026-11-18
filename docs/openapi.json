@@ -12019,6 +12019,10 @@
             "example": "UZS",
             "description": "The venue's currency"
           },
+          "unavailable": {
+            "type": "boolean",
+            "description": "The POS stop list has the dish (in every linked branch, or in the requested branchId): it is shown but cannot be ordered. Always false without a POS"
+          },
           "weight": {
             "type": "string",
             "example": "800 g",
@@ -12049,6 +12053,7 @@
           "images",
           "price",
           "currency",
+          "unavailable",
           "weight",
           "nutrition",
           "optionGroups"
