@@ -27,6 +27,7 @@ import { TenantDomainModule } from './modules/tenant-domain/tenant-domain.module
 import { StaffModule } from './modules/staff/staff.module';
 import { ReportModule } from './modules/report/report.module';
 import { PosModule } from './modules/pos/pos.module';
+import { HealthModule } from './modules/health/health.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -41,6 +42,7 @@ import { PosModule } from './modules/pos/pos.module';
     CategoryModule,
     CustomerModule,
     FileModule,
+    HealthModule,
     MenuModule,
     OrderModule,
     DeliveryModule,

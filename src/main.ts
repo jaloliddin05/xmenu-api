@@ -8,6 +8,7 @@ import { configureErrorHandling } from './infra/errors/configure';
 import { AccessTokenUserGuard } from './modules/auth/passport-strategies/access-token-user/access-token-user.guard';
 import { StaffAccessGuard } from './modules/auth/access/staff-access.guard';
 import { checkEnvAtStartup } from './config/env/startup-check';
+import { parseTrustProxy } from './infra/http/trust-proxy';
 
 async function bootstrap() {
   // Production refuses to start with a bad configuration; development prints what is switched off
@@ -17,9 +18,13 @@ async function bootstrap() {
     logger: ['log', 'warn', 'error'],
   });
 
-  // nginx on the same host proxies every request: trust X-Forwarded-For from loopback only, so
-  // req.ip is the client (per-IP auth limits) and a direct caller cannot spoof it.
-  app.set('trust proxy', 'loopback');
+  // The reverse proxy (Caddy) passes the client IP in X-Forwarded-For: trust it only from the proxy's
+  // addresses (TRUST_PROXY, loopback by default), so req.ip is the client (per-IP limits) and a direct
+  // caller cannot spoof it. The value is checked at startup (trustProxyEnvIssues).
+  app.set(
+    'trust proxy',
+    parseTrustProxy(process.env.TRUST_PROXY) ?? 'loopback',
+  );
 
   // Why origin: true is acceptable and when to revisit it: docs/API.md, "CORS".
   // Bearer-token arxitektura: hech qaysi endpoint cookie ishlatmaydi

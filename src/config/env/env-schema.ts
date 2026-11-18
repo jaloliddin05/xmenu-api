@@ -6,6 +6,7 @@ import { isSmsConfigured, smsEnvIssues } from 'src/modules/sms/sms.module';
 import { customerAuthEnvIssues } from 'src/modules/auth/customer-auth.config';
 import { parsePaymentConfigKey } from 'src/modules/payment/domain/payment-crypto';
 import { platformDomainFrom } from 'src/modules/tenant/host';
+import { trustProxyEnvIssues } from 'src/infra/http/trust-proxy';
 import { staffAuthEnvIssues } from '../index';
 import { Env, EnvIssues, isProduction, isSet } from './env-issues';
 
@@ -57,6 +58,8 @@ export const ENV_SCHEMA: readonly EnvVarSpec[] = [
     values: ['development', 'production', 'test'],
   },
   int('PORT'),
+  // format: trustProxyEnvIssues
+  str('TRUST_PROXY'),
   url('DATABASE_URL', {
     required: 'always',
     protocols: ['postgresql', 'postgres'],
@@ -362,6 +365,7 @@ export function validateEnv(env: Env = process.env): EnvReport {
     iikoApiEnvIssues(env),
     domainEnvIssues(env),
     revalidateEnvIssues(env),
+    trustProxyEnvIssues(env),
   ];
   return {
     production: isProduction(env),
