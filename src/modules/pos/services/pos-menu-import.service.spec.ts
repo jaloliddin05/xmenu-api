@@ -86,6 +86,7 @@ describe('PosMenuImportService', () => {
     revalidate = { addRevalidationJob: jest.fn(async () => undefined) };
     alerts = {
       raise: jest.fn(async () => undefined),
+      needsReconnect: jest.fn(async () => undefined),
       clear: jest.fn(async () => undefined),
       keyRejected: jest.fn(async () => false),
       platform: jest.fn(async () => undefined),
@@ -276,8 +277,7 @@ describe('PosMenuImportService', () => {
     await expect(service.import(row)).rejects.toMatchObject({
       code: 'pos_key_invalid',
     });
-    expect(row.status).toBe('needs_reconnect');
-    expect(alerts.raise).toHaveBeenCalledWith(row, 'key_revoked');
+    expect(alerts.needsReconnect).toHaveBeenCalledWith(row);
   });
 
   it('keys of several venues rejected at once: the platform, no venue reconnects', async () => {
@@ -290,6 +290,7 @@ describe('PosMenuImportService', () => {
       code: 'pos_key_invalid',
     });
     expect(row.status).toBe('active');
+    expect(alerts.needsReconnect).not.toHaveBeenCalled();
     expect(alerts.raise).not.toHaveBeenCalled();
   });
 

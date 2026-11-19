@@ -70,6 +70,39 @@ describe('PosAlertService', () => {
     expect(restaurant.alertPosMenuImport).toHaveBeenCalledTimes(2);
   });
 
+  it('"needs reconnect": every first transition goes to the ops chat as well, the owner is alerted once', async () => {
+    await service.needsReconnect(rows.a);
+    expect(rows.a).toMatchObject({
+      status: 'needs_reconnect',
+      alert: 'key_revoked',
+    });
+    expect(restaurant.alertPosReconnect).toHaveBeenCalledWith('org-a');
+    expect(ops.alert).toHaveBeenCalledTimes(1);
+    expect(ops.alert.mock.calls[0][0]).toContain('org-a');
+
+    // already waiting for a new key: neither the owner nor the ops chat is told again
+    await service.needsReconnect(rows.a);
+    expect(ops.alert).toHaveBeenCalledTimes(1);
+    expect(restaurant.alertPosReconnect).toHaveBeenCalledTimes(1);
+
+    // another venue, and the same venue after a new key: each transition is reported, not once an hour
+    await service.needsReconnect(rows.b);
+    expect(ops.alert).toHaveBeenCalledTimes(2);
+    expect(ops.alert.mock.calls[1][0]).toContain('org-b');
+    Object.assign(rows.a, { status: 'active' });
+    await service.clear('a', 'key_revoked');
+    await service.needsReconnect(rows.a);
+    expect(ops.alert).toHaveBeenCalledTimes(3);
+    expect(restaurant.alertPosReconnect).toHaveBeenCalledTimes(3);
+  });
+
+  it('an ops chat that fails does not stop the owner alert', async () => {
+    ops.alert.mockRejectedValueOnce(new Error('429'));
+    await expect(service.needsReconnect(rows.a)).resolves.toBeUndefined();
+    expect(rows.a.status).toBe('needs_reconnect');
+    expect(restaurant.alertPosReconnect).toHaveBeenCalledWith('org-a');
+  });
+
   it('a chat that fails does not fail the caller', async () => {
     restaurant.alertPosMenuImport.mockRejectedValueOnce(new Error('403'));
     await expect(

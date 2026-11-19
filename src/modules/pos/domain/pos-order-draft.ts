@@ -29,7 +29,7 @@ export interface DraftSource {
 /** The integration's links an order needs (pos_branch_link, pos_payment_link, pos_menu_link). */
 export interface DraftLinks {
   terminalGroupId: string;
-  /** Price category of the branch, else of the integration */
+  /** Price category of the venue (the integration's one, the menu prices are imported in it) */
   priceCategoryId: string | null;
   addressFormat: PosAddressFormat | null;
   /** Picked by the operator when the organization takes streets from the iiko directory */
@@ -73,7 +73,7 @@ export const posPaymentMethod = (
 
 /**
  * Builds the order iiko gets (docs/IIKO.md, "Путь заказа и статусы"): the external-menu positions
- * with the prices of the order (the price category of the branch was the one imported), the service
+ * with the prices of the order (the venue's price category, the one imported), the service
  * item "Delivery" when the fee is above zero, the payment through its link, the address in the way
  * the organization takes it and only the guest data the kitchen and the delivery need.
  */

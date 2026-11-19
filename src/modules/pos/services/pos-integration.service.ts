@@ -221,7 +221,6 @@ export class PosIntegrationService {
       branches: row.branch_links.map((b) => ({
         branchId: b.branch_id,
         terminalGroupId: b.terminal_group_id,
-        priceCategoryId: b.price_category_id,
       })),
       payments: row.payment_links.map((p) => ({
         method: p.method,
@@ -396,9 +395,10 @@ export class PosIntegrationService {
   }
 
   /**
-   * Steps 3–5 in one document (PUT replaces all links): checked against the iiko dictionaries. Each
-   * branch may have its own price category (decision 4 b); it goes into the orders of the branch,
-   * the menu prices are imported in the integration's one.
+   * Steps 3–5 in one document (PUT replaces all links): checked against the iiko dictionaries. One
+   * price category for the venue (decision 4): the menu prices are imported in it and every order
+   * carries it, so iiko never sees an order priced in another category; a branch asking for a
+   * different one is rejected (price_category_differs).
    */
   async setLinks(orgId: string, dto: PosLinksDto) {
     const row = await this.requireRow(orgId);
@@ -444,11 +444,11 @@ export class PosIntegrationService {
           'unknown_terminal_group',
           'No such terminal group',
         );
-      if (b.priceCategoryId && !knownCategory(b.priceCategoryId))
+      if ((b.priceCategoryId ?? category) !== category)
         bad(
           `branches[${i}].priceCategoryId`,
-          'unknown_price_category',
-          'No such price category',
+          'price_category_differs',
+          'All branches use the price category of the venue',
         );
     });
 
@@ -503,7 +503,6 @@ export class PosIntegrationService {
           integration_id: row.id,
           branch_id: b.branchId,
           terminal_group_id: b.terminalGroupId,
-          price_category_id: b.priceCategoryId ?? null,
         })),
       });
       await tx.pos_payment_link.deleteMany({

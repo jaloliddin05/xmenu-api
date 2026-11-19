@@ -36,7 +36,7 @@ export function iikoCreateBody(orgId: string, order: PosOrderDraft) {
     order: {
       id: order.id,
       externalNumber: order.externalNumber,
-      // The price category of the branch (decision 4): iiko prices the order like the menu imported
+      // The price category of the venue (decision 4): iiko prices the order like the menu imported
       ...(order.priceCategoryId
         ? { priceCategoryId: order.priceCategoryId }
         : {}),

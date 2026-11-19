@@ -292,13 +292,8 @@ export class PosMenuImportService {
         );
       } else if (err.code === 'pos_key_invalid') {
         // The key was revoked or expired: the owner has to reconnect, orders keep coming
-        if (!(await this.alerts.keyRejected(row.id))) {
-          await this.prisma.pos_integration.updateMany({
-            where: { id: row.id, status: 'active' },
-            data: { status: 'needs_reconnect' },
-          });
-          await this.alerts.raise(row, 'key_revoked');
-        }
+        if (!(await this.alerts.keyRejected(row.id)))
+          await this.alerts.needsReconnect(row);
       } else {
         await this.alerts.raise(row, 'menu_import_failed');
       }
