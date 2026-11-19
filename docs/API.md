@@ -1236,7 +1236,7 @@ miniapp_required` / `miniapp_init_data_invalid`, «Mini App и режимы до
 Статус: `{ available, connected, status: draft | active | needs_reconnect, alert: { code: menu_import_failed |
 key_revoked, at } | null, steps: { key, organization, branches, payments, menu: done | todo }, externalOrgId,
 addressFormat: city | legacy | international | int_no_postcode | unknown, courierMode, externalMenuId,
-priceCategoryId, deliveryItem: { itemId, sizeId } | null, branches: [{ branchId, terminalGroupId, priceCategoryId }],
+priceCategoryId, deliveryItem: { itemId, sizeId } | null, branches: [{ branchId, terminalGroupId }],
 payments: [{ method, paymentTypeId, paymentTypeKind }], checks: [{ key, status, branchId?, code? }], checkedAt,
 menuImportedAt, menuImportError, stopListUpdatedAt, enabledAt }`.
 
@@ -1248,9 +1248,10 @@ menuImportedAt, menuImportError, stopListUpdatedAt, enabledAt }`.
   метод доставки iiko не отвечает `402`), `terminal_alive` на каждый связанный филиал (касса на связи). `status`:
   `ok` | `fail` | `unknown` (iiko не ответил); `code` у упавшей: `pos_module_missing`, `pos_access_denied`,
   `pos_access_blocked`, `pos_key_invalid`, `pos_unavailable`.
-- **Связи.** Ценовая категория у каждого филиала своя (`branches[].priceCategoryId`, по умолчанию общая
-  `priceCategoryId`): она уходит в заказы филиала (`priceCategoryId` в `deliveries/create`); цены меню импортируются в
-  общей категории. Id, которых нет в справочниках iiko: `unknown_price_category` (общая и у филиала),
+- **Связи.** Ценовая категория одна на заведение (`priceCategoryId`): в ней импортируются цены меню, и она же уходит
+  в каждый заказ (`priceCategoryId` в `deliveries/create`), поэтому iiko не получает заказ с ценами другой категории.
+  `branches[].priceCategoryId` принимается только пустым или равным общей (не сохраняется), другая категория:
+  `price_category_differs`. Id, которых нет в справочниках iiko: `unknown_price_category`,
   `unknown_terminal_group`, `unknown_payment_type`, `unknown_item`, `unknown_size` (у позиции с размерами размер
   обязателен), `duplicate`; чужой филиал `404`; внешнего меню больше нет: `422 pos_external_menu_missing`. У включённой
   интеграции смена меню, категории или позиции «Доставка» ставит импорт.
@@ -1271,7 +1272,9 @@ menuImportedAt, menuImportError, stopListUpdatedAt, enabledAt }`.
   `menuImportError`; снимается успешным импортом) и `key_revoked` (iiko не выдаёт маркер по ключу при импорте или при
   отправке заказа; `status: needs_reconnect`, при отправке ещё красная проверка `key_access`; снимается новым ключом).
   Одна тревога на эпизод: баннер в дашборде и одно сообщение в чаты филиалов заведения. Приём заказов это не
-  останавливает.
+  останавливает. Отличить отзыв ключа от отказа приложения платформы можно только догадкой (ниже), поэтому текст
+  владельцу называет обе причины, а каждый переход заведения в `needs_reconnect` дублируется в лог и ops-чат платформы
+  (с id заведения, без ограничения частоты).
 - **Отказ приложения платформы.** Если iiko отклоняет `IIKO_APP_ID`/`IIKO_CLIENT_SECRET` (текст ответа называет
   приложение, или за 10 минут отклонены ключи двух и более заведений и процесс API за это время не получил ни одного
   маркера), это `platform_misconfigured` (`feature: pos`):
@@ -1354,7 +1357,7 @@ slug; ставится в iiko при включении (`/api/1/webhooks/updat
   позиции внешнего меню по связям с ценами заказа (размер входит в цену позиции, допы идут модификаторами), позиция
   «Доставка» с ценой доставки при стоимости больше нуля, одна оплата на сумму заказа по связи способа (Click и Payme
   = `online`, оплаченная онлайн помечена `isProcessedExternally`), `transportToFrontTimeout` 8 с и проверка
-  стоп-листа, `priceCategoryId` филиала (иначе общий, без него поле не передаётся). Данные гостя: имя (без имени
+  стоп-листа, `priceCategoryId` заведения (без него поле не передаётся). Данные гостя: имя (без имени
   `Xmenu #<номер>`), телефон, комментарий, адрес. Адрес по способу организации: `city` строкой с координатами,
   подъездом, этажом и квартирой; остальные (`legacy`, `international`, `int_no_postcode`, `unknown`) адресом iiko
   `legacy` с улицей из справочника iiko. Улица и дом сначала сопоставляются со строкой адреса гостя (части через

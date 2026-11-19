@@ -37,9 +37,7 @@ describe('PosIntegrationService', () => {
       address_format: 'city',
       external_menu_id: 'm1',
       delivery_item_id: 'i-dlv',
-      branch_links: [
-        { branch_id: 'b1', terminal_group_id: 'tg1', price_category_id: null },
-      ],
+      branch_links: [{ branch_id: 'b1', terminal_group_id: 'tg1' }],
       payment_links: [
         {
           method: 'cash',
@@ -233,14 +231,14 @@ describe('PosIntegrationService', () => {
       ...over,
     });
 
-    it('a price category per branch; one iiko does not know is a field error', async () => {
+    it('one price category for the venue: the same one at a branch is accepted and not stored, another is a field error', async () => {
       prisma.branch.findMany.mockResolvedValue([{ id: 'b1' }, { id: 'b2' }]);
       await service.setLinks(
         ORG,
         links({
           branches: [
-            { branchId: 'b1', terminalGroupId: 'tg1', priceCategoryId: 'pc2' },
-            { branchId: 'b2', terminalGroupId: 'tg1' },
+            { branchId: 'b1', terminalGroupId: 'tg1', priceCategoryId: 'pc1' },
+            { branchId: 'b2', terminalGroupId: 'tg1', priceCategoryId: null },
           ],
         }),
       );
@@ -250,16 +248,15 @@ describe('PosIntegrationService', () => {
             integration_id: 'int-1',
             branch_id: 'b1',
             terminal_group_id: 'tg1',
-            price_category_id: 'pc2',
           },
           {
             integration_id: 'int-1',
             branch_id: 'b2',
             terminal_group_id: 'tg1',
-            price_category_id: null,
           },
         ],
       });
+      prisma.pos_branch_link.createMany.mockClear();
       prisma.branch.findMany.mockResolvedValue([{ id: 'b1' }]);
       await expect(
         service.setLinks(
@@ -269,7 +266,7 @@ describe('PosIntegrationService', () => {
               {
                 branchId: 'b1',
                 terminalGroupId: 'tg1',
-                priceCategoryId: 'pc-x',
+                priceCategoryId: 'pc2',
               },
             ],
           }),
@@ -279,10 +276,11 @@ describe('PosIntegrationService', () => {
         fields: [
           expect.objectContaining({
             field: 'branches[0].priceCategoryId',
-            code: 'unknown_price_category',
+            code: 'price_category_differs',
           }),
         ],
       });
+      expect(prisma.pos_branch_link.createMany).not.toHaveBeenCalled();
     });
 
     it('ids iiko does not know are field errors', async () => {

@@ -12359,11 +12359,6 @@
           "terminalGroupId": {
             "type": "string",
             "description": "iiko terminal group id"
-          },
-          "priceCategoryId": {
-            "type": "string",
-            "nullable": true,
-            "description": "Price category of the external menu for this branch: it goes into the orders of the branch (deliveries/create priceCategoryId); null takes `priceCategoryId` of the integration"
           }
         },
         "required": [
@@ -12890,6 +12885,28 @@
           "serviceItems"
         ]
       },
+      "PosBranchLinkInputDto": {
+        "type": "object",
+        "properties": {
+          "branchId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "terminalGroupId": {
+            "type": "string",
+            "description": "iiko terminal group id"
+          },
+          "priceCategoryId": {
+            "type": "string",
+            "nullable": true,
+            "description": "One price category for the venue: null or the same as `priceCategoryId` of the links, another one is rejected (`price_category_differs`); not stored"
+          }
+        },
+        "required": [
+          "branchId",
+          "terminalGroupId"
+        ]
+      },
       "PosLinksDto": {
         "type": "object",
         "properties": {
@@ -12900,12 +12917,12 @@
           "priceCategoryId": {
             "type": "string",
             "nullable": true,
-            "description": "Price category of the external menu: the default of the branches and the one the menu prices are imported in; null = iiko default"
+            "description": "Price category of the external menu, one for the venue: the menu prices are imported in it and every order carries it (deliveries/create priceCategoryId); null = iiko default"
           },
           "branches": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/PosBranchLinkDto"
+              "$ref": "#/components/schemas/PosBranchLinkInputDto"
             }
           },
           "payments": {

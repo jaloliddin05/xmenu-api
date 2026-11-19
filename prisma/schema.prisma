@@ -1203,8 +1203,6 @@ model pos_branch_link {
   branch_id         String          @unique
   branch            branch          @relation(fields: [branch_id], references: [id], onDelete: Cascade)
   terminal_group_id String
-  // Price category of the external menu for this branch (null = the integration's one)
-  price_category_id String?
 
   @@index([integration_id])
 }

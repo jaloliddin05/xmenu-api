@@ -22,7 +22,8 @@ const OPS_EVERY_SECONDS = 3600;
  * failed and a key iiko rejected; the field on the integration is set once per episode, and only
  * that change sends one message to every branch chat. The platform's: iiko rejecting the Xmenu
  * application (IIKO_APP_ID / IIKO_CLIENT_SECRET) goes to the log and the ops chat, and no venue is
- * asked to reconnect.
+ * asked to reconnect. Telling the two apart is a guess (keyRejected), so every venue that goes to
+ * "needs reconnect" is reported to the ops chat as well.
  */
 @Injectable()
 export class PosAlertService {
@@ -58,6 +59,33 @@ export class PosAlertService {
         `alert ${alert} of integration ${integration.id} not sent: ${errorMessage(e)}`,
       );
     }
+  }
+
+  /**
+   * iiko rejected the key of the venue (and keyRejected did not blame the platform): an active
+   * integration goes to "needs reconnect" and the owner is alerted. The transition itself is also
+   * sent to the ops chat (OpsNotifierService logs it too), every time: the rejection may still be the platform's
+   * application with a refusal text not recognised, and on a pilot with one venue nothing else
+   * would tell the platform.
+   */
+  async needsReconnect(integration: {
+    id: string;
+    organization_id: string;
+  }): Promise<void> {
+    const moved = await this.prisma.pos_integration.updateMany({
+      where: { id: integration.id, status: 'active' },
+      data: { status: 'needs_reconnect' },
+    });
+    if (moved.count) {
+      try {
+        await this.ops.alert(
+          `iiko: iiko rejected the key of venue ${integration.organization_id} (integration ${integration.id}): the venue is asked to reconnect; if its key is right, check the iiko application credentials of the platform`,
+        );
+      } catch (e) {
+        this.logger.warn(`ops alert not sent: ${errorMessage(e)}`);
+      }
+    }
+    await this.raise(integration, 'key_revoked');
   }
 
   /** The episode is over (the menu imported, a new key entered). */

@@ -307,6 +307,9 @@ export function buildPosAlertText(number: number, alert: PosAlert): string {
 export const POS_MENU_IMPORT_TEXT =
   '⚠️ <b>Меню из iiko не обновилось.</b>\nГости видят прошлое меню. Проверьте внешнее меню и доступ к iiko; владелец может обновить меню вручную в дашборде: «Интеграции → iiko».';
 
-/** The iiko key of the venue stopped working: every branch chat is told once. */
+/**
+ * iiko stopped accepting the connection of the venue: every branch chat is told once. The cause may
+ * be the venue's key or the platform's application (the platform is alerted too), so both are named.
+ */
 export const POS_RECONNECT_TEXT =
-  '🔌 <b>iiko не принимает ключ API заведения.</b>\nЗаказы принимаются, но в iiko не уходят. Владельцу нужно переподключить iiko в дашборде: «Интеграции → iiko».';
+  '🔌 <b>iiko не принял подключение заведения.</b>\nЗаказы принимаются, но в iiko не уходят. Владельцу нужно проверить ключ API в iikoWeb и переподключить iiko в дашборде: «Интеграции → iiko». Если ключ верный, мы уже разбираемся.';

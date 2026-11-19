@@ -89,7 +89,7 @@ describe('IikoProvider: orders', () => {
       order: {
         id: 'order-1',
         externalNumber: '12',
-        // The price category of the branch (decision 4)
+        // The price category of the venue (decision 4)
         priceCategoryId: 'pc-delivery',
         phone: '+998901234567',
         orderServiceType: 'DeliveryByCourier',

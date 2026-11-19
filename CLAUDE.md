@@ -194,8 +194,8 @@ Payme вручную через ops-чат.
   повтор; ошибки без ключа, маркера и тела ответа, в лог `iikoErrorText`; HTTP-статусы → коды `pos_*`). Нормализация
   меню `iiko/iiko-menu.ts` (поля по OpenAPI iiko: `itemsGroups`, `sizePrices`, модификаторы по id).
 - Модели `pos/models/pos.prisma`: `pos_integration` (одна на заведение, ключ `AES-256-GCM` `PAYMENT_CONFIG_KEY` через
-  `PosKeyring`, `webhook_secret_hash`, тревога владельцу `alert`/`alert_at`), `pos_branch_link` (группа терминалов и
-  своя ценовая категория филиала), `pos_payment_link`, `pos_menu_link` (строка меню ↔ позиция iiko,
+  `PosKeyring`, `webhook_secret_hash`, тревога владельцу `alert`/`alert_at`), `pos_branch_link` (группа терминалов
+  филиала; ценовая категория одна на заведение, у интеграции), `pos_payment_link`, `pos_menu_link` (строка меню ↔ позиция iiko,
   `@@unique([integration_id, kind, external_id])`, FK с cascade на строку меню), `pos_stop_item` (по филиалу; `option_id`
   = остановленный размер, без него блюдо целиком; уникальность двумя частичными индексами в миграции). У переводов
   меню `stale`, у `file` `content_hash` и `from_pos`. «Работает» = `active` или `needs_reconnect` (`isPosLive`,
@@ -238,11 +238,11 @@ Payme вручную через ops-чат.
   попытка с захватом условным `updateMany` (`state`, `attempts`), итог команды заданием `check` (3 с, до 20 раз),
   классификация `domain/pos-order-errors.ts` (повтор или сразу `failed`; 5 попыток, паузы 1–4 минуты), `confirm` после
   создания, один раз (`pos_order.confirmed_at`, захват условным `updateMany`). `401` переводит интеграцию в
-  `needs_reconnect` (тревога `key_revoked`), `402/403/423` красят `checks`. Отказ приложения платформы (текст iiko
+  `needs_reconnect` (`PosAlertService.needsReconnect`: тревога `key_revoked` и каждый переход в ops-чат), `402/403/423` красят `checks`. Отказ приложения платформы (текст iiko
   называет приложение или ключи двух заведений отклонены за 10 минут без единого выданного маркера в процессе,
   `PosAlertService.keyRejected`) =
-  `platform_misconfigured`: заведения не переподключаются, тревога в ops-чат. Ценовая категория филиала уходит в
-  `deliveries/create`. Адрес не `city`: улица и дом сначала сопоставляются со строкой адреса (`domain/street-match.ts`
+  `platform_misconfigured`: заведения не переподключаются, тревога в ops-чат. Ценовая категория заведения (в ней же импортированы
+  цены меню) уходит в `deliveries/create`. Адрес не `city`: улица и дом сначала сопоставляются со строкой адреса (`domain/street-match.ts`
   по справочнику `PosStreetsCache`: города и улицы организации в Redis на сутки), иначе `needs_street`. Действия
   оператора `PosOrderController` (`/order/:id/pos/*`, право `orders`).
 - Статусы: чистая таблица `domain/pos-status-map.ts` (только вперёд, противоречие → журнал и тревога),

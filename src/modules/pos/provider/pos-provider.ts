@@ -149,7 +149,7 @@ export interface PosOrderDraft {
   id: string;
   externalNumber: string;
   terminalGroupId: string;
-  /** Price category of the branch (or of the integration); null: the POS default */
+  /** Price category of the venue (the one the menu is imported in); null: the POS default */
   priceCategoryId: string | null;
   kind: 'delivery' | 'pickup';
   phone: string;

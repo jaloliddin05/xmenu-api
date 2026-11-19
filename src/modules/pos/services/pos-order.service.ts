@@ -272,7 +272,6 @@ export class PosOrderService {
         select: {
           integration_id: true,
           terminal_group_id: true,
-          price_category_id: true,
         },
       }),
       this.prisma.pos_menu_link.findMany({
@@ -326,8 +325,8 @@ export class PosOrderService {
       },
       {
         terminalGroupId: branch.terminal_group_id,
-        priceCategoryId:
-          branch.price_category_id ?? integration.price_category_id,
+        // One price category for the venue: the one the menu prices were imported in
+        priceCategoryId: integration.price_category_id,
         addressFormat: integration.address_format,
         street:
           row.street_id && row.house
@@ -489,11 +488,7 @@ export class PosOrderService {
     if (reason !== 'pos_key_invalid') return;
     // Keys of several venues rejected at once: the platform's application, not this key
     if (await this.alerts.keyRejected(row.integration_id)) return;
-    await this.prisma.pos_integration.updateMany({
-      where: { id: row.integration_id, status: 'active' },
-      data: { status: 'needs_reconnect' },
-    });
-    await this.alerts.raise(row.integration, 'key_revoked');
+    await this.alerts.needsReconnect(row.integration);
   }
 
   /**

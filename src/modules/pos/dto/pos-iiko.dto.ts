@@ -43,12 +43,14 @@ export class PosBranchLinkDto {
   @IsString()
   @Length(1, ID_MAX)
   readonly terminalGroupId: string;
+}
 
+export class PosBranchLinkInputDto extends PosBranchLinkDto {
   @ApiPropertyOptional({
     type: String,
     nullable: true,
     description:
-      'Price category of the external menu for this branch: it goes into the orders of the branch (deliveries/create priceCategoryId); null takes `priceCategoryId` of the integration',
+      'One price category for the venue: null or the same as `priceCategoryId` of the links, another one is rejected (`price_category_differs`); not stored',
   })
   @IsOptional()
   @IsString()
@@ -90,19 +92,19 @@ export class PosLinksDto {
     type: String,
     nullable: true,
     description:
-      'Price category of the external menu: the default of the branches and the one the menu prices are imported in; null = iiko default',
+      'Price category of the external menu, one for the venue: the menu prices are imported in it and every order carries it (deliveries/create priceCategoryId); null = iiko default',
   })
   @IsOptional()
   @IsString()
   @MaxLength(ID_MAX)
   readonly priceCategoryId?: string | null;
 
-  @ApiProperty({ type: [PosBranchLinkDto] })
+  @ApiProperty({ type: [PosBranchLinkInputDto] })
   @IsArray()
   @ArrayMaxSize(200)
   @ValidateNested({ each: true })
-  @Type(() => PosBranchLinkDto)
-  readonly branches: PosBranchLinkDto[];
+  @Type(() => PosBranchLinkInputDto)
+  readonly branches: PosBranchLinkInputDto[];
 
   @ApiProperty({ type: [PosPaymentLinkDto] })
   @IsArray()

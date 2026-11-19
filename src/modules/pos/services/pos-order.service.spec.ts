@@ -206,7 +206,7 @@ describe('PosOrderService', () => {
       },
     );
 
-    it('the key was revoked: "needs reconnect" and the owner alert (once per episode, PosAlertService); orders keep being accepted', async () => {
+    it('the key was revoked: "needs reconnect" with the owner and ops alerts (PosAlertService.needsReconnect); orders keep being accepted', async () => {
       t.provider.createOrder.mockRejectedValue(
         httpError(401, 'pos_key_invalid'),
       );
@@ -215,10 +215,8 @@ describe('PosOrderService', () => {
         state: 'failed',
         error: 'pos_key_invalid',
       });
-      expect(t.world.integration.status).toBe('needs_reconnect');
-      expect(t.alerts.raise).toHaveBeenCalledWith(
+      expect(t.alerts.needsReconnect).toHaveBeenCalledWith(
         expect.objectContaining({ id: 'int-1', organization_id: ORG }),
-        'key_revoked',
       );
       expect(t.world.order.status).toBe('accepted');
     });
@@ -230,6 +228,7 @@ describe('PosOrderService', () => {
       );
       await service.push(ORDER);
       expect(t.world.integration.status).toBe('active');
+      expect(t.alerts.needsReconnect).not.toHaveBeenCalled();
       expect(t.alerts.raise).not.toHaveBeenCalled();
     });
 
@@ -280,18 +279,12 @@ describe('PosOrderService', () => {
       expect(pos().confirmed_at).toBeInstanceOf(Date);
     });
 
-    it('the price category of the branch, else of the integration, goes into the order', async () => {
+    it('the price category of the venue (the one the menu was imported in) goes into the order', async () => {
       t.provider.createOrder.mockResolvedValue(success());
       t.world.integration.price_category_id = 'pc-venue';
       await service.push(ORDER);
       expect(t.provider.createOrder.mock.calls[0][2].priceCategoryId).toBe(
         'pc-venue',
-      );
-      t.world.pos.state = 'queued';
-      t.world.branchLink.price_category_id = 'pc-branch';
-      await service.push(ORDER);
-      expect(t.provider.createOrder.mock.calls[1][2].priceCategoryId).toBe(
-        'pc-branch',
       );
     });
 

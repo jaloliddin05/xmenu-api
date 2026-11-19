@@ -95,7 +95,6 @@ export function fakePosOrderWorld() {
     branch_id: 'b1',
     integration_id: INTEGRATION,
     terminal_group_id: 'tg1',
-    price_category_id: null,
   };
   const world = { integration, order, pos, branchLink, keyring };
 
@@ -180,6 +179,7 @@ export function fakePosOrderWorld() {
   };
   const alerts = {
     raise: jest.fn(async () => undefined),
+    needsReconnect: jest.fn(async () => undefined),
     keyRejected: jest.fn(async () => false),
     platform: jest.fn(async () => undefined),
   };
