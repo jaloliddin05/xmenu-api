@@ -1,7 +1,11 @@
 import { randomBytes } from 'crypto';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { createHttpApp, staffToken } from 'src/infra/testing/http-app.fake';
+import {
+  createHttpApp,
+  staffToken,
+  stepUpToken,
+} from 'src/infra/testing/http-app.fake';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
 import { PLATFORM_ORDER_SETTINGS } from 'src/modules/organization/domain/platform-defaults';
 import { RevalidateService } from 'src/modules/revalidate-queue/revalidate.service';
@@ -87,6 +91,7 @@ describe('Payment providers: the last payment method at delivery stays (W13F-04)
     request(app.getHttpServer())
       .put(`/payment-provider/${provider}`)
       .set('Authorization', owner)
+      .set('X-Step-Up-Token', stepUpToken('owner'))
       .send(body);
 
   it('online is the only method: disabling its provider is 409, the provider stays on, nothing is revalidated', async () => {

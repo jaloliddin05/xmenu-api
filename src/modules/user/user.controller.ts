@@ -20,6 +20,7 @@ import { MulterStorage } from 'src/infra/helper/upload/multer-upload';
 import { FileUploadValidationForOptional } from 'src/infra/validators/file-upload-validation-update';
 import { AppException } from 'src/infra/errors/app-exception';
 import { StaffAccess } from 'src/modules/auth/access/staff-access.decorator';
+import { StepUp } from 'src/modules/auth/step-up/step-up.decorator';
 
 /** An owner may only act on their own account; anyone else's id looks like it does not exist. */
 export function assertSelf(
@@ -64,6 +65,7 @@ export class UserController {
   }
 
   @StaffAccess('venue')
+  @StepUp('account_deleted')
   @Delete(':id')
   @ApiOperation({ summary: 'Method: delete' })
   @HttpCode(HttpStatus.NO_CONTENT)

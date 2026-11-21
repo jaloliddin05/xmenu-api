@@ -8,6 +8,7 @@ import { parsePaymentConfigKey } from 'src/modules/payment/domain/payment-crypto
 import { platformDomainFrom } from 'src/modules/tenant/host';
 import { trustProxyEnvIssues } from 'src/infra/http/trust-proxy';
 import { staffAuthEnvIssues } from '../index';
+import { stepUpEnvIssues } from 'src/modules/auth/step-up/step-up.config';
 import { Env, EnvIssues, isProduction, isSet } from './env-issues';
 
 type Kind =
@@ -136,6 +137,7 @@ export const ENV_SCHEMA: readonly EnvVarSpec[] = [
   secret('CLIENT_REVALIDATE_SECRET'),
   // Staff auth
   secret('JWT_ACCESS_TOKEN_SECRET'),
+  secret('STAFF_STEP_UP_SECRET'),
   str('JWT_ACCESS_TOKEN_EXPIRATION_TIME'),
   int('STAFF_REFRESH_TTL_DAYS'),
   int('STAFF_SESSION_ABSOLUTE_DAYS'),
@@ -362,6 +364,7 @@ export function validateEnv(env: Env = process.env): EnvReport {
     schemaIssues(env),
     customerAuthEnvIssues(env),
     staffAuthEnvIssues(env),
+    stepUpEnvIssues(env),
     smsEnvIssues(env),
     telegramApiEnvIssues(env),
     iikoApiEnvIssues(env),

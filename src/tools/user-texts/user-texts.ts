@@ -27,6 +27,7 @@ export const BOT_TEXT_FILES = [
   'src/modules/auth/services/customer-otp.service.ts',
   'src/modules/courier/domain/courier-texts.ts',
   'src/modules/report/domain/report-table.ts',
+  'src/modules/auth/step-up/owner-security-texts.ts',
 ];
 
 /**

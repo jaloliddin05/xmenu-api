@@ -15,6 +15,7 @@ const prodOk = {
   JWT_CUSTOMER_REGISTRATION_SECRET: secret('b'),
   OTP_HMAC_SECRET: secret('c'),
   JWT_ACCESS_TOKEN_SECRET: secret('d'),
+  STAFF_STEP_UP_SECRET: secret('s'),
   SMS_PROVIDER: 'eskiz',
   ESKIZ_EMAIL: 'ops@xmenu.uz',
   ESKIZ_PASSWORD: 'p',

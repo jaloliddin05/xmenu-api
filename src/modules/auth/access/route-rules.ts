@@ -6,6 +6,8 @@ import { ROLE_PERMISSIONS, STAFF_ROLES } from './permissions';
 import type { StaffRole } from './permissions';
 import { STAFF_ACCESS_KEY } from './staff-access.decorator';
 import type { StaffAccessRule } from './staff-access.decorator';
+import { STEP_UP_KEY } from '../step-up/step-up.decorator';
+import type { StepUpAction } from '../step-up/step-up.decorator';
 
 export interface RouteInfo {
   /** GET, POST, … */
@@ -16,6 +18,8 @@ export interface RouteInfo {
   handler: string;
   /** 'public' (@Public on the method or the class), the StaffAccess rule, or null: no rule (denied) */
   rule: 'public' | StaffAccessRule | null;
+  /** @StepUp: the critical action this route performs (needs X-Step-Up-Token) */
+  stepUp?: StepUpAction;
 }
 
 const joinPath = (...parts: string[]) =>
@@ -57,6 +61,9 @@ export function collectRoutes(app: INestApplicationContext): RouteInfo[] {
         : ((Reflect.getMetadata(STAFF_ACCESS_KEY, fn) as
             | StaffAccessRule
             | undefined) ?? null);
+      const stepUp = Reflect.getMetadata(STEP_UP_KEY, fn) as
+        | StepUpAction
+        | undefined;
       for (const b of base)
         for (const p of asList(Reflect.getMetadata(PATH_METADATA, fn)))
           routes.push({
@@ -65,6 +72,7 @@ export function collectRoutes(app: INestApplicationContext): RouteInfo[] {
             controller,
             handler,
             rule,
+            ...(stepUp ? { stepUp } : {}),
           });
     }
   }
@@ -89,10 +97,10 @@ export function renderAccessMatrix(routes: RouteInfo[]): string {
       r.rule !== 'public' && r.rule !== null,
   );
   const head = [
-    '| Метод | Путь | Право | Заведение в пути | ' +
+    '| Метод | Путь | Право | Заведение в пути | Пароль | ' +
       STAFF_ROLES.map((r) => ROLE_TITLE[r]).join(' | ') +
       ' |',
-    '|---|---|---|---|' + STAFF_ROLES.map(() => '---').join('|') + '|',
+    '|---|---|---|---|---|' + STAFF_ROLES.map(() => '---').join('|') + '|',
   ];
   const rows = staff.map((r) => {
     const { permission, orgParam } = r.rule;
@@ -102,7 +110,8 @@ export function renderAccessMatrix(routes: RouteInfo[]): string {
     );
     const right = admin ? 'администратор платформы' : `\`${permission}\``;
     const org = orgParam ? `\`${orgParam}\`` : '';
-    return `| ${r.method} | \`${openApiPath(r.path)}\` | ${right} | ${org} | ${cells.join(' | ')} |`;
+    const stepUp = r.stepUp ? 'step-up' : '';
+    return `| ${r.method} | \`${openApiPath(r.path)}\` | ${right} | ${org} | ${stepUp} | ${cells.join(' | ')} |`;
   });
   return [...head, ...rows].join('\n');
 }

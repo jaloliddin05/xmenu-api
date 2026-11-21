@@ -176,6 +176,38 @@
 `JWT_ACCESS_TOKEN_EXPIRATION_TIME`). События журнала: `staff_session_revoked`, `staff_sessions_revoked_all`,
 `staff_password_changed`.
 
+### 11. `POST /auth/step-up` → 200 (нужен access-токен): повторное подтверждение
+
+Критичные действия владельца требуют свежего ввода пароля. `{ "password": "..." }` → `{ "stepUpToken", "expiresIn": 300 }`.
+Токен отправляется заголовком `X-Step-Up-Token` вместе с обычным `Authorization`; он привязан к пользователю и к
+текущему входу (`sid`), действует 5 минут и в эти 5 минут принимается сколько угодно раз. Подпись HS256 отдельным
+секретом `STAFF_STEP_UP_SECRET`, `aud` `xmenu:step-up`: access-токен и токен клиента вместо него не принимаются.
+
+- Неверный пароль: `400 wrong_password`, событие `staff_step_up_failed`. Не больше 5 неверных паролей за 15 минут на
+  пользователя, дальше `429 rate_limited` с `retryAfter` (и для верного пароля, пока окно не кончится). Верный пароль
+  попытку не тратит. Блокировку входа по телефону step-up не трогает. Успех: событие `staff_step_up`.
+- Маршрут с пометкой `step-up` в матрице без заголовка, с неверным, просроченным токеном или токеном другого входа
+  или пользователя: `403 step_up_required`, до обработчика запрос не доходит. Проверка идёт после права: оператору
+  такие маршруты по-прежнему `403 forbidden`, чужое заведение `404`.
+- Защищены (`@StepUp`, `src/modules/auth/step-up/step-up.decorator.ts`; тест сверяет список):
+
+  | Маршрут | Событие в `staff_auth_event` |
+  |---|---|
+  | `PUT /payment-provider/{provider}` | `staff_payment_keys_changed` (`meta.provider`) |
+  | `PUT /telegram-bot` | `staff_telegram_bot_changed` |
+  | `DELETE /telegram-bot` | `staff_telegram_bot_removed` |
+  | `PUT /integrations/iiko/key` | `staff_iiko_key_changed` |
+  | `DELETE /integrations/iiko` | `staff_iiko_disconnected` |
+  | `DELETE /organization/{id}` | `staff_organization_deleted` |
+  | `DELETE /user/{id}` | `staff_account_deleted` |
+
+- После успешного ответа: строка в `staff_auth_event` (`meta: { action, provider? }`, значений ключей и токенов нет) и
+  SMS на телефон владельца через очередь BullMQ `owner-notification` (3 попытки; при `ORDER_QUEUES=off` сразу, без
+  повторов): «В Xmenu изменены настройки (…) заведения «…». Если это были не вы, смените пароль.» (для удаления
+  заведения и аккаунта свой текст). Сбой SMS действие не отменяет, причина в логе. Неуспешное действие не
+  записывается и SMS не шлёт. Списка этих событий в API нет (только журнал в БД).
+- Смены телефона владельца в API нет; `POST /payment-provider/{provider}/disable` (ключи остаются) step-up не требует.
+
 `user` в ответах `login` и `check-code` (и `GET /user/me`): `id, phone, email, first_name, last_name, url, isActive,
 created_at, avatar_id` и `organization { id, name, slug, type, is_active, logo { id, url }, banner { id, url },
 translations [{ id, lang, description }] }`. Хеша пароля, `owner_id`, `order_seq`, `int_id` и путей файлов на диске
@@ -187,7 +219,8 @@ translations [{ id, lang, description }] }`. Хеша пароля, `owner_id`, 
 |---|---|---|
 | 400 | `validation_error` | тело не прошло DTO (пароль короче 8, неизвестный `type`...), поля в `fields` |
 | 400 | `invalid_phone` | номер не `+998XXXXXXXXX` |
-| 400 | `wrong_password` | `password/change`: неверный текущий пароль |
+| 400 | `wrong_password` | `password/change`: неверный текущий пароль; `step-up`: неверный пароль |
+| 403 | `step_up_required` | критичное действие без действующего `X-Step-Up-Token` (раздел 11) |
 | 400 | `invalid_code` | неверный код или код не той длины (попытка не тратится, если формат неверен) |
 | 400 | `code_expired` | код истёк или уже использован |
 | 400 | `registration_expired` | заявки нет: истекла, уже подтверждена или неизвестный `registrationId` |
@@ -216,6 +249,7 @@ translations [{ id, lang, description }] }`. Хеша пароля, `owner_id`, 
 | Попыток входа с IP | 20 за 15 мин |
 | Сброс пароля: проверка кода | 10 за 15 мин на номер+IP, 60 за 15 мин на IP |
 | Смена пароля | 5 попыток за 15 мин на владельца, 20 на IP |
+| Step-up | 5 неверных паролей за 15 мин на владельца |
 | Вход по номеру | 5 неудач за 15 мин → блокировка 60 с, далее 120, 240... до 1 ч; уровень сбрасывается после суток без блокировок или после успешного входа |
 
 Счётчики входа ведутся и для несуществующих номеров: блокировка не выдаёт, есть ли аккаунт.
@@ -282,123 +316,127 @@ IP берётся из `X-Forwarded-For` только от доверенног�
 ### Матрица маршрутов
 
 Генерируется `npm run openapi` из правил в коде; CI проверяет, что она не устарела. «Заведение в пути»: параметр,
-который должен быть id своего заведения.
+который должен быть id своего заведения. «Пароль»: `step-up` — нужен `X-Step-Up-Token` (раздел «Авторизация
+владельцев», 11).
 
 <!-- access-matrix:start (npm run openapi) -->
-| Метод | Путь | Право | Заведение в пути | Владелец | Оператор |
-|---|---|---|---|---|---|
-| POST | `/additional-product` | `venue` |  | ✓ | — |
-| DELETE | `/additional-product/{id}` | `venue` |  | ✓ | — |
-| PUT | `/additional-product/{id}` | `venue` |  | ✓ | — |
-| POST | `/additional-product/group` | `venue` |  | ✓ | — |
-| DELETE | `/additional-product/group/{id}` | `venue` |  | ✓ | — |
-| PUT | `/additional-product/group/{id}` | `venue` |  | ✓ | — |
-| GET | `/application` | администратор платформы |  | — | — |
-| POST | `/auth/password/change` | `account` |  | ✓ | ✓ |
-| DELETE | `/auth/sessions` | `account` |  | ✓ | ✓ |
-| GET | `/auth/sessions` | `account` |  | ✓ | ✓ |
-| DELETE | `/auth/sessions/{id}` | `account` |  | ✓ | ✓ |
-| GET | `/branch` | `branches.read` |  | ✓ | ✓ |
-| POST | `/branch` | `venue` |  | ✓ | — |
-| DELETE | `/branch/{id}` | `venue` |  | ✓ | — |
-| PATCH | `/branch/{id}` | `venue` |  | ✓ | — |
-| GET | `/branch/{id}/delivery-pricing` | `venue` |  | ✓ | — |
-| PUT | `/branch/{id}/delivery-pricing` | `venue` |  | ✓ | — |
-| GET | `/branch/{id}/delivery-pricing/check` | `venue` |  | ✓ | — |
-| POST | `/branch/{id}/exceptions` | `venue` |  | ✓ | — |
-| DELETE | `/branch/{id}/exceptions/{exceptionId}` | `venue` |  | ✓ | — |
-| PUT | `/branch/{id}/working-hours` | `venue` |  | ✓ | — |
-| GET | `/category` | `menu.read` |  | ✓ | ✓ |
-| POST | `/category` | `venue` |  | ✓ | — |
-| DELETE | `/category/{id}` | `venue` |  | ✓ | — |
-| GET | `/category/{id}` | `menu.read` |  | ✓ | ✓ |
-| PUT | `/category/{id}` | `venue` |  | ✓ | — |
-| PATCH | `/category/{id}/activate` | `venue` |  | ✓ | — |
-| GET | `/category/for-select/{organizationId}` | `menu.read` | `organizationId` | ✓ | ✓ |
-| PATCH | `/category/index` | `venue` |  | ✓ | — |
-| GET | `/couriers` | `couriers` |  | ✓ | ✓ |
-| POST | `/couriers` | `couriers.manage` |  | ✓ | — |
-| PATCH | `/couriers/{id}` | `couriers.manage` |  | ✓ | — |
-| POST | `/couriers/{id}/disable` | `couriers.manage` |  | ✓ | — |
-| POST | `/couriers/{id}/invitation` | `couriers.manage` |  | ✓ | — |
-| PUT | `/couriers/{id}/pay-rate` | `venue` |  | ✓ | — |
-| GET | `/couriers/pay-rates` | `venue` |  | ✓ | — |
-| GET | `/external-services` | `orders` |  | ✓ | ✓ |
-| POST | `/file/upload` | `profile` |  | ✓ | ✓ |
-| DELETE | `/integrations/iiko` | `venue` |  | ✓ | — |
-| GET | `/integrations/iiko` | `venue` |  | ✓ | — |
-| POST | `/integrations/iiko/checks` | `venue` |  | ✓ | — |
-| PUT | `/integrations/iiko/couriers` | `venue` |  | ✓ | — |
-| GET | `/integrations/iiko/dictionaries` | `venue` |  | ✓ | — |
-| POST | `/integrations/iiko/enable` | `venue` |  | ✓ | — |
-| PUT | `/integrations/iiko/key` | `venue` |  | ✓ | — |
-| PUT | `/integrations/iiko/links` | `venue` |  | ✓ | — |
-| POST | `/integrations/iiko/menu/import` | `venue` |  | ✓ | — |
-| POST | `/integrations/iiko/menu/preview` | `venue` |  | ✓ | — |
-| POST | `/integrations/iiko/menu/rematch` | `venue` |  | ✓ | — |
-| PUT | `/integrations/iiko/organization` | `venue` |  | ✓ | — |
-| GET | `/integrations/iiko/organizations` | `venue` |  | ✓ | — |
-| GET | `/order` | `orders` |  | ✓ | ✓ |
-| GET | `/order-settings` | `venue` |  | ✓ | — |
-| PUT | `/order-settings` | `venue` |  | ✓ | — |
-| GET | `/order/{id}` | `orders` |  | ✓ | ✓ |
-| POST | `/order/{id}/accept` | `orders` |  | ✓ | ✓ |
-| POST | `/order/{id}/advance` | `orders` |  | ✓ | ✓ |
-| DELETE | `/order/{id}/courier` | `orders` |  | ✓ | ✓ |
-| PUT | `/order/{id}/courier` | `orders` |  | ✓ | ✓ |
-| POST | `/order/{id}/external` | `orders` |  | ✓ | ✓ |
-| POST | `/order/{id}/external-payment` | `orders` |  | ✓ | ✓ |
-| POST | `/order/{id}/pos/manual` | `orders` |  | ✓ | ✓ |
-| POST | `/order/{id}/pos/retry` | `orders` |  | ✓ | ✓ |
-| PUT | `/order/{id}/pos/street` | `orders` |  | ✓ | ✓ |
-| GET | `/order/{id}/pos/streets` | `orders` |  | ✓ | ✓ |
-| POST | `/order/{id}/reject` | `orders` |  | ✓ | ✓ |
-| POST | `/order/{id}/status` | `orders` |  | ✓ | ✓ |
-| DELETE | `/organization/{id}` | `venue` | `id` | ✓ | — |
-| GET | `/organization/{id}` | `venue` | `id` | ✓ | — |
-| PUT | `/organization/{id}` | `venue` | `id` | ✓ | — |
-| PUT | `/organization/{id}/channels` | `venue` | `id` | ✓ | — |
-| GET | `/organization/{id}/domains` | `venue` | `id` | ✓ | — |
-| POST | `/organization/{id}/domains` | `venue` | `id` | ✓ | — |
-| DELETE | `/organization/{id}/domains/{domainId}` | `venue` | `id` | ✓ | — |
-| POST | `/organization/{id}/domains/{domainId}/verify` | `venue` | `id` | ✓ | — |
-| GET | `/organization/{id}/publication` | `venue` | `id` | ✓ | — |
-| POST | `/organization/{id}/publish` | `venue` | `id` | ✓ | — |
-| GET | `/organization/{id}/settings` | `venue` | `id` | ✓ | — |
-| PUT | `/organization/{id}/settings` | `venue` | `id` | ✓ | — |
-| GET | `/organization/{id}/staff` | `staff` | `id` | ✓ | — |
-| POST | `/organization/{id}/staff` | `staff` | `id` | ✓ | — |
-| POST | `/organization/{id}/staff/{memberId}/disable` | `staff` | `id` | ✓ | — |
-| POST | `/organization/{id}/unpublish` | `venue` | `id` | ✓ | — |
-| POST | `/organization/check-slug` | `venue` |  | ✓ | — |
-| GET | `/payment-provider` | `venue` |  | ✓ | — |
-| PUT | `/payment-provider/{provider}` | `venue` |  | ✓ | — |
-| POST | `/payment-provider/{provider}/disable` | `venue` |  | ✓ | — |
-| GET | `/product` | `menu.read` |  | ✓ | ✓ |
-| POST | `/product` | `venue` |  | ✓ | — |
-| DELETE | `/product/{id}` | `venue` |  | ✓ | — |
-| GET | `/product/{id}` | `menu.read` |  | ✓ | ✓ |
-| PUT | `/product/{id}` | `venue` |  | ✓ | — |
-| PATCH | `/product/{id}/activate` | `venue` |  | ✓ | — |
-| PATCH | `/product/{id}/images` | `venue` |  | ✓ | — |
-| DELETE | `/product/image/{id}` | `venue` |  | ✓ | — |
-| PATCH | `/product/index` | `venue` |  | ✓ | — |
-| GET | `/reports/couriers` | `reports` |  | ✓ | — |
-| GET | `/reports/external` | `reports` |  | ✓ | — |
-| GET | `/reports/problems` | `reports` |  | ✓ | — |
-| GET | `/shifts` | `shifts` |  | ✓ | ✓ |
-| GET | `/shifts/{id}` | `shifts` |  | ✓ | ✓ |
-| POST | `/shifts/{id}/close` | `shifts` |  | ✓ | ✓ |
-| POST | `/shifts/{id}/reconcile` | `shifts` |  | ✓ | ✓ |
-| DELETE | `/telegram-bot` | `venue` |  | ✓ | — |
-| GET | `/telegram-bot` | `venue` |  | ✓ | — |
-| PUT | `/telegram-bot` | `venue` |  | ✓ | — |
-| PUT | `/telegram-bot/profile` | `venue` |  | ✓ | — |
-| POST | `/telegram-bot/sync` | `venue` |  | ✓ | — |
-| POST | `/translation` | `venue` |  | ✓ | — |
-| DELETE | `/user/{id}` | `venue` |  | ✓ | — |
-| PUT | `/user/{id}` | `profile` |  | ✓ | ✓ |
-| GET | `/user/me` | `account` |  | ✓ | ✓ |
+| Метод | Путь | Право | Заведение в пути | Пароль | Владелец | Оператор |
+|---|---|---|---|---|---|---|
+| POST | `/additional-product` | `venue` |  |  | ✓ | — |
+| DELETE | `/additional-product/{id}` | `venue` |  |  | ✓ | — |
+| PUT | `/additional-product/{id}` | `venue` |  |  | ✓ | — |
+| POST | `/additional-product/group` | `venue` |  |  | ✓ | — |
+| DELETE | `/additional-product/group/{id}` | `venue` |  |  | ✓ | — |
+| PUT | `/additional-product/group/{id}` | `venue` |  |  | ✓ | — |
+| GET | `/application` | администратор платформы |  |  | — | — |
+| POST | `/auth/password/change` | `account` |  |  | ✓ | ✓ |
+| DELETE | `/auth/sessions` | `account` |  |  | ✓ | ✓ |
+| GET | `/auth/sessions` | `account` |  |  | ✓ | ✓ |
+| DELETE | `/auth/sessions/{id}` | `account` |  |  | ✓ | ✓ |
+| POST | `/auth/step-up` | `account` |  |  | ✓ | ✓ |
+| GET | `/branch` | `branches.read` |  |  | ✓ | ✓ |
+| POST | `/branch` | `venue` |  |  | ✓ | — |
+| DELETE | `/branch/{id}` | `venue` |  |  | ✓ | — |
+| PATCH | `/branch/{id}` | `venue` |  |  | ✓ | — |
+| GET | `/branch/{id}/delivery-pricing` | `venue` |  |  | ✓ | — |
+| PUT | `/branch/{id}/delivery-pricing` | `venue` |  |  | ✓ | — |
+| GET | `/branch/{id}/delivery-pricing/check` | `venue` |  |  | ✓ | — |
+| POST | `/branch/{id}/exceptions` | `venue` |  |  | ✓ | — |
+| DELETE | `/branch/{id}/exceptions/{exceptionId}` | `venue` |  |  | ✓ | — |
+| DELETE | `/branch/{id}/telegram-chat` | `venue` |  |  | ✓ | — |
+| POST | `/branch/{id}/telegram-chat/code` | `venue` |  |  | ✓ | — |
+| PUT | `/branch/{id}/working-hours` | `venue` |  |  | ✓ | — |
+| GET | `/category` | `menu.read` |  |  | ✓ | ✓ |
+| POST | `/category` | `venue` |  |  | ✓ | — |
+| DELETE | `/category/{id}` | `venue` |  |  | ✓ | — |
+| GET | `/category/{id}` | `menu.read` |  |  | ✓ | ✓ |
+| PUT | `/category/{id}` | `venue` |  |  | ✓ | — |
+| PATCH | `/category/{id}/activate` | `venue` |  |  | ✓ | — |
+| GET | `/category/for-select/{organizationId}` | `menu.read` | `organizationId` |  | ✓ | ✓ |
+| PATCH | `/category/index` | `venue` |  |  | ✓ | — |
+| GET | `/couriers` | `couriers` |  |  | ✓ | ✓ |
+| POST | `/couriers` | `couriers.manage` |  |  | ✓ | — |
+| PATCH | `/couriers/{id}` | `couriers.manage` |  |  | ✓ | — |
+| POST | `/couriers/{id}/disable` | `couriers.manage` |  |  | ✓ | — |
+| POST | `/couriers/{id}/invitation` | `couriers.manage` |  |  | ✓ | — |
+| PUT | `/couriers/{id}/pay-rate` | `venue` |  |  | ✓ | — |
+| GET | `/couriers/pay-rates` | `venue` |  |  | ✓ | — |
+| GET | `/external-services` | `orders` |  |  | ✓ | ✓ |
+| POST | `/file/upload` | `profile` |  |  | ✓ | ✓ |
+| DELETE | `/integrations/iiko` | `venue` |  | step-up | ✓ | — |
+| GET | `/integrations/iiko` | `venue` |  |  | ✓ | — |
+| POST | `/integrations/iiko/checks` | `venue` |  |  | ✓ | — |
+| PUT | `/integrations/iiko/couriers` | `venue` |  |  | ✓ | — |
+| GET | `/integrations/iiko/dictionaries` | `venue` |  |  | ✓ | — |
+| POST | `/integrations/iiko/enable` | `venue` |  |  | ✓ | — |
+| PUT | `/integrations/iiko/key` | `venue` |  | step-up | ✓ | — |
+| PUT | `/integrations/iiko/links` | `venue` |  |  | ✓ | — |
+| POST | `/integrations/iiko/menu/import` | `venue` |  |  | ✓ | — |
+| POST | `/integrations/iiko/menu/preview` | `venue` |  |  | ✓ | — |
+| POST | `/integrations/iiko/menu/rematch` | `venue` |  |  | ✓ | — |
+| PUT | `/integrations/iiko/organization` | `venue` |  |  | ✓ | — |
+| GET | `/integrations/iiko/organizations` | `venue` |  |  | ✓ | — |
+| GET | `/order` | `orders` |  |  | ✓ | ✓ |
+| GET | `/order-settings` | `venue` |  |  | ✓ | — |
+| PUT | `/order-settings` | `venue` |  |  | ✓ | — |
+| GET | `/order/{id}` | `orders` |  |  | ✓ | ✓ |
+| POST | `/order/{id}/accept` | `orders` |  |  | ✓ | ✓ |
+| POST | `/order/{id}/advance` | `orders` |  |  | ✓ | ✓ |
+| DELETE | `/order/{id}/courier` | `orders` |  |  | ✓ | ✓ |
+| PUT | `/order/{id}/courier` | `orders` |  |  | ✓ | ✓ |
+| POST | `/order/{id}/external` | `orders` |  |  | ✓ | ✓ |
+| POST | `/order/{id}/external-payment` | `orders` |  |  | ✓ | ✓ |
+| POST | `/order/{id}/pos/manual` | `orders` |  |  | ✓ | ✓ |
+| POST | `/order/{id}/pos/retry` | `orders` |  |  | ✓ | ✓ |
+| PUT | `/order/{id}/pos/street` | `orders` |  |  | ✓ | ✓ |
+| GET | `/order/{id}/pos/streets` | `orders` |  |  | ✓ | ✓ |
+| POST | `/order/{id}/reject` | `orders` |  |  | ✓ | ✓ |
+| POST | `/order/{id}/status` | `orders` |  |  | ✓ | ✓ |
+| DELETE | `/organization/{id}` | `venue` | `id` | step-up | ✓ | — |
+| GET | `/organization/{id}` | `venue` | `id` |  | ✓ | — |
+| PUT | `/organization/{id}` | `venue` | `id` |  | ✓ | — |
+| PUT | `/organization/{id}/channels` | `venue` | `id` |  | ✓ | — |
+| GET | `/organization/{id}/domains` | `venue` | `id` |  | ✓ | — |
+| POST | `/organization/{id}/domains` | `venue` | `id` |  | ✓ | — |
+| DELETE | `/organization/{id}/domains/{domainId}` | `venue` | `id` |  | ✓ | — |
+| POST | `/organization/{id}/domains/{domainId}/verify` | `venue` | `id` |  | ✓ | — |
+| GET | `/organization/{id}/publication` | `venue` | `id` |  | ✓ | — |
+| POST | `/organization/{id}/publish` | `venue` | `id` |  | ✓ | — |
+| GET | `/organization/{id}/settings` | `venue` | `id` |  | ✓ | — |
+| PUT | `/organization/{id}/settings` | `venue` | `id` |  | ✓ | — |
+| GET | `/organization/{id}/staff` | `staff` | `id` |  | ✓ | — |
+| POST | `/organization/{id}/staff` | `staff` | `id` |  | ✓ | — |
+| POST | `/organization/{id}/staff/{memberId}/disable` | `staff` | `id` |  | ✓ | — |
+| POST | `/organization/{id}/unpublish` | `venue` | `id` |  | ✓ | — |
+| POST | `/organization/check-slug` | `venue` |  |  | ✓ | — |
+| GET | `/payment-provider` | `venue` |  |  | ✓ | — |
+| PUT | `/payment-provider/{provider}` | `venue` |  | step-up | ✓ | — |
+| POST | `/payment-provider/{provider}/disable` | `venue` |  |  | ✓ | — |
+| GET | `/product` | `menu.read` |  |  | ✓ | ✓ |
+| POST | `/product` | `venue` |  |  | ✓ | — |
+| DELETE | `/product/{id}` | `venue` |  |  | ✓ | — |
+| GET | `/product/{id}` | `menu.read` |  |  | ✓ | ✓ |
+| PUT | `/product/{id}` | `venue` |  |  | ✓ | — |
+| PATCH | `/product/{id}/activate` | `venue` |  |  | ✓ | — |
+| PATCH | `/product/{id}/images` | `venue` |  |  | ✓ | — |
+| DELETE | `/product/image/{id}` | `venue` |  |  | ✓ | — |
+| PATCH | `/product/index` | `venue` |  |  | ✓ | — |
+| GET | `/reports/couriers` | `reports` |  |  | ✓ | — |
+| GET | `/reports/external` | `reports` |  |  | ✓ | — |
+| GET | `/reports/problems` | `reports` |  |  | ✓ | — |
+| GET | `/shifts` | `shifts` |  |  | ✓ | ✓ |
+| GET | `/shifts/{id}` | `shifts` |  |  | ✓ | ✓ |
+| POST | `/shifts/{id}/close` | `shifts` |  |  | ✓ | ✓ |
+| POST | `/shifts/{id}/reconcile` | `shifts` |  |  | ✓ | ✓ |
+| DELETE | `/telegram-bot` | `venue` |  | step-up | ✓ | — |
+| GET | `/telegram-bot` | `venue` |  |  | ✓ | — |
+| PUT | `/telegram-bot` | `venue` |  | step-up | ✓ | — |
+| PUT | `/telegram-bot/profile` | `venue` |  |  | ✓ | — |
+| POST | `/telegram-bot/sync` | `venue` |  |  | ✓ | — |
+| POST | `/translation` | `venue` |  |  | ✓ | — |
+| DELETE | `/user/{id}` | `venue` |  | step-up | ✓ | — |
+| PUT | `/user/{id}` | `profile` |  |  | ✓ | ✓ |
+| GET | `/user/me` | `account` |  |  | ✓ | ✓ |
 <!-- access-matrix:end -->
 
 ## Курьеры (владелец и оператор)
@@ -1032,6 +1070,27 @@ invalid_settings`, `fields: [{ field: "deliveryPayment", code: "delivery_payment
 провайдером: `GET /tenant/config` (`fulfillment.deliveryPaymentMethods`), `GET /checkout-config`
 (`paymentMethods.delivery`) и `POST /orders` (`422 payment_method_unavailable`). Самовывоз: наличные всегда, онлайн
 с ключами, карты курьеру нет. Гость при наличных может указать `cashChangeFrom` (с какой суммы сдача, не меньше суммы к оплате).
+
+## Чат филиала (владелец)
+
+Новые заказы, кнопки «Принять / Отклонить», напоминания и тревоги филиала платформенный бот пишет в группу филиала
+(`branch.telegram_chat_id`, в ответе `GET /branch`). Владелец этот id не вводит: `telegramChatId` в `POST /branch` и
+`PATCH /branch/{id}` → `400 validation_error`. Чат привязывается только из самой группы:
+
+1. `POST /branch/{id}/telegram-chat/code` (право `venue`) → 200 `{ code, expiresIn: 600, botUsername }`. Код из 8
+   символов (`A-Z` и `2-9` без `O`, `I`, `0`, `1`), действует 10 минут, у филиала один действующий код: новый гасит
+   прежний. В Redis только sha256 кода. `botUsername`: платформенный бот заказов (`null`, если Telegram не ответил).
+   Чужой филиал → `404 not_found`.
+2. Владелец добавляет бота в группу филиала и пишет там `/bind КОД` (или `/bind@<бот> КОД`). Вебхук
+   `POST /telegram/orders/webhook` принимает `message`: верный код → `telegram_chat_id` = id этой группы, код погашен,
+   бот отвечает «Чат привязан к филиалу «…»». Неверный, использованный или просроченный код: «Код неверный или устарел…»
+   без подробностей. Личный чат с ботом не привязывается. Не больше 5 команд `/bind` за 10 минут на чат, дальше бот
+   отвечает «Слишком много попыток…». Прочие сообщения бот не читает.
+3. `DELETE /branch/{id}/telegram-chat` → 204: чат отвязан, новые заказы туда не идут (уходят в эскалацию по SMS).
+
+Один чат можно привязать к нескольким филиалам. Повторная привязка заменяет чат филиала. `setWebhook` платформенного
+бота должен просить `allowed_updates: ["callback_query", "message"]` (`docs/BACKEND_ORDERS.md`). Кто именно в группе
+нажимает кнопки заказа, бот не проверяет: доступ к группе = доступ к заказам филиала.
 
 ## Каналы и публикация (владелец)
 

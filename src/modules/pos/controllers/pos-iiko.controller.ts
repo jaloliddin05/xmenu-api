@@ -31,6 +31,7 @@ import {
   PosStatusDto,
 } from '../dto/pos-iiko.dto';
 import { PosIntegrationService } from '../services/pos-integration.service';
+import { StepUp } from 'src/modules/auth/step-up/step-up.decorator';
 
 /**
  * Connecting the venue to iiko (owner only). Neither the key nor the webhook address is ever
@@ -50,6 +51,7 @@ export class PosIikoController {
   }
 
   @StaffAccess('venue')
+  @StepUp('iiko_key_changed')
   @Put('key')
   @ApiOperation({
     summary:
@@ -175,6 +177,7 @@ export class PosIikoController {
   }
 
   @StaffAccess('venue')
+  @StepUp('iiko_disconnected')
   @Delete()
   @ApiOperation({
     summary:

@@ -31,6 +31,7 @@ import {
 import { TelegramBotProfileService } from './telegram-bot-profile.service';
 import { TelegramBotService } from './telegram-bot.service';
 import { StaffAccess } from 'src/modules/auth/access/staff-access.decorator';
+import { StepUp } from 'src/modules/auth/step-up/step-up.decorator';
 
 type StaffRequest = Parameters<typeof requireStaffOrganizationId>[0];
 
@@ -57,6 +58,7 @@ export class TelegramBotController {
   }
 
   @StaffAccess('venue')
+  @StepUp('telegram_bot_changed')
   @Put()
   @ApiOperation({
     summary:
@@ -118,6 +120,7 @@ export class TelegramBotController {
   }
 
   @StaffAccess('venue')
+  @StepUp('telegram_bot_removed')
   @Delete()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({

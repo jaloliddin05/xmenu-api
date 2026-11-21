@@ -33,7 +33,7 @@ Env: см. `.env.example` (полный; тест сверяет его со с�
 `/translation` → `503 platform_misconfigured`, `feature: translation`), `NEXT_PUBLIC_URL` + `REVALIDATE_SECRET` (QR),
 `CLIENT_REVALIDATE_URL` + `CLIENT_REVALIDATE_SECRET` (сайт доставки), `DELIVERY_URL_TEMPLATE` (адрес Mini App для кнопки бота),
 `PLATFORM_DOMAIN` (`xmenu.uz`; в dev `localhost`), `DOMAIN_VERIFY_SKIP` (только dev), `DOMAIN_VERIFY_DNS_SERVERS` (DNS проверки доменов, фейк в e2e), `STAFF_REFRESH_TTL_DAYS`,
-`STAFF_SESSION_ABSOLUTE_DAYS`, `PUBLIC_POST_RATE_*`, `APPLICATION_RATE_*`, `TRANSLATION_IP_RATE_*` (лимиты по IP). Окончания строк LF (`.gitattributes`, `.editorconfig`).
+`STAFF_SESSION_ABSOLUTE_DAYS`, `STAFF_STEP_UP_SECRET` (step-up, в production ≥ 32 символа и не равен другим секретам), `PUBLIC_POST_RATE_*`, `APPLICATION_RATE_*`, `TRANSLATION_IP_RATE_*` (лимиты по IP). Окончания строк LF (`.gitattributes`, `.editorconfig`).
 
 ## Схема Prisma
 Не правь `prisma/schema.prisma` руками: он собирается из `src/modules/*/models/*.prisma` командой
@@ -389,6 +389,20 @@ App (`instant`) нового номера кладёт Telegram-id в `registrat
 - IP клиента: `trust proxy` из `TRUST_PROXY` (`infra/http/trust-proxy.ts`, по умолчанию `loopback`), прокси передаёт `X-Forwarded-For`.
 - Владение данными: организация из `requireStaffOrganizationId(req)`; меню проверяется фрагментами из
   `product/services/menu-ownership.ts`; чужой id в пути или в теле → 404. Новые эндпоинты админки делай так же.
+
+- Критичные действия владельца только со step-up: `@StepUp(action)` (`auth/step-up/step-up.decorator.ts`) на платёжных
+  ключах, боте заведения, ключе и отключении iiko, удалении заведения и аккаунта. `POST /auth/step-up { password }` →
+  токен на 5 минут (HS256, `STAFF_STEP_UP_SECRET`, `aud` `xmenu:step-up`, привязан к `sub` и `sid` входа; 5 неверных
+  паролей за 15 минут на пользователя, блокировку входа не трогает), заголовок `X-Step-Up-Token`. `StepUpGuard`
+  (глобальный, после `StaffAccessGuard`, в `main.ts` и `createHttpApp`) без токена → `403 step_up_required`.
+  `StepUpAuditInterceptor` после успеха пишет `staff_<action>` в `staff_auth_event` (без значений) и ставит SMS владельцу
+  в очередь `owner-notification` (`OwnerSecurityNotifier`, тексты `step-up/owner-security-texts.ts`). Новое критичное
+  действие: `@StepUp` и строка в `STEP_UP_EXPECTED` в `staff-access.matrix.spec.ts`; в HTTP-спеках токен даёт
+  `stepUpToken()` из `http-app.fake.ts`.
+- Чат филиала для заказов только привязкой (`BranchChatBindingService` в `order`): `POST /branch/:id/telegram-chat/code`
+  (код 8 символов, 10 минут, в Redis sha256, один на филиал), `/bind КОД` в группе платформенному боту
+  (`TelegramOrdersController` читает `message`, лимит 5 за 10 минут на чат), `DELETE /branch/:id/telegram-chat`.
+  `telegramChatId` в DTO филиала нет (лишнее поле → 400).
 
 ## Сотрудники и права
 Контракт и матрица маршрутов: `docs/API.md`, «Сотрудники и права».

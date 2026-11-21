@@ -20,6 +20,7 @@ import type { OnlineProvider } from '../services/payment-config.service';
 import { PaymentConfigService } from '../services/payment-config.service';
 import { StaffAccess } from 'src/modules/auth/access/staff-access.decorator';
 import { RevalidateService } from 'src/modules/revalidate-queue/revalidate.service';
+import { StepUp } from 'src/modules/auth/step-up/step-up.decorator';
 
 enum ProviderParam {
   click = 'click',
@@ -66,6 +67,7 @@ export class PaymentProviderController {
   }
 
   @StaffAccess('venue')
+  @StepUp('payment_keys_changed')
   @Put(':provider')
   @ApiOperation({
     summary: 'Provayder kalitlarini saqlash (shifrlanadi) va yoqish',

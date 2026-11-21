@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
 import { maskPhone } from 'src/infra/helper/auth/customer-validators';
 import type { RequestCtx } from './customer-auth-event.service';
+import type { StepUpAction } from '../step-up/step-up.decorator';
 
 export type StaffAuthEventType =
   | 'staff_otp_requested'
@@ -23,7 +24,11 @@ export type StaffAuthEventType =
   | 'staff_invited'
   | 'staff_invite_code_requested'
   | 'staff_invite_accepted'
-  | 'staff_disabled';
+  | 'staff_disabled'
+  | 'staff_step_up'
+  | 'staff_step_up_failed'
+  // Critical owner actions (@StepUp), meta: { action, provider? }
+  | `staff_${StepUpAction}`;
 
 /** Owner auth audit: DB row + structured log. Codes, passwords, tokens and full phones are never written. */
 @Injectable()

@@ -31,6 +31,7 @@ import {
 import { isValidSlug, SLUG_RULE } from './domain/slug';
 import { AppException } from 'src/infra/errors/app-exception';
 import { StaffAccess } from 'src/modules/auth/access/staff-access.decorator';
+import { StepUp } from 'src/modules/auth/step-up/step-up.decorator';
 
 @ApiTags('Organization')
 @Controller('organization')
@@ -125,6 +126,7 @@ export class OrganizationController {
   }
 
   @StaffAccess('venue', { orgParam: 'id' })
+  @StepUp('organization_deleted')
   @Delete(':id')
   @ApiOperation({ summary: 'Method: delete' })
   @HttpCode(HttpStatus.NO_CONTENT)
