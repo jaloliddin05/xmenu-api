@@ -125,6 +125,9 @@ export const ENV_SCHEMA: readonly EnvVarSpec[] = [
   // Per guest in one venue: order-limits.ts
   int('ORDER_ACTIVE_LIMIT_PER_CUSTOMER'),
   int('ORDER_HOURLY_LIMIT_PER_CUSTOMER'),
+  // Retention of personal data (modules/privacy/retention-cutoffs.ts)
+  int('ORDER_PII_RETENTION_DAYS'),
+  int('APPLICATION_RETENTION_DAYS'),
   // Payments
   { name: 'PAYMENT_CONFIG_KEY', kind: 'key32', required: 'production' },
   url('MINIAPP_RETURN_URL'),

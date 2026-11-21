@@ -86,6 +86,7 @@ const EXPECTED: Record<string, string> = {
   'PATCH /customers/me': 'public',
   'GET /customers/me/addresses': 'public',
   'POST /customers/me/addresses': 'public',
+  'DELETE /customers/me': 'public',
   'DELETE /customers/me/addresses/:id': 'public',
   'POST /customers/me/addresses/:id/default': 'public',
   'POST /csp-report': 'public',

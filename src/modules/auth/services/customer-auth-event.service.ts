@@ -40,7 +40,7 @@ export class CustomerAuthEventService {
     data: {
       tenantId?: string;
       customerId?: string;
-      phone?: string;
+      phone?: string | null;
       meta?: Record<string, unknown>;
     } = {},
   ): Promise<void> {

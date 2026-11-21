@@ -2477,6 +2477,48 @@
         "tags": [
           "Customers"
         ]
+      },
+      "delete": {
+        "description": "Removes the phone, name, Telegram id, addresses and sessions and anonymizes the guest data in past orders (sums, items, statuses and dates stay). Signing in with the same phone later creates a new guest.",
+        "operationId": "CustomerController_deleteMe",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Account deleted"
+          },
+          "409": {
+            "description": "has_active_orders: the guest has unfinished orders"
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Delete the guest account (anonymization)",
+        "tags": [
+          "Customers"
+        ]
       }
     },
     "/customers/me/addresses": {
@@ -7929,6 +7971,7 @@
           "shift_not_awaiting_reconciliation",
           "external_payment_not_pending",
           "courier_has_active_orders",
+          "has_active_orders",
           "delivery_unavailable_no_zone",
           "delivery_not_configured",
           "ordering_channel_disabled",
@@ -10529,11 +10572,15 @@
             "type": "string"
           },
           "name": {
-            "type": "string"
+            "type": "object",
+            "nullable": true,
+            "description": "null after anonymization"
           },
           "phone": {
-            "type": "string",
-            "example": "+998901234567"
+            "type": "object",
+            "example": "+998901234567",
+            "nullable": true,
+            "description": "null after anonymization"
           }
         },
         "required": [
@@ -10803,8 +10850,10 @@
             "description": "Delivery address snapshot (null for pickup)"
           },
           "phone": {
-            "type": "string",
-            "example": "+998901234567"
+            "type": "object",
+            "example": "+998901234567",
+            "nullable": true,
+            "description": "null after the guest data was anonymized"
           },
           "comment": {
             "type": "string"
@@ -11198,8 +11247,10 @@
             "description": "Delivery address snapshot (null for pickup)"
           },
           "phone": {
-            "type": "string",
-            "example": "+998901234567"
+            "type": "object",
+            "example": "+998901234567",
+            "nullable": true,
+            "description": "null after the guest data was anonymized"
           },
           "comment": {
             "type": "string"

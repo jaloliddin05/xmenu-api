@@ -82,7 +82,7 @@ export function buildRestaurantText(order: OrderWithItems): string {
     lines.push(`Доставка: ${fmtSum(order.delivery_fee)}`);
   lines.push(`<b>Итого: ${fmtSum(order.total)}</b>`);
   lines.push('');
-  lines.push(`📞 ${esc(order.phone)}`);
+  if (order.phone) lines.push(`📞 ${esc(order.phone)}`);
 
   const a = order.address_snapshot as {
     address?: string;

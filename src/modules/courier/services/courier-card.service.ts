@@ -187,7 +187,7 @@ type OrderRow = {
   courier_id: string | null;
   door_problem: 'no_answer' | 'refused' | null;
   door_problem_reason: string | null;
-  phone: string;
+  phone: string | null;
   comment: string | null;
   address_snapshot: unknown;
   total: number;

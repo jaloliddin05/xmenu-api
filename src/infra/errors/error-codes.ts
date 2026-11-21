@@ -383,6 +383,12 @@ export const ERROR_CODES = spec({
     when: 'Закрыть смену нельзя, пока на курьере есть незавершённые заказы; `details.activeOrders`',
     details: ['activeOrders'],
   },
+  has_active_orders: {
+    status: 409,
+    message: 'The guest has unfinished orders',
+    when: 'Удалить аккаунт гостя нельзя, пока есть незавершённые заказы (включая ожидающие оплаты); `details.activeOrders`',
+    details: ['activeOrders'],
+  },
   delivery_unavailable_no_zone: {
     status: 422,
     message: 'Delivery zone is not set',

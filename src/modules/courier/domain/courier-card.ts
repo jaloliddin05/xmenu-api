@@ -98,7 +98,7 @@ export interface CourierCardOrder {
   doorProblemReason: string | null;
   branch: { id: string; title: string; address: string };
   guestName: string | null;
-  phone: string;
+  phone: string | null;
   address: CourierCardAddress | null;
   comment: string | null;
   items: { name: string; quantity: number }[];
@@ -207,9 +207,8 @@ export function renderCourierCard(
   const map = mapLink(a);
   if (map) lines.push(`${t.map}: ${map}`);
 
-  lines.push(
-    `${t.guest}: ${order.guestName ? `${order.guestName}, ` : ''}${order.phone}`,
-  );
+  const guest = [order.guestName, order.phone].filter(Boolean).join(', ');
+  if (guest) lines.push(`${t.guest}: ${guest}`);
   if (order.comment) lines.push(`${t.comment}: ${order.comment}`);
 
   lines.push('');

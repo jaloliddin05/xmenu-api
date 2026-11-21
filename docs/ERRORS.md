@@ -74,6 +74,7 @@
 | `shift_not_awaiting_reconciliation` | 409 | Сверить наличные можно один раз и только у закончившейся смены (`awaiting_reconciliation`); `details.status` — статус смены сейчас | `details.status` |
 | `external_payment_not_pending` | 409 | Отметить оплату можно один раз и только у переданного внешней службе заказа с наличными | — |
 | `courier_has_active_orders` | 409 | Закрыть смену нельзя, пока на курьере есть незавершённые заказы; `details.activeOrders` | `details.activeOrders` |
+| `has_active_orders` | 409 | Удалить аккаунт гостя нельзя, пока есть незавершённые заказы (включая ожидающие оплаты); `details.activeOrders` | `details.activeOrders` |
 | ~~`delivery_unavailable_no_zone`~~ устарел → `delivery_not_configured` | 422 | У заведения не нарисована зона доставки | — |
 | `delivery_not_configured` | 422 | Ни у одного филиала с доставкой нет правил стоимости (зон или правила по расстоянию) | — |
 | `ordering_channel_disabled` | 422 | Канал «доставка» выключен (заказ или код входа гостю по SMS) | — |

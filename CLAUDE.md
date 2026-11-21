@@ -29,7 +29,7 @@ Env: см. `.env.example` (полный; тест сверяет его со с�
 них `platform_misconfigured`, `feature: pos`), `IIKO_API_BASE_URL` (`infra/iiko/iiko-api-url.ts`; фейк в тестах, в production
 только `https://` на хосте из `IIKO_OFFICIAL_API_HOSTS`), `IIKO_MENU_IMPORT_MINUTES` (интервал импорта меню, 30 по
 умолчанию), `IIKO_IMAGE_HOSTS` (хосты фото меню iiko, пусто = любой публичный), `OPS_CHAT_ID`, `ORDER_QUEUES`,
-`ORDER_ACTIVE_LIMIT_PER_CUSTOMER` + `ORDER_HOURLY_LIMIT_PER_CUSTOMER` (лимиты заказов гостя), `SMS_DAILY_LIMIT_PLATFORM` +
+`ORDER_ACTIVE_LIMIT_PER_CUSTOMER` + `ORDER_HOURLY_LIMIT_PER_CUSTOMER` (лимиты заказов гостя), `ORDER_PII_RETENTION_DAYS` + `APPLICATION_RETENTION_DAYS` (сроки хранения ПДн, по 365), `SMS_DAILY_LIMIT_PLATFORM` +
 `SMS_DAILY_LIMIT_TENANT` (суточные потолки SMS, в production обязательны), `SWAGGER_ENABLED`,
 `MINIAPP_URL`, `UPLOAD_MAX_BYTES`, `PLATFORM_ADMIN_USER_IDS`, `TRANSLATION_*`, `OPENAI_API_KEY` (необязателен: без него
 `/translation` → `503 platform_misconfigured`, `feature: translation`), `NEXT_PUBLIC_URL` + `REVALIDATE_SECRET` (QR),
@@ -52,7 +52,7 @@ Env: см. `.env.example` (полный; тест сверяет его со с�
 `sms` (провайдеры eskiz, telegram, console), `telegram` (боты заведений: `TelegramBotService`, `TelegramClient`,
 `/telegram-bot`), `tenant-domain` (свои домены заведения, `/organization/:id/domains`), `file`, `translation`, `application`,
 `health` (`GET /health`, `/health/ready`), `csp-report` (`POST /csp-report`, приёмник отчётов CSP фронтов, `docs/API.md`, «Отчёты CSP»), `revalidate-queue` (`RevalidateModule`: ревалидация QR-меню и сайта доставки, `docs/REVALIDATE.md`), `guest-login` (способы входа
-клиентов заведения: `GuestLoginService`), `pos` (интеграция с кассой iiko: подключение, меню, стоп-лист, вебхук, отправка заказов и статусы; раздел
+клиентов заведения: `GuestLoginService`), `privacy` (ежедневная очистка по срокам хранения, раздел «Персональные данные»), `pos` (интеграция с кассой iiko: подключение, меню, стоп-лист, вебхук, отправка заказов и статусы; раздел
 «Интеграция с кассой»).
 
 ## Контракт API
@@ -579,6 +579,21 @@ Asia/Tashkent. `SMS_PROVIDER` отдаёт `BudgetedSmsProvider` поверх в
 `POST /orders` в транзакции записи, под блокировкой строки заведения (`UPDATE … order_seq`): незавершённые заказы гостя
 не больше меньшего из `maxActiveOrders` заведения и `ORDER_ACTIVE_LIMIT_PER_CUSTOMER` (`429 too_many_active_orders`),
 заказы за последний час не больше `ORDER_HOURLY_LIMIT_PER_CUSTOMER` (`429 rate_limited`); `order/domain/order-limits.ts`.
+
+## Персональные данные
+Контракт: `docs/API.md`, «Удаление аккаунта гостя и сроки хранения»; факты для юриста: `../docs/PRIVACY-FACTS.md`.
+- Столбцы с ПДн гостя в заказе (`phone`, `comment`, `address_snapshot`, `guest_telegram_id`, `guest_telegram_bot_id`) и
+  в госте (`phone`, `name`, `telegram_id`, `language`) обнуляет один сервис `CustomerAnonymizerService`
+  (`customer/services/`): его зовут `DELETE /customers/me`, задача сроков и скрипт `npm run privacy:delete-guest`
+  (по умолчанию пробный запуск, `--apply` пишет). Состав, суммы, статусы и даты заказа остаются.
+- Ежедневная задача `privacy-retention` (`modules/privacy`, 03:00 `Asia/Tashkent`, `upsertJobScheduler` с `pattern` и
+  `tz`): завершённые заказы старше `ORDER_PII_RETENTION_DAYS`, `staff_auth_event` старше 90 дней, истёкшие
+  `staff_session` (7 дней), `application` старше `APPLICATION_RETENTION_DAYS`; пакетами, идемпотентно.
+- Правило: новое поле с ПДн = обезличивание в `CustomerAnonymizerService` (список `ORDER_PII_CLEARED`/`ORDER_HAS_PII`
+  или сервис гостя) **и** срок хранения в `privacy`, в том же PR. Читатели таких полей допускают `null`.
+- Отметку о согласии с политикой бэкенд не хранит (ждёт решения юриста).
+- `DELETE /organization/:id` удаляет заведение каскадом, вместе с заказами (проверено на PostgreSQL:
+  `organization-delete.db.spec.ts`).
 
 ## Лимиты публичных POST
 `PublicRateLimitGuard` (`infra/http/public-rate-limit.ts`, глобальный `APP_GUARD`): POST к `@Public()` маршрутам по IP через

@@ -79,7 +79,12 @@ export class OrderViewDto {
     description: 'Delivery address snapshot (null for pickup)',
   })
   address: Record<string, unknown> | null;
-  @ApiProperty({ example: '+998901234567' }) phone: string;
+  @ApiProperty({
+    example: '+998901234567',
+    nullable: true,
+    description: 'null after the guest data was anonymized',
+  })
+  phone: string | null;
   @ApiProperty() comment: string;
   @ApiProperty({ enum: PAYMENT_METHODS }) paymentMethod: string;
   @ApiProperty({
@@ -162,8 +167,14 @@ class OrderExternalDto {
 
 class OrderCustomerDto {
   @ApiProperty() id: string;
-  @ApiProperty() name: string;
-  @ApiProperty({ example: '+998901234567' }) phone: string;
+  @ApiProperty({ nullable: true, description: 'null after anonymization' })
+  name: string | null;
+  @ApiProperty({
+    example: '+998901234567',
+    nullable: true,
+    description: 'null after anonymization',
+  })
+  phone: string | null;
 }
 
 class OrderEventDto {

@@ -72,6 +72,19 @@ describe('courier card', () => {
       expect(text).toContain(part);
   });
 
+  it('an anonymized order (no phone, no guest name) prints no "null" and no empty guest line', () => {
+    const { text } = card({
+      status: 'on_the_way',
+      phone: null,
+      guestName: null,
+    });
+    expect(text).not.toContain('null');
+    expect(text).not.toContain('Гость');
+    const named = card({ phone: null }).text;
+    expect(named).toContain('Aziza');
+    expect(named).not.toContain('null');
+  });
+
   it('assigned, still cooking: the card without buttons', () => {
     expect(card({ status: 'accepted' }).keyboard).toBeNull();
   });
