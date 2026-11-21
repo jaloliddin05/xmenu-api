@@ -6,6 +6,9 @@ import { ConsoleSmsProvider } from './providers/console-sms.provider';
 import { EskizSmsProvider } from './providers/eskiz-sms.provider';
 import { TelegramSmsProvider } from './providers/telegram-sms.provider';
 import { Env, EnvIssues, isProduction } from 'src/config/env/env-issues';
+import { OpsNotifierService } from 'src/modules/order/notifications/ops-notifier.service';
+import { TelegramApiService } from 'src/modules/order/services/telegram-api.service';
+import { BudgetedSmsProvider, SmsBudgetService } from './sms-budget.service';
 
 export type SmsProviderName = 'eskiz' | 'telegram' | 'console';
 
@@ -89,21 +92,31 @@ export function smsEnvIssues(env: Env = process.env): EnvIssues {
     ConsoleSmsProvider,
     EskizSmsProvider,
     TelegramSmsProvider,
+    // Own instances for the budget alerts (stateless): OrderCoreModule imports this module, not the other way round
+    TelegramApiService,
+    OpsNotifierService,
+    SmsBudgetService,
     {
       provide: SMS_PROVIDER,
+      // Whatever the provider, every SMS goes through the daily ceilings (SmsBudgetService)
       useFactory: (
         c: ConsoleSmsProvider,
         e: EskizSmsProvider,
         t: TelegramSmsProvider,
+        budget: SmsBudgetService,
       ) => {
         const name = resolveSmsProviderName();
-        if (name === 'eskiz') return e;
-        if (name === 'telegram') return t;
-        return c;
+        const chosen = name === 'eskiz' ? e : name === 'telegram' ? t : c;
+        return new BudgetedSmsProvider(chosen, budget);
       },
-      inject: [ConsoleSmsProvider, EskizSmsProvider, TelegramSmsProvider],
+      inject: [
+        ConsoleSmsProvider,
+        EskizSmsProvider,
+        TelegramSmsProvider,
+        SmsBudgetService,
+      ],
     },
   ],
-  exports: [SMS_PROVIDER],
+  exports: [SMS_PROVIDER, SmsBudgetService],
 })
 export class SmsModule {}

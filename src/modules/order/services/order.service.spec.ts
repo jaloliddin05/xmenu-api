@@ -252,6 +252,8 @@ describe('OrderService.create: delivery price, payment and change', () => {
       opensAt: null,
     },
   ]);
+  // Unfinished and last-hour orders of the guest, as the transaction counts them
+  let counts = { active: 0, lastHour: 0 };
   const tx = {
     $queryRaw: jest.fn(async () => [{ order_seq: 7 }]),
     customer_order: {
@@ -259,6 +261,12 @@ describe('OrderService.create: delivery price, payment and change', () => {
         created = data;
         return { id: 'o1', ...data, items: [], branch: {} };
       }),
+      count: jest.fn(async ({ where }: { where: { status?: unknown } }) =>
+        where.status ? counts.active : counts.lastHour,
+      ),
+      findFirst: jest.fn(async () => ({
+        created_at: new Date(Date.now() - 50 * 60 * 1000),
+      })),
     },
     order_status_event: { create: jest.fn() },
   };
@@ -341,6 +349,7 @@ describe('OrderService.create: delivery price, payment and change', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     created = undefined;
+    counts = { active: 0, lastHour: 0 };
     settings = {
       minOrderPickup: 0,
       courierMode: 'own',
@@ -363,6 +372,54 @@ describe('OrderService.create: delivery price, payment and change', () => {
       cash_change_from: null,
     });
     expect(listActiveWithState).not.toHaveBeenCalled();
+  });
+
+  describe('per-guest limits (S-19)', () => {
+    const env = { ...process.env };
+    afterEach(() => {
+      process.env = { ...env };
+    });
+
+    it('five unfinished orders: the sixth is 429 too_many_active_orders, nothing written', async () => {
+      counts.active = 5;
+      const r = await run(order());
+      expect(r).toMatchObject({ code: 'too_many_active_orders', status: 429 });
+      expect(created).toBeUndefined();
+      counts.active = 4;
+      expect(await run(order())).toBeNull();
+    });
+
+    it('the platform ceiling wins over a looser venue setting', async () => {
+      process.env.ORDER_ACTIVE_LIMIT_PER_CUSTOMER = '2';
+      counts.active = 2;
+      expect((await run(order()))?.code).toBe('too_many_active_orders');
+    });
+
+    it('twenty orders in the last hour: 429 rate_limited until the oldest leaves the hour', async () => {
+      counts.lastHour = 20;
+      const r = await run(order());
+      expect(r).toMatchObject({ code: 'rate_limited', status: 429 });
+      // the oldest order is 50 minutes old: about 10 minutes to wait
+      expect(r?.body.retryAfter).toBeGreaterThan(590);
+      expect(r?.body.retryAfter).toBeLessThanOrEqual(600);
+      expect(created).toBeUndefined();
+      counts.lastHour = 19;
+      expect(await run(order())).toBeNull();
+    });
+
+    it('ORDER_HOURLY_LIMIT_PER_CUSTOMER sets the hourly ceiling', async () => {
+      process.env.ORDER_HOURLY_LIMIT_PER_CUSTOMER = '3';
+      counts.lastHour = 3;
+      expect((await run(order()))?.code).toBe('rate_limited');
+    });
+
+    it('the limits are counted inside the transaction, after the venue row is locked', async () => {
+      await run(order());
+      const lock = tx.$queryRaw.mock.invocationCallOrder[0];
+      const count = tx.customer_order.count.mock.invocationCallOrder[0];
+      expect(count).toBeGreaterThan(lock);
+      expect(prisma.customer_order.count).not.toHaveBeenCalled();
+    });
   });
 
   it('delivery: the branchId hint is ignored', async () => {

@@ -19,6 +19,8 @@ const prodOk = {
   SMS_PROVIDER: 'eskiz',
   ESKIZ_EMAIL: 'ops@xmenu.uz',
   ESKIZ_PASSWORD: 'p',
+  SMS_DAILY_LIMIT_PLATFORM: '2000',
+  SMS_DAILY_LIMIT_TENANT: '300',
   PUBLIC_API_URL: 'https://api.xmenu.uz',
   DELIVERY_URL_TEMPLATE: 'https://{slug}.xmenu.uz',
   PLATFORM_DOMAIN: 'xmenu.uz',
@@ -70,6 +72,9 @@ describe('validateEnv', () => {
     ['TELEGRAM_API_BASE_URL', 'http://fake:1', /TELEGRAM_API_BASE_URL/],
     ['IIKO_API_BASE_URL', 'http://fake:1', /IIKO_API_BASE_URL/],
     ['JWT_CUSTOMER_ACCESS_SECRET', 'short', /32 characters/],
+    ['JWT_ACCESS_TOKEN_SECRET', 'x'.repeat(31), /32 characters/],
+    ['SWAGGER_ENABLED', 'yes', /true or false/],
+    ['SMS_DAILY_LIMIT_TENANT', '0', /integer/],
     ['REVALIDATE_SECRET', '', /REVALIDATE_SECRET/],
   ])('production refuses %s=%s', (name, value, error) => {
     const report = validateEnv({ ...prodOk, [name]: value });
@@ -84,6 +89,8 @@ describe('validateEnv', () => {
     'PAYMENT_CONFIG_KEY',
     'JWT_ACCESS_TOKEN_SECRET',
     'ESKIZ_PASSWORD',
+    'SMS_DAILY_LIMIT_PLATFORM',
+    'SMS_DAILY_LIMIT_TENANT',
   ])('production requires %s', (name) => {
     const env: Record<string, string> = { ...prodOk };
     delete env[name];

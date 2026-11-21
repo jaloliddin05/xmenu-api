@@ -25,7 +25,10 @@ import { ProductService } from '../services/product.service';
 import { CreateProductDto } from '../dto/create-product.dto';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { OptionalBoolPipe } from 'src/infra/http/optional-bool.pipe';
-import { MulterStorage } from 'src/infra/helper/upload/multer-upload';
+import {
+  MulterStorage,
+  uploadLimits,
+} from 'src/infra/helper/upload/multer-upload';
 import MoveProductDto from '../dto/move-product.dto';
 import { UpdateProductDto } from '../dto/update-product.dto';
 import { UploadProductImagesDto } from '../dto/product-image.dot';
@@ -156,6 +159,7 @@ export class ProductController {
   @UseInterceptors(
     FileFieldsInterceptor([{ name: 'images', maxCount: 10 }], {
       storage: MulterStorage('uploads/image/products'),
+      limits: uploadLimits(10),
     }),
   )
   @HttpCode(HttpStatus.OK)

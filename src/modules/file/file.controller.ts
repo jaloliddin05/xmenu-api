@@ -9,7 +9,10 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { MulterStorage } from 'src/infra/helper/upload/multer-upload';
+import {
+  MulterStorage,
+  uploadLimits,
+} from 'src/infra/helper/upload/multer-upload';
 import { fieldError } from 'src/infra/validators/validation-errors';
 import { StaffAccess } from 'src/modules/auth/access/staff-access.decorator';
 
@@ -24,6 +27,7 @@ export class FileController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: MulterStorage('uploads/image/products'),
+      limits: uploadLimits(1),
     }),
   )
   @HttpCode(HttpStatus.OK)

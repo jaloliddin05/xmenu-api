@@ -11,6 +11,7 @@ import type { StaffRole } from 'src/modules/auth/access/permissions';
 import { AccessTokenUserStrategy } from 'src/modules/auth/passport-strategies/access-token-user/access-token-user.strategy';
 import { AuthService } from 'src/modules/auth/services/auth.service';
 import { StaffSessionService } from 'src/modules/auth/services/staff-session.service';
+import { STAFF_TOKEN } from 'src/modules/auth/jwt.service';
 import { StepUpGuard } from 'src/modules/auth/step-up/step-up.guard';
 import { StepUpTokenService } from 'src/modules/auth/step-up/step-up-token.service';
 import { StepUpAuditInterceptor } from 'src/modules/auth/step-up/step-up-audit.interceptor';
@@ -34,7 +35,10 @@ export function staffToken(
   secret = SECRET,
   sid = `sid-${userId}`,
 ): string {
-  return sign({ sub: userId, role: 'user', sid }, secret, { expiresIn: 60 });
+  return sign({ sub: userId, role: 'user', sid }, secret, {
+    expiresIn: 60,
+    ...STAFF_TOKEN,
+  });
 }
 
 /** X-Step-Up-Token for a staff user of createHttpApp() (same login as staffToken() unless `sid` is given). */

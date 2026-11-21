@@ -1,4 +1,5 @@
 import type { Job } from 'bullmq';
+import { AppException } from 'src/infra/errors/app-exception';
 import { EscalationProcessor } from './escalation.processor';
 import { ESCALATION_STEPS } from './order-queue.service';
 
@@ -13,6 +14,7 @@ function setup(status: string) {
         status,
         payment_expires_at: null,
         placed_at: new Date(),
+        organization_id: 'org-1',
       })),
     },
   };
@@ -41,6 +43,19 @@ function setup(status: string) {
 }
 
 describe('Escalation chain', () => {
+  it('over the daily SMS ceiling the branch SMS becomes an ops alert, the job does not fail', async () => {
+    const { run, ops, sms } = setup('pending_acceptance');
+    sms.send.mockRejectedValueOnce(new AppException('sms_limit'));
+    await expect(run('esc-sms')).resolves.toBeUndefined();
+    expect(ops.alert).toHaveBeenCalledWith(expect.stringContaining('№1001'));
+  });
+
+  it('another SMS failure still fails the job (retried by the queue)', async () => {
+    const { run, sms } = setup('pending_acceptance');
+    sms.send.mockRejectedValueOnce(new Error('provider down'));
+    await expect(run('esc-sms')).rejects.toThrow('provider down');
+  });
+
   it('is 45 s Telegram ping, 120 s SMS; auto-cancel comes from the acceptance timeout', () => {
     expect(ESCALATION_STEPS).toEqual([
       { name: 'ping', afterSeconds: 45 },
@@ -64,7 +79,10 @@ describe('Escalation chain', () => {
     await run('esc-sms');
     await run('esc-cancel');
     expect(restaurant.ping).toHaveBeenCalledWith(ORDER_ID, 1);
-    expect(sms.send).toHaveBeenCalledWith('+998901234567', expect.any(String));
+    // counted towards the venue's daily SMS ceiling
+    expect(sms.send).toHaveBeenCalledWith('+998901234567', expect.any(String), {
+      tenantId: 'org-1',
+    });
     expect(transitions.transition).toHaveBeenCalledWith(
       expect.objectContaining({
         orderId: ORDER_ID,

@@ -5,6 +5,12 @@ import {
   FieldErrorDto,
 } from './infra/errors/error-response.dto';
 import { collectRoutes, openApiPath } from './modules/auth/access/route-rules';
+import { Env, isProduction } from './config/env/env-issues';
+
+/** Whether /docs is served: always outside production, in production only with SWAGGER_ENABLED=true. */
+export function swaggerEnabled(env: Env = process.env): boolean {
+  return !isProduction(env) || env.SWAGGER_ENABLED === 'true';
+}
 
 const ERROR_RESPONSE = {
   description: 'Error: one shape for every endpoint (docs/ERRORS.md)',

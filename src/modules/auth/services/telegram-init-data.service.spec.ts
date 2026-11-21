@@ -27,7 +27,7 @@ function signed(
 
 function service(token: string | null) {
   const bots = { initDataToken: jest.fn(async () => token) };
-  const cfg = { telegramInitDataMaxAgeSeconds: 86400 } as CustomerAuthConfig;
+  const cfg = { telegramInitDataMaxAgeSeconds: 3600 } as CustomerAuthConfig;
   return new TelegramInitDataService(cfg, bots as any);
 }
 
@@ -44,13 +44,33 @@ describe('TelegramInitDataService.verifyForTenant', () => {
     ).rejects.toMatchObject({ code: 'invalid_telegram_data' });
   });
 
-  it('rejects stale initData', async () => {
-    const old = Math.floor(Date.now() / 1000) - 86401;
-    await expect(
-      service(VENUE_TOKEN).verifyForTenant(
-        't1',
-        signed(VENUE_TOKEN, { id: 555 }, old),
+  const at = (offsetSeconds: number) =>
+    service(VENUE_TOKEN).verifyForTenant(
+      't1',
+      signed(
+        VENUE_TOKEN,
+        { id: 555 },
+        Math.floor(Date.now() / 1000) + offsetSeconds,
       ),
-    ).rejects.toMatchObject({ code: 'invalid_telegram_data' });
+    );
+
+  it('rejects stale initData', async () => {
+    await expect(at(-86401)).rejects.toMatchObject({
+      code: 'invalid_telegram_data',
+    });
+  });
+
+  it('accepts initData within the hour and refuses it after', async () => {
+    await expect(at(-3590)).resolves.toMatchObject({ id: 555 });
+    await expect(at(-3610)).rejects.toMatchObject({
+      code: 'invalid_telegram_data',
+    });
+  });
+
+  it('refuses auth_date more than 60 s in the future, tolerates clock skew below that', async () => {
+    await expect(at(30)).resolves.toMatchObject({ id: 555 });
+    await expect(at(90)).rejects.toMatchObject({
+      code: 'invalid_telegram_data',
+    });
   });
 });

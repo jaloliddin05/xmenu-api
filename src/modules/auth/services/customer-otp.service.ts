@@ -13,6 +13,7 @@ import {
 } from 'src/infra/errors/app-exception';
 import type { Lang } from 'src/infra/http/request-helpers';
 import { isSmsConfigured } from 'src/modules/sms/sms.module';
+import { smsBrand } from './sms-brand';
 
 const SEND_TIMEOUT_MS = 5000;
 
@@ -104,8 +105,9 @@ export class CustomerOtpService {
     lang: Lang = tenant.defaultLanguage ?? 'ru',
     purpose?: string,
   ): Promise<number> {
+    // The venue name reaches the SMS only cleaned (smsBrand): never free text from the platform's sender
     return this.requestWith(tenant, phone, ip, scope, purpose, (code) =>
-      SMS_TEXT[scope][lang](tenant.brandName, code),
+      SMS_TEXT[scope][lang](smsBrand(tenant.brandName), code),
     );
   }
 
@@ -142,7 +144,11 @@ export class CustomerOtpService {
       ip,
       scope,
       purpose,
-      deliver: (code) => this.sms.send(phone, textFor(code)),
+      // A guest code counts towards the venue's daily SMS ceiling; owner codes only towards the platform's
+      deliver: (code) =>
+        this.sms.send(phone, textFor(code), {
+          tenantId: scope === 'customer' ? tenant.id : undefined,
+        }),
     });
   }
 
@@ -224,9 +230,11 @@ export class CustomerOtpService {
             ).unref(),
           ),
         ]);
-      } catch {
+      } catch (err) {
         await this.redis.del(key);
         await this.rateLimit.rollback(rules);
+        // The daily SMS ceiling is its own answer (429, retryAfter), not a provider failure
+        if (err instanceof AppException && err.code === 'sms_limit') throw err;
         throw new AppException(opts.unavailableCode ?? 'sms_unavailable', {
           message: 'Code delivery unavailable',
         });

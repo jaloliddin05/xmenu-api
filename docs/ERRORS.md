@@ -16,7 +16,7 @@
 | `not_found` | 404 | Ресурс не найден или принадлежит другому заведению; неизвестный маршрут | — |
 | `payload_too_large` | 413 | Файл или тело больше лимита | `details.maxBytes` |
 | `unsupported_media_type` | 415 | Неподдерживаемый `Content-Type` | — |
-| `rate_limited` | 429 | Превышен лимит запросов (по IP, номеру или пользователю) | `retryAfter` |
+| `rate_limited` | 429 | Превышен лимит запросов (по IP, номеру или пользователю; заказов гостя за час) | `retryAfter` |
 | `internal_error` | 500 | Непредвиденная ошибка сервера; подробности только в логе по `requestId` | — |
 | `unavailable` | 503 | Временный сбой (очередь, база); повторить позже | — |
 | `platform_misconfigured` | 503 | Функция выключена настройкой платформы (не заведения); `details.feature`: `telegram_bot`, `delivery_link`, `sms`, `domains`, `payments`, `translation`, `order_notifications`, `pos` | `details.feature` |
@@ -38,6 +38,7 @@
 | `invalid_token` | 401 | Access-токен клиента неверен или сессия отозвана | — |
 | `customer_blocked` | 403 | Клиент заблокирован заведением | — |
 | `sms_unavailable` | 503 | Провайдер SMS не ответил или отказал; лимиты отправки откатываются | — |
+| `sms_limit` | 429 | Исчерпан суточный лимит SMS платформы или заведения; `retryAfter` до полуночи по Ташкенту | `retryAfter` |
 | `telegram_unavailable` | 503 | У заведения нет бота или бот не смог доставить код; предложить SMS | — |
 | `invalid_telegram_data` | 401 | `initData` Mini App не прошла проверку подписи или устарела | — |
 | `invalid_credentials` | 401 | Вход владельца: неверный телефон или пароль (ответ одинаковый) | — |
@@ -75,8 +76,8 @@
 | `courier_has_active_orders` | 409 | Закрыть смену нельзя, пока на курьере есть незавершённые заказы; `details.activeOrders` | `details.activeOrders` |
 | ~~`delivery_unavailable_no_zone`~~ устарел → `delivery_not_configured` | 422 | У заведения не нарисована зона доставки | — |
 | `delivery_not_configured` | 422 | Ни у одного филиала с доставкой нет правил стоимости (зон или правила по расстоянию) | — |
-| `ordering_channel_disabled` | 422 | Канал «доставка» выключен | — |
-| `ordering_not_published` | 422 | Канал включён, но не опубликован | — |
+| `ordering_channel_disabled` | 422 | Канал «доставка» выключен (заказ или код входа гостю по SMS) | — |
+| `ordering_not_published` | 422 | Канал включён, но не опубликован (заказ или код входа гостю по SMS) | — |
 | `settings_missing` | 500 | Нет строки настроек заведения (ошибка данных, не клиента) | — |
 | `invalid_settings` | 400 | Настройки заведения противоречат друг другу; поля в `fields` | `fields` |
 | `invalid_slug` | 400 | Slug не по правилам (формат, UUID, зарезервирован) | — |

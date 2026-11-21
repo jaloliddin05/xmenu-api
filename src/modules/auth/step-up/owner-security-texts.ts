@@ -1,11 +1,13 @@
 import type { StepUpAction } from './step-up.decorator';
+import {
+  SMS_BRAND_FALLBACK,
+  smsBrand,
+} from 'src/modules/auth/services/sms-brand';
 
-const NAME_MAX = 40;
-
-/** Venue name as it goes into the SMS: one line, at most 40 characters. */
+/** Venue name as it goes into the SMS: the same cleaning as every SMS (smsBrand); a name it refuses is left out. */
 export function smsVenueName(name: string | null | undefined): string {
-  const flat = (name ?? '').replace(/\s+/g, ' ').trim();
-  return flat.length > NAME_MAX ? `${flat.slice(0, NAME_MAX - 1)}…` : flat;
+  const brand = smsBrand(name);
+  return brand === SMS_BRAND_FALLBACK ? '' : brand;
 }
 
 const PROVIDER_NAMES: Record<string, string> = {

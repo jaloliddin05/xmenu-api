@@ -48,6 +48,7 @@ function setup(cfg = staffTestConfig) {
     { revokeAllForUser: jest.fn() } as any,
     deps.sms,
     cfg,
+    deps.smsBudget,
   );
   const addOwner = (phone: string) =>
     deps.db.user.create({ data: { phone, isActive: true, password: 'x' } });

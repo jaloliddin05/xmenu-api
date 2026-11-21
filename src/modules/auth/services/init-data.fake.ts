@@ -5,7 +5,7 @@ import { TelegramInitDataService } from './telegram-init-data.service';
 
 export const VENUE_BOT_TOKEN = '111111:venue-token';
 export const OTHER_BOT_TOKEN = '333333:other-token';
-export const INIT_DATA_MAX_AGE = 86400;
+export const INIT_DATA_MAX_AGE = 3600;
 
 /** Signs initData the way Telegram does for a Mini App opened from the bot with `token`. */
 export function signInitData(

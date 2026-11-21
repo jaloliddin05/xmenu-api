@@ -7,6 +7,8 @@ import type { CustomerAuthConfig } from '../customer-auth.config';
 import { CustomerOtpService } from './customer-otp.service';
 import { RateLimitService } from './rate-limit.service';
 import { StaffAuthEventService } from './staff-auth-event.service';
+import { SmsBudgetService } from 'src/modules/sms/sms-budget.service';
+import type { OpsNotifierService } from 'src/modules/order/notifications/ops-notifier.service';
 import { StaffLoginThrottleService } from './staff-login-throttle.service';
 
 export const staffTestConfig = {
@@ -296,6 +298,13 @@ export function makeStaffAuthDeps(cfg: CustomerAuthConfig = staffTestConfig) {
   const otp = new CustomerOtpService(r, cfg, sms, rateLimit);
   const events = new StaffAuthEventService(db as any);
   const throttle = new StaffLoginThrottleService(r);
+  // The real ceilings on the fake Redis; alerts are only recorded
+  const opsAlerts: string[] = [];
+  const smsBudget = new SmsBudgetService(r, {
+    alert: async (text: string) => {
+      opsAlerts.push(text);
+    },
+  } as unknown as OpsNotifierService);
   return {
     redis,
     sms,
@@ -305,6 +314,8 @@ export function makeStaffAuthDeps(cfg: CustomerAuthConfig = staffTestConfig) {
     otp,
     events,
     throttle,
+    smsBudget,
+    opsAlerts,
     organizations: new FakeOrganizations(db),
     sessions: new FakeStaffSessions(),
   };

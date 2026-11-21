@@ -182,10 +182,12 @@ describe('owner security SMS texts', () => {
     }
   });
 
-  it('the venue name is one line of at most 40 characters', () => {
+  it('the venue name is cleaned like in every SMS: one line, at most 30 characters, no links or phones', () => {
     expect(smsVenueName('  Mant\n  Chilonzor  ')).toBe('Mant Chilonzor');
     const long = smsVenueName('x'.repeat(100));
-    expect(long).toHaveLength(40);
+    expect(long).toHaveLength(30);
     expect(smsVenueName(null)).toBe('');
+    expect(smsVenueName('Звоните +998 90 123 45 67')).toBe('');
+    expect(smsVenueName('pay.example.com')).toBe('');
   });
 });

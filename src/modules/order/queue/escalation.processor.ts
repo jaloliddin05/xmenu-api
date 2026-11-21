@@ -11,6 +11,7 @@ import { bullConnection } from 'src/infra/redis/bull-connection';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
 import { SMS_PROVIDER } from 'src/modules/sms/providers/sms-provider.interface';
 import type { SmsProvider } from 'src/modules/sms/providers/sms-provider.interface';
+import { AppException } from 'src/infra/errors/app-exception';
 import { OpsNotifierService } from '../notifications/ops-notifier.service';
 import { RestaurantNotifierService } from '../notifications/restaurant-notifier.service';
 import {
@@ -75,6 +76,7 @@ export class EscalationProcessor implements OnModuleInit, OnModuleDestroy {
         status: true,
         payment_expires_at: true,
         placed_at: true,
+        organization_id: true,
       },
     });
     if (!order) return;
@@ -107,10 +109,20 @@ export class EscalationProcessor implements OnModuleInit, OnModuleDestroy {
         if (order.status !== 'pending_acceptance') return;
         const info = await this.restaurant.branchPhone(orderId);
         if (info?.phone) {
-          await this.sms.send(
-            info.phone,
-            `Xmenu: buyurtma №${info.number} tasdiqlanishini kutmoqda! Telegram guruhini oching.`,
-          );
+          try {
+            await this.sms.send(
+              info.phone,
+              `Xmenu: buyurtma №${info.number} tasdiqlanishini kutmoqda! Telegram guruhini oching.`,
+              { tenantId: order.organization_id },
+            );
+          } catch (err) {
+            // Over the daily SMS ceiling: no retries, the ops chat already knows and gets the order
+            if (!(err instanceof AppException && err.code === 'sms_limit'))
+              throw err;
+            await this.ops.alert(
+              `Заказ №${order.number}: нет подтверждения, SMS филиалу не отправлено (суточный лимит SMS)`,
+            );
+          }
         } else {
           await this.ops.alert(
             `Заказ №${order.number}: нет подтверждения, у филиала нет телефона для SMS`,

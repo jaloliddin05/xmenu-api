@@ -207,7 +207,7 @@ export class StaffAuthService {
         ttlSeconds: LOGIN_IP_WINDOW_SECONDS,
       },
     ]);
-    await this.throttle.assertNotLocked(phone);
+    await this.throttle.assertNotLocked(phone, ctx.ip);
 
     const user = isValidPhone(phone)
       ? await this.prisma.user.findUnique({
@@ -222,7 +222,7 @@ export class StaffAuthService {
     );
 
     if (!hash || !matches) {
-      const lockedFor = await this.throttle.registerFailure(phone);
+      const lockedFor = await this.throttle.registerFailure(phone, ctx.ip);
       await this.events.log('staff_login_failed', ctx, {
         phone,
         userId: user?.id,
@@ -239,7 +239,7 @@ export class StaffAuthService {
       });
     }
 
-    await this.throttle.reset(phone);
+    await this.throttle.clearPair(phone, ctx.ip);
     await this.events.log('staff_login', ctx, {
       userId: user!.id,
       organizationId: user!.membership?.organization_id,

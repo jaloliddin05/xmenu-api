@@ -16,7 +16,10 @@ import { UserService } from './user.service';
 import { UpdateUserDto } from './dto';
 import { ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { MulterStorage } from 'src/infra/helper/upload/multer-upload';
+import {
+  MulterStorage,
+  uploadLimits,
+} from 'src/infra/helper/upload/multer-upload';
 import { FileUploadValidationForOptional } from 'src/infra/validators/file-upload-validation-update';
 import { AppException } from 'src/infra/errors/app-exception';
 import { StaffAccess } from 'src/modules/auth/access/staff-access.decorator';
@@ -52,6 +55,7 @@ export class UserController {
   @UseInterceptors(
     FileInterceptor('avatar', {
       storage: MulterStorage('uploads/image/profile'),
+      limits: uploadLimits(1),
     }),
   )
   @HttpCode(HttpStatus.OK)

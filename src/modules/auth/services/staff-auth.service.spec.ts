@@ -447,6 +447,18 @@ describe('StaffAuthService (signup)', () => {
       ).resolves.toHaveProperty('accessToken');
     });
 
+    it('a stranger guessing from another IP locks only that IP, not the owner', async () => {
+      await seedOwner();
+      for (let i = 0; i < LOGIN_FAILS_BEFORE_LOCK; i++)
+        await failure(PHONE, 'nope', '198.51.100.7');
+      expect((await failure(PHONE, PASSWORD, '198.51.100.7')).code).toBe(
+        'too_many_attempts',
+      );
+      await expect(
+        service.login({ login: PHONE, password: PASSWORD }, CTX),
+      ).resolves.toHaveProperty('accessToken');
+    });
+
     it('locks an unknown phone the same way', async () => {
       for (let i = 0; i < LOGIN_FAILS_BEFORE_LOCK; i++)
         await failure('+998909999999', 'nope');

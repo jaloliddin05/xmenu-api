@@ -7893,6 +7893,7 @@
           "invalid_token",
           "customer_blocked",
           "sms_unavailable",
+          "sms_limit",
           "telegram_unavailable",
           "invalid_telegram_data",
           "invalid_credentials",

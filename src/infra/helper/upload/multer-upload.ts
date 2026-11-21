@@ -18,6 +18,22 @@ export const uploadMaxBytes = (): number => {
   return Number.isFinite(n) && n > 0 ? n : DEFAULT_MAX_BYTES;
 };
 
+const MAX_FIELDS = 20;
+const MAX_FIELD_BYTES = 64 * 1024;
+
+/**
+ * Multer limits of an upload route with `files` files at most: each file within UPLOAD_MAX_BYTES, a bounded number of
+ * text fields of bounded size and of parts in all, so one request cannot hold the memory of the API. Over a limit:
+ * 413 payload_too_large for the file size, 400 bad_request for the counts (the framework maps multer's errors).
+ */
+export const uploadLimits = (files: number) => ({
+  files,
+  fileSize: uploadMaxBytes(),
+  fields: MAX_FIELDS,
+  fieldSize: MAX_FIELD_BYTES,
+  parts: files + MAX_FIELDS,
+});
+
 /** Image type by magic bytes (never by the client's extension or MIME). SVG is deliberately not allowed. */
 export function detectImageExt(
   b: Buffer,

@@ -22,6 +22,7 @@ import type {
   StaffInvitationCodeDto,
 } from '../dto/staff-invitation.dto';
 import type { RequestCtx } from './customer-auth-event.service';
+import { SmsBudgetService } from 'src/modules/sms/sms-budget.service';
 import { CustomerOtpService, SMS_TEXT } from './customer-otp.service';
 import { RateLimitService } from './rate-limit.service';
 import { StaffAuthEventService } from './staff-auth-event.service';
@@ -60,6 +61,7 @@ export class StaffInvitationService {
     private readonly sessions: StaffSessionService,
     @Inject(SMS_PROVIDER) private readonly sms: SmsProvider,
     @Inject(CUSTOMER_AUTH_CONFIG) private readonly cfg: CustomerAuthConfig,
+    private readonly smsBudget: SmsBudgetService,
   ) {}
 
   // ================= POST /auth/invitation/code =================
@@ -72,6 +74,9 @@ export class StaffInvitationService {
         'sms',
         'the SMS provider (SMS_PROVIDER) lacks its credentials',
       );
+
+    // The SMS below is not awaited, so the daily ceiling is checked here, for any phone alike (same answer)
+    await this.smsBudget.assertAvailable();
 
     const invitation = await this.findAcceptable(phone);
     const resendAfter = await this.otp.issue(
