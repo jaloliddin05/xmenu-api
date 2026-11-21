@@ -1,7 +1,7 @@
 import { NestFactory, Reflector } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { SwaggerModule } from '@nestjs/swagger';
-import { createOpenApiDocument } from './swagger';
+import { createOpenApiDocument, swaggerEnabled } from './swagger';
 import { AppModule } from './app.module';
 import { configureStatic } from './infra/http/static-assets';
 import { configureErrorHandling } from './infra/errors/configure';
@@ -57,6 +57,13 @@ async function bootstrap() {
     new StepUpAuditInterceptor(reflector, app.get(OwnerSecurityNotifier)),
   );
 
+  // The contract lives in the repository (docs/openapi.json); production serves /docs only on request
+  if (swaggerEnabled()) setupSwagger(app);
+
+  await app.listen(process.env.PORT || 4000);
+}
+
+function setupSwagger(app: NestExpressApplication) {
   const document = createOpenApiDocument(app);
   SwaggerModule.setup('docs', app, document, {
     swaggerOptions: {
@@ -76,7 +83,5 @@ async function bootstrap() {
       },
     },
   });
-
-  await app.listen(process.env.PORT || 4000);
 }
 void bootstrap();

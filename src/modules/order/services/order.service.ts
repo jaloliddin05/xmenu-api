@@ -37,6 +37,12 @@ import { OrderWithItems, toOrderView } from './order-view';
 import { orderSource } from '../notifications/guest-notification';
 import { AppException } from 'src/infra/errors/app-exception';
 import { isPosLive } from 'src/modules/pos/domain/pos-steps';
+import {
+  activeOrderLimit,
+  customerOrderLimits,
+  HOURLY_WINDOW_SECONDS,
+  hourlyRetryAfter,
+} from '../domain/order-limits';
 
 export const ORDER_INCLUDE = {
   items: { include: { options: true } },
@@ -61,6 +67,42 @@ export class OrderService {
   ) {}
 
   // ------------------------------------------------------------------ create
+
+  /**
+   * One guest in one venue (customer rows are per venue): at most activeOrderLimit unfinished orders (429
+   * too_many_active_orders) and ORDER_HOURLY_LIMIT_PER_CUSTOMER placed in the last hour (429 rate_limited, retryAfter
+   * until the oldest of them leaves the hour). Audit S-19.
+   */
+  private async assertCustomerLimits(
+    tx: Prisma.TransactionClient,
+    customerId: string,
+    venueMaxActive: number,
+    now: number,
+  ): Promise<void> {
+    const active = await tx.customer_order.count({
+      where: { customer_id: customerId, status: { in: [...ACTIVE_STATUSES] } },
+    });
+    if (active >= activeOrderLimit(venueMaxActive)) {
+      throw new AppException('too_many_active_orders', {
+        message: 'Too many active orders',
+        retryAfter: 60,
+      });
+    }
+    const since = new Date(now - HOURLY_WINDOW_SECONDS * 1000);
+    const recent = { customer_id: customerId, created_at: { gte: since } };
+    const lastHour = await tx.customer_order.count({ where: recent });
+    if (lastHour >= customerOrderLimits().hourly) {
+      const oldest = await tx.customer_order.findFirst({
+        where: recent,
+        orderBy: { created_at: 'asc' },
+        select: { created_at: true },
+      });
+      throw new AppException('rate_limited', {
+        message: 'Too many orders in the last hour',
+        retryAfter: oldest ? hourlyRetryAfter(oldest.created_at, now) : 60,
+      });
+    }
+  }
 
   /**
    * POST /orders. Tartib: takror so'rovmi? → mijoz → kanal va nashr → narxlash (bazadan) → filial: olib
@@ -245,16 +287,7 @@ export class OrderService {
       });
     }
 
-    // 8. Suiiste'moldan himoya
-    const active = await this.prisma.customer_order.count({
-      where: { customer_id: customerId, status: { in: [...ACTIVE_STATUSES] } },
-    });
-    if (active >= settings.maxActiveOrders) {
-      throw new AppException('too_many_active_orders', {
-        message: 'Too many active orders',
-        retryAfter: 60,
-      });
-    }
+    // 8. Suiiste'moldan himoya: the per-guest limits are checked in the transaction below, under the venue row lock
 
     // 9. Yozish
     const now = Date.now();
@@ -272,6 +305,13 @@ export class OrderService {
           { order_seq: number }[]
         >`
           UPDATE organization SET order_seq = order_seq + 1 WHERE id = ${organizationId} RETURNING order_seq`;
+        // The UPDATE above locks the venue row: parallel orders of one guest are counted one after another
+        await this.assertCustomerLimits(
+          tx,
+          customerId,
+          settings.maxActiveOrders,
+          now,
+        );
 
         const created = await tx.customer_order.create({
           data: {

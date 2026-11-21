@@ -78,8 +78,13 @@ Webhook'и Click/Payme переводят заказ `awaiting_payment → pendi
 и публикация заведения → режим доставки (Mini App) → расчёт по БД (`item_unavailable`, `invalid_modifiers`,
 `invalid_order`) → филиал: самовывоз — выбранный и его часы, доставка — адрес и выбор филиала с ценой → способ оплаты
 (не из `paymentMethods` выбранного режима → `payment_method_unavailable`) → `cashChangeFrom` →
-`delivery_fee_changed` → `price_changed` → `min_order_not_reached` → лимит активных заказов. Первая найденная проблема
-возвращается сразу.
+`delivery_fee_changed` → `price_changed` → `min_order_not_reached` → лимиты гостя (в транзакции записи, под блокировкой
+строки заведения: незавершённые заказы, затем заказы за час). Первая найденная проблема возвращается сразу.
+
+* **Лимиты гостя в заведении.** Незавершённых заказов не больше меньшего из `maxActiveOrders` заведения и
+  `ORDER_ACTIVE_LIMIT_PER_CUSTOMER` платформы → иначе `429 too_many_active_orders`; заказов за последний час не больше
+  `ORDER_HOURLY_LIMIT_PER_CUSTOMER` → иначе `429 rate_limited`, `retryAfter` до выхода самого старого из них из часа.
+  Повтор уже созданного заказа (тот же `Idempotency-Key`) не считается.
 
 * **Канал и публикация.** Заказ (доставка и самовывоз) принимается, только если владелец
   включил канал заказов и опубликовал заведение (`API.md`, «Каналы и публикация»). Канал
@@ -197,6 +202,7 @@ cash ─────────────────────▶ pending_
 | 403 | `miniapp_init_data_invalid` | — | переоткрыть Mini App (данные Telegram устарели или чужие) |
 | 503 | `telegram_unavailable` | — | режим Mini App без бота заведения: заказы недоступны |
 | 429 | `too_many_active_orders` | `retryAfter` | сообщение |
+| 429 | `rate_limited` | `retryAfter` | слишком много заказов за час, повторить позже |
 | 422 | `invalid_modifiers` | `{ items: [{ index, itemId, reason, groupId? }] }` (`reason`: `missing_required`, `below_min`, `above_max`, `unknown_group`, `unknown_option`, `duplicate_group`, `duplicate_option`) | строки помечаются, «Убрать» |
 | 409 | `item_unavailable` | `{ items: [{ index, itemId, reason }] }` (`reason`: `not_available`, `stop_list`: в стоп-листе кассы у филиала) | то же |
 | 409 | `price_changed` | `{ items: [{ index, unitPrice }], subtotal, deliveryFee, total }` | цены в корзине обновляются, просим подтвердить |

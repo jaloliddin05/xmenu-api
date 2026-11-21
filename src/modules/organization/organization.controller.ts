@@ -21,7 +21,10 @@ import {
 } from '@nestjs/swagger';
 import { OrganizationService } from './services/organization.service';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
-import { MulterStorage } from 'src/infra/helper/upload/multer-upload';
+import {
+  MulterStorage,
+  uploadLimits,
+} from 'src/infra/helper/upload/multer-upload';
 import UpdateOrganizationDto from './dto/update-organization.dto';
 import { Public } from '../auth/decorators/public.decorator';
 import {
@@ -103,6 +106,7 @@ export class OrganizationController {
       ],
       {
         storage: MulterStorage('uploads/image/organization'),
+        limits: uploadLimits(2),
       },
     ),
   )

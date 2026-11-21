@@ -9,6 +9,7 @@ import { AuthService } from '../../services/auth.service';
 import { StaffSessionService } from '../../services/staff-session.service';
 import { AppException } from 'src/infra/errors/app-exception';
 import type { StaffUser } from 'src/infra/helper/auth/staff-user';
+import { STAFF_TOKEN } from '../../jwt.service';
 
 export const ACCESS_TOKEN_USER = 'access_token_user';
 
@@ -27,6 +28,9 @@ export class AccessTokenUserStrategy extends PassportStrategy(
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
       secretOrKey: jwtConfig.accessTokenSecret,
+      algorithms: [STAFF_TOKEN.algorithm],
+      audience: STAFF_TOKEN.audience,
+      issuer: STAFF_TOKEN.issuer,
     });
   }
 

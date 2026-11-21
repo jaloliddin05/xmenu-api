@@ -8,6 +8,9 @@ import {
   platformMisconfigured,
 } from 'src/infra/errors/app-exception';
 
+/** How far in the future auth_date may be (clocks of the server and Telegram differ a little). */
+export const INIT_DATA_CLOCK_SKEW_SECONDS = 60;
+
 export interface TelegramUser {
   id: number | string;
   first_name?: string;
@@ -75,11 +78,13 @@ export class TelegramInitDataService {
     )
       throw bad();
 
-    // Eski initData qayta ishlatilishiga yo'l qo'ymaymiz
+    // Eski initData qayta ishlatilishiga yo'l qo'ymaymiz; a date in the future (beyond clock skew) is refused too
     const authDate = Number(params.get('auth_date'));
+    const age = Date.now() / 1000 - authDate;
     if (
       !authDate ||
-      Date.now() / 1000 - authDate > this.cfg.telegramInitDataMaxAgeSeconds
+      age > this.cfg.telegramInitDataMaxAgeSeconds ||
+      age < -INIT_DATA_CLOCK_SKEW_SECONDS
     )
       throw bad();
 

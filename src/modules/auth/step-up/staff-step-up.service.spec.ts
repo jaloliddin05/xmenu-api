@@ -167,7 +167,7 @@ describe('StaffStepUpService', () => {
         'wrong_password',
       );
     await expect(
-      deps.throttle.assertNotLocked('+998901234567'),
+      deps.throttle.assertNotLocked('+998901234567', CTX.ip),
     ).resolves.toBeUndefined();
     const other = await deps.db.user.create({
       data: {

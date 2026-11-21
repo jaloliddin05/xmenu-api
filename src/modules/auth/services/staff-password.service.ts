@@ -11,6 +11,7 @@ import { errorMessage } from 'src/infra/helper/error-text';
 import { isSmsConfigured } from 'src/modules/sms/sms.module';
 import { SMS_PROVIDER } from 'src/modules/sms/providers/sms-provider.interface';
 import type { SmsProvider } from 'src/modules/sms/providers/sms-provider.interface';
+import { SmsBudgetService } from 'src/modules/sms/sms-budget.service';
 import { CUSTOMER_AUTH_CONFIG } from '../customer-auth.config';
 import type { CustomerAuthConfig } from '../customer-auth.config';
 import type {
@@ -49,6 +50,7 @@ export class StaffPasswordService {
     private readonly sessions: StaffSessionService,
     @Inject(SMS_PROVIDER) private readonly sms: SmsProvider,
     @Inject(CUSTOMER_AUTH_CONFIG) private readonly cfg: CustomerAuthConfig,
+    private readonly smsBudget: SmsBudgetService,
   ) {}
 
   // ================= POST /auth/password/forgot =================
@@ -65,6 +67,9 @@ export class StaffPasswordService {
         'sms',
         'the SMS provider (SMS_PROVIDER) lacks its credentials',
       );
+
+    // The SMS below is not awaited, so the daily ceiling is checked here, for any phone alike (same answer)
+    await this.smsBudget.assertAvailable();
 
     const user = await this.prisma.user.findUnique({
       where: { phone },

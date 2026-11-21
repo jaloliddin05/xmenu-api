@@ -3,6 +3,7 @@ import { sign } from 'jsonwebtoken';
 import request from 'supertest';
 import { AppException } from 'src/infra/errors/app-exception';
 import { createHttpApp, staffToken } from 'src/infra/testing/http-app.fake';
+import { STAFF_TOKEN } from 'src/modules/auth/jwt.service';
 import { StaffPasswordService } from '../services/staff-password.service';
 import { StaffSessionService } from '../services/staff-session.service';
 import { AuthController } from './auth.controller';
@@ -139,8 +140,10 @@ describe('owner password and sessions routes', () => {
       .set(bearer());
     expect(ended.status).toBe(401);
 
+    // Signed exactly like a real token (algorithm, audience, issuer): only the session id is missing
     const legacy = sign({ sub: ME, role: 'user' }, 'http-spec-access-secret', {
       expiresIn: 60,
+      ...STAFF_TOKEN,
     });
     const res = await request(app.getHttpServer())
       .get('/auth/sessions')

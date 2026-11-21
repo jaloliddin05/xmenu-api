@@ -71,7 +71,7 @@ export const ERROR_CODES = spec({
   rate_limited: {
     status: 429,
     message: 'Too many requests',
-    when: 'Превышен лимит запросов (по IP, номеру или пользователю)',
+    when: 'Превышен лимит запросов (по IP, номеру или пользователю; заказов гостя за час)',
     retryAfter: true,
   },
   internal_error: {
@@ -184,6 +184,12 @@ export const ERROR_CODES = spec({
     status: 503,
     message: 'SMS provider did not accept the message',
     when: 'Провайдер SMS не ответил или отказал; лимиты отправки откатываются',
+  },
+  sms_limit: {
+    status: 429,
+    message: 'Daily SMS limit reached',
+    when: 'Исчерпан суточный лимит SMS платформы или заведения; `retryAfter` до полуночи по Ташкенту',
+    retryAfter: true,
   },
   telegram_unavailable: {
     status: 503,
@@ -391,12 +397,12 @@ export const ERROR_CODES = spec({
   ordering_channel_disabled: {
     status: 422,
     message: 'Ordering channel is disabled',
-    when: 'Канал «доставка» выключен',
+    when: 'Канал «доставка» выключен (заказ или код входа гостю по SMS)',
   },
   ordering_not_published: {
     status: 422,
     message: 'Ordering is not published',
-    when: 'Канал включён, но не опубликован',
+    when: 'Канал включён, но не опубликован (заказ или код входа гостю по SMS)',
   },
 
   // Venue settings and publication

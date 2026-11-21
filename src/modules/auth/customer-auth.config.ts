@@ -108,7 +108,7 @@ export function loadInitDataConfig(): InitDataConfig {
   return {
     telegramInitDataMaxAgeSeconds: int(
       'TELEGRAM_INITDATA_MAX_AGE_SECONDS',
-      86400,
+      3600,
     ),
   };
 }

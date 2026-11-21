@@ -10,7 +10,7 @@ import { StaffSessionsController } from './controllers/staff-sessions.controller
 import { ConfigService } from '@nestjs/config';
 import { AccessTokenUserStrategy } from './passport-strategies/access-token-user/access-token-user.strategy';
 import { OrganizationModule } from '../organization/organization.module';
-import { JwtTokenService } from './jwt.service';
+import { JwtTokenService, STAFF_TOKEN } from './jwt.service';
 import { SmsModule } from '../sms/sms.module';
 import { AuthService } from './services/auth.service';
 import { AuthCustomerController } from './controllers/customer-auth.controller';
@@ -73,7 +73,10 @@ import { OwnerSecurityNotifier } from './step-up/owner-security-notifier.service
         const jwtConfig = configService.getOrThrow<IConfig['jwt']>('jwt');
         return {
           secret: jwtConfig.accessTokenSecret,
-          signOptions: { expiresIn: jwtConfig.accessTokenExpiration },
+          signOptions: {
+            expiresIn: jwtConfig.accessTokenExpiration,
+            ...STAFF_TOKEN,
+          },
         };
       },
       inject: [ConfigService],

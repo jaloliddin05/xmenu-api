@@ -76,6 +76,28 @@ describe('CustomerOtpService', () => {
     expect(sms.sent[1].text).not.toMatch(/[Ѐ-ӿ]/);
   });
 
+  it('puts only the cleaned venue name into the SMS (no links, no phone numbers)', async () => {
+    await otp.request(
+      {
+        ...TENANT,
+        brandName: 'Payme: карта заблокирована, звоните +998 90 123 45 67',
+      },
+      PHONE,
+      IP,
+      'customer',
+      'ru',
+    );
+    expect(sms.sent[0].text).toMatch(/^Код для входа в Xmenu: \d{6}\./);
+    await otp.request(
+      { ...TENANT, brandName: 'Кафе «Самса» №1' },
+      '+998901234568',
+      IP,
+      'customer',
+      'ru',
+    );
+    expect(sms.sent[1].text).toMatch(/^Код для входа в Кафе Самса 1: \d{6}\./);
+  });
+
   it('falls back to the venue default language when none is passed', async () => {
     await otp.request({ ...TENANT, defaultLanguage: 'en' }, PHONE, IP);
     expect(sms.sent[0].text).toMatch(/sign-in code/);
@@ -208,6 +230,42 @@ describe('CustomerOtpService', () => {
     expect(await redis.exists(`sotp:staff:${PHONE}`)).toBe(0);
     // No cooldown was consumed
     await expect(otp.request(STAFF, PHONE, IP, 'staff')).resolves.toBe(60);
+  });
+
+  it('the daily SMS ceiling answers as itself (sms_limit), and the limits are given back', async () => {
+    const limited = new CustomerOtpService(
+      redis as unknown as Redis,
+      cfg,
+      {
+        send: async () => {
+          throw new AppException('sms_limit', { retryAfter: 100 });
+        },
+      },
+      new RateLimitService(redis as unknown as Redis),
+    );
+    const err = await limited.request(TENANT, PHONE, IP).catch((e) => e);
+    expect(err.code).toBe('sms_limit');
+    expect(err.retryAfter).toBe(100);
+    expect(await redis.exists(`otp:${TENANT.id}:${PHONE}`)).toBe(0);
+    // no cooldown was consumed
+    await expect(otp.request(TENANT, PHONE, IP)).resolves.toBe(60);
+  });
+
+  it('a guest code is counted for the venue, an owner code is not', async () => {
+    const calls: unknown[] = [];
+    const recording = new CustomerOtpService(
+      redis as unknown as Redis,
+      cfg,
+      {
+        send: async (_p: string, _t: string, opts?: object) => {
+          calls.push(opts);
+        },
+      },
+      new RateLimitService(redis as unknown as Redis),
+    );
+    await recording.request(TENANT, PHONE, IP);
+    await recording.request(STAFF, PHONE, IP, 'staff');
+    expect(calls).toEqual([{ tenantId: TENANT.id }, { tenantId: undefined }]);
   });
 
   it('validates the code format against OTP_LENGTH', () => {

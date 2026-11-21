@@ -12,12 +12,16 @@ const TENANT = {
 const CTX = { ip: '10.0.0.1', userAgent: 'jest' };
 
 describe('CustomerAuthService.requestOtp', () => {
-  function service(otpLength: number) {
-    const otp = { request: jest.fn(async () => 60) };
+  const PUBLISHED = { delivery_enabled: true, published_at: new Date() };
+  let otp: { request: jest.Mock };
+
+  function service(otpLength: number, org: object | null = PUBLISHED) {
+    otp = { request: jest.fn(async () => 60) };
     const events = { log: jest.fn(async () => undefined) };
+    const prisma = { organization: { findUnique: jest.fn(async () => org) } };
     const none = null as any;
     return new CustomerAuthService(
-      none,
+      prisma as any,
       none,
       none,
       otp as any,
@@ -45,6 +49,27 @@ describe('CustomerAuthService.requestOtp', () => {
       .requestOtp(TENANT, '+7901', CTX)
       .catch((e) => e);
     expect(err.code).toBe('invalid_phone');
+  });
+
+  it.each([
+    [
+      'unpublished',
+      { delivery_enabled: true, published_at: null },
+      'ordering_not_published',
+    ],
+    [
+      'delivery channel off',
+      { delivery_enabled: false, published_at: null },
+      'ordering_channel_disabled',
+    ],
+    ['missing', null, 'ordering_channel_disabled'],
+  ])('a venue that is %s sends no SMS: %s', async (_what, org, code) => {
+    const err = await service(6, org)
+      .requestOtp(TENANT, '+998901234567', CTX)
+      .catch((e) => e);
+    expect(err.code).toBe(code);
+    expect(err.getStatus()).toBe(422);
+    expect(otp.request).not.toHaveBeenCalled();
   });
 });
 

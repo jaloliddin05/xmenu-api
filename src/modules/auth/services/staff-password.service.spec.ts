@@ -37,6 +37,7 @@ describe('StaffPasswordService', () => {
       sessions as any,
       deps.sms,
       staffTestConfig,
+      deps.smsBudget,
     );
   });
 
@@ -49,6 +50,26 @@ describe('StaffPasswordService', () => {
       expect(deps.sms.sent).toHaveLength(1);
       expect(deps.sms.sent[0].phone).toBe(PHONE);
       expect(JSON.stringify(res)).not.toContain(deps.sms.lastCode());
+    });
+
+    it('over the daily SMS ceiling: the same refusal for a known and an unknown phone', async () => {
+      process.env.SMS_DAILY_LIMIT_PLATFORM = '1';
+      try {
+        await addOwner();
+        await deps.smsBudget.consume();
+        const known = await service
+          .forgot({ phone: PHONE }, CTX)
+          .catch((e) => e);
+        const unknown = await service
+          .forgot({ phone: '+998901111111' }, CTX)
+          .catch((e) => e);
+        expect(known.code).toBe('sms_limit');
+        expect(unknown.code).toBe('sms_limit');
+        expect(known.retryAfter).toBe(unknown.retryAfter);
+        expect(deps.sms.sent).toHaveLength(0);
+      } finally {
+        delete process.env.SMS_DAILY_LIMIT_PLATFORM;
+      }
     });
 
     it('answers an unknown or deactivated phone the same way and sends nothing', async () => {

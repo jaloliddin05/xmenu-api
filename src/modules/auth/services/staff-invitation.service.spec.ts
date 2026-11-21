@@ -27,6 +27,7 @@ describe('StaffInvitationService', () => {
       deps.sessions as any,
       deps.sms,
       staffTestConfig,
+      deps.smsBudget,
     );
     const owner = await deps.db.user.create({
       data: { phone: '+998901234567', isActive: true },

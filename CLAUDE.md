@@ -5,7 +5,7 @@
 
 ## Стек
 NestJS 11, TypeScript, Prisma 6 + PostgreSQL 16, Redis + BullMQ, Passport (JWT), class-validator,
-Swagger (`/docs`), Jest. Prettier: одинарные кавычки, trailing comma `all`, отступ 2 пробела, с `;`.
+Swagger (`/docs`; в production только при `SWAGGER_ENABLED=true`, `swaggerEnabled` в `src/swagger.ts`), Jest. Prettier: одинарные кавычки, trailing comma `all`, отступ 2 пробела, с `;`.
 Комментарии частично на узбекском, документация на русском; новые комментарии на английском.
 
 ## Команды
@@ -28,7 +28,9 @@ Env: см. `.env.example` (полный; тест сверяет его со с�
 `https://api.telegram.org`), `IIKO_APP_ID` + `IIKO_CLIENT_SECRET` (приложение интегратора iiko, одно на платформу; без
 них `platform_misconfigured`, `feature: pos`), `IIKO_API_BASE_URL` (`infra/iiko/iiko-api-url.ts`; фейк в тестах, в production
 только `https://` на хосте из `IIKO_OFFICIAL_API_HOSTS`), `IIKO_MENU_IMPORT_MINUTES` (интервал импорта меню, 30 по
-умолчанию), `OPS_CHAT_ID`, `ORDER_QUEUES`,
+умолчанию), `IIKO_IMAGE_HOSTS` (хосты фото меню iiko, пусто = любой публичный), `OPS_CHAT_ID`, `ORDER_QUEUES`,
+`ORDER_ACTIVE_LIMIT_PER_CUSTOMER` + `ORDER_HOURLY_LIMIT_PER_CUSTOMER` (лимиты заказов гостя), `SMS_DAILY_LIMIT_PLATFORM` +
+`SMS_DAILY_LIMIT_TENANT` (суточные потолки SMS, в production обязательны), `SWAGGER_ENABLED`,
 `MINIAPP_URL`, `UPLOAD_MAX_BYTES`, `PLATFORM_ADMIN_USER_IDS`, `TRANSLATION_*`, `OPENAI_API_KEY` (необязателен: без него
 `/translation` → `503 platform_misconfigured`, `feature: translation`), `NEXT_PUBLIC_URL` + `REVALIDATE_SECRET` (QR),
 `CLIENT_REVALIDATE_URL` + `CLIENT_REVALIDATE_SECRET` (сайт доставки), `DELIVERY_URL_TEMPLATE` (адрес Mini App для кнопки бота),
@@ -213,7 +215,11 @@ Payme вручную через ops-чат.
   обычный импорт строки без связи не трогает. Пока интеграция работает, создание блюд, категорий и групп допов
   отвечает `409 pos_menu_locked` (`assertPosMenuOpen` в `product/services/pos-managed.ts`). Размеры → обязательная
   группа «Размер» (`size_group`/`size`). Фото `PosImageStore` (файл по sha256 в `uploads/image/products/pos`;
-  `FileService.removeFile` не удаляет файл с диска, пока на путь ссылается другая строка).
+  `FileService.removeFile` не удаляет файл с диска, пока на путь ссылается другая строка). Адрес фото из меню
+  заведения не доверяется (SSRF): редиректы вручную с проверкой каждого шага, `IIKO_IMAGE_HOSTS`, только публичные IP
+  (`isPublicAddress` в `infra/http/internal-request.ts`; имя проверяет `publicOnlyLookup` из `infra/http/public-lookup.ts`
+  в агенте, соединение идёт на проверенный адрес), прокси из окружения выключен. Новый исходящий запрос по адресу
+  из внешних данных делай так же. Вне production фото с адреса `IIKO_API_BASE_URL` (фейк iiko) проверку IP пропускают.
 - Только чтение у связанных строк: `product/services/pos-managed.ts` (`posSourceLang`, `pos_managed_field`) в сервисах
   блюд, категорий и допов; `posMarker` даёт `pos` в ответах владельца.
 - Стоп-лист `PosStopListService` (чистые правила `domain/stop-list.ts`); `GET /menu` и `POST /orders`
@@ -300,6 +306,12 @@ Payme вручную через ops-чат.
 сессиями. `CustomerOtpService.issue()` не зависит от канала доставки (SMS или Telegram), лимиты по телефону общие.
 Параметры и значения по умолчанию: `OTP_LENGTH`, `OTP_TTL_SECONDS`, `OTP_MAX_ATTEMPTS`, `OTP_COOLDOWN_SECONDS` (см. `.env.example`).
 Длина кода приходит в `codeLength`; фронты читают её из ответа, своих констант у них нет.
+`otp/request` шлёт код только гостям заведения, которое принимает заказы (`orderingProblem` из БД, иначе
+`422 ordering_channel_disabled` / `ordering_not_published` без SMS). Название заведения попадает в любую SMS только
+через `smsBrand` (`auth/services/sms-brand.ts`: одна функция очистки, неподходящее имя → «Xmenu»); все тексты SMS с
+переменными для модерации Eskiz: `docs/SMS-TEMPLATES.md`, новый или изменённый текст SMS правит и его.
+`initData` проверяется сроком `TELEGRAM_INITDATA_MAX_AGE_SECONDS`; `auth_date` в будущем сверх
+`INIT_DATA_CLOCK_SKEW_SECONDS` тоже отказ (`telegram-init-data.service.ts`).
 `TelegramInitDataService.verifyForTenant` проверяет `initData` из тела токеном бота заведения (иначе платформенным
 `TELEGRAM_BOT_TOKEN`); заголовок `X-Telegram-Init-Data` проверяет `MiniAppAccessService` только ботом заведения.
 Вход по `initData` (`POST /auth/customer/login`) только для клиента с уже привязанным `telegram_id`. Подтверждение в Mini
@@ -382,8 +394,13 @@ App (`instant`) нового номера кладёт Telegram-id в `registrat
   регистрация на тот же номер не может перехватить первую.
 - Код выдаёт `CustomerOtpService` со `scope: 'staff'` (ключи `sotp:*`, свои лимиты, те же `OTP_*`), доставка через
   `SmsProvider`. `SMS_PROVIDER=console` и `OTP_DEV_MODE` в production не стартуют.
-- Вход: лимит по IP, нарастающая блокировка по телефону (60 с → 1 ч), единый `401 invalid_credentials` и одна
-  bcrypt-проверка на любую неудачу (фиктивный хеш для неизвестного номера).
+- Вход: лимит по IP и две нарастающие блокировки (`StaffLoginThrottleService`): пара «номер + IP» строгая, номер
+  целиком с любых IP мягче (порог выше, блокировка короче), так чужой не держит владельца без входа; успешный вход
+  обнуляет только свою пару, сброс пароля все счётчики номера (поколение номера в ключах пар). Числа: `docs/API.md`,
+  «Лимиты». Единый `401 invalid_credentials` и одна bcrypt-проверка на любую неудачу (фиктивный хеш для неизвестного номера).
+- Access-токен владельца: только HS256, `aud` `xmenu:staff`, `iss` `xmenu` (`STAFF_TOKEN` в `auth/jwt.service.ts`, подпись в
+  `AuthModule`, проверка в `AccessTokenUserStrategy`); токен гостя и токен с другим алгоритмом не принимаются;
+  `JWT_ACCESS_TOKEN_SECRET` в production не короче 32 символов (`staffAuthEnvIssues`).
 - Токены staff принимаются только для существующего пользователя с `isActive=true` и активной строкой в
   `organization_member` (роль читается из БД на каждом запросе); хеш пароля не уходит в ответы.
 - IP клиента: `trust proxy` из `TRUST_PROXY` (`infra/http/trust-proxy.ts`, по умолчанию `loopback`), прокси передаёт `X-Forwarded-For`.
@@ -436,13 +453,13 @@ App (`instant`) нового номера кладёт Telegram-id в `registrat
   (операторы админки живут в `organization_member`, раздел «Сотрудники и права»).
 - Касса iiko: проверка на живом iiko (`../docs/IIKO.md`, «Перед пилотом»). Другие кассы позже.
 - Позже: Web Push/WebSocket для админки, фискальные чеки, промокоды (поле `discount` всегда 0), заказ ко
-  времени, меню по филиалам, ротация `PAYMENT_CONFIG_KEY`, rate limit на
-  `POST /orders`.
+  времени, меню по филиалам, ротация `PAYMENT_CONFIG_KEY` (принятый риск S-12, `../audit/SECURITY.md`, раздел 7).
 
 ## Известные долги
 - Сессии владельцев: «последняя активность» в списке сессий = последний refresh (запросы между refresh не пишутся в БД).
 - Загрузки (`MulterStorage`) принимают только изображения (JPEG, PNG, GIF, WebP по содержимому, до `UPLOAD_MAX_BYTES`) и
-  пишут на диск после проверки. Но при 404 владельца в `PUT /organization`, `POST/PATCH /product…` файл, уже записанный
+  пишут на диск после проверки. Каждый интерцептор multer задаёт `limits: uploadLimits(файлов)` (`multer-upload.ts`:
+  файлы, размер, поля, части); новый маршрут загрузки тоже. Но при 404 владельца в `PUT /organization`, `POST/PATCH /product…` файл, уже записанный
   валидатором, остаётся на диске без записи в БД.  Отдача делает любой не-образ `attachment` + `sandbox`.
 - Ревалидация: ключ задания `revalidate-{target}-{route}-{tenantId}`, цели QR и сайт доставки (`docs/REVALIDATE.md`);
   в очередь идут tenantId, route, oldSlug, актуальный slug читается при выполнении; при заданном адресе цели и пустом
@@ -522,8 +539,9 @@ Docker Compose на одном сервере, снаружи Caddy (TLS, `api.x
   переделан; не запускай его.
 - Прод не стартует с `SMS_PROVIDER=console`, `OTP_DEV_MODE`, пустым `REVALIDATE_SECRET`, `DOMAIN_VERIFY_SKIP=true`, без
   `PLATFORM_DOMAIN`, с `TELEGRAM_API_BASE_URL` не на `https://api.telegram.org`, без https `PUBLIC_API_URL` и
-  `DELIVERY_URL_TEMPLATE` (с `{slug}`), без годного `PAYMENT_CONFIG_KEY`, с неразбираемым `TRUST_PROXY` и без учётных
-  данных выбранного SMS-провайдера (`validateEnv`). Перед первым запуском: staging, бэкапы по расписанию, чек-лист
+  `DELIVERY_URL_TEMPLATE` (с `{slug}`), без годного `PAYMENT_CONFIG_KEY`, с неразбираемым `TRUST_PROXY`, без учётных
+  данных выбранного SMS-провайдера, без `SMS_DAILY_LIMIT_PLATFORM` и `SMS_DAILY_LIMIT_TENANT`, с коротким
+  `JWT_ACCESS_TOKEN_SECRET` (`validateEnv`). `/docs` в production не публикуется без `SWAGGER_ENABLED=true`. Перед первым запуском: staging, бэкапы по расписанию, чек-лист
   безопасности (корневой `CLAUDE.md`, очередь, п. 6).
 
 ## Ошибки
@@ -547,6 +565,20 @@ Docker Compose на одном сервере, снаружи Caddy (TLS, `api.x
   файлы текстов бота и SMS (`BOT_TEXT_FILES`), `errorMessage`/`errorStack`/`telegramErrorText` вне вызова логгера.
   Исключения по файлам с причиной: `ERROR_TEXT_ALLOWED` (ops-чат платформы, сам фильтр). Новый файл с текстами бота
   добавь в `BOT_TEXT_FILES`.
+
+## Бюджет SMS
+`SmsBudgetService` (`sms/sms-budget.service.ts`): суточные потолки SMS платформы и заведения в Redis, сутки по
+Asia/Tashkent. `SMS_PROVIDER` отдаёт `BudgetedSmsProvider` поверх выбранного провайдера, так любая SMS проходит
+потолки; `send(phone, text, { tenantId })` считает и в потолок заведения (коды гостей, эскалация филиалу), без
+`tenantId` только в платформенный (владельцы). На пороге предупреждения и сверх потолка по одной тревоге в ops-чат за
+сутки на потолок; сверх потолка `429 sms_limit` (`retryAfter` до полуночи по Ташкенту), `CustomerOtpService` отдаёт его
+как есть. Отправка без ожидания (сброс пароля, приглашение) проверяет потолок заранее `assertAvailable()` для любого
+номера; эскалация при потолке пишет в ops-чат и не падает. Без переменных (только вне production) потолков нет.
+
+## Лимиты заказов гостя
+`POST /orders` в транзакции записи, под блокировкой строки заведения (`UPDATE … order_seq`): незавершённые заказы гостя
+не больше меньшего из `maxActiveOrders` заведения и `ORDER_ACTIVE_LIMIT_PER_CUSTOMER` (`429 too_many_active_orders`),
+заказы за последний час не больше `ORDER_HOURLY_LIMIT_PER_CUSTOMER` (`429 rate_limited`); `order/domain/order-limits.ts`.
 
 ## Лимиты публичных POST
 `PublicRateLimitGuard` (`infra/http/public-rate-limit.ts`, глобальный `APP_GUARD`): POST к `@Public()` маршрутам по IP через

@@ -27,6 +27,44 @@ export function isPrivateAddress(raw: string | undefined): boolean {
   return PRIVATE.check(address, version === 4 ? 'ipv4' : 'ipv6');
 }
 
+// Everything an outgoing request to an address from external data (iiko menu pictures) must never reach, on top
+// of PRIVATE: "this network", carrier-grade NAT, link-local (cloud metadata), multicast, reserved and broadcast,
+// the unspecified IPv6 address, IPv6 link-local and multicast. IPv4-mapped IPv6 is checked as IPv4.
+const NOT_PUBLIC = new BlockList();
+NOT_PUBLIC.addSubnet('0.0.0.0', 8, 'ipv4');
+NOT_PUBLIC.addSubnet('100.64.0.0', 10, 'ipv4');
+NOT_PUBLIC.addSubnet('169.254.0.0', 16, 'ipv4');
+NOT_PUBLIC.addSubnet('224.0.0.0', 4, 'ipv4');
+NOT_PUBLIC.addSubnet('240.0.0.0', 4, 'ipv4');
+NOT_PUBLIC.addAddress('::', 'ipv6');
+NOT_PUBLIC.addSubnet('fe80::', 10, 'ipv6');
+NOT_PUBLIC.addSubnet('ff00::', 8, 'ipv6');
+
+/** `::ffff:a.b.c.d` and `::ffff:XXXX:XXXX` as the IPv4 address they carry; anything else unchanged. */
+function unwrapMappedIpv4(address: string): string {
+  const dotted = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(address);
+  if (dotted) return dotted[1];
+  const hex = /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/i.exec(address);
+  if (!hex) return address;
+  const hi = parseInt(hex[1], 16);
+  const lo = parseInt(hex[2], 16);
+  return [hi >> 8, hi & 255, lo >> 8, lo & 255].join('.');
+}
+
+/**
+ * Whether an outgoing request may go to this IP: a valid address that is not loopback, private, link-local, CGNAT,
+ * "this network", multicast, reserved or broadcast (IPv4-mapped IPv6 is judged as the IPv4 inside). Not an IP: false.
+ */
+export function isPublicAddress(raw: string | undefined): boolean {
+  if (!raw) return false;
+  const address = unwrapMappedIpv4(raw.replace(/^\[|\]$/g, ''));
+  const version = isIP(address);
+  if (!version) return false;
+  const type = version === 4 ? 'ipv4' : 'ipv6';
+  if (type === 'ipv6' && /^::ffff:/i.test(address)) return false;
+  return !PRIVATE.check(address, type) && !NOT_PUBLIC.check(address, type);
+}
+
 /**
  * A request made inside the server's private network, not passed through the public proxy: the TCP peer
  * (never X-Forwarded-For, whatever `trust proxy` says) is a private address, and the request carries none of

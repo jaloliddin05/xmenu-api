@@ -97,6 +97,9 @@ export const ENV_SCHEMA: readonly EnvVarSpec[] = [
   str('ESKIZ_FROM'),
   secret('OTP_BOT'),
   str('XMENU_CHAT_ID'),
+  // Daily SMS ceilings (Asia/Tashkent day): sms-budget.service.ts; unset outside production = no ceiling
+  { name: 'SMS_DAILY_LIMIT_PLATFORM', kind: 'int', required: 'production' },
+  { name: 'SMS_DAILY_LIMIT_TENANT', kind: 'int', required: 'production' },
   secret('TELEGRAM_BOT_TOKEN'),
   int('TELEGRAM_INITDATA_MAX_AGE_SECONDS'),
   int('TELEGRAM_VERIFY_TTL_SECONDS'),
@@ -119,6 +122,9 @@ export const ENV_SCHEMA: readonly EnvVarSpec[] = [
   secret('TELEGRAM_WEBHOOK_SECRET'),
   str('OPS_CHAT_ID'),
   { name: 'ORDER_QUEUES', kind: 'enum', values: ['on', 'off'] },
+  // Per guest in one venue: order-limits.ts
+  int('ORDER_ACTIVE_LIMIT_PER_CUSTOMER'),
+  int('ORDER_HOURLY_LIMIT_PER_CUSTOMER'),
   // Payments
   { name: 'PAYMENT_CONFIG_KEY', kind: 'key32', required: 'production' },
   url('MINIAPP_RETURN_URL'),
@@ -130,6 +136,8 @@ export const ENV_SCHEMA: readonly EnvVarSpec[] = [
   str('IIKO_API_BASE_URL'),
   // Menu import interval in minutes (default 30; 5 at least, a day at most: pos-sync.queue.ts)
   int('IIKO_MENU_IMPORT_MINUTES', 5),
+  // Hosts iiko menu pictures may come from (empty: any public host): pos-image.store.ts
+  str('IIKO_IMAGE_HOSTS'),
   // Revalidation
   url('NEXT_PUBLIC_URL'),
   secret('REVALIDATE_SECRET'),
@@ -143,6 +151,8 @@ export const ENV_SCHEMA: readonly EnvVarSpec[] = [
   int('STAFF_SESSION_ABSOLUTE_DAYS'),
   int('STAFF_REFRESH_REUSE_LEEWAY_SECONDS'),
   // Misc
+  // /docs in production only when true (always on outside production): swagger.ts
+  bool('SWAGGER_ENABLED'),
   int('HTTP_TIMEOUT'),
   int('HTTP_MAX_REDIRECTS', 0),
   int('UPLOAD_MAX_BYTES'),

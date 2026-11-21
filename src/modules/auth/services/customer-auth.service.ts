@@ -25,6 +25,7 @@ import {
 import { RateLimitService } from './rate-limit.service';
 import { TelegramInitDataService } from './telegram-init-data.service';
 import { AppException } from 'src/infra/errors/app-exception';
+import { orderingProblem } from 'src/modules/organization/domain/publication';
 
 type Customer = NonNullable<
   Awaited<ReturnType<CustomerRepository['findById']>>
@@ -58,6 +59,7 @@ export class CustomerAuthService {
     ctx: RequestCtx,
   ): Promise<{ resendAfter: number; codeLength: number }> {
     if (!isValidPhone(phone)) throw new AppException('invalid_phone');
+    await this.assertTakesGuests(tenant.id);
 
     try {
       const resendAfter = await this.otp.request(
@@ -81,6 +83,28 @@ export class CustomerAuthService {
       }
       throw err;
     }
+  }
+
+  /**
+   * SMS codes go only to guests of a venue that takes orders (delivery channel on and published): the SMS carries
+   * the venue name from the platform's sender, so a venue that never went live cannot send it to anyone (audit S-06).
+   * Read from the database, like POST /orders; an inactive venue is already refused by TenantGuard.
+   */
+  private async assertTakesGuests(organizationId: string): Promise<void> {
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { delivery_enabled: true, published_at: true },
+    });
+    const problem = org
+      ? orderingProblem({
+          deliveryEnabled: org.delivery_enabled,
+          publishedAt: org.published_at,
+        })
+      : 'ordering_channel_disabled';
+    if (problem)
+      throw new AppException(problem, {
+        message: 'The venue does not take guests yet',
+      });
   }
 
   // ================= POST otp/verify =================
