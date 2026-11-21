@@ -28,6 +28,7 @@ import { StaffModule } from './modules/staff/staff.module';
 import { ReportModule } from './modules/report/report.module';
 import { PosModule } from './modules/pos/pos.module';
 import { HealthModule } from './modules/health/health.module';
+import { CspReportModule } from './modules/csp-report/csp-report.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -40,6 +41,7 @@ import { HealthModule } from './modules/health/health.module';
     BranchModule,
     BullModule,
     CategoryModule,
+    CspReportModule,
     CustomerModule,
     FileModule,
     HealthModule,

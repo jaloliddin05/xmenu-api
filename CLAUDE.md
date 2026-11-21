@@ -49,7 +49,7 @@ Env: см. `.env.example` (полный; тест сверяет его со с�
 провайдеры доставки), `report` (отчёты доставки для владельца), `payment` (Click, Payme, ключи тенанта, возвраты),
 `sms` (провайдеры eskiz, telegram, console), `telegram` (боты заведений: `TelegramBotService`, `TelegramClient`,
 `/telegram-bot`), `tenant-domain` (свои домены заведения, `/organization/:id/domains`), `file`, `translation`, `application`,
-`health` (`GET /health`, `/health/ready`), `revalidate-queue` (`RevalidateModule`: ревалидация QR-меню и сайта доставки, `docs/REVALIDATE.md`), `guest-login` (способы входа
+`health` (`GET /health`, `/health/ready`), `csp-report` (`POST /csp-report`, приёмник отчётов CSP фронтов, `docs/API.md`, «Отчёты CSP»), `revalidate-queue` (`RevalidateModule`: ревалидация QR-меню и сайта доставки, `docs/REVALIDATE.md`), `guest-login` (способы входа
 клиентов заведения: `GuestLoginService`), `pos` (интеграция с кассой iiko: подключение, меню, стоп-лист, вебхук, отправка заказов и статусы; раздел
 «Интеграция с кассой»).
 

@@ -81,6 +81,7 @@ const EXPECTED: Record<string, string> = {
   'POST /customers/me/addresses': 'public',
   'DELETE /customers/me/addresses/:id': 'public',
   'POST /customers/me/addresses/:id/default': 'public',
+  'POST /csp-report': 'public',
   'GET /delivery/quote': 'public',
   'GET /external-services': 'orders',
   'POST /file/upload': 'profile',

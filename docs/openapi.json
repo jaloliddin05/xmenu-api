@@ -5111,6 +5111,31 @@
         "x-permission": "venue"
       }
     },
+    "/csp-report": {
+      "post": {
+        "operationId": "CspReportController_report",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "CSP violation report from a browser (legacy report-uri or Reporting API). Up to 16 KB; a broken body is ignored",
+        "tags": [
+          "Health"
+        ]
+      }
+    },
     "/file/upload": {
       "post": {
         "operationId": "FileController_uploadFile",

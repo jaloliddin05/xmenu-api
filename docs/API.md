@@ -1518,14 +1518,14 @@ posNumber, posStatus, courierName, attempts, sentAt, manualAt, deliveredPush }`.
 по IP клиента (Redis): `PUBLIC_POST_RATE_LIMIT` за `PUBLIC_POST_RATE_WINDOW_SECONDS` (120 за 60 с; мобильные операторы
 делят IP, поэтому лимит щедрый). Сверх лимита: `429`, `{ "code": "rate_limited", "retryAfter": <секунды> }` и заголовок
 `Retry-After`. Формат одинаков для владельцев и клиентов. Жёстче: `POST /application` (5 в час), `POST /translation`
-(по IP 60 за 600 с, сверх лимита на владельца). Эндпоинты со своими лимитами (OTP, вход владельцев) продолжают
+(по IP 60 за 600 с, сверх лимита на владельца), `POST /csp-report` (60 за 60 с). Эндпоинты со своими лимитами (OTP, вход владельцев) продолжают
 считаться по ним, общий лимит стоит над ними.
 
 Публичные POST (метка `@Public()`, считаются):
 - владельцы: `/auth/login`, `/auth/register`, `/auth/check-code`, `/auth/resend-code`, `/auth/refresh`, `/auth/logout`;
 - клиенты: `/auth/customer/otp/request`, `otp/verify`, `telegram/start`, `telegram/status`, `register`, `refresh`,
   `logout`, `login`;
-- прочее: `/application`. `POST /organization/check-slug` не публичный: нужен токен владельца (без него `401`), общий лимит его не считает;
+- прочее: `/application`, `/csp-report` (сверх общего 60 в минуту на IP). `POST /organization/check-slug` не публичный: нужен токен владельца (без него `401`), общий лимит его не считает;
 - с токеном клиента (`@Public()` только чтобы обойти токен владельца): `POST /orders`, `/orders/:id/cancel`,
   `/orders/:id/payment/retry`, `POST /customers/me/addresses`, `…/:id/default`.
 
@@ -1550,6 +1550,19 @@ loopback или частный, и в запросе нет заголовков
 `infra/http/internal-request.ts`. В Caddyfile дополнительно закрыт путь (`respond /internal/* 404` на `api.xmenu.uz`),
 пример в `CLAUDE.md`, «Продакшен». Ответ раскрывает лишь то, есть ли у хоста заведение, что и так отдаёт публичный
 `GET /tenant/by-host`, поэтому условие пересмотра CORS («эндпоинт, полагающийся на сетевое положение») он не задевает.
+
+### Отчёты CSP
+
+`POST /csp-report`: приёмник отчётов браузеров о нарушениях Content-Security-Policy (`report-uri` и `report-to` в
+политиках дашборда, QR-меню и сайта доставки). Без токена, `Cache-Control: no-store`, ответ всегда `204` без тела.
+- `Content-Type`: `application/csp-report` (старый формат `{ "csp-report": { … } }`), `application/reports+json`
+  (Reporting API, массив `{ type: "csp-violation", body: { … } }`, отчёты других типов пропускаются) или
+  `application/json` (любой из двух форматов). Другой тип: `415 unsupported_media_type`.
+- Тело до 16 КБ, больше: `413 payload_too_large`. Битый JSON или чужая форма: `204`, в лог ничего не пишется.
+- Лимит: 60 запросов в минуту на IP сверх общего лимита публичных POST, дальше `429 rate_limited`.
+- Лог: строка на нарушение (до 10 на запрос), `csp_report directive=<директива> blocked=<хост|ключевое слово|схема>
+  document=<хост>`; пути, query, IP и тело в строку не попадают. Читать: `infra/docs/DEPLOY.md`, «CSP: отчёты».
+- Код: `src/modules/csp-report` (парсер тела в `csp-report.body.ts` подключает `configureErrorHandling`).
 
 ## CORS
 
