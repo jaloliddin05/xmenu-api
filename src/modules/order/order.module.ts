@@ -9,6 +9,9 @@ import { CustomerOrderController } from './controllers/customer-order.controller
 import { OrderSettingsController } from './controllers/order-settings.controller';
 import { StaffOrderController } from './controllers/staff-order.controller';
 import { TelegramOrdersController } from './controllers/telegram-orders.controller';
+import { BranchChatController } from './controllers/branch-chat.controller';
+import { BranchChatBindingService } from './services/branch-chat-binding.service';
+import { RateLimitService } from '../auth/services/rate-limit.service';
 import { OrderCoreModule } from './order-core.module';
 import { RevalidateModule } from '../revalidate-queue/revalidate.module';
 import { OrderStaffService } from './services/order-staff.service';
@@ -33,8 +36,14 @@ import { DeliveryModule } from '../delivery/delivery.module';
     OrderSettingsController,
     CheckoutConfigController,
     TelegramOrdersController,
+    BranchChatController,
   ],
-  providers: [OrderService, OrderStaffService],
+  providers: [
+    OrderService,
+    OrderStaffService,
+    BranchChatBindingService,
+    RateLimitService,
+  ],
   exports: [OrderService, OrderStaffService],
 })
 export class OrderModule {}

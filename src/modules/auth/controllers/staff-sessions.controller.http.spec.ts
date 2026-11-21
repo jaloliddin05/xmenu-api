@@ -9,6 +9,7 @@ import { AuthController } from './auth.controller';
 import { StaffAuthService } from '../services/staff-auth.service';
 import { StaffSessionsController } from './staff-sessions.controller';
 import { StaffInvitationService } from '../services/staff-invitation.service';
+import { StaffStepUpService } from '../step-up/staff-step-up.service';
 
 const ME = 'user-me';
 const OPERATOR = 'user-operator';
@@ -39,6 +40,9 @@ describe('owner password and sessions routes', () => {
     reset: jest.fn(async () => undefined),
     change: jest.fn(async () => undefined),
   };
+  const stepUp = {
+    issue: jest.fn(async () => ({ stepUpToken: 'step-up', expiresIn: 300 })),
+  };
   const invitations = {
     requestCode: jest.fn(async () => ({
       resendAfter: 60,
@@ -57,6 +61,7 @@ describe('owner password and sessions routes', () => {
           { provide: StaffPasswordService, useValue: passwords },
           { provide: StaffAuthService, useValue: {} },
           { provide: StaffInvitationService, useValue: invitations },
+          { provide: StaffStepUpService, useValue: stepUp },
         ],
       },
       [
@@ -118,6 +123,7 @@ describe('owner password and sessions routes', () => {
 
   it.each([
     ['post', '/auth/password/change'],
+    ['post', '/auth/step-up'],
     ['get', '/auth/sessions'],
     ['delete', `/auth/sessions/${SID}`],
     ['delete', '/auth/sessions'],
@@ -157,6 +163,36 @@ describe('owner password and sessions routes', () => {
       { currentPassword: 'old-password-1', newPassword: 'long-enough-1' },
       expect.anything(),
     );
+  });
+
+  it('step-up passes the user, the session of the token and the password', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/auth/step-up')
+      .set(bearer())
+      .send({ password: 'my-password-1' });
+    expect([res.status, res.body]).toEqual([
+      200,
+      { stepUpToken: 'step-up', expiresIn: 300 },
+    ]);
+    expect(stepUp.issue).toHaveBeenCalledWith(
+      ME,
+      SID,
+      'my-password-1',
+      expect.anything(),
+    );
+  });
+
+  it('step-up without a password is a field error and never reaches the service', async () => {
+    stepUp.issue.mockClear();
+    const res = await request(app.getHttpServer())
+      .post('/auth/step-up')
+      .set(bearer())
+      .send({});
+    expect([res.status, res.body.code]).toEqual([400, 'validation_error']);
+    expect(
+      new Set(res.body.fields.map((f: { field: string }) => f.field)),
+    ).toEqual(new Set(['password']));
+    expect(stepUp.issue).not.toHaveBeenCalled();
   });
 
   it('lists sessions for the owner of the token', async () => {

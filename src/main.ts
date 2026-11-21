@@ -7,6 +7,10 @@ import { configureStatic } from './infra/http/static-assets';
 import { configureErrorHandling } from './infra/errors/configure';
 import { AccessTokenUserGuard } from './modules/auth/passport-strategies/access-token-user/access-token-user.guard';
 import { StaffAccessGuard } from './modules/auth/access/staff-access.guard';
+import { StepUpGuard } from './modules/auth/step-up/step-up.guard';
+import { StepUpTokenService } from './modules/auth/step-up/step-up-token.service';
+import { StepUpAuditInterceptor } from './modules/auth/step-up/step-up-audit.interceptor';
+import { OwnerSecurityNotifier } from './modules/auth/step-up/owner-security-notifier.service';
 import { checkEnvAtStartup } from './config/env/startup-check';
 import { parseTrustProxy } from './infra/http/trust-proxy';
 
@@ -42,10 +46,15 @@ async function bootstrap() {
   configureErrorHandling(app);
 
   const reflector = app.get(Reflector);
-  // The staff token first, then the route's access rule for the caller's role (deny by default)
+  // The staff token first, then the route's access rule for the caller's role (deny by default), then the step-up of
+  // critical actions (@StepUp); their audit and owner SMS follow a successful answer
   app.useGlobalGuards(
     new AccessTokenUserGuard(reflector),
     new StaffAccessGuard(reflector),
+    new StepUpGuard(reflector, app.get(StepUpTokenService)),
+  );
+  app.useGlobalInterceptors(
+    new StepUpAuditInterceptor(reflector, app.get(OwnerSecurityNotifier)),
   );
 
   const document = createOpenApiDocument(app);

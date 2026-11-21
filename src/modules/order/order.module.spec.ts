@@ -1,3 +1,4 @@
+import { Global, Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import { PrismaService } from '../_prisma/prisma.service';
@@ -8,6 +9,16 @@ import { OrderModule } from './order.module';
 import { OrderService } from './services/order.service';
 import { OrderTransitionService } from './services/order-transition.service';
 import { OrderStaffService } from './services/order-staff.service';
+import { REDIS } from 'src/infra/redis/redis.module';
+import { FakeRedis } from 'src/infra/redis/redis.fake';
+
+/** RedisModule is global in AppModule; here an in-memory client stands in for it. */
+@Global()
+@Module({
+  providers: [{ provide: REDIS, useValue: new FakeRedis() }],
+  exports: [REDIS],
+})
+class FakeRedisModule {}
 
 /**
  * Bog'lanish testi: modullar bir-birini sikl va yetishmayotgan provider'siz
@@ -26,6 +37,7 @@ describe('order/payment/branch/menu modules wiring', () => {
     const moduleRef = await Test.createTestingModule({
       imports: [
         ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: true }),
+        FakeRedisModule,
         BranchModule,
         MenuModule,
         PaymentModule,

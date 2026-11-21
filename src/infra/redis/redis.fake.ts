@@ -78,6 +78,12 @@ export class FakeRedis {
     return 'OK';
   }
 
+  async getdel(key: string) {
+    const v = this.str(key);
+    if (v !== null) this.data.delete(key);
+    return v;
+  }
+
   async del(...keys: string[]) {
     let n = 0;
     for (const k of keys) {

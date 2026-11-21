@@ -11,8 +11,14 @@ import type { StaffRole } from 'src/modules/auth/access/permissions';
 import { AccessTokenUserStrategy } from 'src/modules/auth/passport-strategies/access-token-user/access-token-user.strategy';
 import { AuthService } from 'src/modules/auth/services/auth.service';
 import { StaffSessionService } from 'src/modules/auth/services/staff-session.service';
+import { StepUpGuard } from 'src/modules/auth/step-up/step-up.guard';
+import { StepUpTokenService } from 'src/modules/auth/step-up/step-up-token.service';
+import { StepUpAuditInterceptor } from 'src/modules/auth/step-up/step-up-audit.interceptor';
+import { OwnerSecurityNotifier } from 'src/modules/auth/step-up/owner-security-notifier.service';
 
 const SECRET = 'http-spec-access-secret';
+const STEP_UP_SECRET = 'http-spec-step-up-secret';
+const stepUpTokens = new StepUpTokenService(STEP_UP_SECRET);
 
 export interface FakeStaffUser {
   id: string;
@@ -29,6 +35,25 @@ export function staffToken(
   sid = `sid-${userId}`,
 ): string {
   return sign({ sub: userId, role: 'user', sid }, secret, { expiresIn: 60 });
+}
+
+/** X-Step-Up-Token for a staff user of createHttpApp() (same login as staffToken() unless `sid` is given). */
+export function stepUpToken(userId: string, sid = `sid-${userId}`): string {
+  return stepUpTokens.issue(userId, sid).token;
+}
+
+/** Records the critical actions instead of the audit and the SMS, unless a spec brings its own OwnerSecurityNotifier. */
+export class FakeOwnerSecurityNotifier {
+  readonly calls: { action: string; userId: string; provider?: string }[] = [];
+  notify(
+    action: string,
+    actor: { id: string },
+    _ctx: unknown,
+    provider?: string,
+  ) {
+    this.calls.push({ action, userId: actor.id, provider });
+    return Promise.resolve();
+  }
 }
 
 /**
@@ -94,7 +119,15 @@ export async function createHttpApp(
   app.useGlobalGuards(
     new AccessTokenUserGuard(reflector),
     new StaffAccessGuard(reflector),
+    new StepUpGuard(reflector, stepUpTokens),
   );
+  let notifier: OwnerSecurityNotifier;
+  try {
+    notifier = app.get(OwnerSecurityNotifier, { strict: false });
+  } catch {
+    notifier = new FakeOwnerSecurityNotifier() as never;
+  }
+  app.useGlobalInterceptors(new StepUpAuditInterceptor(reflector, notifier));
   await app.init();
   // One listening server per app: otherwise supertest opens a new ephemeral server for every request, and
   // parallel requests race for connections (ECONNRESET on slow runners).

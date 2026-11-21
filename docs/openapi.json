@@ -501,6 +501,56 @@
         ]
       }
     },
+    "/auth/step-up": {
+      "post": {
+        "description": "Send the token as X-Step-Up-Token. It is bound to this login (sid) and may be used any number of times until it expires. Wrong passwords: at most 5 per 15 minutes per user, then 429 rate_limited; the login lockout is not affected.",
+        "operationId": "StaffSessionsController_issueStepUp",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StaffStepUpDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffStepUpTokenDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "wrong_password, validation_error"
+          },
+          "429": {
+            "description": "rate_limited with retryAfter: too many wrong passwords"
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Confirm the password once more: the token opens critical actions (payment keys, bot, iiko, deleting the venue or the account) for 5 minutes",
+        "tags": [
+          "Auth"
+        ],
+        "x-permission": "account"
+      }
+    },
     "/auth/password/change": {
       "post": {
         "operationId": "StaffSessionsController_changePassword",
@@ -1266,11 +1316,20 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "X-Step-Up-Token",
+            "in": "header",
+            "description": "Token from POST /auth/step-up (5 minutes, this login only); missing, invalid or expired: 403 step_up_required",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
-          "204": {
-            "description": ""
+          "403": {
+            "description": "step_up_required: confirm the action with the password (POST /auth/step-up)"
           },
           "default": {
             "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
@@ -1377,11 +1436,20 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "X-Step-Up-Token",
+            "in": "header",
+            "description": "Token from POST /auth/step-up (5 minutes, this login only); missing, invalid or expired: 403 step_up_required",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
-          "204": {
-            "description": ""
+          "403": {
+            "description": "step_up_required: confirm the action with the password (POST /auth/step-up)"
           },
           "default": {
             "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
@@ -2093,7 +2161,17 @@
       },
       "put": {
         "operationId": "TelegramBotController_connect",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "X-Step-Up-Token",
+            "in": "header",
+            "description": "Token from POST /auth/step-up (5 minutes, this login only); missing, invalid or expired: 403 step_up_required",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -2122,7 +2200,7 @@
             "description": "No or invalid owner token"
           },
           "403": {
-            "description": "The user has no organization"
+            "description": "step_up_required: confirm the action with the password (POST /auth/step-up)"
           },
           "409": {
             "description": "bot_already_connected: the bot belongs to another venue"
@@ -2155,7 +2233,17 @@
       "delete": {
         "description": "The menu button returns to Telegram default. Name, descriptions and commands set by autoconfiguration stay on the bot (listed in leftOnBot): it is the owner bot, they change them in @BotFather.",
         "operationId": "TelegramBotController_disconnect",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "X-Step-Up-Token",
+            "in": "header",
+            "description": "Token from POST /auth/step-up (5 minutes, this login only); missing, invalid or expired: 403 step_up_required",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
@@ -2171,7 +2259,7 @@
             "description": "No or invalid owner token"
           },
           "403": {
-            "description": "The user has no organization"
+            "description": "step_up_required: confirm the action with the password (POST /auth/step-up)"
           },
           "default": {
             "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
@@ -4098,6 +4186,89 @@
         ]
       }
     },
+    "/branch/{id}/telegram-chat/code": {
+      "post": {
+        "operationId": "BranchChatController_createCode",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BranchChatCodeDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found: no such branch here"
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "One-time code to bind a Telegram group to the branch (8 characters, 10 minutes); a new code cancels the previous one",
+        "tags": [
+          "Branch"
+        ],
+        "x-permission": "venue"
+      }
+    },
+    "/branch/{id}/telegram-chat": {
+      "delete": {
+        "operationId": "BranchChatController_unbind",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "404": {
+            "description": "not_found: no such branch here"
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Unbind the Telegram chat of the branch: new orders stop going there",
+        "tags": [
+          "Branch"
+        ],
+        "x-permission": "venue"
+      }
+    },
     "/branches": {
       "get": {
         "operationId": "BranchController_list",
@@ -4451,6 +4622,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "X-Step-Up-Token",
+            "in": "header",
+            "description": "Token from POST /auth/step-up (5 minutes, this login only); missing, invalid or expired: 403 step_up_required",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -4464,8 +4644,8 @@
           }
         },
         "responses": {
-          "200": {
-            "description": ""
+          "403": {
+            "description": "step_up_required: confirm the action with the password (POST /auth/step-up)"
           },
           "default": {
             "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
@@ -5313,7 +5493,17 @@
       },
       "delete": {
         "operationId": "PosIikoController_disconnect",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "X-Step-Up-Token",
+            "in": "header",
+            "description": "Token from POST /auth/step-up (5 minutes, this login only); missing, invalid or expired: 403 step_up_required",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
@@ -5324,6 +5514,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "step_up_required: confirm the action with the password (POST /auth/step-up)"
           },
           "default": {
             "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
@@ -5346,7 +5539,17 @@
     "/integrations/iiko/key": {
       "put": {
         "operationId": "PosIikoController_setKey",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "X-Step-Up-Token",
+            "in": "header",
+            "description": "Token from POST /auth/step-up (5 minutes, this login only); missing, invalid or expired: 403 step_up_required",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -5367,6 +5570,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "step_up_required: confirm the action with the password (POST /auth/step-up)"
           },
           "default": {
             "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
@@ -7692,6 +7898,7 @@
           "invalid_credentials",
           "phone_taken",
           "wrong_password",
+          "step_up_required",
           "invalid_address",
           "address_not_found",
           "address_limit_reached",
@@ -8352,6 +8559,36 @@
             "type": "string"
           }
         }
+      },
+      "StaffStepUpDto": {
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": "string",
+            "description": "Current password of the owner"
+          }
+        },
+        "required": [
+          "password"
+        ]
+      },
+      "StaffStepUpTokenDto": {
+        "type": "object",
+        "properties": {
+          "stepUpToken": {
+            "type": "string",
+            "description": "Send as X-Step-Up-Token on critical actions; valid for this login only, any number of times until it expires"
+          },
+          "expiresIn": {
+            "type": "number",
+            "example": 300,
+            "description": "Seconds until it expires"
+          }
+        },
+        "required": [
+          "stepUpToken",
+          "expiresIn"
+        ]
       },
       "StaffChangePasswordDto": {
         "type": "object",
@@ -11403,6 +11640,32 @@
           "paymentMethods"
         ]
       },
+      "BranchChatCodeDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "K7QW2M9P",
+            "description": "One-time code: send `/bind <code>` to the platform bot in the branch group"
+          },
+          "expiresIn": {
+            "type": "number",
+            "example": 600,
+            "description": "Seconds until the code expires"
+          },
+          "botUsername": {
+            "type": "object",
+            "nullable": true,
+            "example": "xmenu_orders_bot",
+            "description": "Username of the platform orders bot to add to the group; null if Telegram did not answer"
+          }
+        },
+        "required": [
+          "code",
+          "expiresIn",
+          "botUsername"
+        ]
+      },
       "BranchViewDto": {
         "type": "object",
         "properties": {
@@ -11506,11 +11769,6 @@
           },
           "acceptsDelivery": {
             "type": "boolean"
-          },
-          "telegramChatId": {
-            "type": "string",
-            "example": "-1001234567890",
-            "description": "Buyurtma xabarlari yuboriladigan Telegram guruh id'si (bot a'zo bo'lishi shart)"
           }
         },
         "required": [
@@ -11553,9 +11811,6 @@
           },
           "acceptsDelivery": {
             "type": "boolean"
-          },
-          "telegramChatId": {
-            "type": "string"
           }
         }
       },

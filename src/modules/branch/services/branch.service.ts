@@ -150,7 +150,6 @@ export class BranchService {
         sort_order: dto.sortOrder,
         accepts_pickup: dto.acceptsPickup,
         accepts_delivery: dto.acceptsDelivery,
-        telegram_chat_id: dto.telegramChatId,
       },
     });
     return this.changed(organizationId, branch);
@@ -171,7 +170,6 @@ export class BranchService {
         is_active: dto.isActive,
         accepts_pickup: dto.acceptsPickup,
         accepts_delivery: dto.acceptsDelivery,
-        telegram_chat_id: dto.telegramChatId,
       },
     });
     return this.changed(organizationId, branch);

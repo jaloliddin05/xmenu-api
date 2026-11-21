@@ -2,7 +2,11 @@ import { INestApplication, Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import request from 'supertest';
 import { AppModule } from 'src/app.module';
-import { createHttpApp, staffToken } from 'src/infra/testing/http-app.fake';
+import {
+  createHttpApp,
+  staffToken,
+  stepUpToken,
+} from 'src/infra/testing/http-app.fake';
 import type { FakeStaffUser } from 'src/infra/testing/http-app.fake';
 import { roleCan } from './permissions';
 import { collectRoutes } from './route-rules';
@@ -48,6 +52,7 @@ const EXPECTED: Record<string, string> = {
   'DELETE /auth/sessions': 'account',
   'GET /auth/sessions': 'account',
   'DELETE /auth/sessions/:id': 'account',
+  'POST /auth/step-up': 'account',
   'GET /branch': 'branches.read',
   'POST /branch': 'venue',
   'DELETE /branch/:id': 'venue',
@@ -58,6 +63,8 @@ const EXPECTED: Record<string, string> = {
   'POST /branch/:id/exceptions': 'venue',
   'DELETE /branch/:id/exceptions/:exceptionId': 'venue',
   'PUT /branch/:id/working-hours': 'venue',
+  'DELETE /branch/:id/telegram-chat': 'venue',
+  'POST /branch/:id/telegram-chat/code': 'venue',
   'GET /branches': 'public',
   'GET /category': 'menu.read',
   'POST /category': 'venue',
@@ -180,6 +187,17 @@ const EXPECTED: Record<string, string> = {
   'GET /user/me': 'account',
 };
 
+/** Critical owner actions: they also need X-Step-Up-Token (POST /auth/step-up). */
+const STEP_UP_EXPECTED: Record<string, string> = {
+  'DELETE /integrations/iiko': 'iiko_disconnected',
+  'PUT /integrations/iiko/key': 'iiko_key_changed',
+  'DELETE /organization/:id': 'organization_deleted',
+  'PUT /payment-provider/:provider': 'payment_keys_changed',
+  'DELETE /telegram-bot': 'telegram_bot_removed',
+  'PUT /telegram-bot': 'telegram_bot_changed',
+  'DELETE /user/:id': 'account_deleted',
+};
+
 const key = (r: RouteInfo) => `${r.method} ${r.path}`;
 const describeRule = (rule: RouteInfo['rule']) =>
   rule === 'public'
@@ -252,6 +270,13 @@ describe('staff access matrix', () => {
     expect(actual).toEqual(EXPECTED);
   });
 
+  it('critical actions need a step-up, and exactly these', () => {
+    const actual = Object.fromEntries(
+      routes.filter((r) => r.stepUp).map((r) => [key(r), r.stepUp]),
+    );
+    expect(actual).toEqual(STEP_UP_EXPECTED);
+  });
+
   it('every path with an organization id declares it, so another venue’s id is refused', () => {
     for (const r of routes) {
       if (r.rule === 'public' || r.rule === null) continue;
@@ -291,10 +316,17 @@ describe('staff access matrix', () => {
         name === r.rule.orgParam ? ORG : ANY_ID,
       );
 
-    const send = (r: RouteInfo & { rule: StaffAccessRule }, user?: string) => {
+    /** With a valid step-up of the same user on critical routes, unless `stepUp` is false. */
+    const send = (
+      r: RouteInfo & { rule: StaffAccessRule },
+      user?: string,
+      stepUp = true,
+    ) => {
       const method = r.method.toLowerCase() as 'get';
       const req = request(app.getHttpServer())[method](pathFor(r));
       if (user) void req.set('Authorization', `Bearer ${staffToken(user)}`);
+      if (user && stepUp && r.stepUp)
+        void req.set('X-Step-Up-Token', stepUpToken(user));
       return ['GET', 'DELETE'].includes(r.method) ? req : req.send({});
     };
 
@@ -306,6 +338,32 @@ describe('staff access matrix', () => {
         expect([label(r), res.status]).toEqual([label(r), 401]);
       }
       expect(calls).toHaveLength(0);
+    });
+
+    it('the owner without a step-up, or with one of another login or user: 403 step_up_required on critical routes, nothing reached', async () => {
+      const critical = staff.filter((r) => r.stepUp);
+      expect(critical).toHaveLength(Object.keys(STEP_UP_EXPECTED).length);
+      const variants: [string, string | undefined][] = [
+        ['none', undefined],
+        ['other login', stepUpToken('owner', 'sid-another-login')],
+        ['other user', stepUpToken('foreign')],
+        ['garbage', 'not-a-token'],
+        ['access token', staffToken('owner')],
+      ];
+      for (const r of critical)
+        for (const [name, token] of variants) {
+          calls.length = 0;
+          const req = send(r, 'owner', false);
+          if (token) void req.set('X-Step-Up-Token', token);
+          const res = await req;
+          expect([label(r), name, res.status, res.body.code]).toEqual([
+            label(r),
+            name,
+            403,
+            'step_up_required',
+          ]);
+          expect([label(r), name, calls.length]).toEqual([label(r), name, 0]);
+        }
     });
 
     it('a disabled operator: 401 everywhere, nothing reached', async () => {

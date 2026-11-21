@@ -44,14 +44,16 @@ npx prisma migrate deploy   # 20261010090000_branches_orders_payments
 
 ## Подключение нового ресторана (по шагам)
 
-1. `POST /branch` — филиал (адрес, координаты, `phone` для SMS, `telegramChatId`).
+1. `POST /branch` — филиал (адрес, координаты, `phone` для SMS).
 2. `PUT /branch/:id/working-hours` — расписание.
 3. `PUT /order-settings` — минимум самовывоза, шаг округления цены доставки, способ доставки (`courierMode`), таймауты;
    `PUT /branch/:id/delivery-pricing` — зоны и правило по расстоянию филиала (`API.md`, «Стоимость доставки»).
-4. Telegram: бот добавить в группу филиала, id группы → `telegramChatId`. Один раз на платформу:
+4. Telegram: `POST /branch/:id/telegram-chat/code` даёт одноразовый код (8 символов, 10 минут); платформенного
+   бота добавить в группу филиала и отправить там `/bind КОД` (`API.md`, «Чат филиала»). Вручную id чата не задаётся.
+   Один раз на платформу:
    ```
    POST https://api.telegram.org/bot<TOKEN>/setWebhook
-   { "url": "<API>/telegram/orders/webhook", "secret_token": "<TELEGRAM_WEBHOOK_SECRET>", "allowed_updates": ["callback_query"] }
+   { "url": "<API>/telegram/orders/webhook", "secret_token": "<TELEGRAM_WEBHOOK_SECRET>", "allowed_updates": ["callback_query", "message"] }
    ```
 5. Платежи: `PUT /payment-provider/click` `{config:{merchantId,serviceId,merchantUserId,secretKey}}`,
    `PUT /payment-provider/payme` `{config:{merchantId,key}}`. `GET /payment-provider` вернёт

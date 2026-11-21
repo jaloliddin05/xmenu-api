@@ -210,7 +210,12 @@ export const ERROR_CODES = spec({
   wrong_password: {
     status: 400,
     message: 'Current password does not match',
-    when: 'Смена пароля: текущий пароль неверен',
+    when: 'Смена пароля или повторное подтверждение (`POST /auth/step-up`): пароль неверен',
+  },
+  step_up_required: {
+    status: 403,
+    message: 'Confirm the action with the password',
+    when: 'Критичное действие владельца без действующего `X-Step-Up-Token`: заголовка нет, токен неверный, просрочен или выдан для другого входа; получить токен: `POST /auth/step-up`',
   },
 
   // Addresses

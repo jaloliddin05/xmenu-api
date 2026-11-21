@@ -46,6 +46,15 @@ import { TelegramUpdateProcessor } from './services/telegram-update.processor';
 import { TelegramBotWebhookController } from './controllers/telegram-bot-webhook.controller';
 import { CustomerAccessTokenStrategy } from './passport-strategies/customer-access-token/customer-access-token.strategy';
 import { NoStoreMiddleware } from './middleware/no-store.middleware';
+import { loadStepUpSecret } from './step-up/step-up.config';
+import { StepUpTokenService } from './step-up/step-up-token.service';
+import { StaffStepUpService } from './step-up/staff-step-up.service';
+import {
+  BullOwnerNotificationQueue,
+  OWNER_NOTIFICATION_QUEUE,
+  OwnerNotificationSender,
+} from './step-up/owner-notification.queue';
+import { OwnerSecurityNotifier } from './step-up/owner-security-notifier.service';
 
 @Module({
   imports: [
@@ -93,6 +102,14 @@ import { NoStoreMiddleware } from './middleware/no-store.middleware';
     CustomerAccessTokenStrategy,
     AccessTokenUserStrategy,
     JwtTokenService,
+    {
+      provide: StepUpTokenService,
+      useFactory: () => new StepUpTokenService(loadStepUpSecret()),
+    },
+    StaffStepUpService,
+    OwnerNotificationSender,
+    { provide: OWNER_NOTIFICATION_QUEUE, useClass: BullOwnerNotificationQueue },
+    OwnerSecurityNotifier,
   ],
   controllers: [
     AuthController,
@@ -106,6 +123,8 @@ import { NoStoreMiddleware } from './middleware/no-store.middleware';
     RateLimitService,
     StaffSessionService,
     StaffAuthEventService,
+    StepUpTokenService,
+    OwnerSecurityNotifier,
   ],
 })
 export class AuthModule implements NestModule {

@@ -13,7 +13,11 @@ import { ApiExcludeController } from '@nestjs/swagger';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
 import { Public } from 'src/modules/auth/decorators/public.decorator';
 import { RestaurantNotifierService } from '../notifications/restaurant-notifier.service';
-import { CALLBACK } from '../notifications/order-messages';
+import { BIND_TEXT, CALLBACK } from '../notifications/order-messages';
+import {
+  BranchChatBindingService,
+  parseBindCommand,
+} from '../services/branch-chat-binding.service';
 import { TelegramApiService } from '../services/telegram-api.service';
 import {
   OrderStaffService,
@@ -31,12 +35,18 @@ interface CallbackQuery {
   message?: { chat: { id: number } };
 }
 
+interface ChatMessage {
+  chat?: { id?: number; type?: string };
+  text?: string;
+}
+
 /**
  * Restoran guruhidagi inline tugmalar (Принять / Отклонить / Далее) shu webhook
- * orqali keladi. Sozlash (bir marta):
+ * orqali keladi; `/bind CODE` in a group binds that chat to a branch (BranchChatBindingService).
+ * Sozlash (bir marta):
  *   POST https://api.telegram.org/bot<TOKEN>/setWebhook
  *     { url: "<API>/telegram/orders/webhook", secret_token: "<TELEGRAM_WEBHOOK_SECRET>",
- *       allowed_updates: ["callback_query"] }
+ *       allowed_updates: ["callback_query", "message"] }
  *
  * Xavfsizlik:
  *  1. secret_token sarlavhasi (timingSafeEqual) — Telegram'dan boshqa hech kim chaqira olmaydi.
@@ -56,13 +66,14 @@ export class TelegramOrdersController {
     private readonly staff: OrderStaffService,
     private readonly telegram: TelegramApiService,
     private readonly restaurant: RestaurantNotifierService,
+    private readonly binding: BranchChatBindingService,
   ) {}
 
   @Post('webhook')
   @HttpCode(200)
   async webhook(
     @Headers('x-telegram-bot-api-secret-token') secret: string | undefined,
-    @Body() update: { callback_query?: CallbackQuery },
+    @Body() update: { callback_query?: CallbackQuery; message?: ChatMessage },
   ) {
     const expected = process.env.TELEGRAM_WEBHOOK_SECRET;
     if (!expected)
@@ -90,7 +101,38 @@ export class TelegramOrdersController {
         );
       }
     }
+    const message = update?.message;
+    if (message) {
+      try {
+        await this.handleMessage(message);
+      } catch (e) {
+        this.logger.error(`message failed: ${errorStack(e)}`);
+      }
+    }
     return { ok: true };
+  }
+
+  /** Only `/bind CODE` is answered; any other message in a branch chat is ignored. */
+  private async handleMessage(message: ChatMessage) {
+    const code = parseBindCommand(message.text);
+    const chatId = message.chat?.id;
+    if (code === undefined || chatId == null) return;
+    const type = message.chat?.type;
+    if (type !== 'group' && type !== 'supergroup')
+      return void (await this.telegram.sendMessage(
+        chatId,
+        BIND_TEXT.groupOnly,
+      ));
+    if (!code)
+      return void (await this.telegram.sendMessage(chatId, BIND_TEXT.usage));
+    const result = await this.binding.bind(String(chatId), code);
+    const text =
+      result.status === 'bound'
+        ? BIND_TEXT.bound(result.branchTitle)
+        : result.status === 'rate_limited'
+          ? BIND_TEXT.tooMany
+          : BIND_TEXT.invalid;
+    await this.telegram.sendMessage(chatId, text);
   }
 
   private async handleCallback(cq: CallbackQuery) {
