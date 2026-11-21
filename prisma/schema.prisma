@@ -241,9 +241,10 @@ model customer {
   organization_id String
   organization    organization   @relation(fields: [organization_id], references: [id], onDelete: Cascade)
 
-  phone           String         // E.164: +998XXXXXXXXX
+  // E.164 +998XXXXXXXXX; phone, name and telegram_id are null after the guest deleted the account (deleted_at)
+  phone           String?
   telegram_id     String?
-  name            String
+  name            String?
   // ru | uz | en; null until the first sign-in, then the venue's default language applies
   language        String?
   status          CustomerStatus @default(active)
@@ -321,7 +322,8 @@ model customer_order {
   idempotency_key String
   request_hash    String
 
-  phone           String
+  // null once anonymized (guest deleted the account or ORDER_PII_RETENTION_DAYS passed)
+  phone           String?
   comment         String?
   // Yetkazib berish manzili snapshot'i (pickup uchun null)
   address_snapshot Json?

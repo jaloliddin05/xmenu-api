@@ -6,6 +6,7 @@ import { CustomerController } from './customer.controller';
 import { CustomerAddressRepository } from './repositories/customer-address.repository';
 import { CustomerRepository } from './repositories/customer.repository';
 import { CustomerAddressService } from './services/customer-address.service';
+import { CustomerAnonymizerService } from './services/customer-anonymizer.service';
 import { CustomerService } from './services/customer.service';
 
 @Module({
@@ -14,9 +15,10 @@ import { CustomerService } from './services/customer.service';
   providers: [
     CustomerRepository,
     CustomerService,
+    CustomerAnonymizerService,
     CustomerAddressRepository,
     CustomerAddressService,
   ],
-  exports: [CustomerRepository, CustomerService],
+  exports: [CustomerRepository, CustomerService, CustomerAnonymizerService],
 })
 export class CustomerModule {}

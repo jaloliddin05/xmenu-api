@@ -232,3 +232,11 @@ describe('customer message for delivery steps', () => {
     );
   });
 });
+
+describe('anonymized order', () => {
+  it('the restaurant text has no phone line and no "null"', () => {
+    const text = buildRestaurantText(order({ phone: null }));
+    expect(text).not.toContain('📞');
+    expect(text).not.toContain('null');
+  });
+});

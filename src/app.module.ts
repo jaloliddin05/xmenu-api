@@ -27,6 +27,7 @@ import { TenantDomainModule } from './modules/tenant-domain/tenant-domain.module
 import { StaffModule } from './modules/staff/staff.module';
 import { ReportModule } from './modules/report/report.module';
 import { PosModule } from './modules/pos/pos.module';
+import { PrivacyModule } from './modules/privacy/privacy.module';
 import { HealthModule } from './modules/health/health.module';
 import { CspReportModule } from './modules/csp-report/csp-report.module';
 @Module({
@@ -51,6 +52,7 @@ import { CspReportModule } from './modules/csp-report/csp-report.module';
     OrganizationModule,
     PaymentModule,
     PosModule,
+    PrivacyModule,
     ProductModule,
     RedisModule,
     SmsModule,

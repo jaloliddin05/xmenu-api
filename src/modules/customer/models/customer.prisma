@@ -17,9 +17,10 @@ model customer {
   organization_id String
   organization    organization   @relation(fields: [organization_id], references: [id], onDelete: Cascade)
 
-  phone           String         // E.164: +998XXXXXXXXX
+  // E.164 +998XXXXXXXXX; phone, name and telegram_id are null after the guest deleted the account (deleted_at)
+  phone           String?
   telegram_id     String?
-  name            String
+  name            String?
   // ru | uz | en; null until the first sign-in, then the venue's default language applies
   language        String?
   status          CustomerStatus @default(active)

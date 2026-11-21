@@ -304,7 +304,8 @@ export class PosOrderService {
         id: order.id,
         number: order.number,
         fulfillment: order.fulfillment,
-        phone: order.phone,
+        // Only accepted orders are pushed; an anonymized order (phone null) is always final
+        phone: order.phone ?? '',
         comment: order.comment,
         customerName: order.customer.name,
         paymentMethod: order.payment_method,

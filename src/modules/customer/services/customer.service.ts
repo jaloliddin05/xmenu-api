@@ -19,14 +19,15 @@ export class CustomerService {
   /** Frontend bilan kelishilgan yagona format: { id, phone, name, language } */
   toUser(c: {
     id: string;
-    phone: string;
-    name: string;
+    phone: string | null;
+    name: string | null;
     language?: string | null;
   }): CustomerUser {
+    // phone and name are null only after the account was deleted; such a guest is never served
     return {
       id: c.id,
-      phone: c.phone,
-      name: c.name,
+      phone: c.phone ?? '',
+      name: c.name ?? '',
       language: c.language ?? null,
     };
   }
