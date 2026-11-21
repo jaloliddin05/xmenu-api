@@ -94,15 +94,18 @@ branch_delivery_distance        -- правило по расстоянию (о�
 |---|---|---|
 | GET | `/branch` | все филиалы, включая скрытые, с расписанием и исключениями |
 | POST | `/branch` | создать |
-| PATCH | `/branch/:id` | поля, `isActive`, `sortOrder`, `telegramChatId`, `acceptsPickup/Delivery` |
+| PATCH | `/branch/:id` | поля, `isActive`, `sortOrder`, `acceptsPickup/Delivery` (`telegramChatId` → 400) |
 | PUT | `/branch/:id/working-hours` | расписание целиком (`weekday` 1=пн … 7=вс; `closesAt <= opensAt` — ночная смена) |
 | POST | `/branch/:id/exceptions` | исключение на дату `YYYY-MM-DD` (upsert) |
 | DELETE | `/branch/:id/exceptions/:exceptionId` | убрать исключение |
 | DELETE | `/branch/:id` | удалить; если есть заказы — только скрыть (`isActive=false`) |
 | GET/PUT | `/branch/:id/delivery-pricing` | правила цены доставки (зоны и расстояние), PUT заменяет целиком |
 | GET | `/branch/:id/delivery-pricing/check?lat=&lng=&subtotal=` | цена от филиала до точки (без учёта часов) |
+| POST | `/branch/:id/telegram-chat/code` | одноразовый код привязки чата `{ code, expiresIn: 600, botUsername }` |
+| DELETE | `/branch/:id/telegram-chat` | отвязать чат (204) |
 
 Правила, расчёт и ошибки: `API.md`, «Стоимость доставки».
 
-`telegramChatId` — группа, куда уходят заказы этого филиала (бот должен быть в ней).
+`telegram_chat_id` (в ответе `GET /branch`) — группа, куда уходят заказы этого филиала. Задаётся только привязкой:
+код из `POST /branch/:id/telegram-chat/code`, затем `/bind КОД` платформенному боту в самой группе (`API.md`, «Чат филиала»).
 `phone` — номер для SMS-эскалации (`+998XXXXXXXXX`).

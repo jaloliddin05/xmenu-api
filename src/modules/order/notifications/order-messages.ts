@@ -313,3 +313,14 @@ export const POS_MENU_IMPORT_TEXT =
  */
 export const POS_RECONNECT_TEXT =
   '🔌 <b>iiko не принял подключение заведения.</b>\nЗаказы принимаются, но в iiko не уходят. Владельцу нужно проверить ключ API в iikoWeb и переподключить iiko в дашборде: «Интеграции → iiko». Если ключ верный, мы уже разбираемся.';
+
+/** Answers of the platform bot to `/bind CODE` in a chat (branch chat binding). */
+export const BIND_TEXT = {
+  bound: (branchTitle: string) =>
+    `✅ Чат привязан к филиалу «${esc(branchTitle)}». Сюда будут приходить новые заказы.`,
+  invalid: 'Код неверный или устарел. Получите новый код в дашборде.',
+  tooMany: 'Слишком много попыток. Попробуйте позже.',
+  groupOnly:
+    'Привязать можно только группу. Добавьте бота в группу филиала и отправьте команду там.',
+  usage: 'Отправьте команду с кодом из дашборда: /bind КОД',
+} as const;

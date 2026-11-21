@@ -91,6 +91,11 @@ export class TelegramApiService {
     });
   }
 
+  /** The bot's own account: the dashboard names it when the owner binds a branch chat. */
+  getMe() {
+    return this.call<{ id: number; username?: string }>('getMe', {});
+  }
+
   answerCallbackQuery(callbackQueryId: string, text?: string) {
     return this.call('answerCallbackQuery', {
       callback_query_id: callbackQueryId,

@@ -70,16 +70,6 @@ export class CreateBranchDto {
   @IsOptional()
   @IsBoolean()
   readonly acceptsDelivery?: boolean;
-
-  @ApiPropertyOptional({
-    example: '-1001234567890',
-    description:
-      "Buyurtma xabarlari yuboriladigan Telegram guruh id'si (bot a'zo bo'lishi shart)",
-  })
-  @IsOptional()
-  @IsString()
-  @MaxLength(40)
-  readonly telegramChatId?: string;
 }
 
 export class UpdateBranchDto {
@@ -125,11 +115,6 @@ export class UpdateBranchDto {
   @IsOptional()
   @IsBoolean()
   readonly acceptsDelivery?: boolean;
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  @MaxLength(40)
-  readonly telegramChatId?: string;
 }
 
 export class WorkingDayDto {
