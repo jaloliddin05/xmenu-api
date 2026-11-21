@@ -449,8 +449,9 @@ App (`instant`) нового номера кладёт Telegram-id в `registrat
   перевыгрузить (`git rm --cached -r . && git reset --hard` на чистом дереве); иначе prettier видит `␍`.
 
 ## Продакшен
-Docker Compose на одном сервере, снаружи Caddy (TLS, `api.xmenu.uz` → `api:4000`); сервисы видят друг друга по
-внутренней сети compose. Образ собирается на сервере (`Dockerfile`, Node 22, Debian slim), `.dockerignore` не пускает в
+Docker Compose на одном сервере, снаружи Caddy (TLS, `api.xmenu.uz` → `api:4000`). api в двух сетях compose:
+`edge` (Caddy, фронты, выход в интернет) и `data` (`internal: true`, PostgreSQL и Redis; фронтов в ней нет), схема в
+`../infra/docker-compose.prod.yml` и корневом `CLAUDE.md`, «Продакшен». Образ собирается на сервере (`Dockerfile`, Node 22, Debian slim), `.dockerignore` не пускает в
 контекст `.env`, `node_modules`, `dist`, `uploads`, тесты и фейки.
 - Цели `Dockerfile`: `runtime` (по умолчанию: `node dist/main`, пользователь `node`, только production-зависимости и
   сгенерированный Prisma-клиент, `prisma generate` при сборке) и `migrate` (разовый контейнер с Prisma CLI:
@@ -461,7 +462,9 @@ Docker Compose на одном сервере, снаружи Caddy (TLS, `api.x
 - Загрузки: том на `/app/uploads` (владелец `node`), отдаются с корня сайта; `PUBLIC_FILES_URL` = публичный адрес API.
 - Переменные запуска: весь `.env.example` (production проверяется `validateEnv`, без ошибок не стартует; проверка без
   запуска в контейнере: `node dist/config/env/check-env.cli.js`). Для Docker важны: `NODE_ENV=production`,
-  `DATABASE_URL` (хост сервиса базы), `REDIS_URL` (`redis://redis:6379`), `TRUST_PROXY` (подсеть сети compose или
+  `DATABASE_URL` (хост сервиса базы), `REDIS_URL` (`redis://:<пароль>@redis:6379`: Redis с паролем, адрес собирает
+  `../infra/scripts/gen-secrets.sh`; пароль из него берут и `RedisModule`, и BullMQ через `bullConnection()`,
+  тест `infra/redis/bull-connection.spec.ts`), `TRUST_PROXY` (адрес Caddy в сети `edge` compose или
   `uniquelocal`, иначе все гости получат IP Caddy и общие лимиты), `NEXT_PUBLIC_URL=http://qr:3000` и
   `CLIENT_REVALIDATE_URL=http://client:3000/api/revalidate` (ревалидация по внутренней сети, не через Caddy),
   `PUBLIC_API_URL=https://api.xmenu.uz`, `PLATFORM_DOMAIN=xmenu.uz`, `DELIVERY_URL_TEMPLATE=https://{slug}.xmenu.uz`.
@@ -500,7 +503,7 @@ Docker Compose на одном сервере, снаружи Caddy (TLS, `api.x
   Caddy передаёт исходный `Host` и ставит `X-Forwarded-For`, `-Proto`, `-Host`; `api`, `dashboard`, `qr`, `app`
   (редирект на `qr`) описаны отдельными сайтами, зарезервированные имена из `RESERVED_SLUGS` под `*.xmenu.uz` отдают
   404 (список в Caddyfile ведётся вручную), всё прочее идёт в `client`. `TRUST_PROXY` = фиксированный адрес Caddy в
-  сети compose (`172.30.0.10`, `../infra/docker-compose.prod.yml`).
+  сети `edge` (`172.30.0.10`, `../infra/docker-compose.prod.yml`).
 - `.github/workflows/deploy.yml` (старый деплой через SSH, `git pull` и pm2) запускается только вручную и под Docker не
   переделан; не запускай его.
 - Прод не стартует с `SMS_PROVIDER=console`, `OTP_DEV_MODE`, пустым `REVALIDATE_SECRET`, `DOMAIN_VERIFY_SKIP=true`, без
