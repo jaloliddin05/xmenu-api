@@ -11,6 +11,7 @@ import { TenantService } from '../tenant/tenant.service';
 import { RevalidateService } from '../revalidate-queue/revalidate.service';
 import { OrganizationSettingsController } from './organization-settings.controller';
 import { OrganizationService } from './services/organization.service';
+import { PosSyncQueue } from '../pos/services/pos-sync.queue';
 import { OrganizationSettingsService } from './services/organization-settings.service';
 
 const ORG_A = '3f2b8c1e-4d5a-4b6c-8d7e-9f0a1b2c3d4e';
@@ -94,6 +95,7 @@ describe('GET/PUT /organization/:id/settings', () => {
             provide: TelegramBotProfileService,
             useValue: { syncMenuButton: jest.fn() },
           },
+          { provide: PosSyncQueue, useValue: {} },
         ],
       },
       [

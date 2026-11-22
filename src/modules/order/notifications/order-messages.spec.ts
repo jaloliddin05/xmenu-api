@@ -3,10 +3,13 @@ import {
   buildDeliveryAlertText,
   buildRestaurantKeyboard,
   buildRestaurantText,
+  CALLBACK,
+  callbackData,
   esc,
   fmtSum,
 } from './order-messages';
 import type { OrderWithItems } from '../services/order-view';
+import { ORDER_STATUSES } from '../domain/order-state-machine';
 
 const order = (over: Record<string, unknown> = {}): OrderWithItems =>
   ({
@@ -76,18 +79,34 @@ describe('restaurant keyboard', () => {
     const kb = buildRestaurantKeyboard(order())!;
     const [accept, reject] = kb.inline_keyboard[0];
     expect(accept.callback_data).toBe(
-      'o:a:11111111-1111-1111-1111-111111111111',
+      'o:a:pending_acceptance:11111111-1111-1111-1111-111111111111',
     );
-    expect(reject.callback_data.startsWith('o:r:')).toBe(true);
+    expect(reject.callback_data).toBe(
+      'o:r:pending_acceptance:11111111-1111-1111-1111-111111111111',
+    );
     for (const b of kb.inline_keyboard.flat())
       expect(Buffer.byteLength(b.callback_data)).toBeLessThanOrEqual(64);
+  });
+
+  it('every button carries the status it was drawn for and fits 64 bytes whatever the status', () => {
+    const id = '11111111-1111-1111-1111-111111111111';
+    for (const status of ORDER_STATUSES)
+      for (const prefix of Object.values(CALLBACK))
+        expect(
+          Buffer.byteLength(callbackData(prefix, status, id)),
+        ).toBeLessThanOrEqual(64);
+    expect(
+      buildRestaurantKeyboard(
+        order({ status: 'preparing', fulfillment: 'pickup' }),
+      )!.inline_keyboard[0][0].callback_data,
+    ).toBe(`o:n:preparing:${id}`);
   });
 
   it('follows the order through the kitchen and ends with no buttons', () => {
     expect(
       buildRestaurantKeyboard(
         order({ status: 'accepted' }),
-      )!.inline_keyboard[0][0].callback_data.startsWith('o:n:'),
+      )!.inline_keyboard[0][0].callback_data.startsWith('o:n:accepted:'),
     ).toBe(true);
     expect(
       buildRestaurantKeyboard(

@@ -12,6 +12,9 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends openssl python3 make g++ \
   && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
+# No Prisma update check (checkpoint): migrate has no internet (data network), and api has no use for it.
+# Set in the image, not in env/api.env: here for build and migrate, in runtime again (it does not start from base)
+ENV CHECKPOINT_DISABLE=1
 
 # All dependencies: the Nest CLI, TypeScript and the Prisma CLI build the app
 FROM base AS deps
@@ -44,7 +47,8 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 ENV NODE_ENV=production \
-  PORT=4000
+  PORT=4000 \
+  CHECKPOINT_DISABLE=1
 COPY --from=prod-deps --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/dist ./dist
 COPY --chown=node:node package.json ./

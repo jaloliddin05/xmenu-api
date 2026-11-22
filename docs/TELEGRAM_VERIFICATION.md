@@ -154,6 +154,9 @@ Webhook и секрет ставятся автоматически, рукам�
    `setMyDescription`, `setMyShortDescription`, `setMyCommands`, `setChatMenuButton` → `true`; `sendMessage` →
    `{ "message_id": 1, "chat": { "id": <chat_id из тела> } }`. Ошибку изображать `{ "ok": false, "error_code": 400,
    "description": "…" }`, медленный Telegram — задержкой ответа. Каждый запрос записывать (метод и тело).
+   Группа, ставшая супергруппой (`xmenu-e2e`: `POST /__e2e/migrate { chatId, newChatId }`): `sendMessage` и
+   `editMessageText` в старый `chat_id` → 400 `{ "ok": false, "error_code": 400, "description": "Bad Request: group
+   chat was upgraded to a supergroup chat", "parameters": { "migrate_to_chat_id": <новый id> } }`, как у Telegram.
 3. `PUT /telegram-bot` требует https `PUBLIC_API_URL`; адрес вебхука уходит только фейку в `setWebhook`, сам Telegram
    его не вызывает, поэтому достаточно любого `https://…` в `PUBLIC_API_URL` стека.
 4. Секрет вебхука тест берёт из тела `setWebhook` (`secret_token`): в БД только хеш. `botKey` — из `url` того же тела

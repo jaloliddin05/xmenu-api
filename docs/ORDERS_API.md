@@ -175,7 +175,8 @@ cash ─────────────────────▶ pending_
 
 `cancelled`: `cancelledBy` = `customer | restaurant | system | pos`;
 `cancelReason`, напр. `declined`, `no_response` (авто-отмена, если ресторан
-не принял за 5 мин — по ранее спроектированной эскалации), `pos_cancelled` (отменён в iiko).
+не принял за 5 мин — по ранее спроектированной эскалации), `pos_cancelled` (отменён в iiko), `payment_expired`
+(гость оставил заказ в `payment_failed` на `PAYMENT_FAILED_TTL_HOURS`, `cancelledBy: system`, гостю не сообщается).
 Клиент может отменить заказ (доставку и самовывоз) только из `awaiting_payment`, `payment_failed`,
 `pending_acceptance` (до принятия рестораном); иначе `409 cancel_not_allowed`.
 Повторная отмена уже отменённого — не ошибка.

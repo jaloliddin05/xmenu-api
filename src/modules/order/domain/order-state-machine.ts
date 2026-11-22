@@ -158,6 +158,12 @@ export const LIVE_STATUSES: readonly OrderStatusName[] = [
   'problem_at_door',
 ];
 
+/**
+ * cancel_reason of an order the guest left in payment_failed for PAYMENT_FAILED_TTL_HOURS (cancelled by the
+ * system, queue/payment-failed-expiry.service.ts; no message to the guest)
+ */
+export const PAYMENT_EXPIRED_REASON = 'payment_expired';
+
 /** Mijozning "faol buyurtma" hisobiga kiradigan holatlar (final emas). */
 export const ACTIVE_STATUSES: readonly OrderStatusName[] = [
   'awaiting_payment',

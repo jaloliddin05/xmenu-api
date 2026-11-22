@@ -18,6 +18,8 @@ import {
 } from '../domain/platform-defaults';
 import { parseTenantId } from 'src/modules/tenant/tenant-key';
 import { AppException } from 'src/infra/errors/app-exception';
+import { ACTIVE_STATUSES } from 'src/modules/order/domain/order-state-machine';
+import { PosSyncQueue } from 'src/modules/pos/services/pos-sync.queue';
 
 /** The user who signs the venue up and becomes its owner. */
 export interface StaffOwner {
@@ -38,6 +40,7 @@ export class OrganizationService {
     private readonly revalidateService: RevalidateService,
     private readonly tenants: TenantService,
     private readonly botProfile: TelegramBotProfileService,
+    private readonly posSync: PosSyncQueue,
   ) {}
 
   /** Creates the venue with its owner row in organization_member (role owner, active). */
@@ -283,12 +286,36 @@ export class OrganizationService {
     });
   }
 
+  /**
+   * Deletes the venue with everything it owns (every relation to organization cascades). Refused with
+   * 409 has_active_orders while an order is not final: the row lock conflicts with the key-share lock an
+   * order insert takes, so no order can slip in between the count and the delete. The iiko schedulers are
+   * removed after the commit, so a refusal or a rollback keeps them; a job firing in between finds no row.
+   */
   async delete(id: string, organizationId: string) {
     this.assertOwn(id, organizationId);
-    const deleted = await this.prismaService.organization.delete({
-      where: { id },
+    const integration = await this.prismaService.pos_integration.findUnique({
+      where: { organization_id: id },
+      select: { id: true },
+    });
+    const deleted = await this.prismaService.$transaction(async (tx) => {
+      const locked = await tx.$queryRaw<{ id: string }[]>`
+        SELECT "id" FROM "organization" WHERE "id" = ${id} FOR UPDATE`;
+      if (locked.length === 0)
+        throw new AppException('not_found', {
+          message: 'Organization not found',
+        });
+      const activeOrders = await tx.customer_order.count({
+        where: { organization_id: id, status: { in: [...ACTIVE_STATUSES] } },
+      });
+      if (activeOrders > 0)
+        throw new AppException('has_active_orders', {
+          details: { activeOrders },
+        });
+      return tx.organization.delete({ where: { id } });
     });
     this.tenants.invalidate(id);
+    if (integration) await this.posSync.unschedule(integration.id);
     return deleted;
   }
 

@@ -13,6 +13,7 @@ import {
   PosAlert,
 } from './order-messages';
 import type { OrderWithItems } from '../services/order-view';
+import { FINAL_STATUSES } from '../domain/order-state-machine';
 
 const include = {
   items: { include: { options: true } },
@@ -27,10 +28,19 @@ const include = {
   },
 } as const;
 
+/** A reply to the order card that still goes out when the card is gone (the chat moved to a supergroup). */
+const replyTo = (messageId: number) => ({
+  reply_to_message_id: messageId,
+  allow_sending_without_reply: true,
+});
+
 /**
  * Restoran Telegram guruhiga buyurtma xabari. Tugmalar (Принять / Отклонить ...)
  * xabarni TAHRIRLAYDI, yangisini yubormaydi — guruh to'lib ketmasligi uchun.
  * Xabar id'si buyurtmada saqlanadi (tg_chat_id / tg_message_id).
+ *
+ * Every message to a branch chat goes through sendToChat / editInChat: a group that became a supergroup answers
+ * with its new id (migrate_to_chat_id), the binding moves there (migrateChat) and the message is sent once more.
  */
 @Injectable()
 export class RestaurantNotifierService {
@@ -60,7 +70,7 @@ export class RestaurantNotifierService {
       return false;
     }
 
-    const sent = await this.telegram.sendMessage(
+    const sent = await this.sendToChat(
       chatId,
       buildRestaurantText(order as OrderWithItems),
       {
@@ -83,22 +93,88 @@ export class RestaurantNotifierService {
   async refreshMessage(orderId: string): Promise<void> {
     const order = await this.load(orderId);
     if (!order?.tg_chat_id || !order.tg_message_id) return;
-    await this.telegram.editMessageText(
+    const outcome = await this.telegram.editMessageTextWithOutcome(
       order.tg_chat_id,
       order.tg_message_id,
       buildRestaurantText(order as OrderWithItems),
       buildRestaurantKeyboard(order),
     );
+    // The chat became a supergroup: migrateChat posts the cards of unfinished orders there afresh
+    if (outcome.migrateToChatId)
+      await this.migrateChat(order.tg_chat_id, outcome.migrateToChatId);
+  }
+
+  /**
+   * The group of a branch became a supergroup (Telegram gives it a new id): every branch bound to the old id
+   * moves to the new one, and every unfinished order whose card was in the old chat gets a new card there (the
+   * old card cannot be edited any more). Idempotent: a second call finds nothing bound to the old id. Both the
+   * service messages of the migration (webhook) and an error answer to a send (sendToChat) call it.
+   */
+  async migrateChat(oldChatId: string, newChatId: string): Promise<void> {
+    if (!oldChatId || !newChatId || oldChatId === newChatId) return;
+    const branches = await this.prisma.branch.updateMany({
+      where: { telegram_chat_id: oldChatId },
+      data: { telegram_chat_id: newChatId },
+    });
+    const orders = await this.prisma.customer_order.findMany({
+      where: {
+        tg_chat_id: oldChatId,
+        status: { notIn: [...FINAL_STATUSES] },
+      },
+      select: { id: true },
+    });
+    let reposted = 0;
+    for (const { id } of orders) {
+      // Claim the order, so two calls at once never post two cards
+      const claimed = await this.prisma.customer_order.updateMany({
+        where: { id, tg_chat_id: oldChatId },
+        data: { tg_chat_id: newChatId, tg_message_id: null },
+      });
+      if (claimed.count === 0) continue;
+      const order = await this.load(id);
+      if (!order) continue;
+      const sent = await this.telegram.sendMessage(
+        newChatId,
+        buildRestaurantText(order as OrderWithItems),
+        { reply_markup: buildRestaurantKeyboard(order) },
+      );
+      if (!sent) continue;
+      await this.prisma.customer_order.update({
+        where: { id },
+        data: { tg_message_id: sent.message_id },
+      });
+      reposted++;
+    }
+    if (branches.count > 0 || reposted > 0)
+      this.logger.log(
+        `chat ${oldChatId} became ${newChatId}: ${branches.count} branches moved, ${reposted} cards posted again`,
+      );
+  }
+
+  /** sendMessage to a branch chat; after a move to a supergroup the binding follows and the message is sent once more. */
+  private async sendToChat(
+    chatId: string,
+    text: string,
+    extra: Record<string, unknown> = {},
+  ) {
+    const outcome = await this.telegram.sendMessageWithOutcome(
+      chatId,
+      text,
+      extra,
+    );
+    if (!outcome.migrateToChatId) return outcome.result;
+    await this.migrateChat(chatId, outcome.migrateToChatId);
+    return this.telegram.sendMessage(outcome.migrateToChatId, text, extra);
   }
 
   /** Eskalatsiya: tasdiqlanmagan buyurtma haqida eslatma (asl xabarga javob sifatida). */
   async ping(orderId: string, minutesWaiting: number): Promise<void> {
     const order = await this.load(orderId);
     if (!order?.tg_chat_id) return;
-    await this.telegram.sendMessage(
+    await this.sendToChat(
       order.tg_chat_id,
       `⏰ <b>Заказ №${order.number} ждёт подтверждения уже ${minutesWaiting} мин!</b>\nПримите или отклоните его кнопками выше.`,
-      order.tg_message_id ? { reply_to_message_id: order.tg_message_id } : {},
+      order.tg_message_id ? replyTo(order.tg_message_id) : {},
     );
   }
 
@@ -148,7 +224,7 @@ export class RestaurantNotifierService {
       select: { telegram_chat_id: true },
     });
     for (const chatId of new Set(branches.map((b) => b.telegram_chat_id!)))
-      await this.telegram.sendMessage(chatId, text);
+      await this.sendToChat(chatId, text);
   }
 
   private async alertDelivery(
@@ -183,11 +259,11 @@ export class RestaurantNotifierService {
       });
       courierName = c?.name ?? null;
     }
-    await this.telegram.sendMessage(
+    await this.sendToChat(
       chatId,
       text(order.number, courierName),
       order.tg_message_id && order.tg_chat_id
-        ? { reply_to_message_id: order.tg_message_id }
+        ? replyTo(order.tg_message_id)
         : {},
     );
   }

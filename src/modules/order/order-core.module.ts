@@ -8,6 +8,8 @@ import { RestaurantNotifierService } from './notifications/restaurant-notifier.s
 import { EscalationProcessor } from './queue/escalation.processor';
 import { GuestNotificationProcessor } from './queue/guest-notification.processor';
 import { OrderQueueService } from './queue/order-queue.service';
+import { PaymentFailedExpiryQueue } from './queue/payment-failed-expiry.queue';
+import { PaymentFailedExpiryService } from './queue/payment-failed-expiry.service';
 import { OrderSettingsService } from './services/order-settings.service';
 import { OrderTransitionService } from './services/order-transition.service';
 import { TelegramApiService } from './services/telegram-api.service';
@@ -29,6 +31,8 @@ import { TelegramApiService } from './services/telegram-api.service';
     OrderTransitionService,
     EscalationProcessor,
     GuestNotificationProcessor,
+    PaymentFailedExpiryService,
+    PaymentFailedExpiryQueue,
   ],
   exports: [
     TelegramApiService,

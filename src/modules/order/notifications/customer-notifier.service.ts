@@ -56,6 +56,7 @@ export class CustomerNotifierService {
         payment_method: true,
         payment_status: true,
         cancelled_by: true,
+        cancel_reason: true,
         fulfillment: true,
         door_problem: true,
         courier: { select: { name: true } },

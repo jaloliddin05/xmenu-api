@@ -1427,6 +1427,7 @@
         "x-permission": "venue"
       },
       "delete": {
+        "description": "Deletes the venue with its menu, branches, guests, orders, couriers and integrations. Refused while an order is not final.",
         "operationId": "OrganizationController_remove",
         "parameters": [
           {
@@ -1448,8 +1449,14 @@
           }
         ],
         "responses": {
+          "204": {
+            "description": "Venue deleted"
+          },
           "403": {
             "description": "step_up_required: confirm the action with the password (POST /auth/step-up)"
+          },
+          "409": {
+            "description": "has_active_orders: the venue has unfinished orders"
           },
           "default": {
             "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
@@ -1462,7 +1469,7 @@
             }
           }
         },
-        "summary": "Method: delete",
+        "summary": "Delete the venue",
         "tags": [
           "Organization"
         ],
@@ -2389,6 +2396,716 @@
           "Telegram bot"
         ],
         "x-permission": "venue"
+      }
+    },
+    "/integrations/iiko": {
+      "get": {
+        "operationId": "PosIikoController_status",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosStatusDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Status, steps, links and the last checks",
+        "tags": [
+          "POS (iiko)"
+        ],
+        "x-permission": "venue"
+      },
+      "delete": {
+        "operationId": "PosIikoController_disconnect",
+        "parameters": [
+          {
+            "name": "X-Step-Up-Token",
+            "in": "header",
+            "description": "Token from POST /auth/step-up (5 minutes, this login only); missing, invalid or expired: 403 step_up_required",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosDisconnectedDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "step_up_required: confirm the action with the password (POST /auth/step-up)"
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Disconnect: the webhook is removed in iiko, dishes stay as ordinary Xmenu dishes, the history of sent orders stays; waits up to 10 s for a running menu import (409 pos_busy after)",
+        "tags": [
+          "POS (iiko)"
+        ],
+        "x-permission": "venue"
+      }
+    },
+    "/integrations/iiko/key": {
+      "put": {
+        "operationId": "PosIikoController_setKey",
+        "parameters": [
+          {
+            "name": "X-Step-Up-Token",
+            "in": "header",
+            "description": "Token from POST /auth/step-up (5 minutes, this login only); missing, invalid or expired: 403 step_up_required",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosKeyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosKeyResultDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "step_up_required: confirm the action with the password (POST /auth/step-up)"
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Step 1: the restaurant API key (checked by getting a token, stored encrypted); answers the iiko organizations",
+        "tags": [
+          "POS (iiko)"
+        ],
+        "x-permission": "venue"
+      }
+    },
+    "/integrations/iiko/organizations": {
+      "get": {
+        "operationId": "PosIikoController_organizations",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosOrganizationsDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "iiko organizations of the key",
+        "tags": [
+          "POS (iiko)"
+        ],
+        "x-permission": "venue"
+      }
+    },
+    "/integrations/iiko/organization": {
+      "put": {
+        "operationId": "PosIikoController_setOrganization",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosOrganizationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosStatusDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Step 2: the iiko organization; its address format is read at once",
+        "tags": [
+          "POS (iiko)"
+        ],
+        "x-permission": "venue"
+      }
+    },
+    "/integrations/iiko/dictionaries": {
+      "get": {
+        "operationId": "PosIikoController_dictionaries",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosDictionariesDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Terminal groups (cash desk online), payment types, external menus, price categories, items for \"Delivery\"",
+        "tags": [
+          "POS (iiko)"
+        ],
+        "x-permission": "venue"
+      }
+    },
+    "/integrations/iiko/links": {
+      "put": {
+        "operationId": "PosIikoController_setLinks",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosLinksDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosStatusDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Steps 3–5: branches ↔ terminal groups, payment methods ↔ payment types, the \"Delivery\" item, external menu and price category (replaces all)",
+        "tags": [
+          "POS (iiko)"
+        ],
+        "x-permission": "venue"
+      }
+    },
+    "/integrations/iiko/menu/preview": {
+      "post": {
+        "operationId": "PosIikoController_preview",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosPreviewDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "What enabling (or \"match again\") does: pairs by name, new iiko positions, dishes to hide",
+        "tags": [
+          "POS (iiko)"
+        ],
+        "x-permission": "venue"
+      }
+    },
+    "/integrations/iiko/checks": {
+      "post": {
+        "operationId": "PosIikoController_checks",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosStatusDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Run the checks: delivery module, key rights, cash desks online",
+        "tags": [
+          "POS (iiko)"
+        ],
+        "x-permission": "venue"
+      }
+    },
+    "/integrations/iiko/enable": {
+      "post": {
+        "operationId": "PosIikoController_enable",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosEnableDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosStatusDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Enable: all steps and checks green, menu imported with the confirmed pairs, webhook set in iiko",
+        "tags": [
+          "POS (iiko)"
+        ],
+        "x-permission": "venue"
+      }
+    },
+    "/integrations/iiko/menu/import": {
+      "post": {
+        "operationId": "PosIikoController_importMenu",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosAcceptedDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "\"Обновить меню\": queues an import (the result shows in GET: menuImportedAt, menuImportError)",
+        "tags": [
+          "POS (iiko)"
+        ],
+        "x-permission": "venue"
+      }
+    },
+    "/integrations/iiko/menu/rematch": {
+      "post": {
+        "operationId": "PosIikoController_rematch",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosRematchDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosStatusDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "\"Сопоставить заново\": imports the menu now pairing the dishes without a link (as on enabling); dishes left without a pair are hidden",
+        "tags": [
+          "POS (iiko)"
+        ],
+        "x-permission": "venue"
+      }
+    },
+    "/integrations/iiko/couriers": {
+      "put": {
+        "operationId": "PosIikoController_setCouriers",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosCourierModeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosStatusDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Courier mode: Xmenu or iiko couriers (only without open delivery orders)",
+        "tags": [
+          "POS (iiko)"
+        ],
+        "x-permission": "venue"
+      }
+    },
+    "/order/{id}/pos/retry": {
+      "post": {
+        "operationId": "PosOrderController_retry",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosOrderViewDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "«Повторить»: a new round of attempts for an order not sent to iiko",
+        "tags": [
+          "POS (iiko)"
+        ],
+        "x-permission": "orders"
+      }
+    },
+    "/order/{id}/pos/manual": {
+      "post": {
+        "operationId": "PosOrderController_manual",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosManualDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosOrderViewDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "«Внесён вручную»: the operator entered the order into iiko",
+        "tags": [
+          "POS (iiko)"
+        ],
+        "x-permission": "orders"
+      }
+    },
+    "/order/{id}/pos/streets": {
+      "get": {
+        "operationId": "PosOrderController_streets",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Part of the name",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosStreetsDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Streets of the iiko directory for an order waiting for a street",
+        "tags": [
+          "POS (iiko)"
+        ],
+        "x-permission": "orders"
+      }
+    },
+    "/order/{id}/pos/street": {
+      "put": {
+        "operationId": "PosOrderController_setStreet",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosStreetDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosOrderViewDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "The street and house for iiko; the order is sent again",
+        "tags": [
+          "POS (iiko)"
+        ],
+        "x-permission": "orders"
       }
     },
     "/customers/me": {
@@ -5499,716 +6216,6 @@
         "tags": [
           "Menu (customer)"
         ]
-      }
-    },
-    "/integrations/iiko": {
-      "get": {
-        "operationId": "PosIikoController_status",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PosStatusDto"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Status, steps, links and the last checks",
-        "tags": [
-          "POS (iiko)"
-        ],
-        "x-permission": "venue"
-      },
-      "delete": {
-        "operationId": "PosIikoController_disconnect",
-        "parameters": [
-          {
-            "name": "X-Step-Up-Token",
-            "in": "header",
-            "description": "Token from POST /auth/step-up (5 minutes, this login only); missing, invalid or expired: 403 step_up_required",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PosDisconnectedDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "step_up_required: confirm the action with the password (POST /auth/step-up)"
-          },
-          "default": {
-            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Disconnect: the webhook is removed in iiko, dishes stay as ordinary Xmenu dishes, the history of sent orders stays; waits up to 10 s for a running menu import (409 pos_busy after)",
-        "tags": [
-          "POS (iiko)"
-        ],
-        "x-permission": "venue"
-      }
-    },
-    "/integrations/iiko/key": {
-      "put": {
-        "operationId": "PosIikoController_setKey",
-        "parameters": [
-          {
-            "name": "X-Step-Up-Token",
-            "in": "header",
-            "description": "Token from POST /auth/step-up (5 minutes, this login only); missing, invalid or expired: 403 step_up_required",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PosKeyDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PosKeyResultDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "step_up_required: confirm the action with the password (POST /auth/step-up)"
-          },
-          "default": {
-            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Step 1: the restaurant API key (checked by getting a token, stored encrypted); answers the iiko organizations",
-        "tags": [
-          "POS (iiko)"
-        ],
-        "x-permission": "venue"
-      }
-    },
-    "/integrations/iiko/organizations": {
-      "get": {
-        "operationId": "PosIikoController_organizations",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PosOrganizationsDto"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "summary": "iiko organizations of the key",
-        "tags": [
-          "POS (iiko)"
-        ],
-        "x-permission": "venue"
-      }
-    },
-    "/integrations/iiko/organization": {
-      "put": {
-        "operationId": "PosIikoController_setOrganization",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PosOrganizationDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PosStatusDto"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Step 2: the iiko organization; its address format is read at once",
-        "tags": [
-          "POS (iiko)"
-        ],
-        "x-permission": "venue"
-      }
-    },
-    "/integrations/iiko/dictionaries": {
-      "get": {
-        "operationId": "PosIikoController_dictionaries",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PosDictionariesDto"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Terminal groups (cash desk online), payment types, external menus, price categories, items for \"Delivery\"",
-        "tags": [
-          "POS (iiko)"
-        ],
-        "x-permission": "venue"
-      }
-    },
-    "/integrations/iiko/links": {
-      "put": {
-        "operationId": "PosIikoController_setLinks",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PosLinksDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PosStatusDto"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Steps 3–5: branches ↔ terminal groups, payment methods ↔ payment types, the \"Delivery\" item, external menu and price category (replaces all)",
-        "tags": [
-          "POS (iiko)"
-        ],
-        "x-permission": "venue"
-      }
-    },
-    "/integrations/iiko/menu/preview": {
-      "post": {
-        "operationId": "PosIikoController_preview",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PosPreviewDto"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "summary": "What enabling (or \"match again\") does: pairs by name, new iiko positions, dishes to hide",
-        "tags": [
-          "POS (iiko)"
-        ],
-        "x-permission": "venue"
-      }
-    },
-    "/integrations/iiko/checks": {
-      "post": {
-        "operationId": "PosIikoController_checks",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PosStatusDto"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Run the checks: delivery module, key rights, cash desks online",
-        "tags": [
-          "POS (iiko)"
-        ],
-        "x-permission": "venue"
-      }
-    },
-    "/integrations/iiko/enable": {
-      "post": {
-        "operationId": "PosIikoController_enable",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PosEnableDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PosStatusDto"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Enable: all steps and checks green, menu imported with the confirmed pairs, webhook set in iiko",
-        "tags": [
-          "POS (iiko)"
-        ],
-        "x-permission": "venue"
-      }
-    },
-    "/integrations/iiko/menu/import": {
-      "post": {
-        "operationId": "PosIikoController_importMenu",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PosAcceptedDto"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "summary": "\"Обновить меню\": queues an import (the result shows in GET: menuImportedAt, menuImportError)",
-        "tags": [
-          "POS (iiko)"
-        ],
-        "x-permission": "venue"
-      }
-    },
-    "/integrations/iiko/menu/rematch": {
-      "post": {
-        "operationId": "PosIikoController_rematch",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PosRematchDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PosStatusDto"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "summary": "\"Сопоставить заново\": imports the menu now pairing the dishes without a link (as on enabling); dishes left without a pair are hidden",
-        "tags": [
-          "POS (iiko)"
-        ],
-        "x-permission": "venue"
-      }
-    },
-    "/integrations/iiko/couriers": {
-      "put": {
-        "operationId": "PosIikoController_setCouriers",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PosCourierModeDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PosStatusDto"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Courier mode: Xmenu or iiko couriers (only without open delivery orders)",
-        "tags": [
-          "POS (iiko)"
-        ],
-        "x-permission": "venue"
-      }
-    },
-    "/order/{id}/pos/retry": {
-      "post": {
-        "operationId": "PosOrderController_retry",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PosOrderViewDto"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "summary": "«Повторить»: a new round of attempts for an order not sent to iiko",
-        "tags": [
-          "POS (iiko)"
-        ],
-        "x-permission": "orders"
-      }
-    },
-    "/order/{id}/pos/manual": {
-      "post": {
-        "operationId": "PosOrderController_manual",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PosManualDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PosOrderViewDto"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "summary": "«Внесён вручную»: the operator entered the order into iiko",
-        "tags": [
-          "POS (iiko)"
-        ],
-        "x-permission": "orders"
-      }
-    },
-    "/order/{id}/pos/streets": {
-      "get": {
-        "operationId": "PosOrderController_streets",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "q",
-            "required": false,
-            "in": "query",
-            "description": "Part of the name",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PosStreetsDto"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Streets of the iiko directory for an order waiting for a street",
-        "tags": [
-          "POS (iiko)"
-        ],
-        "x-permission": "orders"
-      }
-    },
-    "/order/{id}/pos/street": {
-      "put": {
-        "operationId": "PosOrderController_setStreet",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PosStreetDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PosOrderViewDto"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "summary": "The street and house for iiko; the order is sent again",
-        "tags": [
-          "POS (iiko)"
-        ],
-        "x-permission": "orders"
       }
     },
     "/product": {
@@ -9973,6 +9980,1005 @@
           "leftOnBot"
         ]
       },
+      "PosAlertDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "menu_import_failed",
+              "key_revoked"
+            ],
+            "description": "menu_import_failed: the last menu import failed (menuImportError tells why); key_revoked: iiko rejects the key, the owner reconnects"
+          },
+          "at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "at"
+        ]
+      },
+      "PosStepsDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "enum": [
+              "done",
+              "todo"
+            ]
+          },
+          "organization": {
+            "type": "string",
+            "enum": [
+              "done",
+              "todo"
+            ]
+          },
+          "branches": {
+            "type": "string",
+            "enum": [
+              "done",
+              "todo"
+            ]
+          },
+          "payments": {
+            "type": "string",
+            "enum": [
+              "done",
+              "todo"
+            ]
+          },
+          "menu": {
+            "type": "string",
+            "enum": [
+              "done",
+              "todo"
+            ]
+          }
+        },
+        "required": [
+          "key",
+          "organization",
+          "branches",
+          "payments",
+          "menu"
+        ]
+      },
+      "PosDeliveryItemDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "description": "iiko item (productId) of the external menu"
+          },
+          "sizeId": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "itemId"
+        ]
+      },
+      "PosBranchLinkDto": {
+        "type": "object",
+        "properties": {
+          "branchId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "terminalGroupId": {
+            "type": "string",
+            "description": "iiko terminal group id"
+          }
+        },
+        "required": [
+          "branchId",
+          "terminalGroupId"
+        ]
+      },
+      "PosPaymentLinkDto": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "type": "string",
+            "enum": [
+              "cash",
+              "card",
+              "online"
+            ]
+          },
+          "paymentTypeId": {
+            "type": "string",
+            "description": "iiko payment type id"
+          }
+        },
+        "required": [
+          "method",
+          "paymentTypeId"
+        ]
+      },
+      "PosCheckDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "enum": [
+              "delivery_module",
+              "key_access",
+              "terminal_alive"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "fail",
+              "unknown"
+            ]
+          },
+          "branchId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "terminal_alive only"
+          },
+          "code": {
+            "type": "string",
+            "description": "Error code of a failed check: pos_module_missing, pos_access_denied, pos_access_blocked, pos_key_invalid, pos_unavailable"
+          }
+        },
+        "required": [
+          "key",
+          "status"
+        ]
+      },
+      "PosStatusDto": {
+        "type": "object",
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "description": "The platform can connect iiko (its iiko application and key storage are set up); false: the connection form is not shown, connecting answers 503 platform_misconfigured"
+          },
+          "connected": {
+            "type": "boolean",
+            "description": "False without an integration and after disconnecting"
+          },
+          "status": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "draft",
+              "active",
+              "needs_reconnect"
+            ]
+          },
+          "alert": {
+            "nullable": true,
+            "description": "What the owner is warned about (a banner); the branch chats got one message when it was raised",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PosAlertDto"
+              }
+            ]
+          },
+          "steps": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PosStepsDto"
+              }
+            ]
+          },
+          "externalOrgId": {
+            "type": "string",
+            "nullable": true
+          },
+          "addressFormat": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "city",
+              "legacy",
+              "international",
+              "int_no_postcode",
+              "unknown"
+            ],
+            "description": "How the iiko organization takes addresses (addressFormatType): city = a line with coordinates; the others = a street from the iiko directory and a house (matched from the address when it can be, otherwise the operator picks it)"
+          },
+          "courierMode": {
+            "type": "string",
+            "enum": [
+              "xmenu",
+              "iiko"
+            ]
+          },
+          "externalMenuId": {
+            "type": "string",
+            "nullable": true
+          },
+          "priceCategoryId": {
+            "type": "string",
+            "nullable": true
+          },
+          "deliveryItem": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PosDeliveryItemDto"
+              }
+            ]
+          },
+          "branches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosBranchLinkDto"
+            }
+          },
+          "payments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosPaymentLinkDto"
+            }
+          },
+          "checks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosCheckDto"
+            }
+          },
+          "checkedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "menuImportedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "menuImportError": {
+            "type": "string",
+            "nullable": true,
+            "description": "Error code of the last failed menu import (the previous menu stays)"
+          },
+          "stopListUpdatedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "enabledAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "available",
+          "connected",
+          "status",
+          "alert",
+          "steps",
+          "externalOrgId",
+          "addressFormat",
+          "courierMode",
+          "externalMenuId",
+          "priceCategoryId",
+          "deliveryItem",
+          "branches",
+          "payments",
+          "checks",
+          "checkedAt",
+          "menuImportedAt",
+          "menuImportError",
+          "stopListUpdatedAt",
+          "enabledAt"
+        ]
+      },
+      "PosKeyDto": {
+        "type": "object",
+        "properties": {
+          "apiKey": {
+            "type": "string",
+            "description": "API key the restaurant created in iikoWeb. Stored encrypted; never returned",
+            "example": "b1c2d3e4f5"
+          }
+        },
+        "required": [
+          "apiKey"
+        ]
+      },
+      "PosNamedDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "PosKeyResultDto": {
+        "type": "object",
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "description": "The platform can connect iiko (its iiko application and key storage are set up); false: the connection form is not shown, connecting answers 503 platform_misconfigured"
+          },
+          "connected": {
+            "type": "boolean",
+            "description": "False without an integration and after disconnecting"
+          },
+          "status": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "draft",
+              "active",
+              "needs_reconnect"
+            ]
+          },
+          "alert": {
+            "nullable": true,
+            "description": "What the owner is warned about (a banner); the branch chats got one message when it was raised",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PosAlertDto"
+              }
+            ]
+          },
+          "steps": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PosStepsDto"
+              }
+            ]
+          },
+          "externalOrgId": {
+            "type": "string",
+            "nullable": true
+          },
+          "addressFormat": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "city",
+              "legacy",
+              "international",
+              "int_no_postcode",
+              "unknown"
+            ],
+            "description": "How the iiko organization takes addresses (addressFormatType): city = a line with coordinates; the others = a street from the iiko directory and a house (matched from the address when it can be, otherwise the operator picks it)"
+          },
+          "courierMode": {
+            "type": "string",
+            "enum": [
+              "xmenu",
+              "iiko"
+            ]
+          },
+          "externalMenuId": {
+            "type": "string",
+            "nullable": true
+          },
+          "priceCategoryId": {
+            "type": "string",
+            "nullable": true
+          },
+          "deliveryItem": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PosDeliveryItemDto"
+              }
+            ]
+          },
+          "branches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosBranchLinkDto"
+            }
+          },
+          "payments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosPaymentLinkDto"
+            }
+          },
+          "checks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosCheckDto"
+            }
+          },
+          "checkedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "menuImportedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "menuImportError": {
+            "type": "string",
+            "nullable": true,
+            "description": "Error code of the last failed menu import (the previous menu stays)"
+          },
+          "stopListUpdatedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "enabledAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "organizations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosNamedDto"
+            }
+          }
+        },
+        "required": [
+          "available",
+          "connected",
+          "status",
+          "alert",
+          "steps",
+          "externalOrgId",
+          "addressFormat",
+          "courierMode",
+          "externalMenuId",
+          "priceCategoryId",
+          "deliveryItem",
+          "branches",
+          "payments",
+          "checks",
+          "checkedAt",
+          "menuImportedAt",
+          "menuImportError",
+          "stopListUpdatedAt",
+          "enabledAt",
+          "organizations"
+        ]
+      },
+      "PosOrganizationsDto": {
+        "type": "object",
+        "properties": {
+          "organizations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosNamedDto"
+            }
+          }
+        },
+        "required": [
+          "organizations"
+        ]
+      },
+      "PosOrganizationDto": {
+        "type": "object",
+        "properties": {
+          "externalOrgId": {
+            "type": "string",
+            "description": "iiko organization id (GET .../organizations)"
+          }
+        },
+        "required": [
+          "externalOrgId"
+        ]
+      },
+      "PosTerminalGroupDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "isAlive": {
+            "type": "boolean",
+            "nullable": true,
+            "description": "Cash desk online (null: unknown)"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "isAlive"
+        ]
+      },
+      "PosPaymentTypeDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "description": "iiko paymentTypeKind: Cash, Card, External, ..."
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "kind"
+        ]
+      },
+      "PosServiceItemDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sizes": {
+            "description": "Sizes (id, name) when the item has several",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosNamedDto"
+            }
+          },
+          "openPrice": {
+            "type": "boolean",
+            "description": "iiko lets the order set its price (canSetOpenPrice)"
+          }
+        },
+        "required": [
+          "itemId",
+          "name",
+          "sizes",
+          "openPrice"
+        ]
+      },
+      "PosDictionariesDto": {
+        "type": "object",
+        "properties": {
+          "terminalGroups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosTerminalGroupDto"
+            }
+          },
+          "paymentTypes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosPaymentTypeDto"
+            }
+          },
+          "externalMenus": {
+            "description": "Empty: no external menu in iiko (the dashboard shows how to set it up)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosNamedDto"
+            }
+          },
+          "priceCategories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosNamedDto"
+            }
+          },
+          "serviceItems": {
+            "description": "Items of the chosen external menu (empty until one is chosen)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosServiceItemDto"
+            }
+          }
+        },
+        "required": [
+          "terminalGroups",
+          "paymentTypes",
+          "externalMenus",
+          "priceCategories",
+          "serviceItems"
+        ]
+      },
+      "PosBranchLinkInputDto": {
+        "type": "object",
+        "properties": {
+          "branchId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "terminalGroupId": {
+            "type": "string",
+            "description": "iiko terminal group id"
+          },
+          "priceCategoryId": {
+            "type": "string",
+            "nullable": true,
+            "description": "One price category for the venue: null or the same as `priceCategoryId` of the links, another one is rejected (`price_category_differs`); not stored"
+          }
+        },
+        "required": [
+          "branchId",
+          "terminalGroupId"
+        ]
+      },
+      "PosLinksDto": {
+        "type": "object",
+        "properties": {
+          "externalMenuId": {
+            "type": "string",
+            "description": "External menu id (GET .../dictionaries)"
+          },
+          "priceCategoryId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Price category of the external menu, one for the venue: the menu prices are imported in it and every order carries it (deliveries/create priceCategoryId); null = iiko default"
+          },
+          "branches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosBranchLinkInputDto"
+            }
+          },
+          "payments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosPaymentLinkDto"
+            }
+          },
+          "deliveryItem": {
+            "nullable": true,
+            "description": "Service item \"Delivery\": the delivery fee goes to iiko as this position",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PosDeliveryItemDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "externalMenuId",
+          "branches",
+          "payments"
+        ]
+      },
+      "PosPreviewPairDto": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "productTitle": {
+            "type": "string",
+            "nullable": true
+          },
+          "itemId": {
+            "type": "string"
+          },
+          "itemName": {
+            "type": "string"
+          },
+          "byName": {
+            "type": "boolean",
+            "description": "Paired by exact name (not confirmed yet)"
+          }
+        },
+        "required": [
+          "productId",
+          "productTitle",
+          "itemId",
+          "itemName",
+          "byName"
+        ]
+      },
+      "PosPreviewDto": {
+        "type": "object",
+        "properties": {
+          "pairs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosPreviewPairDto"
+            }
+          },
+          "newItems": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "itemId": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "iiko positions without a pair: created"
+          },
+          "unmatched": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "productId": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string",
+                  "nullable": true
+                }
+              }
+            },
+            "description": "Dishes without a pair: hidden, not deleted"
+          }
+        },
+        "required": [
+          "pairs",
+          "newItems",
+          "unmatched"
+        ]
+      },
+      "PosMatchDto": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Xmenu dish"
+          },
+          "itemId": {
+            "type": "string",
+            "nullable": true,
+            "description": "iiko item it pairs with; null = no pair (the dish is hidden)"
+          }
+        },
+        "required": [
+          "productId",
+          "itemId"
+        ]
+      },
+      "PosEnableDto": {
+        "type": "object",
+        "properties": {
+          "matches": {
+            "description": "Pairs the owner confirmed in the preview; dishes not listed pair by exact name",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosMatchDto"
+            }
+          }
+        }
+      },
+      "PosAcceptedDto": {
+        "type": "object",
+        "properties": {
+          "queued": {
+            "type": "boolean",
+            "example": true
+          }
+        },
+        "required": [
+          "queued"
+        ]
+      },
+      "PosRematchDto": {
+        "type": "object",
+        "properties": {
+          "matches": {
+            "description": "Pairs the owner confirmed in the preview; dishes without a link not listed pair by exact name, the rest are hidden",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosMatchDto"
+            }
+          }
+        }
+      },
+      "PosCourierModeDto": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "xmenu",
+              "iiko"
+            ]
+          }
+        },
+        "required": [
+          "mode"
+        ]
+      },
+      "PosDisconnectedDto": {
+        "type": "object",
+        "properties": {
+          "connected": {
+            "type": "boolean",
+            "example": false
+          },
+          "unfinishedOrders": {
+            "type": "number",
+            "example": 0,
+            "description": "Orders already in iiko (being sent or sent) that are not finished yet: their statuses no longer come from iiko, the dashboard warns about them. The history of sent orders stays"
+          }
+        },
+        "required": [
+          "connected",
+          "unfinishedOrders"
+        ]
+      },
+      "PosOrderViewDto": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "sending",
+              "sent",
+              "failed",
+              "needs_street",
+              "manual"
+            ],
+            "description": "queued: waiting for an attempt; sending: iiko is creating it; sent: in iiko; failed: not sent («Повторить» or «Внесён вручную»); needs_street: the operator picks a street of the iiko directory; manual: entered into iiko by hand"
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "pos_unavailable",
+              "pos_not_taken",
+              "pos_rejected_stop_list",
+              "pos_rejected_price",
+              "pos_rejected_data",
+              "pos_key_invalid",
+              "pos_module_missing",
+              "pos_access_denied",
+              "pos_access_blocked",
+              "unmapped_branch",
+              "unmapped_item",
+              "unmapped_payment",
+              "unmapped_delivery_item"
+            ],
+            "nullable": true,
+            "description": "Why the last attempt failed (null after a success)"
+          },
+          "posNumber": {
+            "type": "string",
+            "nullable": true,
+            "description": "Number in iiko"
+          },
+          "posStatus": {
+            "type": "string",
+            "nullable": true,
+            "description": "Last iiko delivery status (CookingStarted, OnWay, ...)"
+          },
+          "courierName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Courier named by iiko (courier mode \"iiko\")"
+          },
+          "attempts": {
+            "type": "number",
+            "description": "Attempts of the current round (up to 5)"
+          },
+          "sentAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "manualAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "deliveredPush": {
+            "type": "string",
+            "enum": [
+              "none",
+              "pending",
+              "on_way",
+              "done",
+              "failed"
+            ],
+            "description": "Own couriers: \"on the way\" and \"delivered\" passed to iiko after the courier delivered. failed: the status in iiko was not updated (iiko refused, or its status did not allow it); the operator was alerted and closes it in iiko"
+          }
+        },
+        "required": [
+          "state",
+          "error",
+          "posNumber",
+          "posStatus",
+          "courierName",
+          "attempts",
+          "sentAt",
+          "manualAt",
+          "deliveredPush"
+        ]
+      },
+      "PosManualDto": {
+        "type": "object",
+        "properties": {
+          "posNumber": {
+            "type": "string",
+            "nullable": true,
+            "description": "Order number in iiko, if the operator has it",
+            "example": "1042"
+          }
+        }
+      },
+      "PosStreetViewDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string",
+            "description": "City of the street in iiko"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "city"
+        ]
+      },
+      "PosStreetsDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosStreetViewDto"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "PosStreetDto": {
+        "type": "object",
+        "properties": {
+          "streetId": {
+            "type": "string",
+            "description": "Street id from GET .../pos/streets"
+          },
+          "house": {
+            "type": "string",
+            "description": "House number as iiko takes it",
+            "example": "12А"
+          }
+        },
+        "required": [
+          "streetId",
+          "house"
+        ]
+      },
       "UpdateCustomerDto": {
         "type": "object",
         "properties": {
@@ -10619,94 +11625,6 @@
           "handedAt",
           "cashReceived",
           "paymentMarkPending"
-        ]
-      },
-      "PosOrderViewDto": {
-        "type": "object",
-        "properties": {
-          "state": {
-            "type": "string",
-            "enum": [
-              "queued",
-              "sending",
-              "sent",
-              "failed",
-              "needs_street",
-              "manual"
-            ],
-            "description": "queued: waiting for an attempt; sending: iiko is creating it; sent: in iiko; failed: not sent («Повторить» or «Внесён вручную»); needs_street: the operator picks a street of the iiko directory; manual: entered into iiko by hand"
-          },
-          "error": {
-            "type": "string",
-            "enum": [
-              "pos_unavailable",
-              "pos_not_taken",
-              "pos_rejected_stop_list",
-              "pos_rejected_price",
-              "pos_rejected_data",
-              "pos_key_invalid",
-              "pos_module_missing",
-              "pos_access_denied",
-              "pos_access_blocked",
-              "unmapped_branch",
-              "unmapped_item",
-              "unmapped_payment",
-              "unmapped_delivery_item"
-            ],
-            "nullable": true,
-            "description": "Why the last attempt failed (null after a success)"
-          },
-          "posNumber": {
-            "type": "string",
-            "nullable": true,
-            "description": "Number in iiko"
-          },
-          "posStatus": {
-            "type": "string",
-            "nullable": true,
-            "description": "Last iiko delivery status (CookingStarted, OnWay, ...)"
-          },
-          "courierName": {
-            "type": "string",
-            "nullable": true,
-            "description": "Courier named by iiko (courier mode \"iiko\")"
-          },
-          "attempts": {
-            "type": "number",
-            "description": "Attempts of the current round (up to 5)"
-          },
-          "sentAt": {
-            "type": "string",
-            "nullable": true,
-            "format": "date-time"
-          },
-          "manualAt": {
-            "type": "string",
-            "nullable": true,
-            "format": "date-time"
-          },
-          "deliveredPush": {
-            "type": "string",
-            "enum": [
-              "none",
-              "pending",
-              "on_way",
-              "done",
-              "failed"
-            ],
-            "description": "Own couriers: \"on the way\" and \"delivered\" passed to iiko after the courier delivered. failed: the status in iiko was not updated (iiko refused, or its status did not allow it); the operator was alerted and closes it in iiko"
-          }
-        },
-        "required": [
-          "state",
-          "error",
-          "posNumber",
-          "posStatus",
-          "courierName",
-          "attempts",
-          "sentAt",
-          "manualAt",
-          "deliveredPush"
         ]
       },
       "OrderEventDto": {
@@ -12595,917 +13513,6 @@
           "id",
           "title",
           "items"
-        ]
-      },
-      "PosAlertDto": {
-        "type": "object",
-        "properties": {
-          "code": {
-            "type": "string",
-            "enum": [
-              "menu_import_failed",
-              "key_revoked"
-            ],
-            "description": "menu_import_failed: the last menu import failed (menuImportError tells why); key_revoked: iiko rejects the key, the owner reconnects"
-          },
-          "at": {
-            "format": "date-time",
-            "type": "string"
-          }
-        },
-        "required": [
-          "code",
-          "at"
-        ]
-      },
-      "PosStepsDto": {
-        "type": "object",
-        "properties": {
-          "key": {
-            "type": "string",
-            "enum": [
-              "done",
-              "todo"
-            ]
-          },
-          "organization": {
-            "type": "string",
-            "enum": [
-              "done",
-              "todo"
-            ]
-          },
-          "branches": {
-            "type": "string",
-            "enum": [
-              "done",
-              "todo"
-            ]
-          },
-          "payments": {
-            "type": "string",
-            "enum": [
-              "done",
-              "todo"
-            ]
-          },
-          "menu": {
-            "type": "string",
-            "enum": [
-              "done",
-              "todo"
-            ]
-          }
-        },
-        "required": [
-          "key",
-          "organization",
-          "branches",
-          "payments",
-          "menu"
-        ]
-      },
-      "PosDeliveryItemDto": {
-        "type": "object",
-        "properties": {
-          "itemId": {
-            "type": "string",
-            "description": "iiko item (productId) of the external menu"
-          },
-          "sizeId": {
-            "type": "string",
-            "nullable": true
-          }
-        },
-        "required": [
-          "itemId"
-        ]
-      },
-      "PosBranchLinkDto": {
-        "type": "object",
-        "properties": {
-          "branchId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "terminalGroupId": {
-            "type": "string",
-            "description": "iiko terminal group id"
-          }
-        },
-        "required": [
-          "branchId",
-          "terminalGroupId"
-        ]
-      },
-      "PosPaymentLinkDto": {
-        "type": "object",
-        "properties": {
-          "method": {
-            "type": "string",
-            "enum": [
-              "cash",
-              "card",
-              "online"
-            ]
-          },
-          "paymentTypeId": {
-            "type": "string",
-            "description": "iiko payment type id"
-          }
-        },
-        "required": [
-          "method",
-          "paymentTypeId"
-        ]
-      },
-      "PosCheckDto": {
-        "type": "object",
-        "properties": {
-          "key": {
-            "type": "string",
-            "enum": [
-              "delivery_module",
-              "key_access",
-              "terminal_alive"
-            ]
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "ok",
-              "fail",
-              "unknown"
-            ]
-          },
-          "branchId": {
-            "type": "string",
-            "format": "uuid",
-            "description": "terminal_alive only"
-          },
-          "code": {
-            "type": "string",
-            "description": "Error code of a failed check: pos_module_missing, pos_access_denied, pos_access_blocked, pos_key_invalid, pos_unavailable"
-          }
-        },
-        "required": [
-          "key",
-          "status"
-        ]
-      },
-      "PosStatusDto": {
-        "type": "object",
-        "properties": {
-          "available": {
-            "type": "boolean",
-            "description": "The platform can connect iiko (its iiko application and key storage are set up); false: the connection form is not shown, connecting answers 503 platform_misconfigured"
-          },
-          "connected": {
-            "type": "boolean",
-            "description": "False without an integration and after disconnecting"
-          },
-          "status": {
-            "type": "string",
-            "nullable": true,
-            "enum": [
-              "draft",
-              "active",
-              "needs_reconnect"
-            ]
-          },
-          "alert": {
-            "nullable": true,
-            "description": "What the owner is warned about (a banner); the branch chats got one message when it was raised",
-            "type": "object",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/PosAlertDto"
-              }
-            ]
-          },
-          "steps": {
-            "nullable": true,
-            "type": "object",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/PosStepsDto"
-              }
-            ]
-          },
-          "externalOrgId": {
-            "type": "string",
-            "nullable": true
-          },
-          "addressFormat": {
-            "type": "string",
-            "nullable": true,
-            "enum": [
-              "city",
-              "legacy",
-              "international",
-              "int_no_postcode",
-              "unknown"
-            ],
-            "description": "How the iiko organization takes addresses (addressFormatType): city = a line with coordinates; the others = a street from the iiko directory and a house (matched from the address when it can be, otherwise the operator picks it)"
-          },
-          "courierMode": {
-            "type": "string",
-            "enum": [
-              "xmenu",
-              "iiko"
-            ]
-          },
-          "externalMenuId": {
-            "type": "string",
-            "nullable": true
-          },
-          "priceCategoryId": {
-            "type": "string",
-            "nullable": true
-          },
-          "deliveryItem": {
-            "nullable": true,
-            "type": "object",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/PosDeliveryItemDto"
-              }
-            ]
-          },
-          "branches": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PosBranchLinkDto"
-            }
-          },
-          "payments": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PosPaymentLinkDto"
-            }
-          },
-          "checks": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PosCheckDto"
-            }
-          },
-          "checkedAt": {
-            "type": "string",
-            "nullable": true,
-            "format": "date-time"
-          },
-          "menuImportedAt": {
-            "type": "string",
-            "nullable": true,
-            "format": "date-time"
-          },
-          "menuImportError": {
-            "type": "string",
-            "nullable": true,
-            "description": "Error code of the last failed menu import (the previous menu stays)"
-          },
-          "stopListUpdatedAt": {
-            "type": "string",
-            "nullable": true,
-            "format": "date-time"
-          },
-          "enabledAt": {
-            "type": "string",
-            "nullable": true,
-            "format": "date-time"
-          }
-        },
-        "required": [
-          "available",
-          "connected",
-          "status",
-          "alert",
-          "steps",
-          "externalOrgId",
-          "addressFormat",
-          "courierMode",
-          "externalMenuId",
-          "priceCategoryId",
-          "deliveryItem",
-          "branches",
-          "payments",
-          "checks",
-          "checkedAt",
-          "menuImportedAt",
-          "menuImportError",
-          "stopListUpdatedAt",
-          "enabledAt"
-        ]
-      },
-      "PosKeyDto": {
-        "type": "object",
-        "properties": {
-          "apiKey": {
-            "type": "string",
-            "description": "API key the restaurant created in iikoWeb. Stored encrypted; never returned",
-            "example": "b1c2d3e4f5"
-          }
-        },
-        "required": [
-          "apiKey"
-        ]
-      },
-      "PosNamedDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "name"
-        ]
-      },
-      "PosKeyResultDto": {
-        "type": "object",
-        "properties": {
-          "available": {
-            "type": "boolean",
-            "description": "The platform can connect iiko (its iiko application and key storage are set up); false: the connection form is not shown, connecting answers 503 platform_misconfigured"
-          },
-          "connected": {
-            "type": "boolean",
-            "description": "False without an integration and after disconnecting"
-          },
-          "status": {
-            "type": "string",
-            "nullable": true,
-            "enum": [
-              "draft",
-              "active",
-              "needs_reconnect"
-            ]
-          },
-          "alert": {
-            "nullable": true,
-            "description": "What the owner is warned about (a banner); the branch chats got one message when it was raised",
-            "type": "object",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/PosAlertDto"
-              }
-            ]
-          },
-          "steps": {
-            "nullable": true,
-            "type": "object",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/PosStepsDto"
-              }
-            ]
-          },
-          "externalOrgId": {
-            "type": "string",
-            "nullable": true
-          },
-          "addressFormat": {
-            "type": "string",
-            "nullable": true,
-            "enum": [
-              "city",
-              "legacy",
-              "international",
-              "int_no_postcode",
-              "unknown"
-            ],
-            "description": "How the iiko organization takes addresses (addressFormatType): city = a line with coordinates; the others = a street from the iiko directory and a house (matched from the address when it can be, otherwise the operator picks it)"
-          },
-          "courierMode": {
-            "type": "string",
-            "enum": [
-              "xmenu",
-              "iiko"
-            ]
-          },
-          "externalMenuId": {
-            "type": "string",
-            "nullable": true
-          },
-          "priceCategoryId": {
-            "type": "string",
-            "nullable": true
-          },
-          "deliveryItem": {
-            "nullable": true,
-            "type": "object",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/PosDeliveryItemDto"
-              }
-            ]
-          },
-          "branches": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PosBranchLinkDto"
-            }
-          },
-          "payments": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PosPaymentLinkDto"
-            }
-          },
-          "checks": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PosCheckDto"
-            }
-          },
-          "checkedAt": {
-            "type": "string",
-            "nullable": true,
-            "format": "date-time"
-          },
-          "menuImportedAt": {
-            "type": "string",
-            "nullable": true,
-            "format": "date-time"
-          },
-          "menuImportError": {
-            "type": "string",
-            "nullable": true,
-            "description": "Error code of the last failed menu import (the previous menu stays)"
-          },
-          "stopListUpdatedAt": {
-            "type": "string",
-            "nullable": true,
-            "format": "date-time"
-          },
-          "enabledAt": {
-            "type": "string",
-            "nullable": true,
-            "format": "date-time"
-          },
-          "organizations": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PosNamedDto"
-            }
-          }
-        },
-        "required": [
-          "available",
-          "connected",
-          "status",
-          "alert",
-          "steps",
-          "externalOrgId",
-          "addressFormat",
-          "courierMode",
-          "externalMenuId",
-          "priceCategoryId",
-          "deliveryItem",
-          "branches",
-          "payments",
-          "checks",
-          "checkedAt",
-          "menuImportedAt",
-          "menuImportError",
-          "stopListUpdatedAt",
-          "enabledAt",
-          "organizations"
-        ]
-      },
-      "PosOrganizationsDto": {
-        "type": "object",
-        "properties": {
-          "organizations": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PosNamedDto"
-            }
-          }
-        },
-        "required": [
-          "organizations"
-        ]
-      },
-      "PosOrganizationDto": {
-        "type": "object",
-        "properties": {
-          "externalOrgId": {
-            "type": "string",
-            "description": "iiko organization id (GET .../organizations)"
-          }
-        },
-        "required": [
-          "externalOrgId"
-        ]
-      },
-      "PosTerminalGroupDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "isAlive": {
-            "type": "boolean",
-            "nullable": true,
-            "description": "Cash desk online (null: unknown)"
-          }
-        },
-        "required": [
-          "id",
-          "name",
-          "isAlive"
-        ]
-      },
-      "PosPaymentTypeDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "kind": {
-            "type": "string",
-            "description": "iiko paymentTypeKind: Cash, Card, External, ..."
-          }
-        },
-        "required": [
-          "id",
-          "name",
-          "kind"
-        ]
-      },
-      "PosServiceItemDto": {
-        "type": "object",
-        "properties": {
-          "itemId": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "sizes": {
-            "description": "Sizes (id, name) when the item has several",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PosNamedDto"
-            }
-          },
-          "openPrice": {
-            "type": "boolean",
-            "description": "iiko lets the order set its price (canSetOpenPrice)"
-          }
-        },
-        "required": [
-          "itemId",
-          "name",
-          "sizes",
-          "openPrice"
-        ]
-      },
-      "PosDictionariesDto": {
-        "type": "object",
-        "properties": {
-          "terminalGroups": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PosTerminalGroupDto"
-            }
-          },
-          "paymentTypes": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PosPaymentTypeDto"
-            }
-          },
-          "externalMenus": {
-            "description": "Empty: no external menu in iiko (the dashboard shows how to set it up)",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PosNamedDto"
-            }
-          },
-          "priceCategories": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PosNamedDto"
-            }
-          },
-          "serviceItems": {
-            "description": "Items of the chosen external menu (empty until one is chosen)",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PosServiceItemDto"
-            }
-          }
-        },
-        "required": [
-          "terminalGroups",
-          "paymentTypes",
-          "externalMenus",
-          "priceCategories",
-          "serviceItems"
-        ]
-      },
-      "PosBranchLinkInputDto": {
-        "type": "object",
-        "properties": {
-          "branchId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "terminalGroupId": {
-            "type": "string",
-            "description": "iiko terminal group id"
-          },
-          "priceCategoryId": {
-            "type": "string",
-            "nullable": true,
-            "description": "One price category for the venue: null or the same as `priceCategoryId` of the links, another one is rejected (`price_category_differs`); not stored"
-          }
-        },
-        "required": [
-          "branchId",
-          "terminalGroupId"
-        ]
-      },
-      "PosLinksDto": {
-        "type": "object",
-        "properties": {
-          "externalMenuId": {
-            "type": "string",
-            "description": "External menu id (GET .../dictionaries)"
-          },
-          "priceCategoryId": {
-            "type": "string",
-            "nullable": true,
-            "description": "Price category of the external menu, one for the venue: the menu prices are imported in it and every order carries it (deliveries/create priceCategoryId); null = iiko default"
-          },
-          "branches": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PosBranchLinkInputDto"
-            }
-          },
-          "payments": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PosPaymentLinkDto"
-            }
-          },
-          "deliveryItem": {
-            "nullable": true,
-            "description": "Service item \"Delivery\": the delivery fee goes to iiko as this position",
-            "type": "object",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/PosDeliveryItemDto"
-              }
-            ]
-          }
-        },
-        "required": [
-          "externalMenuId",
-          "branches",
-          "payments"
-        ]
-      },
-      "PosPreviewPairDto": {
-        "type": "object",
-        "properties": {
-          "productId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "productTitle": {
-            "type": "string",
-            "nullable": true
-          },
-          "itemId": {
-            "type": "string"
-          },
-          "itemName": {
-            "type": "string"
-          },
-          "byName": {
-            "type": "boolean",
-            "description": "Paired by exact name (not confirmed yet)"
-          }
-        },
-        "required": [
-          "productId",
-          "productTitle",
-          "itemId",
-          "itemName",
-          "byName"
-        ]
-      },
-      "PosPreviewDto": {
-        "type": "object",
-        "properties": {
-          "pairs": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PosPreviewPairDto"
-            }
-          },
-          "newItems": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "itemId": {
-                  "type": "string"
-                },
-                "name": {
-                  "type": "string"
-                }
-              }
-            },
-            "description": "iiko positions without a pair: created"
-          },
-          "unmatched": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "productId": {
-                  "type": "string"
-                },
-                "title": {
-                  "type": "string",
-                  "nullable": true
-                }
-              }
-            },
-            "description": "Dishes without a pair: hidden, not deleted"
-          }
-        },
-        "required": [
-          "pairs",
-          "newItems",
-          "unmatched"
-        ]
-      },
-      "PosMatchDto": {
-        "type": "object",
-        "properties": {
-          "productId": {
-            "type": "string",
-            "format": "uuid",
-            "description": "Xmenu dish"
-          },
-          "itemId": {
-            "type": "string",
-            "nullable": true,
-            "description": "iiko item it pairs with; null = no pair (the dish is hidden)"
-          }
-        },
-        "required": [
-          "productId",
-          "itemId"
-        ]
-      },
-      "PosEnableDto": {
-        "type": "object",
-        "properties": {
-          "matches": {
-            "description": "Pairs the owner confirmed in the preview; dishes not listed pair by exact name",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PosMatchDto"
-            }
-          }
-        }
-      },
-      "PosAcceptedDto": {
-        "type": "object",
-        "properties": {
-          "queued": {
-            "type": "boolean",
-            "example": true
-          }
-        },
-        "required": [
-          "queued"
-        ]
-      },
-      "PosRematchDto": {
-        "type": "object",
-        "properties": {
-          "matches": {
-            "description": "Pairs the owner confirmed in the preview; dishes without a link not listed pair by exact name, the rest are hidden",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PosMatchDto"
-            }
-          }
-        }
-      },
-      "PosCourierModeDto": {
-        "type": "object",
-        "properties": {
-          "mode": {
-            "type": "string",
-            "enum": [
-              "xmenu",
-              "iiko"
-            ]
-          }
-        },
-        "required": [
-          "mode"
-        ]
-      },
-      "PosDisconnectedDto": {
-        "type": "object",
-        "properties": {
-          "connected": {
-            "type": "boolean",
-            "example": false
-          },
-          "unfinishedOrders": {
-            "type": "number",
-            "example": 0,
-            "description": "Orders already in iiko (being sent or sent) that are not finished yet: their statuses no longer come from iiko, the dashboard warns about them. The history of sent orders stays"
-          }
-        },
-        "required": [
-          "connected",
-          "unfinishedOrders"
-        ]
-      },
-      "PosManualDto": {
-        "type": "object",
-        "properties": {
-          "posNumber": {
-            "type": "string",
-            "nullable": true,
-            "description": "Order number in iiko, if the operator has it",
-            "example": "1042"
-          }
-        }
-      },
-      "PosStreetViewDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "city": {
-            "type": "string",
-            "description": "City of the street in iiko"
-          }
-        },
-        "required": [
-          "id",
-          "name",
-          "city"
-        ]
-      },
-      "PosStreetsDto": {
-        "type": "object",
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PosStreetViewDto"
-            }
-          }
-        },
-        "required": [
-          "items"
-        ]
-      },
-      "PosStreetDto": {
-        "type": "object",
-        "properties": {
-          "streetId": {
-            "type": "string",
-            "description": "Street id from GET .../pos/streets"
-          },
-          "house": {
-            "type": "string",
-            "description": "House number as iiko takes it",
-            "example": "12А"
-          }
-        },
-        "required": [
-          "streetId",
-          "house"
         ]
       },
       "CreateProductDto": {

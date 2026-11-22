@@ -8,6 +8,15 @@ export interface TelegramMessageResult {
 }
 
 /**
+ * A call that tells why it failed when the reason matters: a group that became a supergroup answers with
+ * parameters.migrate_to_chat_id, the id the chat has now.
+ */
+export interface TelegramCallOutcome<T> {
+  result: T | null;
+  migrateToChatId?: string;
+}
+
+/**
  * The platform orders bot (TELEGRAM_ORDERS_BOT_TOKEN, else TELEGRAM_BOT_TOKEN): new orders and
  * their buttons in the branch chats, ops alerts. Never used for guests: they hear only from the
  * venue's own bot (notifications/customer-notifier.service.ts).
@@ -30,6 +39,13 @@ export class TelegramApiService {
     method: string,
     payload: Record<string, unknown>,
   ): Promise<T | null> {
+    return (await this.callWithOutcome<T>(method, payload)).result;
+  }
+
+  private async callWithOutcome<T>(
+    method: string,
+    payload: Record<string, unknown>,
+  ): Promise<TelegramCallOutcome<T>> {
     const token = this.token;
     if (!token) {
       if (!this.warned) {
@@ -38,7 +54,7 @@ export class TelegramApiService {
         );
         this.warned = true;
       }
-      return null;
+      return { result: null };
     }
     try {
       const { data } = await axios.post<{ result?: T }>(
@@ -46,18 +62,82 @@ export class TelegramApiService {
         payload,
         { timeout: 8000 },
       );
-      return (data?.result ?? null) as T | null;
+      return { result: (data?.result ?? null) as T | null };
     } catch (e) {
       const err = e as {
-        response?: { data?: { description?: string } };
+        response?: {
+          data?: {
+            description?: string;
+            parameters?: { migrate_to_chat_id?: number };
+          };
+        };
         code?: string;
       };
       // Token URL'da — xato matniga tushib qolmasligi uchun faqat Telegram javobini loglaymiz.
       this.logger.warn(
         `${method} failed: ${err?.response?.data?.description ?? err?.code ?? 'unknown error'}`,
       );
-      return null;
+      const migrated = err?.response?.data?.parameters?.migrate_to_chat_id;
+      return typeof migrated === 'number'
+        ? { result: null, migrateToChatId: String(migrated) }
+        : { result: null };
     }
+  }
+
+  /** sendMessage that also reports a chat moved to a supergroup (the branch chat, restaurant-notifier.service.ts). */
+  sendMessageWithOutcome(
+    chatId: string | number,
+    text: string,
+    extra: Record<string, unknown> = {},
+  ) {
+    return this.callWithOutcome<TelegramMessageResult>(
+      'sendMessage',
+      this.messagePayload(chatId, text, extra),
+    );
+  }
+
+  /** editMessageText that also reports a chat moved to a supergroup. */
+  editMessageTextWithOutcome(
+    chatId: string | number,
+    messageId: number,
+    text: string,
+    replyMarkup: unknown,
+  ) {
+    return this.callWithOutcome(
+      'editMessageText',
+      this.editPayload(chatId, messageId, text, replyMarkup),
+    );
+  }
+
+  private messagePayload(
+    chatId: string | number,
+    text: string,
+    extra: Record<string, unknown>,
+  ) {
+    return {
+      chat_id: chatId,
+      text,
+      parse_mode: 'HTML',
+      disable_web_page_preview: true,
+      ...extra,
+    };
+  }
+
+  private editPayload(
+    chatId: string | number,
+    messageId: number,
+    text: string,
+    replyMarkup: unknown,
+  ) {
+    return {
+      chat_id: chatId,
+      message_id: messageId,
+      text,
+      parse_mode: 'HTML',
+      disable_web_page_preview: true,
+      // Bo'sh klaviatura = tugmalarni olib tashlash
+      reply_markup: replyMarkup ?? { inline_keyboard: [] },
+    };
   }
 
   sendMessage(
@@ -65,13 +145,10 @@ export class TelegramApiService {
     text: string,
     extra: Record<string, unknown> = {},
   ) {
-    return this.call<TelegramMessageResult>('sendMessage', {
-      chat_id: chatId,
-      text,
-      parse_mode: 'HTML',
-      disable_web_page_preview: true,
-      ...extra,
-    });
+    return this.call<TelegramMessageResult>(
+      'sendMessage',
+      this.messagePayload(chatId, text, extra),
+    );
   }
 
   editMessageText(
@@ -80,15 +157,10 @@ export class TelegramApiService {
     text: string,
     replyMarkup: unknown,
   ) {
-    return this.call('editMessageText', {
-      chat_id: chatId,
-      message_id: messageId,
-      text,
-      parse_mode: 'HTML',
-      disable_web_page_preview: true,
-      // Bo'sh klaviatura = tugmalarni olib tashlash
-      reply_markup: replyMarkup ?? { inline_keyboard: [] },
-    });
+    return this.call(
+      'editMessageText',
+      this.editPayload(chatId, messageId, text, replyMarkup),
+    );
   }
 
   /** The bot's own account: the dashboard names it when the owner binds a branch chat. */

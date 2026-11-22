@@ -47,6 +47,6 @@ import { PosWebhookService } from './services/pos-webhook.service';
     PosOrderStatusService,
     PosOrderProcessor,
   ],
-  exports: [PosOrderService, PosIntegrationService],
+  exports: [PosOrderService, PosIntegrationService, PosSyncQueue],
 })
 export class PosModule {}

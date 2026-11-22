@@ -17,6 +17,7 @@ import {
   ApiConsumes,
   ApiOkResponse,
   ApiOperation,
+  ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
 import { OrganizationService } from './services/organization.service';
@@ -132,7 +133,16 @@ export class OrganizationController {
   @StaffAccess('venue', { orgParam: 'id' })
   @StepUp('organization_deleted')
   @Delete(':id')
-  @ApiOperation({ summary: 'Method: delete' })
+  @ApiOperation({
+    summary: 'Delete the venue',
+    description:
+      'Deletes the venue with its menu, branches, guests, orders, couriers and integrations. Refused while an order is not final.',
+  })
+  @ApiResponse({ status: 204, description: 'Venue deleted' })
+  @ApiResponse({
+    status: 409,
+    description: 'has_active_orders: the venue has unfinished orders',
+  })
   @HttpCode(HttpStatus.NO_CONTENT)
   async remove(@Param('id') id: string, @Req() req: StaffRequest) {
     return await this.organizationService.delete(
