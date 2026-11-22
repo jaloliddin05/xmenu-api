@@ -8,6 +8,7 @@ import { TenantService } from 'src/modules/tenant/tenant.service';
 import { PrismaService } from '../_prisma/prisma.service';
 import { OrganizationController } from './organization.controller';
 import { OrganizationService } from './services/organization.service';
+import { PosSyncQueue } from '../pos/services/pos-sync.queue';
 
 const ID = '3f1c2a9e-5b7d-4c11-9a2e-0f6b8d4e2a10';
 
@@ -65,6 +66,7 @@ describe('GET /organization/slug/:slug (removed)', () => {
         { provide: RevalidateService, useValue: {} },
         { provide: TenantService, useValue: {} },
         { provide: TelegramBotProfileService, useValue: {} },
+        { provide: PosSyncQueue, useValue: {} },
       ],
     });
   });
