@@ -33,6 +33,15 @@ describe('BranchService: delivery site revalidation', () => {
     });
   });
 
+  it('update passes phone null through to clear it and leaves undefined alone', async () => {
+    const { service } = make();
+    const prisma = (service as any).prisma;
+    await service.update(ORG, 'b-1', { phone: null } as any);
+    expect(prisma.branch.update.mock.calls[0][0].data.phone).toBeNull();
+    await service.update(ORG, 'b-1', { title: 'B' } as any);
+    expect(prisma.branch.update.mock.calls[1][0].data.phone).toBeUndefined();
+  });
+
   it('schedules nothing for a branch of another venue', async () => {
     const { service, revalidate } = make(false);
     await expect(service.update(ORG, 'b-2', {} as any)).rejects.toMatchObject({

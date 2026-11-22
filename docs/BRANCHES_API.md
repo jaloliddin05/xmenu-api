@@ -108,4 +108,4 @@ branch_delivery_distance        -- правило по расстоянию (о�
 
 `telegram_chat_id` (в ответе `GET /branch`) — группа, куда уходят заказы этого филиала. Задаётся только привязкой:
 код из `POST /branch/:id/telegram-chat/code`, затем `/bind КОД` платформенному боту в самой группе (`API.md`, «Чат филиала»).
-`phone` — номер для SMS-эскалации (`+998XXXXXXXXX`).
+`phone` — номер для SMS-эскалации (`+998XXXXXXXXX`). В `PATCH /branch/:id` `phone: null` очищает номер, отсутствие поля его не трогает.
