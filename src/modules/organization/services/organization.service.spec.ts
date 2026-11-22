@@ -72,3 +72,72 @@ describe('OrganizationService.create', () => {
     });
   });
 });
+
+describe('OrganizationService.delete', () => {
+  function setup(activeOrders: number, integration: { id: string } | null) {
+    const tx = {
+      $queryRaw: jest.fn(async () => [{ id: 'org-1' }]),
+      customer_order: { count: jest.fn(async () => activeOrders) },
+      organization: { delete: jest.fn(async () => ({ id: 'org-1' })) },
+    };
+    const db = {
+      pos_integration: { findUnique: jest.fn(async () => integration) },
+      $transaction: jest.fn(async (fn: (t: typeof tx) => unknown) => fn(tx)),
+    };
+    const tenants = { invalidate: jest.fn() };
+    const posSync = { unschedule: jest.fn(async () => undefined) };
+    const service = new OrganizationService(
+      db as any,
+      {} as any,
+      {} as any,
+      tenants as any,
+      {} as any,
+      posSync as any,
+    );
+    return { tx, tenants, posSync, service };
+  }
+
+  it('refuses with has_active_orders while an order is unfinished and keeps the iiko schedule', async () => {
+    const { tx, tenants, posSync, service } = setup(2, { id: 'pos-1' });
+
+    await expect(service.delete('org-1', 'org-1')).rejects.toMatchObject({
+      code: 'has_active_orders',
+      details: { activeOrders: 2 },
+    });
+    expect(tx.customer_order.count.mock.calls[0][0]).toEqual({
+      where: {
+        organization_id: 'org-1',
+        status: {
+          in: expect.arrayContaining([
+            'awaiting_payment',
+            'payment_failed',
+            'pending_acceptance',
+            'accepted',
+          ]),
+        },
+      },
+    });
+    expect(tx.organization.delete).not.toHaveBeenCalled();
+    expect(tenants.invalidate).not.toHaveBeenCalled();
+    expect(posSync.unschedule).not.toHaveBeenCalled();
+  });
+
+  it('deletes after locking the row and then removes the iiko schedulers of the venue', async () => {
+    const { tx, tenants, posSync, service } = setup(0, { id: 'pos-1' });
+
+    await service.delete('org-1', 'org-1');
+
+    expect(String(tx.$queryRaw.mock.calls[0][0])).toContain('FOR UPDATE');
+    expect(tx.organization.delete).toHaveBeenCalledWith({
+      where: { id: 'org-1' },
+    });
+    expect(tenants.invalidate).toHaveBeenCalledWith('org-1');
+    expect(posSync.unschedule).toHaveBeenCalledWith('pos-1');
+  });
+
+  it('a venue without iiko has nothing to unschedule', async () => {
+    const { posSync, service } = setup(0, null);
+    await service.delete('org-1', 'org-1');
+    expect(posSync.unschedule).not.toHaveBeenCalled();
+  });
+});

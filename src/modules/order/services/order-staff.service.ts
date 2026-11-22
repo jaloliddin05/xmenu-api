@@ -298,13 +298,16 @@ export class OrderStaffService {
 
   /**
    * Telegram tugmasi uchun: takror bosish xato emas (changed=false). `organizationId`
-   * berilsa buyurtma o'sha tenantga tegishli bo'lishi shart.
+   * berilsa buyurtma o'sha tenantga tegishli bo'lishi shart. `expectedStatus` (the status a Telegram button
+   * was drawn for): the target is counted from it and the order moves only while it is still in it, so a
+   * repeated delivery or a second press of "next" never takes one more step.
    */
   async perform(
     organizationId: string | null,
     id: string,
     action: RestaurantAction,
     actorId: string,
+    expectedStatus?: OrderStatusName,
   ): Promise<ActionResult & { conflict: boolean }> {
     const order = await this.prisma.customer_order.findFirst({
       where: {
@@ -316,7 +319,10 @@ export class OrderStaffService {
     if (!order)
       throw new AppException('not_found', { message: 'Order not found' });
 
-    const from = order.status as OrderStatusName;
+    const current = order.status as OrderStatusName;
+    if (expectedStatus && current !== expectedStatus)
+      return { changed: false, status: current, conflict: true };
+    const from = expectedStatus ?? current;
     const to = this.target(action, from, order.fulfillment);
     if (!to) return { changed: false, status: from, conflict: true };
 
@@ -326,6 +332,7 @@ export class OrderStaffService {
         to,
         actor: 'restaurant',
         actorId,
+        expectedFrom: expectedStatus,
         reason:
           action.type === 'reject' ? (action.reason ?? 'declined') : undefined,
       });

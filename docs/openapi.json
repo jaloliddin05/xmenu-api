@@ -1427,6 +1427,7 @@
         "x-permission": "venue"
       },
       "delete": {
+        "description": "Deletes the venue with its menu, branches, guests, orders, couriers and integrations. Refused while an order is not final.",
         "operationId": "OrganizationController_remove",
         "parameters": [
           {
@@ -1448,8 +1449,14 @@
           }
         ],
         "responses": {
+          "204": {
+            "description": "Venue deleted"
+          },
           "403": {
             "description": "step_up_required: confirm the action with the password (POST /auth/step-up)"
+          },
+          "409": {
+            "description": "has_active_orders: the venue has unfinished orders"
           },
           "default": {
             "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
@@ -1462,7 +1469,7 @@
             }
           }
         },
-        "summary": "Method: delete",
+        "summary": "Delete the venue",
         "tags": [
           "Organization"
         ],

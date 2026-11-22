@@ -8,6 +8,7 @@ import { TelegramBotProfileService } from '../telegram/telegram-bot-profile.serv
 import { TenantService } from '../tenant/tenant.service';
 import { OrganizationPublicationController } from './organization-publication.controller';
 import { OrganizationService } from './services/organization.service';
+import { PosSyncQueue } from '../pos/services/pos-sync.queue';
 import { PublicationService } from './services/publication.service';
 import { GuestLoginService } from '../guest-login/guest-login.service';
 
@@ -240,6 +241,7 @@ describe('Organization channels and publication (owner)', () => {
           { provide: RevalidateService, useValue: { addRevalidationJob } },
           { provide: TelegramBotProfileService, useValue: { syncMenuButton } },
           { provide: GuestLoginService, useValue: guestLogin },
+          { provide: PosSyncQueue, useValue: {} },
         ],
       },
       [

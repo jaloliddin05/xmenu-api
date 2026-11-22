@@ -7,7 +7,7 @@ model employee {
   password String
   url String
   status String
-  organization    organization   @relation(fields: [organization_id], references: [id])
+  organization    organization   @relation(fields: [organization_id], references: [id], onDelete: Cascade)
   organization_id  String
   created_at  DateTime  @default(now())
 }

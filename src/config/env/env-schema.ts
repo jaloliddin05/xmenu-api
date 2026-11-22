@@ -127,6 +127,7 @@ export const ENV_SCHEMA: readonly EnvVarSpec[] = [
   int('ORDER_HOURLY_LIMIT_PER_CUSTOMER'),
   // Retention of personal data (modules/privacy/retention-cutoffs.ts)
   int('ORDER_PII_RETENTION_DAYS'),
+  int('PAYMENT_FAILED_TTL_HOURS'),
   int('APPLICATION_RETENTION_DAYS'),
   // Payments
   { name: 'PAYMENT_CONFIG_KEY', kind: 'key32', required: 'production' },

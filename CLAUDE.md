@@ -29,7 +29,7 @@ Env: см. `.env.example` (полный; тест сверяет его со с�
 них `platform_misconfigured`, `feature: pos`), `IIKO_API_BASE_URL` (`infra/iiko/iiko-api-url.ts`; фейк в тестах, в production
 только `https://` на хосте из `IIKO_OFFICIAL_API_HOSTS`), `IIKO_MENU_IMPORT_MINUTES` (интервал импорта меню, 30 по
 умолчанию), `IIKO_IMAGE_HOSTS` (хосты фото меню iiko, пусто = любой публичный), `OPS_CHAT_ID`, `ORDER_QUEUES`,
-`ORDER_ACTIVE_LIMIT_PER_CUSTOMER` + `ORDER_HOURLY_LIMIT_PER_CUSTOMER` (лимиты заказов гостя), `ORDER_PII_RETENTION_DAYS` + `APPLICATION_RETENTION_DAYS` (сроки хранения ПДн, по 365), `SMS_DAILY_LIMIT_PLATFORM` +
+`ORDER_ACTIVE_LIMIT_PER_CUSTOMER` + `ORDER_HOURLY_LIMIT_PER_CUSTOMER` (лимиты заказов гостя), `PAYMENT_FAILED_TTL_HOURS` (через сколько часов брошенный `payment_failed` отменяется, 24), `ORDER_PII_RETENTION_DAYS` + `APPLICATION_RETENTION_DAYS` (сроки хранения ПДн, по 365), `SMS_DAILY_LIMIT_PLATFORM` +
 `SMS_DAILY_LIMIT_TENANT` (суточные потолки SMS, в production обязательны), `SWAGGER_ENABLED`,
 `MINIAPP_URL`, `UPLOAD_MAX_BYTES`, `PLATFORM_ADMIN_USER_IDS`, `TRANSLATION_*`, `OPENAI_API_KEY` (необязателен: без него
 `/translation` → `503 platform_misconfigured`, `feature: translation`), `NEXT_PUBLIC_URL` + `REVALIDATE_SECRET` (QR),
@@ -40,6 +40,9 @@ Env: см. `.env.example` (полный; тест сверяет его со с�
 ## Схема Prisma
 Не правь `prisma/schema.prisma` руками: он собирается из `src/modules/*/models/*.prisma` командой
 `npm run generate-schema`. Меняй модельные файлы, потом `npm run migrate`.
+Каждая связь на `organization` (и на её дочерние таблицы) с явным `onDelete`: без него Prisma ставит `RESTRICT`, и
+`DELETE /organization/:id` падает на внешнем ключе. Новую таблицу с ПДн или данными заведения добавляй в
+`organization-delete.db.spec.ts` (строка каждого вида, после удаления ни одной).
 
 ## Модули
 `auth` (два контура: staff и customer; права staff в `auth/access`), `staff` (сотрудники заведения: список, приглашение
@@ -187,6 +190,23 @@ Payme вручную через ops-чат.
 - Действия без смены статуса (назначение, снятие курьера) пишутся в журнал `recordInTx` (`from = to`, `note`).
 - Эффекты после коммита: `courier_card` (очередь `courier-cards`, ключ задания с `version` заказа), `operator_alert`
   (срочное сообщение в чат филиала, `RestaurantNotifierService.alertDeliveryProblem`), `pos_job` и `pos_alert` (iiko).
+- `expectedFrom` во входе перехода: статус, который видел вызывающий (кнопка Telegram, сканирование); заказ в другом
+  статусе не двигается, даже если цель достижима и оттуда.
+- Брошенный `payment_failed`: ежечасная задача `payment-failed-expiry` (`queue/payment-failed-expiry.*`) отменяет
+  (`system`, `cancel_reason = payment_expired`) заказ, у которого последняя запись журнала в `payment_failed` старше
+  `PAYMENT_FAILED_TTL_HOURS` (24); гостю не пишет, видно на таймлайне. Почему сканирование, а не задание на заказ: в
+  комментарии очереди.
+- Кнопки в чате филиала несут ожидаемое состояние: `o:<a|r|n>:<статус>:<orderId>` (`callbackData`, `order-messages.ts`),
+  заказ двигается только из этого статуса (`OrderStaffService.perform`, `expectedStatus`), иначе «Уже обработано» и
+  перерисовка карточки; кнопка старого формата без статуса заказ не меняет («Кнопка устарела, обновлено»). Новая кнопка
+  Telegram, меняющая состояние, тоже несёт ожидаемое состояние.
+- Апдейты Telegram дедуплицируются по `update_id` (`infra/telegram/update-dedupe.ts`, SET NX): платформенный вебхук
+  `tgo:upd:<id>` на 24 ч, бот заведения `claimUpdate` на 1 ч. Новый вебхук Telegram делает так же; после проверки
+  секрета он всегда отвечает 2xx (иначе Telegram повторяет).
+- Группа филиала стала супергруппой: служебные `migrate_to_chat_id` / `migrate_from_chat_id` в вебхуке и ошибка отправки
+  с `parameters.migrate_to_chat_id` ведут в `RestaurantNotifierService.migrateChat` (привязка филиалов переезжает,
+  карточки незавершённых заказов публикуются в новом чате заново; повторный вызов ничего не делает). Всё, что пишет в
+  чат филиала, идёт через `sendToChat` этого сервиса.
 
 ## Интеграция с кассой (iiko)
 Контракт: `docs/API.md`, «Интеграция с кассой (iiko)» и «Передача заказа в iiko»; спецификация `../docs/IIKO.md`.
@@ -486,7 +506,8 @@ Docker Compose на одном сервере, снаружи Caddy (TLS, `api.x
 контекст `.env`, `node_modules`, `dist`, `uploads`, тесты и фейки.
 - Цели `Dockerfile`: `runtime` (по умолчанию: `node dist/main`, пользователь `node`, только production-зависимости и
   сгенерированный Prisma-клиент, `prisma generate` при сборке) и `migrate` (разовый контейнер с Prisma CLI:
-  `prisma migrate deploy`). Приложение миграции при старте не применяет: сначала `docker compose run --rm migrate`, потом
+  `prisma migrate deploy`). `CHECKPOINT_DISABLE=1` задан в образе (стадии `base` и `runtime`), не в `api.env`: проверка
+  обновлений Prisma выключена и в `migrate` без интернета. Приложение миграции при старте не применяет: сначала `docker compose run --rm migrate`, потом
   перезапуск `api`. Миграции только после бэкапа (`pg_dump` в файл с датой, файл не пустой).
 - Порт `4000` (`PORT` задан в образе). `HEALTHCHECK` образа ходит в `GET /health`. Проверки: `GET /health` (жив процесс,
   без базы и Redis), `GET /health/ready` (база и Redis, иначе `503`), контракт `docs/API.md`, «Служебные маршруты».
@@ -593,7 +614,8 @@ Asia/Tashkent. `SMS_PROVIDER` отдаёт `BudgetedSmsProvider` поверх в
   или сервис гостя) **и** срок хранения в `privacy`, в том же PR. Читатели таких полей допускают `null`.
 - Отметку о согласии с политикой бэкенд не хранит (ждёт решения юриста).
 - `DELETE /organization/:id` удаляет заведение каскадом, вместе с заказами (проверено на PostgreSQL:
-  `organization-delete.db.spec.ts`).
+  `organization-delete.db.spec.ts`). При незавершённых заказах (`ACTIVE_STATUSES`) `409 has_active_orders`; проверка в
+  транзакции с `FOR UPDATE` строки заведения; расписания iiko (`pos-menu-<id>`, `pos-poll-<id>`) снимаются после коммита.
 
 ## Лимиты публичных POST
 `PublicRateLimitGuard` (`infra/http/public-rate-limit.ts`, глобальный `APP_GUARD`): POST к `@Public()` маршрутам по IP через

@@ -27,6 +27,7 @@ import {
   pickBotLang,
 } from './telegram-verification.util';
 import { AppException } from 'src/infra/errors/app-exception';
+import { claimTelegramUpdate } from 'src/infra/telegram/update-dedupe';
 
 export type TelegramVerifyMode = 'instant' | 'code';
 
@@ -236,16 +237,13 @@ export class TelegramVerificationService {
    * Telegram retries deliveries: true only for the first delivery of an update_id (remembered 1 h),
    * so each update is queued once. An update without an id cannot be deduplicated and is let through.
    */
-  async claimUpdate(botKey: string, updateId: unknown): Promise<boolean> {
-    if (typeof updateId !== 'number') return true;
-    const fresh = await this.redis.set(
-      updKey(botKey, updateId),
-      '1',
-      'EX',
+  claimUpdate(botKey: string, updateId: unknown): Promise<boolean> {
+    return claimTelegramUpdate(
+      this.redis,
+      (id) => updKey(botKey, id),
+      updateId,
       3600,
-      'NX',
     );
-    return fresh === 'OK';
   }
 
   /** Forget a claimed update that could not be queued, so Telegram's retry is accepted. */

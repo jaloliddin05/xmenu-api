@@ -5,6 +5,7 @@ import type { OrderWithItems } from '../services/order-view';
 import {
   nextRestaurantStatus,
   OrderStatusName,
+  PAYMENT_EXPIRED_REASON,
 } from '../domain/order-state-machine';
 
 /**
@@ -115,12 +116,22 @@ export type InlineKeyboard = {
   inline_keyboard: { text: string; callback_data: string }[][];
 };
 
-/** Callback data: o:a|o:r|o:n:<orderId> (Telegram chegarasi 64 bayt: 4 + 36 = 40). */
+/**
+ * Callback data: o:a|o:r|o:n:<status the button was drawn for>:<orderId>. The status makes a repeated or late
+ * press harmless: the order moves only from that status (Telegram limit 64 bytes; the longest status
+ * pending_acceptance gives 4 + 18 + 1 + 36 = 59). Buttons drawn before carry no status (o:n:<orderId>).
+ */
 export const CALLBACK = {
   accept: 'o:a:',
   reject: 'o:r:',
   next: 'o:n:',
 } as const;
+
+export const callbackData = (
+  prefix: (typeof CALLBACK)[keyof typeof CALLBACK],
+  status: OrderStatusName,
+  orderId: string,
+) => `${prefix}${status}:${orderId}`;
 
 /** Button for the restaurant's next step; a delivery stops at "ready" (the courier moves it on). */
 const NEXT_LABEL: Record<
@@ -143,8 +154,14 @@ export function buildRestaurantKeyboard(
     return {
       inline_keyboard: [
         [
-          { text: '✅ Принять', callback_data: CALLBACK.accept + order.id },
-          { text: '❌ Отклонить', callback_data: CALLBACK.reject + order.id },
+          {
+            text: '✅ Принять',
+            callback_data: callbackData(CALLBACK.accept, status, order.id),
+          },
+          {
+            text: '❌ Отклонить',
+            callback_data: callbackData(CALLBACK.reject, status, order.id),
+          },
         ],
       ],
     };
@@ -153,7 +170,12 @@ export function buildRestaurantKeyboard(
   if (nextRestaurantStatus(status, order.fulfillment) && label) {
     return {
       inline_keyboard: [
-        [{ text: label, callback_data: CALLBACK.next + order.id }],
+        [
+          {
+            text: label,
+            callback_data: callbackData(CALLBACK.next, status, order.id),
+          },
+        ],
       ],
     };
   }
@@ -166,6 +188,7 @@ export function buildCustomerText(
     OrderWithItems,
     'number' | 'status' | 'payment_method' | 'payment_status' | 'cancelled_by'
   > &
+    Partial<Pick<OrderWithItems, 'cancel_reason'>> &
     Partial<
       Pick<OrderWithItems, 'fulfillment' | 'door_problem' | 'external_service'>
     >,
@@ -198,6 +221,8 @@ export function buildCustomerText(
       return t.completed(n);
     case 'cancelled': {
       if (order.cancelled_by === 'customer') return null; // сам отменил — он это видит в приложении
+      // The guest left an unpaid order in payment_failed (PAYMENT_FAILED_TTL_HOURS): the timeline shows it
+      if (order.cancel_reason === PAYMENT_EXPIRED_REASON) return null;
       const refund =
         isOnlineMethod(order.payment_method) &&
         ['refund_pending', 'refunded'].includes(order.payment_status)

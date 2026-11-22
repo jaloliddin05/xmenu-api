@@ -385,8 +385,8 @@ export const ERROR_CODES = spec({
   },
   has_active_orders: {
     status: 409,
-    message: 'The guest has unfinished orders',
-    when: 'Удалить аккаунт гостя нельзя, пока есть незавершённые заказы (включая ожидающие оплаты); `details.activeOrders`',
+    message: 'There are unfinished orders',
+    when: 'Удалить аккаунт гостя или заведение нельзя, пока есть незавершённые заказы (включая ожидающие оплаты); `details.activeOrders`',
     details: ['activeOrders'],
   },
   delivery_unavailable_no_zone: {

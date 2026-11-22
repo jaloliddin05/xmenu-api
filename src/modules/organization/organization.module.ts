@@ -6,6 +6,7 @@ import { PrismaModule } from '../_prisma/prisma.module';
 import { RevalidateModule } from '../revalidate-queue/revalidate.module';
 import { TenantModule } from '../tenant/tenant.module';
 import { TelegramModule } from '../telegram/telegram.module';
+import { PosModule } from '../pos/pos.module';
 import { OrganizationSettingsController } from './organization-settings.controller';
 import { OrganizationSettingsService } from './services/organization-settings.service';
 import { OrganizationPublicationController } from './organization-publication.controller';
@@ -18,6 +19,7 @@ import { PublicationService } from './services/publication.service';
     TenantModule,
     TelegramModule,
     GuestLoginModule,
+    PosModule,
   ],
   controllers: [
     OrganizationController,

@@ -50,6 +50,11 @@ export interface TransitionInput {
   reason?: string;
   /** awaiting_payment (qayta urinish): yangi to'lov muddati */
   paymentExpiresAt?: Date;
+  /**
+   * The status the caller saw when it decided (a Telegram button, a scan): the transition is refused when the
+   * order is in another status by now, even if the target is reachable from there too
+   */
+  expectedFrom?: OrderStatusName;
   /** problem_at_door: what happened at the door (refused: with a reason code) */
   doorProblem?: { kind: 'no_answer' | 'refused'; reason?: string };
   /** completed, cash order: how the guest paid the courier (banknotes by default, or a card) */
@@ -132,6 +137,8 @@ export class OrderTransitionService {
     );
     if (!check.ok)
       throw new InvalidTransitionError(from, input.to, check.reason);
+    if (input.expectedFrom && from !== input.expectedFrom)
+      throw new InvalidTransitionError(from, input.to, 'not_allowed');
     // Only the courier assigned to this order moves it (docs/DELIVERY.md, "Безопасность")
     if (input.actor === 'courier' && order.courier_id !== input.actorId)
       throw new CourierNotAssignedError();
