@@ -90,7 +90,11 @@ export class UpdateBranchDto {
   @IsOptional()
   @IsLongitude()
   readonly longitude?: number;
-  @ApiPropertyOptional() @IsOptional() @Matches(PHONE) readonly phone?: string;
+  /** null clears the phone. */
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsOptional()
+  @Matches(PHONE)
+  readonly phone?: string | null;
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()

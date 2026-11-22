@@ -12764,7 +12764,8 @@
             "type": "number"
           },
           "phone": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "timezone": {
             "type": "string"
