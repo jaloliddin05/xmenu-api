@@ -13403,10 +13403,11 @@
           "reason": {
             "type": "string",
             "enum": [
-              "out_of_delivery_zone"
+              "out_of_delivery_zone",
+              "fulfillment_unavailable"
             ],
             "nullable": true,
-            "description": "Why the branch does not deliver there; null when covered"
+            "description": "Why the branch does not deliver there (fulfillment_unavailable: the branch takes no delivery); null when covered"
           },
           "rule": {
             "type": "string",

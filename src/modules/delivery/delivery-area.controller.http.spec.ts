@@ -342,7 +342,7 @@ describe('Venue delivery area: owner, region catalog, guest map and quote', () =
       );
     });
 
-    it('takes a body over the API-wide 100 KB, refuses one over 1 MB with payload_too_large', async () => {
+    it('takes a body over the API-wide 100 KB, refuses one over 256 KB with payload_too_large', async () => {
       const json = (padding: number) =>
         JSON.stringify({
           parts: [{ source: 'custom', polygon: TRIANGLE }],
@@ -350,11 +350,11 @@ describe('Venue delivery area: owner, region catalog, guest map and quote', () =
         }).replace('{', '{' + ' '.repeat(padding));
       await owner('put', AREA)
         .set('Content-Type', 'application/json')
-        .send(json(300_000))
+        .send(json(150_000))
         .expect(200);
       const res = await owner('put', AREA)
         .set('Content-Type', 'application/json')
-        .send(json(1_100_000))
+        .send(json(300_000))
         .expect(413);
       expect(res.body.code).toBe('payload_too_large');
     });
@@ -590,6 +590,19 @@ describe('Venue delivery area: owner, region catalog, guest map and quote', () =
         rule: 'zone',
         zoneIndex: 0,
         deliveryFee: 4000,
+      });
+    });
+
+    it('a branch that takes no delivery covers nothing: fulfillment_unavailable, even inside the area', async () => {
+      branches[0].accepts_delivery = false;
+      await setArea();
+      const res = await check(north(5.5)).expect(200);
+      expect(res.body).toMatchObject({
+        covered: false,
+        inArea: true,
+        reason: 'fulfillment_unavailable',
+        rule: null,
+        deliveryFee: null,
       });
     });
 

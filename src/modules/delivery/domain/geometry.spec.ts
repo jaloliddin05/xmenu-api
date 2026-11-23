@@ -145,3 +145,39 @@ describe('rounding and bbox', () => {
     ]);
   });
 });
+
+// Shared with xmenu-backend geometry.spec.ts, xmenu-dashboard geometry.test.js and xmenu-client deliveryArea.test.js:
+// the same rings, points and expectations in all three (edge and vertex cases follow the backend formula).
+describe('shared cases', () => {
+  const SKEW: Ring = [
+    [0, 0],
+    [1, 4],
+    [3, 3],
+    [2, -1],
+  ];
+  const SQ: Ring = [
+    [0, 0],
+    [0, 2],
+    [2, 2],
+    [2, 0],
+  ];
+  const SHARED_CASES: [string, LatLng, Ring, boolean][] = [
+    ['skew ring, inside', [1.5, 1.5], SKEW, true],
+    ['skew ring, outside', [0.2, 3], SKEW, false],
+    ['at the latitude of a vertex, inside', [1, 3.9], SKEW, true],
+    ['at the latitude of a vertex, outside', [1, 4.1], SKEW, false],
+    ['at a vertex', [1, 4], SKEW, false],
+    ['at the first vertex', [0, 0], SKEW, false],
+    ['on the extension of a horizontal edge, right', [0, 3], SQ, false],
+    ['on the extension of a horizontal edge, left', [0, -1], SQ, false],
+    ['on the extension of the top edge, right', [2, 3], SQ, false],
+    ['on the extension of the top edge, left', [2, -1], SQ, false],
+    ['on the bottom edge', [0, 1], SQ, true],
+    ['on the top edge', [2, 1], SQ, false],
+    ['on the left edge', [1, 0], SQ, true],
+    ['on the right edge', [1, 2], SQ, false],
+  ];
+  it.each(SHARED_CASES)('%s', (_name, point, ring, expected) => {
+    expect(pointInRings(point[0], point[1], [ring])).toBe(expected);
+  });
+});

@@ -3,4 +3,4 @@
  * 10 × 200 points); infra/errors/configure.ts registers this parser before the API-wide one (100 KB).
  */
 export const DELIVERY_AREA_PATH = '/organization/:id/delivery-area';
-export const DELIVERY_AREA_BODY_LIMIT = '1mb';
+export const DELIVERY_AREA_BODY_LIMIT = '256kb';

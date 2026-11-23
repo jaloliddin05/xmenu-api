@@ -144,11 +144,14 @@ export class DeliveryQuoteService {
     ]);
     const from: LatLng = [branch.latitude, branch.longitude];
     const { inArea, rate } = branchRateFor(branch.rules, from, address, area);
-    if (!rate) {
+    // A branch that takes no delivery covers nothing, whatever its rules say (as for the guest).
+    if (!branch.accepts_delivery || !rate) {
       return {
         covered: false,
         inArea,
-        reason: 'out_of_delivery_zone',
+        reason: branch.accepts_delivery
+          ? 'out_of_delivery_zone'
+          : 'fulfillment_unavailable',
         rule: null,
         zoneIndex: null,
         distanceKm: km(distanceKm(from, address)),

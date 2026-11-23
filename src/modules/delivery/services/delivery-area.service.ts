@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import type { delivery_area, delivery_area_part, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+import type { delivery_area, delivery_area_part } from '@prisma/client';
 import { AppException } from 'src/infra/errors/app-exception';
 import { fieldErrorsException } from 'src/infra/validators/validation-errors';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
@@ -159,18 +160,26 @@ export class DeliveryAreaService {
     };
   }
 
+  /**
+   * The row and its parts from one snapshot: a PUT finishing between two plain reads would otherwise pair new
+   * parts with the old default price (or the other way round).
+   */
   private rows(
     organizationId: string,
   ): Promise<[delivery_area | null, delivery_area_part[]]> {
-    return Promise.all([
-      this.prisma.delivery_area.findUnique({
-        where: { organization_id: organizationId },
-      }),
-      this.prisma.delivery_area_part.findMany({
-        where: { organization_id: organizationId },
-        ...PARTS_ORDER,
-      }),
-    ]);
+    return this.prisma.$transaction(
+      async (tx) =>
+        Promise.all([
+          tx.delivery_area.findUnique({
+            where: { organization_id: organizationId },
+          }),
+          tx.delivery_area_part.findMany({
+            where: { organization_id: organizationId },
+            ...PARTS_ORDER,
+          }),
+        ]),
+      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+    );
   }
 }
 

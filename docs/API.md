@@ -1066,7 +1066,7 @@ even-odd по всем её кольцам (так описываются дыр
 | `GET /delivery/regions` | справочник областей: `{ version, attribution, license, regions: [{ code, name, bbox }] }` |
 | `GET /delivery/regions/:code` | одна область с геометрией; неизвестный код → `404 not_found` |
 | `GET /organization/:id/delivery-area` | зона заведения и цена по умолчанию |
-| `PUT /organization/:id/delivery-area` | заменяет целиком, отвечает тем же видом, что `GET`; тело до 1 МБ (остальные маршруты 100 КБ) |
+| `PUT /organization/:id/delivery-area` | заменяет целиком, отвечает тем же видом, что `GET`; тело до 256 КБ (остальные маршруты 100 КБ) |
 
 `GET /delivery/regions` →
 
@@ -1136,7 +1136,7 @@ even-odd по всем её кольцам (так описываются дыр
 | `parts` | `array_max_size` | больше 14 областей или 10 нарисованных частей |
 | `defaultRule` | `required` | есть части, нет цены по умолчанию |
 
-  Тело больше 1 МБ: `413 payload_too_large`.
+  Тело больше 256 КБ: `413 payload_too_large`.
 - Сохранение ревалидацию не ставит: гость читает зону из `GET /delivery/area` (кэш 5 минут).
 
 ### Зона на карте гостя
@@ -1186,6 +1186,7 @@ even-odd по всем её кольцам (так описываются дыр
 - Сохранение ставит ревалидацию `route: 'branches'` (доступность доставки и зоны на карте в `/tenant/config`).
 - `check` → `{ covered, inArea, reason, rule: "zone" | "distance" | "default" | null, zoneIndex, distanceKm, deliveryFee,
   freeFrom, minOrder, shortBy }` (`branchRateFor` в `order/domain/branch-choice.ts`, те же правила, что выбор филиала):
+  - филиал не принимает доставку (`accepts_delivery: false`): `covered: false`, `reason: "fulfillment_unavailable"` (тот же код, что у гостя), правила не смотрятся;
   - `inArea`: адрес в общей зоне заведения; `null`, если зона не задана;
   - зона задана, адрес вне её: `covered: false`, `reason: "out_of_delivery_zone"`, даже если правило филиала дотягивается;
   - правило филиала покрывает адрес: `rule: "zone"` (`zoneIndex`) или `"distance"`;

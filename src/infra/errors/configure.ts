@@ -32,12 +32,17 @@ function bodyParseErrors(
  * Request ids, body parsers, the error filter and the validation pipe, as main.ts and the HTTP specs
  * wire them. The parsers are the ones Nest would add (same defaults); registered here Nest skips its own.
  * CSP reports get their own raw text parser first (16 KB, broken JSON is not an error there). The venue delivery
- * area takes up to 1 MB (drawn outlines); every other route keeps the default 100 KB.
+ * area PUT takes up to 256 KB (drawn outlines); every other route keeps the default 100 KB.
  */
 export function configureErrorHandling(app: INestApplication): void {
   app.use(requestIdMiddleware);
   app.use(CSP_REPORT_PATH, cspReportBodyParser);
-  app.use(DELIVERY_AREA_PATH, json({ limit: DELIVERY_AREA_BODY_LIMIT }));
+  const areaBody = json({ limit: DELIVERY_AREA_BODY_LIMIT });
+  app.use(
+    DELIVERY_AREA_PATH,
+    (req: Request, res: Response, next: NextFunction) =>
+      req.method === 'PUT' ? areaBody(req, res, next) : next(),
+  );
   app.use(json(), urlencoded({ extended: true }), bodyParseErrors);
   app.useGlobalFilters(new AppErrorFilter());
   app.useGlobalPipes(createValidationPipe());

@@ -187,11 +187,12 @@ export class DeliveryPriceCheckDto {
   })
   inArea: boolean | null;
   @ApiProperty({
-    enum: ['out_of_delivery_zone'],
+    enum: ['out_of_delivery_zone', 'fulfillment_unavailable'],
     nullable: true,
-    description: 'Why the branch does not deliver there; null when covered',
+    description:
+      'Why the branch does not deliver there (fulfillment_unavailable: the branch takes no delivery); null when covered',
   })
-  reason: 'out_of_delivery_zone' | null;
+  reason: 'out_of_delivery_zone' | 'fulfillment_unavailable' | null;
   @ApiProperty({
     enum: QUOTE_RULES,
     nullable: true,

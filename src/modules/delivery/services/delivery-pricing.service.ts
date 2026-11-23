@@ -38,7 +38,13 @@ export class DeliveryPricingService {
   async ownBranch(organizationId: string, branchId: string) {
     const b = await this.prisma.branch.findFirst({
       where: { id: branchId, organization_id: organizationId },
-      select: { id: true, latitude: true, longitude: true, ...RULES_INCLUDE },
+      select: {
+        id: true,
+        latitude: true,
+        longitude: true,
+        accepts_delivery: true,
+        ...RULES_INCLUDE,
+      },
     });
     if (!b)
       throw new AppException('not_found', { message: 'Branch not found' });
@@ -46,6 +52,7 @@ export class DeliveryPricingService {
       id: b.id,
       latitude: b.latitude,
       longitude: b.longitude,
+      accepts_delivery: b.accepts_delivery,
       rules: toDeliveryRules(b.delivery_zones, b.delivery_distance),
     };
   }
