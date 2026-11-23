@@ -8,6 +8,7 @@ import {
 } from 'src/modules/order/domain/delivery-payment';
 import { PaymentConfigService } from 'src/modules/payment/services/payment-config.service';
 import { DeliveryPricingService } from 'src/modules/delivery/services/delivery-pricing.service';
+import { DeliveryAreaService } from 'src/modules/delivery/services/delivery-area.service';
 import {
   resolveTheme,
   toSettingsView,
@@ -46,7 +47,8 @@ export function pickDescription(
 
 /**
  * Modes a customer can actually order with (order.service.ts): none while ordering is off or not
- * published (domain/publication.ts), delivery also needs a delivering branch with delivery pricing.
+ * published (domain/publication.ts), delivery also needs a delivering branch and pricing: the venue delivery
+ * area or a delivering branch with its own rules.
  */
 export function fulfillmentModes(
   branches: { accepts_delivery: boolean; accepts_pickup: boolean }[],
@@ -119,43 +121,46 @@ export class TenantConfigService {
     private readonly orderSettings: OrderSettingsService,
     private readonly guestLogin: GuestLoginService,
     private readonly deliveryPricing: DeliveryPricingService,
+    private readonly deliveryArea: DeliveryAreaService,
     private readonly payments: PaymentConfigService,
   ) {}
 
   async get(tenant: Tenant, lang: Lang): Promise<TenantConfigDto> {
-    const [org, ordering, branches, priced, providers] = await Promise.all([
-      this.prisma.organization.findUnique({
-        where: { id: tenant.id },
-        select: {
-          id: true,
-          slug: true,
-          name: true,
-          type: true,
-          logo: { select: { url: true } },
-          banner: { select: { url: true } },
-          translations: { select: { lang: true, description: true } },
-          settings: true,
-          qr_enabled: true,
-          delivery_enabled: true,
-          delivery_mode: true,
-          published_at: true,
-          domains: PRIMARY_DOMAIN_SELECT,
-          telegram_bot: { select: { username: true } },
-        },
-      }),
-      this.orderSettings.get(tenant.id),
-      this.prisma.branch.findMany({
-        where: { organization_id: tenant.id, is_active: true },
-        select: {
-          accepts_delivery: true,
-          accepts_pickup: true,
-          latitude: true,
-          longitude: true,
-        },
-      }),
-      this.deliveryPricing.pricedDeliveryBranches(tenant.id),
-      this.payments.enabledProviders(tenant.id),
-    ]);
+    const [org, ordering, branches, priced, areaSet, providers] =
+      await Promise.all([
+        this.prisma.organization.findUnique({
+          where: { id: tenant.id },
+          select: {
+            id: true,
+            slug: true,
+            name: true,
+            type: true,
+            logo: { select: { url: true } },
+            banner: { select: { url: true } },
+            translations: { select: { lang: true, description: true } },
+            settings: true,
+            qr_enabled: true,
+            delivery_enabled: true,
+            delivery_mode: true,
+            published_at: true,
+            domains: PRIMARY_DOMAIN_SELECT,
+            telegram_bot: { select: { username: true } },
+          },
+        }),
+        this.orderSettings.get(tenant.id),
+        this.prisma.branch.findMany({
+          where: { organization_id: tenant.id, is_active: true },
+          select: {
+            accepts_delivery: true,
+            accepts_pickup: true,
+            latitude: true,
+            longitude: true,
+          },
+        }),
+        this.deliveryPricing.pricedDeliveryBranches(tenant.id),
+        this.deliveryArea.isSet(tenant.id),
+        this.payments.enabledProviders(tenant.id),
+      ]);
     if (!org) throw new AppException('tenant_not_found');
     if (!org.settings) {
       this.logger.error(
@@ -176,7 +181,8 @@ export class TenantConfigService {
     const auth = await this.guestLogin.methods(tenant.id, published);
     // Same bot check as channels.auth: a bot that cannot serve guests offers no Mini App
     const miniApp = auth.telegram && modeNeedsBot(org.delivery_mode);
-    const deliveryPriced = priced.length > 0;
+    // The venue area prices every address in it (default rule); without one, branch rules alone
+    const deliveryPriced = areaSet || priced.length > 0;
     const deliveryZones = priced.flatMap((b) =>
       b.rules.zones.map((z) => z.polygon),
     );

@@ -18,6 +18,7 @@ import { GuestLoginService } from 'src/modules/guest-login/guest-login.service';
 import { TelegramBotProfileService } from 'src/modules/telegram/telegram-bot-profile.service';
 import { deliveryPaymentMethods } from 'src/modules/order/domain/delivery-payment';
 import { readDeliveryPayment } from 'src/modules/order/services/delivery-payment-state';
+import { deliveryAreaIsSet } from 'src/modules/delivery/services/delivery-area.service';
 
 type Db = Prisma.TransactionClient;
 
@@ -234,44 +235,50 @@ export class PublicationService {
     db: Db,
     organizationId: string,
   ): Promise<PublicationFacts> {
-    const [org, categories, products, branches, botConnected, payment] =
-      await Promise.all([
-        db.organization.findUnique({
-          where: { id: organizationId },
-          select: {
-            name: true,
-            slug: true,
-            delivery_enabled: true,
-            delivery_mode: true,
-          },
-        }),
-        db.category.count({
-          where: { organization_id: organizationId, ...ACTIVE },
-        }),
-        // What the menu shows: an active dish in an active category
-        db.product.count({
-          where: {
-            AND: [
-              ACTIVE,
-              { category: { organization_id: organizationId, ...ACTIVE } },
-            ],
-          },
-        }),
-        db.branch.findMany({
-          where: { organization_id: organizationId, is_active: true },
-          select: {
-            latitude: true,
-            longitude: true,
-            accepts_pickup: true,
-            accepts_delivery: true,
-            working_hours: { select: { is_closed: true } },
-            delivery_zones: { select: { id: true }, take: 1 },
-            delivery_distance: { select: { branch_id: true } },
-          },
-        }),
-        this.botConnected(db, organizationId),
-        readDeliveryPayment(db, organizationId),
-      ]);
+    const [
+      org,
+      categories,
+      products,
+      branches,
+      botConnected,
+      payment,
+      hasDeliveryArea,
+    ] = await Promise.all([
+      db.organization.findUnique({
+        where: { id: organizationId },
+        select: {
+          name: true,
+          slug: true,
+          delivery_enabled: true,
+          delivery_mode: true,
+        },
+      }),
+      db.category.count({
+        where: { organization_id: organizationId, ...ACTIVE },
+      }),
+      // What the menu shows: an active dish in an active category
+      db.product.count({
+        where: {
+          AND: [
+            ACTIVE,
+            { category: { organization_id: organizationId, ...ACTIVE } },
+          ],
+        },
+      }),
+      db.branch.findMany({
+        where: { organization_id: organizationId, is_active: true },
+        select: {
+          latitude: true,
+          longitude: true,
+          accepts_pickup: true,
+          accepts_delivery: true,
+          working_hours: { select: { is_closed: true } },
+        },
+      }),
+      this.botConnected(db, organizationId),
+      readDeliveryPayment(db, organizationId),
+      deliveryAreaIsSet(db, organizationId),
+    ]);
     if (!org)
       throw new AppException('not_found', {
         message: 'Organization not found',
@@ -288,9 +295,8 @@ export class PublicationService {
         hasCoordinates: !(b.latitude === 0 && b.longitude === 0),
         acceptsPickup: b.accepts_pickup,
         acceptsDelivery: b.accepts_delivery,
-        hasDeliveryPricing:
-          b.delivery_zones.length > 0 || b.delivery_distance !== null,
       })),
+      hasDeliveryArea,
       botConnected,
       hasDeliveryPaymentMethod:
         deliveryPaymentMethods(payment, payment.providers).length > 0,

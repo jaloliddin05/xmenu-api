@@ -90,6 +90,42 @@ describeDb(
           domains: {
             create: { host: `${uniq()}.example.uz`, verification_token: 't' },
           },
+          delivery_area: {
+            create: {
+              base_price: 9000,
+              included_km: 2,
+              price_per_km: 1500,
+              min_order: 0,
+            },
+          },
+          delivery_area_parts: {
+            create: [
+              {
+                position: 0,
+                source: 'region',
+                region_code: 'UZ-TK',
+                catalog_version: 'osm-test',
+                geometry: [
+                  [
+                    [41.2, 69.1],
+                    [41.2, 69.4],
+                    [41.4, 69.4],
+                  ],
+                ],
+              },
+              {
+                position: 1,
+                source: 'custom',
+                geometry: [
+                  [
+                    [41.3, 69.2],
+                    [41.3, 69.3],
+                    [41.35, 69.25],
+                  ],
+                ],
+              },
+            ],
+          },
         },
       });
       const orgId = org.id;
@@ -341,6 +377,10 @@ describeDb(
           },
         ),
         tenant_domain: await prisma.tenant_domain.count({ where: byOrg }),
+        delivery_area: await prisma.delivery_area.count({ where: byOrg }),
+        delivery_area_part: await prisma.delivery_area_part.count({
+          where: byOrg,
+        }),
         category: await prisma.category.count({ where: byOrg }),
         category_translation: await prisma.category_translation.count({
           where: { category_id: ids.categoryId },

@@ -240,10 +240,23 @@ describe('platform theme', () => {
 
   it('resolveTheme fills what the owner left out and keeps what they chose', () => {
     expect(resolveTheme(null)).toEqual(PLATFORM_THEME);
+    expect(resolveTheme({ muted: '#777777' })).toEqual({
+      ...PLATFORM_THEME,
+      muted: '#777777',
+    });
+  });
+
+  it('the delivery area color follows the brand unless the owner chose one', () => {
+    expect(resolveTheme(null).serviceArea).toBe(PLATFORM_THEME.brand);
     expect(resolveTheme({ brand: '#00AA55' })).toEqual({
       ...PLATFORM_THEME,
       brand: '#00AA55',
+      serviceArea: '#00AA55',
     });
+    // An explicit color stays, whatever the brand
+    expect(
+      resolveTheme({ brand: '#00AA55', serviceArea: '#4A6FA5' }).serviceArea,
+    ).toBe('#4A6FA5');
   });
 
   it('platform brand is not the old red', () => {

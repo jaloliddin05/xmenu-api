@@ -656,6 +656,9 @@ model organization {
   telegram_bot      organization_telegram_bot?
   pos_integration   pos_integration?
   domains           tenant_domain[]
+  // Venue delivery area (delivery/models/delivery-area.prisma)
+  delivery_area       delivery_area?
+  delivery_area_parts delivery_area_part[]
   additional_product_groups additional_product_group[]
   // Tenant ichidagi buyurtma raqami hisoblagichi (atomik UPDATE ... RETURNING)
   order_seq    Int               @default(1000)
@@ -1338,4 +1341,45 @@ model pos_order {
   updated_at     DateTime        @updatedAt
 
   @@index([integration_id, state])
+}
+
+// Venue delivery area (docs/DELIVERY.md, "Общая зона доставки заведения"): parts and the default price.
+// An address is in the area when it is inside at least one part; branch rules apply only inside the area.
+
+// The default price for addresses in the area that no branch rule covers. Exists while the area has parts.
+model delivery_area {
+  organization_id String       @id
+  organization    organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+
+  base_price   Int
+  included_km  Float
+  // Added for every started kilometre over included_km
+  price_per_km Int
+  min_order    Int
+  // Order subtotal from which delivery is free; null = never free
+  free_from    Int?
+  updated_at   DateTime     @updatedAt
+}
+
+// One part of the area: a catalog region (copied with the catalog version, read-only) or a drawn outline.
+model delivery_area_part {
+  id              String               @id @default(uuid())
+  organization_id String
+  organization    organization         @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+
+  position        Int
+  source          DeliveryAreaSource
+  // ISO 3166-2:UZ code of a region part; null for a drawn one
+  region_code     String?
+  // Catalog version the region geometry was copied from; null for a drawn one
+  catalog_version String?
+  // Rings [[[lat, lng], ...], ...], open, even-odd (delivery/domain/geometry.ts); a drawn part has one ring
+  geometry        Json
+
+  @@index([organization_id, position])
+}
+
+enum DeliveryAreaSource {
+  region
+  custom
 }

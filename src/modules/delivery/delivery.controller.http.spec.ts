@@ -8,6 +8,7 @@ import { RevalidateService } from '../revalidate-queue/revalidate.service';
 import { TenantService } from '../tenant/tenant.service';
 import { BranchDeliveryPricingController } from './controllers/branch-delivery-pricing.controller';
 import { DeliveryQuoteController } from './controllers/delivery-quote.controller';
+import { DeliveryAreaService } from './services/delivery-area.service';
 import { DeliveryPricingService } from './services/delivery-pricing.service';
 import { DeliveryQuoteService } from './services/delivery-quote.service';
 
@@ -122,6 +123,11 @@ describe('Delivery pricing (owner) and quote (guest)', () => {
           OrderSettingsService,
           { provide: PrismaService, useValue: prisma },
           { provide: RevalidateService, useValue: revalidate },
+          // No venue area here: branch rules alone (delivery-area.controller.http.spec.ts covers the area)
+          {
+            provide: DeliveryAreaService,
+            useValue: { forPricing: async () => null },
+          },
           {
             provide: TenantService,
             useValue: {

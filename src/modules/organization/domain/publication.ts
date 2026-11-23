@@ -27,8 +27,6 @@ export interface BranchFacts {
   hasCoordinates: boolean;
   acceptsPickup: boolean;
   acceptsDelivery: boolean;
-  /** Delivery pricing set: at least one zone or the distance rule (docs/DELIVERY.md). */
-  hasDeliveryPricing: boolean;
 }
 
 /** What the checklist looks at; read fresh from the database (publication.service.ts). */
@@ -42,6 +40,11 @@ export interface PublicationFacts {
   hasActiveProduct: boolean;
   /** Active branches only. */
   branches: BranchFacts[];
+  /**
+   * The venue delivery area is set: at least one part and the default price (docs/DELIVERY.md, "Общая зона
+   * доставки заведения"). Branch zones are not required.
+   */
+  hasDeliveryArea: boolean;
   /** The venue's bot is connected and enabled (organization_telegram_bot.is_enabled). */
   botConnected: boolean;
   /** The guest has at least one payment method at delivery (deliveryPaymentMethods is not empty). */
@@ -136,8 +139,8 @@ export function evaluateChecklist(f: PublicationFacts): ChecklistItem[] {
     deliversSomewhere
       ? check(
           'delivery_pricing',
-          f.branches.some((b) => b.acceptsDelivery && b.hasDeliveryPricing),
-          'Задайте стоимость доставки (зону или расстояние) хотя бы у одного филиала с доставкой или отключите доставку в филиалах',
+          f.hasDeliveryArea,
+          'Задайте зону доставки заведения и цену доставки по умолчанию или отключите доставку в филиалах',
         )
       : notRequired('delivery_pricing'),
     // A venue setting, not the platform's: blocks like delivery pricing (W13F-04)

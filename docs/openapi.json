@@ -5736,6 +5736,373 @@
         ]
       }
     },
+    "/delivery/area": {
+      "get": {
+        "operationId": "DeliveryAreaPublicController_get",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "Organization id (UUID); resolve a slug with GET /tenant/by-slug/:slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "headers": {
+              "Cache-Control": {
+                "description": "public, max-age=300"
+              },
+              "ETag": {
+                "description": "Send it back as If-None-Match: 304 while unchanged"
+              }
+            },
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicDeliveryAreaDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Venue delivery area for the map: parts as rings (5 decimals, even-odd), or null when the venue has none",
+        "tags": [
+          "Delivery (customer)"
+        ]
+      }
+    },
+    "/organization/{id}/delivery-area": {
+      "get": {
+        "operationId": "DeliveryAreaController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryAreaViewDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No or invalid owner token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The user has no organization, or the role lacks the venue permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not your organization (any other id looks missing)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Venue delivery area: parts (catalog regions with their copied geometry, drawn outlines) and the default price",
+        "tags": [
+          "Organization"
+        ],
+        "x-permission": "venue"
+      },
+      "put": {
+        "operationId": "DeliveryAreaController_replace",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeliveryAreaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryAreaViewDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "validation_error, or invalid_settings with fields[]: unknown_region, duplicate, polygon, outside_bounds, self_intersection, array_max_size (parts), required (defaultRule)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No or invalid owner token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The user has no organization, or the role lacks the venue permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not your organization (any other id looks missing)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "payload_too_large: the body is over 1 MB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Replace the venue delivery area: parts ({ source: region, code } or { source: custom, polygon }) and the default price; no parts removes the area. JSON body up to 1 MB (delivery-area.body.ts)",
+        "tags": [
+          "Organization"
+        ],
+        "x-permission": "venue"
+      }
+    },
+    "/delivery/regions": {
+      "get": {
+        "operationId": "DeliveryRegionsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegionListDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No or invalid owner token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The user has no organization, or the role lacks the venue permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Regions of Uzbekistan: code, names (uz, ru, en) and bbox, with the catalog version and the attribution to show",
+        "tags": [
+          "Delivery"
+        ],
+        "x-permission": "venue"
+      }
+    },
+    "/delivery/regions/{code}": {
+      "get": {
+        "operationId": "DeliveryRegionsController_get",
+        "parameters": [
+          {
+            "name": "code",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegionDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No or invalid owner token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The user has no organization, or the role lacks the venue permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found: no such region code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Geometry of one region (rings, even-odd)",
+        "tags": [
+          "Delivery"
+        ],
+        "x-permission": "venue"
+      }
+    },
     "/category": {
       "get": {
         "operationId": "CategoryController_findAll",
@@ -13135,9 +13502,11 @@
             "type": "string",
             "enum": [
               "zone",
-              "distance"
+              "distance",
+              "default"
             ],
-            "nullable": true
+            "nullable": true,
+            "description": "zone or distance: the branch rule; default: the venue default price (an address in the venue area no branch rule covers)"
           },
           "distanceKm": {
             "type": "number",
@@ -13178,6 +13547,382 @@
           "freeFrom",
           "minOrder",
           "shortBy"
+        ]
+      },
+      "PublicDeliveryAreaDto": {
+        "type": "object",
+        "properties": {
+          "parts": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  },
+                  "minItems": 2,
+                  "maxItems": 2
+                }
+              }
+            },
+            "description": "Parts, each a list of rings [[lat, lng], ...] (5 decimals, open, even-odd); null: the venue has no area"
+          }
+        },
+        "required": [
+          "parts"
+        ]
+      },
+      "RegionNameDto": {
+        "type": "object",
+        "properties": {
+          "uz": {
+            "type": "string",
+            "example": "Toshkent shahri"
+          },
+          "ru": {
+            "type": "string",
+            "example": "Ташкент"
+          },
+          "en": {
+            "type": "string",
+            "example": "Tashkent City"
+          }
+        },
+        "required": [
+          "uz",
+          "ru",
+          "en"
+        ]
+      },
+      "DeliveryAreaPartViewDto": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "region",
+              "custom"
+            ]
+          },
+          "code": {
+            "type": "string",
+            "nullable": true,
+            "example": "UZ-TK",
+            "description": "Region code; null for a drawn part"
+          },
+          "name": {
+            "nullable": true,
+            "description": "Region name; null for a drawn part",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RegionNameDto"
+              }
+            ]
+          },
+          "catalogVersion": {
+            "type": "string",
+            "nullable": true,
+            "example": "osm-2026-11-24",
+            "description": "Catalog version the region was copied from; null for a drawn part"
+          },
+          "rings": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              }
+            },
+            "description": "Rings [[[lat, lng], ...], ...], open; a point is inside by the even-odd rule over all of them. A drawn part has one ring; a region its copy from the catalog"
+          }
+        },
+        "required": [
+          "source",
+          "code",
+          "name",
+          "catalogVersion",
+          "rings"
+        ]
+      },
+      "DeliveryDefaultRuleDto": {
+        "type": "object",
+        "properties": {
+          "basePrice": {
+            "type": "number",
+            "example": 10000,
+            "description": "Price up to includedKm (sum)"
+          },
+          "includedKm": {
+            "type": "number",
+            "example": 3,
+            "description": "Kilometres in the base price, straight line from the branch"
+          },
+          "pricePerKm": {
+            "type": "number",
+            "example": 2000,
+            "description": "Added for every started kilometre over includedKm (sum)"
+          },
+          "minOrder": {
+            "type": "number",
+            "example": 50000,
+            "description": "Minimum order subtotal without delivery (sum)"
+          },
+          "freeFrom": {
+            "type": "number",
+            "nullable": true,
+            "example": null,
+            "description": "Free delivery from this subtotal; null: never free"
+          }
+        },
+        "required": [
+          "basePrice",
+          "includedKm",
+          "pricePerKm",
+          "minOrder"
+        ]
+      },
+      "DeliveryAreaViewDto": {
+        "type": "object",
+        "properties": {
+          "parts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeliveryAreaPartViewDto"
+            }
+          },
+          "defaultRule": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DeliveryDefaultRuleDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "parts",
+          "defaultRule"
+        ]
+      },
+      "DeliveryAreaPartDto": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "region",
+              "custom"
+            ],
+            "example": "region"
+          },
+          "code": {
+            "type": "string",
+            "example": "UZ-TK",
+            "description": "source region: ISO 3166-2:UZ code from GET /delivery/regions (the server copies the geometry)"
+          },
+          "polygon": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "minItems": 3,
+            "maxItems": 200,
+            "example": [
+              [
+                41.35,
+                69.2
+              ],
+              [
+                41.35,
+                69.35
+              ],
+              [
+                41.25,
+                69.3
+              ]
+            ],
+            "description": "source custom: one outline [[lat, lng], ...], 3 to 200 points, open, no holes; rounded to 6 decimals"
+          }
+        },
+        "required": [
+          "source"
+        ]
+      },
+      "DeliveryAreaDto": {
+        "type": "object",
+        "properties": {
+          "parts": {
+            "maxItems": 24,
+            "description": "At most 14 regions and 10 drawn parts",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeliveryAreaPartDto"
+            }
+          },
+          "defaultRule": {
+            "nullable": true,
+            "description": "Required when parts is not empty",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DeliveryDefaultRuleDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "parts"
+        ]
+      },
+      "RegionSummaryDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "UZ-TK",
+            "description": "ISO 3166-2:UZ"
+          },
+          "name": {
+            "$ref": "#/components/schemas/RegionNameDto"
+          },
+          "bbox": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "minItems": 2,
+            "maxItems": 2,
+            "example": [
+              [
+                41.17,
+                69.11
+              ],
+              [
+                41.45,
+                69.5
+              ]
+            ],
+            "description": "[[south, west], [north, east]]"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "bbox"
+        ]
+      },
+      "RegionListDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string",
+            "example": "osm-2026-11-24"
+          },
+          "attribution": {
+            "type": "string",
+            "example": "© OpenStreetMap contributors",
+            "description": "Show next to a map drawing the regions"
+          },
+          "license": {
+            "type": "string",
+            "example": "ODbL-1.0"
+          },
+          "regions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RegionSummaryDto"
+            }
+          }
+        },
+        "required": [
+          "version",
+          "attribution",
+          "license",
+          "regions"
+        ]
+      },
+      "RegionDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "UZ-TK",
+            "description": "ISO 3166-2:UZ"
+          },
+          "name": {
+            "$ref": "#/components/schemas/RegionNameDto"
+          },
+          "bbox": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "minItems": 2,
+            "maxItems": 2,
+            "example": [
+              [
+                41.17,
+                69.11
+              ],
+              [
+                41.45,
+                69.5
+              ]
+            ],
+            "description": "[[south, west], [north, east]]"
+          },
+          "version": {
+            "type": "string",
+            "example": "osm-2026-11-24"
+          },
+          "rings": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              }
+            },
+            "description": "Rings [[[lat, lng], ...], ...], open, even-odd (outlines, holes, exclaves)"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "bbox",
+          "version",
+          "rings"
         ]
       },
       "CreateCategoryDto": {

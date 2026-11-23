@@ -151,7 +151,12 @@ describe('GET/PUT /organization/:id/settings', () => {
     expect(res.body).toEqual({
       ...VALID,
       supportTelegram: 'demo_cafe',
-      effectiveTheme: { ...PLATFORM_THEME, ...VALID.theme },
+      // The delivery area color follows the owner's brand unless they set one
+      effectiveTheme: {
+        ...PLATFORM_THEME,
+        serviceArea: VALID.theme.brand,
+        ...VALID.theme,
+      },
       platformTheme: PLATFORM_THEME,
     });
     expect(invalidate).toHaveBeenCalledWith(ORG_A);

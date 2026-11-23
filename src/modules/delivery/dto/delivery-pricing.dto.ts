@@ -18,8 +18,8 @@ import {
 export const MAX_ZONES = 20;
 export const MAX_ZONE_POINTS = 200;
 export const MAX_DELIVERY_KM = 100;
-const MAX_FEE = 10_000_000;
-const MAX_SUM = 100_000_000;
+export const MAX_FEE = 10_000_000;
+export const MAX_SUM = 100_000_000;
 
 /** Missing or null: no free delivery. */
 const FreeFrom = () =>
@@ -173,6 +173,8 @@ export class DeliveryPointQueryDto {
 }
 
 const RULES = ['zone', 'distance'] as const;
+/** Quote rules: a branch zone or distance rule, or the venue default price (an area gap no branch covers). */
+const QUOTE_RULES = ['zone', 'distance', 'default'] as const;
 
 /** GET /branch/:id/delivery-pricing/check: what this branch charges for the address, hours not considered. */
 export class DeliveryPriceCheckDto {
@@ -244,10 +246,13 @@ export class DeliveryQuoteDto {
   opensAt: string | null;
   @ApiProperty({ type: QuoteBranchDto, nullable: true })
   branch: QuoteBranchDto | null;
-  @ApiProperty({ enum: RULES, nullable: true }) rule:
-    | 'zone'
-    | 'distance'
-    | null;
+  @ApiProperty({
+    enum: QUOTE_RULES,
+    nullable: true,
+    description:
+      'zone or distance: the branch rule; default: the venue default price (an address in the venue area no branch rule covers)',
+  })
+  rule: (typeof QUOTE_RULES)[number] | null;
   @ApiProperty({ type: Number, nullable: true, example: 3.21 })
   distanceKm: number | null;
   @ApiProperty({

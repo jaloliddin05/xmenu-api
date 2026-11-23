@@ -18,6 +18,7 @@ import {
   QUOTE_REASONS,
   QuoteReason,
 } from '../dto/delivery-pricing.dto';
+import { DeliveryAreaService } from './delivery-area.service';
 import { DeliveryPricingService } from './delivery-pricing.service';
 import { NO_RULES } from './delivery-rules.mapper';
 
@@ -39,25 +40,29 @@ export class DeliveryQuoteService {
     private readonly branches: BranchService,
     private readonly settings: OrderSettingsService,
     private readonly pricing: DeliveryPricingService,
+    private readonly area: DeliveryAreaService,
   ) {}
 
   /**
    * Branch and price for an order; throws the reason (branch-choice.ts) when no branch can deliver now. The
-   * minimum is not checked here: shortBy tells the caller.
+   * venue area limits where branch rules apply and prices the gaps with its default rule. The minimum is not
+   * checked here: shortBy tells the caller.
    */
   async choose(
     organizationId: string,
     address: LatLng | null,
     subtotal: number,
   ): Promise<DeliveryChoiceResult> {
-    const [all, rules, settings] = await Promise.all([
+    const [all, rules, settings, area] = await Promise.all([
       this.branches.listActiveWithState(organizationId),
       this.pricing.rulesByBranch(organizationId),
       this.settings.get(organizationId),
+      this.area.forPricing(organizationId),
     ]);
     const { candidate, rate } = chooseDeliveryBranch(
       all.map((c) => ({ ...c, rules: rules.get(c.branch.id) ?? NO_RULES })),
       address,
+      area,
     );
     const { id, title, address: branchAddress } = candidate.branch;
     return {
@@ -67,6 +72,7 @@ export class DeliveryQuoteService {
         rate,
         subtotal,
         settings.deliveryPriceStep,
+        area?.defaultRule ?? null,
       ),
     };
   }
@@ -152,7 +158,7 @@ export class DeliveryQuoteService {
     );
     return {
       covered: true,
-      rule: price.rule,
+      rule: rate.rule,
       zoneIndex: price.zoneIndex,
       distanceKm: km(price.distanceKm),
       deliveryFee: price.deliveryFee,

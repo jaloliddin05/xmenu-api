@@ -16,18 +16,22 @@ export const PLATFORM_SETTINGS = {
  * Neutral colors every front-end shows when the owner has not chosen one (graphite, no accent hue).
  * The single source: GET /tenant/config merges it under the stored theme, and the owner's settings
  * answer carries the merged result as `effectiveTheme` for the preview. Front-ends keep no copy.
- * Keys are exactly THEME_KEYS (organization-settings.ts); a spec guards that.
+ * Keys are exactly THEME_KEYS (organization-settings.ts); a spec guards that. serviceArea (the delivery area
+ * on the guest map) follows the brand: the venue's brand color when the owner set one (resolveTheme), this
+ * brand otherwise.
  */
+const PLATFORM_BRAND = '#2B2B2B';
+
 export const PLATFORM_THEME = {
   background: '#FFFFFF',
   foreground: '#1A1A1A',
   surface: '#FFFFFF',
   mutedSurface: '#F4F4F4',
   muted: '#6B6B6B',
-  brand: '#2B2B2B',
+  brand: PLATFORM_BRAND,
   brandForeground: '#FFFFFF',
   danger: '#B42318',
-  serviceArea: '#4A6FA5',
+  serviceArea: PLATFORM_BRAND,
 };
 
 export const PLATFORM_ORDER_SETTINGS = {
