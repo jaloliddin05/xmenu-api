@@ -943,7 +943,7 @@ activeOrders, cash: { deliveries, due, card, received, discrepancy }, reconciled
 | `brand` | `#2B2B2B` | акцент (кнопки, ссылки) |
 | `brandForeground` | `#FFFFFF` | текст на акценте |
 | `danger` | `#B42318` | ошибки (смысловой цвет, не бренд) |
-| `serviceArea` | `#2B2B2B` | зона доставки на карте гостя; пока владелец не задал свой цвет, берётся его `brand` (`resolveTheme`), без него `brand` платформы |
+| `serviceArea` | `#2B2B2B` | зона доставки на карте гостя; пока владелец не задал свой цвет, берётся его `brand` (`resolveTheme`), без него `brand` платформы; `null` или отсутствие ключа в `PUT` сбрасывает к этому значению |
 
 ## Настройки заведения (владелец)
 
@@ -1160,7 +1160,7 @@ even-odd по всем её кольцам (так описываются дыр
 |---|---|
 | `GET /branch/:id/delivery-pricing` | правила филиала |
 | `PUT /branch/:id/delivery-pricing` | заменяет правила целиком, отвечает тем же видом |
-| `GET /branch/:id/delivery-pricing/check?lat=&lng=&subtotal=` | цена от этого филиала до точки по сохранённым правилам и шагу заведения, без учёта часов и публикации |
+| `GET /branch/:id/delivery-pricing/check?lat=&lng=&subtotal=` | цена от этого филиала до точки так, как её получил бы гость от этого филиала: общая зона заведения, правила филиала, цена по умолчанию; без учёта часов, публикации и других филиалов |
 
 ```json
 {
@@ -1181,8 +1181,14 @@ even-odd по всем её кольцам (так описываются дыр
 - Ошибки: `400 validation_error` (форма, `fields[]`: `zones[0].price`…), `400 invalid_settings` (`zones[1].polygon` /
   `polygon`: точки не `[lat, lng]` на карте; `distance.maxKm` / `min`: меньше `includedKm`).
 - Сохранение ставит ревалидацию `route: 'branches'` (доступность доставки и зоны на карте в `/tenant/config`).
-- `check` → `{ covered, rule: "zone" | "distance" | null, zoneIndex, distanceKm, deliveryFee, freeFrom, minOrder, shortBy }`;
-  вне правил `covered: false`, цены `null`, `distanceKm` всё равно посчитан.
+- `check` → `{ covered, inArea, reason, rule: "zone" | "distance" | "default" | null, zoneIndex, distanceKm, deliveryFee,
+  freeFrom, minOrder, shortBy }` (`branchRateFor` в `order/domain/branch-choice.ts`, те же правила, что выбор филиала):
+  - `inArea`: адрес в общей зоне заведения; `null`, если зона не задана;
+  - зона задана, адрес вне её: `covered: false`, `reason: "out_of_delivery_zone"`, даже если правило филиала дотягивается;
+  - правило филиала покрывает адрес: `rule: "zone"` (`zoneIndex`) или `"distance"`;
+  - иначе при заданной зоне: `rule: "default"`, цена по умолчанию заведения, расстояние от этого филиала;
+  - иначе `covered: false`, `reason: "out_of_delivery_zone"`;
+  - не покрыт: цены `null`, `distanceKm` всё равно посчитан; покрыт: `reason: null`.
 
 **Как считается цена для адреса** (одна функция для корзины, заказа и проверки владельца,
 `branch/domain/delivery-pricing.ts`):

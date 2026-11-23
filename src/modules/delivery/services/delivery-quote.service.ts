@@ -6,10 +6,12 @@ import {
   distanceKm,
   LatLng,
   priceDelivery,
-  rateFor,
 } from 'src/modules/branch/domain/delivery-pricing';
 import { BranchService } from 'src/modules/branch/services/branch.service';
-import { chooseDeliveryBranch } from 'src/modules/order/domain/branch-choice';
+import {
+  branchRateFor,
+  chooseDeliveryBranch,
+} from 'src/modules/order/domain/branch-choice';
 import { OrderSettingsService } from 'src/modules/order/services/order-settings.service';
 import { orderingProblem } from 'src/modules/organization/domain/publication';
 import {
@@ -125,22 +127,28 @@ export class DeliveryQuoteService {
     };
   }
 
-  /** GET /branch/:id/delivery-pricing/check: the saved rules of one branch, hours and publication aside. */
+  /**
+   * GET /branch/:id/delivery-pricing/check: what this branch charges for the address as the guest would get it
+   * from it (venue area, branch rules, venue default rule), hours and publication aside.
+   */
   async check(
     organizationId: string,
     branchId: string,
     address: LatLng,
     subtotal: number,
   ): Promise<DeliveryPriceCheckDto> {
-    const [branch, settings] = await Promise.all([
+    const [branch, settings, area] = await Promise.all([
       this.pricing.ownBranch(organizationId, branchId),
       this.settings.get(organizationId),
+      this.area.forPricing(organizationId),
     ]);
     const from: LatLng = [branch.latitude, branch.longitude];
-    const rate = rateFor(branch.rules, from, address);
+    const { inArea, rate } = branchRateFor(branch.rules, from, address, area);
     if (!rate) {
       return {
         covered: false,
+        inArea,
+        reason: 'out_of_delivery_zone',
         rule: null,
         zoneIndex: null,
         distanceKm: km(distanceKm(from, address)),
@@ -155,9 +163,12 @@ export class DeliveryQuoteService {
       rate,
       subtotal,
       settings.deliveryPriceStep,
+      area?.defaultRule ?? null,
     );
     return {
       covered: true,
+      inArea,
+      reason: null,
       rule: rate.rule,
       zoneIndex: price.zoneIndex,
       distanceKm: km(price.distanceKm),

@@ -155,6 +155,28 @@ export function chooseDeliveryBranch<B>(
   );
 }
 
+/**
+ * What one branch charges for an address, as the guest would get it from this branch (the owner's address
+ * check; hours and other branches aside), by the same rules as chooseDeliveryBranch: outside a set venue area
+ * nothing (inArea false); the branch rules (zone, distance); otherwise, with an area, the venue default rule
+ * from this branch. inArea is null when the venue has no area.
+ */
+export function branchRateFor(
+  rules: DeliveryRules,
+  branchPoint: LatLng,
+  address: LatLng,
+  area: DeliveryArea | null,
+): { inArea: boolean | null; rate: DeliveryRate | null } {
+  if (area && !inArea(area, address)) return { inArea: false, rate: null };
+  const own = rateFor(rules, branchPoint, address);
+  const rate: DeliveryRate | null =
+    own ??
+    (area
+      ? { rule: 'default', distanceKm: distanceKm(branchPoint, address) }
+      : null);
+  return { inArea: area ? true : null, rate };
+}
+
 const pointOf = <B>(c: DeliveryCandidate<B>): LatLng => [
   c.branch.latitude,
   c.branch.longitude,

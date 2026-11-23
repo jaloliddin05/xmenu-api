@@ -6,6 +6,7 @@ import { BranchService } from '../branch/services/branch.service';
 import { OrderSettingsService } from '../order/services/order-settings.service';
 import { RevalidateService } from '../revalidate-queue/revalidate.service';
 import { TenantService } from '../tenant/tenant.service';
+import { BranchDeliveryPricingController } from './controllers/branch-delivery-pricing.controller';
 import { DeliveryAreaPublicController } from './controllers/delivery-area-public.controller';
 import { DeliveryAreaController } from './controllers/delivery-area.controller';
 import { DeliveryQuoteController } from './controllers/delivery-quote.controller';
@@ -102,6 +103,15 @@ describe('Venue delivery area: owner, region catalog, guest map and quote', () =
         })),
       },
       branch: {
+        findFirst: jest.fn(async ({ where }) => {
+          const b = branches.find(
+            (x) =>
+              x.id === where.id && x.organization_id === where.organization_id,
+          );
+          return b
+            ? { ...b, delivery_zones: b.zones, delivery_distance: null }
+            : null;
+        }),
         findMany: jest.fn(async ({ where }) =>
           branches
             .filter((b) => b.organization_id === where.organization_id)
@@ -127,6 +137,7 @@ describe('Venue delivery area: owner, region catalog, guest map and quote', () =
     app = await createHttpApp(
       {
         controllers: [
+          BranchDeliveryPricingController,
           DeliveryAreaController,
           DeliveryAreaPublicController,
           DeliveryRegionsController,
@@ -494,6 +505,81 @@ describe('Venue delivery area: owner, region catalog, guest map and quote', () =
       expect(res.body).toMatchObject({
         available: false,
         reason: 'delivery_not_configured',
+      });
+    });
+  });
+
+  describe('GET /branch/:id/delivery-pricing/check with the area', () => {
+    const check = (lat: number, id = NEAR) =>
+      owner(
+        'get',
+        `/branch/${id}/delivery-pricing/check?lat=${lat}&lng=${CENTRE.lng}&subtotal=50000`,
+      );
+    const setArea = () =>
+      owner('put', AREA)
+        .send({
+          parts: [{ source: 'custom', polygon: square(8) }],
+          defaultRule: DEFAULT_RULE,
+        })
+        .expect(200);
+
+    it('outside the area: not covered, out_of_delivery_zone', async () => {
+      await setArea();
+      const res = await check(north(12)).expect(200);
+      expect(res.body).toMatchObject({
+        covered: false,
+        inArea: false,
+        reason: 'out_of_delivery_zone',
+        rule: null,
+        deliveryFee: null,
+      });
+    });
+
+    it('inside the area, no branch rule: the default price from this branch', async () => {
+      await setArea();
+      // 5.5 km north: 4.5 km from NEAR (2 included, 3 started km at 1500)
+      const res = await check(north(5.5)).expect(200);
+      expect(res.body).toEqual({
+        covered: true,
+        inArea: true,
+        reason: null,
+        rule: 'default',
+        zoneIndex: null,
+        distanceKm: expect.closeTo(4.5, 1),
+        deliveryFee: 13500,
+        freeFrom: null,
+        minOrder: 30000,
+        shortBy: 0,
+      });
+    });
+
+    it('a branch zone inside the area wins over the default price', async () => {
+      branches[0].zones = [
+        {
+          position: 0,
+          polygon: square(1, north(-2)),
+          price: 4000,
+          min_order: 0,
+          free_from: null,
+        },
+      ];
+      await setArea();
+      const res = await check(north(-2)).expect(200);
+      expect(res.body).toMatchObject({
+        covered: true,
+        inArea: true,
+        rule: 'zone',
+        zoneIndex: 0,
+        deliveryFee: 4000,
+      });
+    });
+
+    it('no area: inArea null, the branch rules alone', async () => {
+      const res = await check(north(5.5)).expect(200);
+      expect(res.body).toMatchObject({
+        covered: false,
+        inArea: null,
+        reason: 'out_of_delivery_zone',
       });
     });
   });

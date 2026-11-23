@@ -322,6 +322,8 @@ describe('Delivery pricing (owner) and quote (guest)', () => {
       // 2.5 km from the branch: base 8200 + 1 started km 1500 = 9700 → 10000 at step 500
       expect(res.body).toEqual({
         covered: true,
+        inArea: null,
+        reason: null,
         rule: 'distance',
         zoneIndex: null,
         distanceKm: expect.closeTo(2.5, 1),
@@ -336,6 +338,8 @@ describe('Delivery pricing (owner) and quote (guest)', () => {
       const res = await check(north(20)).expect(200);
       expect(res.body).toMatchObject({
         covered: false,
+        inArea: null,
+        reason: 'out_of_delivery_zone',
         rule: null,
         deliveryFee: null,
         distanceKm: expect.closeTo(17.5, 0),

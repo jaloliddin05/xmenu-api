@@ -171,7 +171,10 @@ test, `npm run openapi` + `git diff --exit-code docs/`, `format:check`, `lint` �
 - Справочник областей: `delivery/regions/uz-regions.json` (14 областей ISO 3166-2:UZ, OSM, ODbL; `RegionCatalog`
   читает при первом обращении, в сборку его кладёт `assets` в `nest-cli.json`). Область в зоне — копия геометрии с
   `catalog_version`, обновление справочника сохранённые зоны не меняет. Пересборка: `scripts/delivery-regions/`
-  (README там же: источник, параметры, проверки), результат коммитится, `uz-regions.spec.ts` проверяет его.
+  (README там же: источник, параметры, проверки), результат коммитится, `uz-regions.spec.ts` проверяет его. Справочник
+  собирается только этим скриптом и только с общими границами (одна топология в `mapshaper`: общая граница соседей
+  упрощается один раз, допуск на ней меньший из двух; дыры UZ-TO — сами кольца UZ-TK); по отдельности области не
+  упрощаются (щели и наложения).
 - Порядок расчёта (`order/domain/branch-choice.ts`, `chooseDeliveryBranch(all, address, area)`): зона задана и адрес
   вне → `out_of_delivery_zone`; правила филиалов внутри зоны, ближайший открытый из покрывающих (только закрытые →
   `branch_closed`/`branch_hours_not_set`); никто не покрывает → ближайший открытый доставляющий по цене по умолчанию
@@ -183,7 +186,8 @@ test, `npm run openapi` + `git diff --exit-code docs/`, `format:check`, `lint` �
   доставляет. Расчёт чистыми функциями `branch/domain/delivery-pricing.ts` (зона → расстояние до `max_km` включительно
   → нет; начатый км сверх включённых; `free_from` → 0; округление вверх до `delivery_price_step` заведения).
 - Модуль `delivery`: `DeliveryPricingService` (`GET/PUT /branch/:id/delivery-pricing`, чужой филиал 404),
-  `DeliveryQuoteService` (`choose` для `POST /orders`, `quote` для `GET /delivery/quote`, `check` для владельца). Корзина
+  `DeliveryQuoteService` (`choose` для `POST /orders`, `quote` для `GET /delivery/quote`, `check` для владельца: как
+  гость получил бы цену от этого филиала, `branchRateFor`: `inArea`, правило филиала или `default`). Корзина
   и заказ идут одним путём, цена фиксируется в `customer_order.delivery_fee`; клиент шлёт `expectedDeliveryFee`, при
   расхождении `409 delivery_fee_changed`.
 - Филиал доставки: открытые, с `accepts_delivery`, покрывающие адрес по своим правилам (или любой доставляющий по

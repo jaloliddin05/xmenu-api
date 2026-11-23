@@ -183,6 +183,21 @@ describe('GET/PUT /organization/:id/settings', () => {
     });
   });
 
+  it('serviceArea null resets the delivery area color to the brand', async () => {
+    await put({
+      ...VALID,
+      theme: { ...VALID.theme, serviceArea: '#123456' },
+    }).expect(200);
+    expect(rows[ORG_A].theme.serviceArea).toBe('#123456');
+    const res = await put({
+      ...VALID,
+      theme: { ...VALID.theme, serviceArea: null },
+    }).expect(200);
+    expect(res.body.theme).toEqual(VALID.theme);
+    expect(rows[ORG_A].theme).toEqual(VALID.theme);
+    expect(res.body.effectiveTheme.serviceArea).toBe(VALID.theme.brand);
+  });
+
   it('accepts a GET answer sent back unchanged: effectiveTheme is ignored, not stored', async () => {
     await put(VALID).expect(200);
     const answer = (await get().expect(200)).body;

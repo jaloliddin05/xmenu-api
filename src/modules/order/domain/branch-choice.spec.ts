@@ -6,6 +6,7 @@ import type {
 import type { DeliveryArea } from 'src/modules/delivery/domain/delivery-area';
 import {
   BranchCandidate,
+  branchRateFor,
   chooseDeliveryBranch,
   choosePickupBranch,
   DeliveryCandidate,
@@ -387,5 +388,44 @@ describe('chooseDeliveryBranch with the venue area', () => {
         ),
       ).code,
     ).toBe('out_of_delivery_zone');
+  });
+});
+
+describe('branchRateFor (the owner checks one branch)', () => {
+  const from = km(1);
+
+  it('outside the area: nothing, even where the branch rule reaches', () => {
+    expect(branchRateFor(radius(20), from, km(8), AREA)).toEqual({
+      inArea: false,
+      rate: null,
+    });
+  });
+
+  it('inside the area the branch rule applies: zone or distance', () => {
+    expect(
+      branchRateFor(zoneAround(ADDRESS, 1), from, ADDRESS, AREA),
+    ).toMatchObject({ inArea: true, rate: { rule: 'zone', zoneIndex: 0 } });
+    expect(branchRateFor(radius(5), from, ADDRESS, AREA)).toMatchObject({
+      inArea: true,
+      rate: { rule: 'distance' },
+    });
+  });
+
+  it('inside the area, no branch rule: the default rule from this branch', () => {
+    const { inArea, rate } = branchRateFor(NO_RULES, from, ADDRESS, AREA);
+    expect(inArea).toBe(true);
+    expect(rate?.rule).toBe('default');
+    expect(rate?.distanceKm).toBeCloseTo(1, 1);
+  });
+
+  it('no area: the branch rules alone, inArea null', () => {
+    expect(branchRateFor(radius(5), from, ADDRESS, null)).toMatchObject({
+      inArea: null,
+      rate: { rule: 'distance' },
+    });
+    expect(branchRateFor(NO_RULES, from, ADDRESS, null)).toEqual({
+      inArea: null,
+      rate: null,
+    });
   });
 });

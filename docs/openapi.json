@@ -13392,18 +13392,33 @@
             "type": "boolean",
             "description": "The branch delivers to the address"
           },
+          "inArea": {
+            "type": "boolean",
+            "nullable": true,
+            "description": "Address inside the venue delivery area; null when no area is set"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "out_of_delivery_zone"
+            ],
+            "nullable": true,
+            "description": "Why the branch does not deliver there; null when covered"
+          },
           "rule": {
             "type": "string",
             "enum": [
               "zone",
-              "distance"
+              "distance",
+              "default"
             ],
-            "nullable": true
+            "nullable": true,
+            "description": "zone or distance: a branch rule; default: the venue default price (inside the area, no branch rule)"
           },
           "zoneIndex": {
             "type": "number",
             "nullable": true,
-            "description": "Index in zones; null for the distance rule"
+            "description": "Index in zones; null for the distance and default rules"
           },
           "distanceKm": {
             "type": "number",
@@ -13430,6 +13445,8 @@
         },
         "required": [
           "covered",
+          "inArea",
+          "reason",
           "rule",
           "zoneIndex",
           "distanceKm",
