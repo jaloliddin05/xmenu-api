@@ -16,7 +16,6 @@ const BRANCH: BranchFacts = {
   hasCoordinates: true,
   acceptsPickup: true,
   acceptsDelivery: true,
-  hasDeliveryPricing: true,
 };
 
 const READY: PublicationFacts = {
@@ -27,6 +26,7 @@ const READY: PublicationFacts = {
   hasActiveCategory: true,
   hasActiveProduct: true,
   branches: [BRANCH],
+  hasDeliveryArea: true,
   botConnected: false,
   hasDeliveryPaymentMethod: true,
 };
@@ -57,10 +57,7 @@ describe('evaluateChecklist', () => {
     ['menu_category', { hasActiveCategory: false }],
     ['menu_product', { hasActiveProduct: false }],
     ['branch', { branches: [] }],
-    [
-      'delivery_pricing',
-      { branches: [{ ...BRANCH, hasDeliveryPricing: false }] },
-    ],
+    ['delivery_pricing', { hasDeliveryArea: false }],
     ['telegram_bot', { deliveryMode: 'miniapp', botConnected: false }],
     ['telegram_bot', { deliveryMode: 'both', botConnected: false }],
     ['delivery_payment', { hasDeliveryPaymentMethod: false }],
@@ -88,9 +85,8 @@ describe('evaluateChecklist', () => {
 
   it('delivery pricing is not required when no branch delivers', () => {
     const facts = {
-      branches: [
-        { ...BRANCH, acceptsDelivery: false, hasDeliveryPricing: false },
-      ],
+      hasDeliveryArea: false,
+      branches: [{ ...BRANCH, acceptsDelivery: false }],
     };
     expect(item(facts, 'delivery_pricing').status).toBe('not_required');
     expect(isReady(evaluateChecklist({ ...READY, ...facts }))).toBe(true);
@@ -107,26 +103,20 @@ describe('evaluateChecklist', () => {
 
   it('delivery pricing is required as soon as one branch delivers', () => {
     const facts = {
-      branches: [
-        { ...BRANCH, acceptsDelivery: false, hasDeliveryPricing: false },
-        { ...BRANCH, hasDeliveryPricing: false },
-      ],
+      hasDeliveryArea: false,
+      branches: [{ ...BRANCH, acceptsDelivery: false }, { ...BRANCH }],
     };
     expect(item(facts, 'delivery_pricing').status).toBe('todo');
   });
 
-  it('pricing on a branch that does not deliver does not count', () => {
-    const facts = {
-      branches: [
-        { ...BRANCH, acceptsDelivery: false, hasDeliveryPricing: true },
-        { ...BRANCH, hasDeliveryPricing: false },
-      ],
-    };
-    expect(item(facts, 'delivery_pricing').status).toBe('todo');
-    expect(
-      item({ branches: [...facts.branches, { ...BRANCH }] }, 'delivery_pricing')
-        .status,
-    ).toBe('done');
+  it('delivery pricing is the venue area with its default price; branch zones are not needed', () => {
+    // Branch facts carry no pricing any more: the area alone decides (docs/DELIVERY.md)
+    expect(item({ hasDeliveryArea: true }, 'delivery_pricing').status).toBe(
+      'done',
+    );
+    expect(item({ hasDeliveryArea: false }, 'delivery_pricing').hint).toMatch(
+      /зону доставки заведения/,
+    );
   });
 
   describe('branch', () => {

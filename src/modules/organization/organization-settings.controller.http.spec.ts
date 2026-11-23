@@ -151,7 +151,12 @@ describe('GET/PUT /organization/:id/settings', () => {
     expect(res.body).toEqual({
       ...VALID,
       supportTelegram: 'demo_cafe',
-      effectiveTheme: { ...PLATFORM_THEME, ...VALID.theme },
+      // The delivery area color follows the owner's brand unless they set one
+      effectiveTheme: {
+        ...PLATFORM_THEME,
+        serviceArea: VALID.theme.brand,
+        ...VALID.theme,
+      },
       platformTheme: PLATFORM_THEME,
     });
     expect(invalidate).toHaveBeenCalledWith(ORG_A);
@@ -176,6 +181,21 @@ describe('GET/PUT /organization/:id/settings', () => {
       effectiveTheme: PLATFORM_THEME,
       platformTheme: PLATFORM_THEME,
     });
+  });
+
+  it('serviceArea null resets the delivery area color to the brand', async () => {
+    await put({
+      ...VALID,
+      theme: { ...VALID.theme, serviceArea: '#123456' },
+    }).expect(200);
+    expect(rows[ORG_A].theme.serviceArea).toBe('#123456');
+    const res = await put({
+      ...VALID,
+      theme: { ...VALID.theme, serviceArea: null },
+    }).expect(200);
+    expect(res.body.theme).toEqual(VALID.theme);
+    expect(rows[ORG_A].theme).toEqual(VALID.theme);
+    expect(res.body.effectiveTheme.serviceArea).toBe(VALID.theme.brand);
   });
 
   it('accepts a GET answer sent back unchanged: effectiveTheme is ignored, not stored', async () => {

@@ -6,10 +6,12 @@ import {
   distanceKm,
   LatLng,
   priceDelivery,
-  rateFor,
 } from 'src/modules/branch/domain/delivery-pricing';
 import { BranchService } from 'src/modules/branch/services/branch.service';
-import { chooseDeliveryBranch } from 'src/modules/order/domain/branch-choice';
+import {
+  branchRateFor,
+  chooseDeliveryBranch,
+} from 'src/modules/order/domain/branch-choice';
 import { OrderSettingsService } from 'src/modules/order/services/order-settings.service';
 import { orderingProblem } from 'src/modules/organization/domain/publication';
 import {
@@ -18,6 +20,7 @@ import {
   QUOTE_REASONS,
   QuoteReason,
 } from '../dto/delivery-pricing.dto';
+import { DeliveryAreaService } from './delivery-area.service';
 import { DeliveryPricingService } from './delivery-pricing.service';
 import { NO_RULES } from './delivery-rules.mapper';
 
@@ -39,25 +42,29 @@ export class DeliveryQuoteService {
     private readonly branches: BranchService,
     private readonly settings: OrderSettingsService,
     private readonly pricing: DeliveryPricingService,
+    private readonly area: DeliveryAreaService,
   ) {}
 
   /**
    * Branch and price for an order; throws the reason (branch-choice.ts) when no branch can deliver now. The
-   * minimum is not checked here: shortBy tells the caller.
+   * venue area limits where branch rules apply and prices the gaps with its default rule. The minimum is not
+   * checked here: shortBy tells the caller.
    */
   async choose(
     organizationId: string,
     address: LatLng | null,
     subtotal: number,
   ): Promise<DeliveryChoiceResult> {
-    const [all, rules, settings] = await Promise.all([
+    const [all, rules, settings, area] = await Promise.all([
       this.branches.listActiveWithState(organizationId),
       this.pricing.rulesByBranch(organizationId),
       this.settings.get(organizationId),
+      this.area.forPricing(organizationId),
     ]);
     const { candidate, rate } = chooseDeliveryBranch(
       all.map((c) => ({ ...c, rules: rules.get(c.branch.id) ?? NO_RULES })),
       address,
+      area,
     );
     const { id, title, address: branchAddress } = candidate.branch;
     return {
@@ -67,6 +74,7 @@ export class DeliveryQuoteService {
         rate,
         subtotal,
         settings.deliveryPriceStep,
+        area?.defaultRule ?? null,
       ),
     };
   }
@@ -119,22 +127,31 @@ export class DeliveryQuoteService {
     };
   }
 
-  /** GET /branch/:id/delivery-pricing/check: the saved rules of one branch, hours and publication aside. */
+  /**
+   * GET /branch/:id/delivery-pricing/check: what this branch charges for the address as the guest would get it
+   * from it (venue area, branch rules, venue default rule), hours and publication aside.
+   */
   async check(
     organizationId: string,
     branchId: string,
     address: LatLng,
     subtotal: number,
   ): Promise<DeliveryPriceCheckDto> {
-    const [branch, settings] = await Promise.all([
+    const [branch, settings, area] = await Promise.all([
       this.pricing.ownBranch(organizationId, branchId),
       this.settings.get(organizationId),
+      this.area.forPricing(organizationId),
     ]);
     const from: LatLng = [branch.latitude, branch.longitude];
-    const rate = rateFor(branch.rules, from, address);
-    if (!rate) {
+    const { inArea, rate } = branchRateFor(branch.rules, from, address, area);
+    // A branch that takes no delivery covers nothing, whatever its rules say (as for the guest).
+    if (!branch.accepts_delivery || !rate) {
       return {
         covered: false,
+        inArea,
+        reason: branch.accepts_delivery
+          ? 'out_of_delivery_zone'
+          : 'fulfillment_unavailable',
         rule: null,
         zoneIndex: null,
         distanceKm: km(distanceKm(from, address)),
@@ -149,10 +166,13 @@ export class DeliveryQuoteService {
       rate,
       subtotal,
       settings.deliveryPriceStep,
+      area?.defaultRule ?? null,
     );
     return {
       covered: true,
-      rule: price.rule,
+      inArea,
+      reason: null,
+      rule: rate.rule,
       zoneIndex: price.zoneIndex,
       distanceKm: km(price.distanceKm),
       deliveryFee: price.deliveryFee,

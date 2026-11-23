@@ -18,8 +18,8 @@ import {
 export const MAX_ZONES = 20;
 export const MAX_ZONE_POINTS = 200;
 export const MAX_DELIVERY_KM = 100;
-const MAX_FEE = 10_000_000;
-const MAX_SUM = 100_000_000;
+export const MAX_FEE = 10_000_000;
+export const MAX_SUM = 100_000_000;
 
 /** Missing or null: no free delivery. */
 const FreeFrom = () =>
@@ -172,18 +172,38 @@ export class DeliveryPointQueryDto {
   readonly subtotal?: number;
 }
 
-const RULES = ['zone', 'distance'] as const;
+/** Quote rules: a branch zone or distance rule, or the venue default price (an area gap no branch covers). */
+const QUOTE_RULES = ['zone', 'distance', 'default'] as const;
 
 /** GET /branch/:id/delivery-pricing/check: what this branch charges for the address, hours not considered. */
 export class DeliveryPriceCheckDto {
   @ApiProperty({ description: 'The branch delivers to the address' })
   covered: boolean;
-  @ApiProperty({ enum: RULES, nullable: true })
-  rule: 'zone' | 'distance' | null;
+  @ApiProperty({
+    type: Boolean,
+    nullable: true,
+    description:
+      'Address inside the venue delivery area; null when no area is set',
+  })
+  inArea: boolean | null;
+  @ApiProperty({
+    enum: ['out_of_delivery_zone', 'fulfillment_unavailable'],
+    nullable: true,
+    description:
+      'Why the branch does not deliver there (fulfillment_unavailable: the branch takes no delivery); null when covered',
+  })
+  reason: 'out_of_delivery_zone' | 'fulfillment_unavailable' | null;
+  @ApiProperty({
+    enum: QUOTE_RULES,
+    nullable: true,
+    description:
+      'zone or distance: a branch rule; default: the venue default price (inside the area, no branch rule)',
+  })
+  rule: 'zone' | 'distance' | 'default' | null;
   @ApiProperty({
     type: Number,
     nullable: true,
-    description: 'Index in zones; null for the distance rule',
+    description: 'Index in zones; null for the distance and default rules',
   })
   zoneIndex: number | null;
   @ApiProperty({ example: 3.21, description: 'Straight line, km (0.01)' })
@@ -244,10 +264,13 @@ export class DeliveryQuoteDto {
   opensAt: string | null;
   @ApiProperty({ type: QuoteBranchDto, nullable: true })
   branch: QuoteBranchDto | null;
-  @ApiProperty({ enum: RULES, nullable: true }) rule:
-    | 'zone'
-    | 'distance'
-    | null;
+  @ApiProperty({
+    enum: QUOTE_RULES,
+    nullable: true,
+    description:
+      'zone or distance: the branch rule; default: the venue default price (an address in the venue area no branch rule covers)',
+  })
+  rule: (typeof QUOTE_RULES)[number] | null;
   @ApiProperty({ type: Number, nullable: true, example: 3.21 })
   distanceKm: number | null;
   @ApiProperty({

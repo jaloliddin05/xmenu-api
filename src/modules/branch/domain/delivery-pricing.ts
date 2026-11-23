@@ -8,6 +8,8 @@
  * 4. Subtotal (without delivery) at or above the rule's free_from: delivery is free.
  * 5. Subtotal below the rule's min_order: the order cannot be placed (shortBy says how much is missing).
  * The fee is rounded up to the venue step (100, 500 or 1000).
+ * The venue default rule (DefaultRule) prices addresses inside the venue delivery area that no branch rule
+ * covers; choosing between them is order/domain/branch-choice.ts.
  */
 
 /** [lat, lng] */
@@ -26,6 +28,15 @@ export interface DistanceRule {
   /** Added for every started kilometre over includedKm */
   pricePerKm: number;
   maxKm: number;
+  minOrder: number;
+  freeFrom: number | null;
+}
+
+/** The venue default price: like the distance rule, without a farthest distance (the venue area limits it). */
+export interface DefaultRule {
+  basePrice: number;
+  includedKm: number;
+  pricePerKm: number;
   minOrder: number;
   freeFrom: number | null;
 }
@@ -93,16 +104,20 @@ export function distanceKm(a: LatLng, b: LatLng): number {
 // Float noise must not start a kilometre or push an address over max_km (2.0000000001 km is 2 km)
 export const KM_EPSILON = 1e-9;
 
-/** The rule that prices this address, or null when the branch does not deliver there. */
-export type DeliveryRate =
+/** A branch rule that prices this address (rateFor). */
+export type BranchRate =
   | { rule: 'zone'; zoneIndex: number; distanceKm: number }
   | { rule: 'distance'; distanceKm: number };
 
+/** The rule that prices an address: a branch rule, or the venue default rule. */
+export type DeliveryRate = BranchRate | { rule: 'default'; distanceKm: number };
+
+/** The branch rule that prices this address, or null when the branch does not deliver there by its rules. */
 export function rateFor(
   rules: DeliveryRules,
   branchPoint: LatLng,
   address: LatLng,
-): DeliveryRate | null {
+): BranchRate | null {
   const km = distanceKm(branchPoint, address);
   const zoneIndex = rules.zones.findIndex((z) =>
     pointInPolygon(address[0], address[1], z.polygon),
@@ -114,7 +129,10 @@ export function rateFor(
 }
 
 /** Distance price before rounding: base plus every started km over the included ones. */
-export function distanceFee(rule: DistanceRule, km: number): number {
+export function distanceFee(
+  rule: Pick<DistanceRule, 'basePrice' | 'includedKm' | 'pricePerKm'>,
+  km: number,
+): number {
   const extra = Math.max(0, Math.ceil(km - rule.includedKm - KM_EPSILON));
   return rule.basePrice + extra * rule.pricePerKm;
 }
@@ -124,8 +142,8 @@ export function roundUpToStep(fee: number, step: number): number {
 }
 
 export interface DeliveryPrice {
-  rule: 'zone' | 'distance';
-  /** Index in rules.zones; null for the distance rule */
+  rule: 'zone' | 'distance' | 'default';
+  /** Index in rules.zones; null for the distance and default rules */
   zoneIndex: number | null;
   distanceKm: number;
   /** Rounded up to the venue step; 0 when free */
@@ -136,18 +154,29 @@ export interface DeliveryPrice {
   shortBy: number;
 }
 
+/**
+ * The price of the rate: a branch zone or distance rule (rules of that branch), or the venue default rule
+ * (`defaultRule`, required for rate.rule 'default').
+ */
 export function priceDelivery(
   rules: DeliveryRules,
   rate: DeliveryRate,
   subtotal: number,
   step: number,
+  defaultRule: DefaultRule | null = null,
 ): DeliveryPrice {
-  const rule =
-    rate.rule === 'zone' ? rules.zones[rate.zoneIndex] : rules.distance!;
-  const raw =
-    rate.rule === 'zone'
-      ? rules.zones[rate.zoneIndex].price
-      : distanceFee(rules.distance!, rate.distanceKm);
+  let rule: { minOrder: number; freeFrom: number | null };
+  let raw: number;
+  if (rate.rule === 'zone') {
+    rule = rules.zones[rate.zoneIndex];
+    raw = rules.zones[rate.zoneIndex].price;
+  } else if (rate.rule === 'distance') {
+    rule = rules.distance!;
+    raw = distanceFee(rules.distance!, rate.distanceKm);
+  } else {
+    rule = defaultRule!;
+    raw = distanceFee(defaultRule!, rate.distanceKm);
+  }
   const free = rule.freeFrom !== null && subtotal >= rule.freeFrom;
   return {
     rule: rate.rule,

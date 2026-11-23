@@ -249,3 +249,46 @@ describe('priceDelivery', () => {
     expect(priceDelivery(r, rate, 200000, 1000).deliveryFee).toBe(0);
   });
 });
+
+describe('priceDelivery with the venue default rule', () => {
+  const NONE: DeliveryRules = { zones: [], distance: null };
+  const defaultRule = {
+    basePrice: 9000,
+    includedKm: 2,
+    pricePerKm: 1500,
+    minOrder: 40000,
+    freeFrom: 150000,
+  };
+
+  it('prices like a distance rule without a farthest distance, rounded to the step', () => {
+    // 2 km included, 30.2 km: 29 started kilometres over them
+    expect(
+      priceDelivery(
+        NONE,
+        { rule: 'default', distanceKm: 30.2 },
+        50000,
+        1000,
+        defaultRule,
+      ),
+    ).toEqual({
+      rule: 'default',
+      zoneIndex: null,
+      distanceKm: 30.2,
+      // 9000 + 29 × 1500 = 52500, up to the 1000 step
+      deliveryFee: 53000,
+      freeFrom: 150000,
+      minOrder: 40000,
+      shortBy: 0,
+    });
+  });
+
+  it('free from freeFrom; shortBy below minOrder', () => {
+    const rate = { rule: 'default' as const, distanceKm: 1 };
+    expect(
+      priceDelivery(NONE, rate, 150000, 100, defaultRule).deliveryFee,
+    ).toBe(0);
+    expect(priceDelivery(NONE, rate, 10000, 100, defaultRule).shortBy).toBe(
+      30000,
+    );
+  });
+});

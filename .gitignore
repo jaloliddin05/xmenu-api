@@ -61,3 +61,6 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 src/**/*.js
 src/**/*.js.map
 src/**/*.d.ts
+
+# Downloads of the delivery region build script
+scripts/delivery-regions/.cache/

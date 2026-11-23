@@ -43,6 +43,9 @@ model organization {
   telegram_bot      organization_telegram_bot?
   pos_integration   pos_integration?
   domains           tenant_domain[]
+  // Venue delivery area (delivery/models/delivery-area.prisma)
+  delivery_area       delivery_area?
+  delivery_area_parts delivery_area_part[]
   additional_product_groups additional_product_group[]
   // Tenant ichidagi buyurtma raqami hisoblagichi (atomik UPDATE ... RETURNING)
   order_seq    Int               @default(1000)

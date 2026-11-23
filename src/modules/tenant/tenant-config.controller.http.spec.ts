@@ -11,6 +11,7 @@ import { GuestLoginService } from '../guest-login/guest-login.service';
 import { TelegramBotService } from '../telegram/telegram-bot.service';
 import { OpsNotifierService } from '../order/notifications/ops-notifier.service';
 import { REDIS } from 'src/infra/redis/redis.module';
+import { DeliveryAreaService } from '../delivery/services/delivery-area.service';
 import { DeliveryPricingService } from '../delivery/services/delivery-pricing.service';
 import { PaymentConfigService } from '../payment/services/payment-config.service';
 
@@ -76,6 +77,8 @@ describe('GET /tenant/config', () => {
   let branches: Record<string, any[]>;
   // DeliveryPricingService.pricedDeliveryBranches: rules of the delivering branches that have any
   let priced: Record<string, { zones: any[]; distance: any }[]>;
+  // DeliveryAreaService.isSet: venues with a delivery area and its default price
+  let areas: Set<string>;
   // PaymentConfigService.enabledProviders: the connected online providers
   let providers: Record<string, string[]>;
 
@@ -133,6 +136,10 @@ describe('GET /tenant/config', () => {
             pricedDeliveryBranches: async (id: string) =>
               (priced[id] ?? []).map((rules, i) => ({ id: `b${i}`, rules })),
           },
+        },
+        {
+          provide: DeliveryAreaService,
+          useValue: { isSet: async (id: string) => areas.has(id) },
         },
       ],
     });
@@ -209,6 +216,7 @@ describe('GET /tenant/config', () => {
     };
     orderRows = { [FULL]: ordering(), [BARE]: ordering() };
     priced = { [FULL]: [zoneRules(ZONE)] };
+    areas = new Set();
     branches = {
       [FULL]: [
         { is_active: true, accepts_delivery: true, accepts_pickup: false },
@@ -240,7 +248,8 @@ describe('GET /tenant/config', () => {
       bannerUrl: null,
       description: 'Описание',
       foundedYear: 2015,
-      theme: { ...PLATFORM_THEME, brand: '#EE2E17' },
+      // The delivery area color follows the brand
+      theme: { ...PLATFORM_THEME, brand: '#EE2E17', serviceArea: '#EE2E17' },
       locale: {
         defaultLanguage: 'uz',
         languages: ['uz', 'ru', 'en'],
@@ -382,6 +391,22 @@ describe('GET /tenant/config', () => {
     const priced2 = await config(BARE).expect(200);
     expect(priced2.body.fulfillment.modes).toEqual(['delivery', 'pickup']);
     expect(priced2.body.map.deliveryZones).toEqual([]);
+  });
+
+  it('the venue delivery area alone offers delivery, no branch rules needed', async () => {
+    publishBare();
+    branches[BARE] = [
+      { is_active: true, accepts_delivery: true, accepts_pickup: true },
+    ];
+    areas.add(BARE);
+    const res = await config(BARE).expect(200);
+    expect(res.body.fulfillment).toMatchObject({
+      modes: ['delivery', 'pickup'],
+      deliveryAvailable: true,
+      deliveryUnavailableReason: null,
+    });
+    // The area geometry is not in the config: the guest reads GET /delivery/area
+    expect(res.body.map.deliveryZones).toEqual([]);
   });
 
   it('external couriers only: no cash on delivery', async () => {

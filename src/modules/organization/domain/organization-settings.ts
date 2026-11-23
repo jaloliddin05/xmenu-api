@@ -69,9 +69,13 @@ export function parseBounds(value: unknown): Bounds | null {
   return [a, b];
 }
 
-/** The stored theme over the platform's neutral colors: always every key (platform-defaults.ts). */
+/**
+ * The stored theme over the platform's neutral colors: always every key (platform-defaults.ts). The delivery
+ * area color the owner did not set follows the brand color (theirs, else the platform's).
+ */
 export function resolveTheme(stored: Theme | null): Required<Theme> {
-  return { ...PLATFORM_THEME, ...stored };
+  const brand = stored?.brand ?? PLATFORM_THEME.brand;
+  return { ...PLATFORM_THEME, serviceArea: brand, ...stored };
 }
 
 /** Theme stored as JSON: only known keys with valid colors survive. */

@@ -22,8 +22,6 @@ interface FakeBranch {
   accepts_pickup: boolean;
   accepts_delivery: boolean;
   working_hours: { is_closed: boolean }[];
-  delivery_zones: { id: string }[];
-  delivery_distance: { branch_id: string } | null;
 }
 
 interface Venue {
@@ -49,6 +47,8 @@ interface Venue {
   };
   /** Enabled online providers */
   providers: string[];
+  /** Parts of the venue delivery area that has its default price (delivery_area_part.count) */
+  areaParts: number;
 }
 
 const HOURS = Array.from({ length: 7 }, () => ({ is_closed: false }));
@@ -59,9 +59,6 @@ const BRANCH: FakeBranch = {
   accepts_pickup: true,
   accepts_delivery: true,
   working_hours: HOURS,
-  // Delivery pricing: one zone, no distance rule
-  delivery_zones: [{ id: 'z1' }],
-  delivery_distance: null,
 };
 
 /** As registered: platform channels, empty menu, no branches, no bot. */
@@ -87,6 +84,7 @@ const fresh = (id: string): Venue => ({
     delivery_pay_online: false,
   },
   providers: [],
+  areaParts: 0,
 });
 
 /** Everything the checklist needs, ordering channel on, not published yet. */
@@ -96,6 +94,8 @@ const ready = (id: string): Venue => ({
   categories: [{ id: 'c1', is_active: true }],
   products: [{ category_id: 'c1', is_active: true }],
   branches: [{ ...BRANCH }],
+  // The venue delivery area: one region and the default price
+  areaParts: 1,
 });
 
 const pick = (row: object, select?: Record<string, boolean>) =>
@@ -194,6 +194,12 @@ describe('Organization channels and publication (owner)', () => {
         return venues[where.organization_id].branches.filter(
           (b) => b.is_active === where.is_active,
         );
+      }),
+    },
+    delivery_area_part: {
+      count: jest.fn(async ({ where }) => {
+        await tick();
+        return venues[where.organization_id].areaParts;
       }),
     },
     organization_telegram_bot: {
@@ -387,8 +393,8 @@ describe('Organization channels and publication (owner)', () => {
         'branch',
       ],
       [
-        'delivering branch without pricing',
-        (v) => (v.branches[0].delivery_zones = []),
+        'delivering branch, no venue delivery area',
+        (v) => (v.areaParts = 0),
         'delivery_pricing',
       ],
       [
@@ -432,10 +438,8 @@ describe('Organization channels and publication (owner)', () => {
       expect(res.body.ready).toBe(false);
     });
 
-    it('a distance rule alone prices delivery', async () => {
+    it('the venue delivery area prices delivery; branches need no rules of their own', async () => {
       venues[ORG_A] = ready(ORG_A);
-      venues[ORG_A].branches[0].delivery_zones = [];
-      venues[ORG_A].branches[0].delivery_distance = { branch_id: 'b1' };
       const res = await get().expect(200);
       expect(status(res.body).delivery_pricing).toBe('done');
     });
@@ -443,7 +447,7 @@ describe('Organization channels and publication (owner)', () => {
     it('pickup-only branches need no delivery pricing', async () => {
       venues[ORG_A] = ready(ORG_A);
       venues[ORG_A].branches[0].accepts_delivery = false;
-      venues[ORG_A].branches[0].delivery_zones = [];
+      venues[ORG_A].areaParts = 0;
       const res = await get().expect(200);
       expect(status(res.body).delivery_pricing).toBe('not_required');
       expect(res.body.ready).toBe(true);

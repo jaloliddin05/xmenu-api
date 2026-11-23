@@ -367,6 +367,8 @@ IP берётся из `X-Forwarded-For` только от доверенног�
 | POST | `/couriers/{id}/invitation` | `couriers.manage` |  |  | ✓ | — |
 | PUT | `/couriers/{id}/pay-rate` | `venue` |  |  | ✓ | — |
 | GET | `/couriers/pay-rates` | `venue` |  |  | ✓ | — |
+| GET | `/delivery/regions` | `venue` |  |  | ✓ | — |
+| GET | `/delivery/regions/{code}` | `venue` |  |  | ✓ | — |
 | GET | `/external-services` | `orders` |  |  | ✓ | ✓ |
 | POST | `/file/upload` | `profile` |  |  | ✓ | ✓ |
 | DELETE | `/integrations/iiko` | `venue` |  | step-up | ✓ | — |
@@ -402,6 +404,8 @@ IP берётся из `X-Forwarded-For` только от доверенног�
 | GET | `/organization/{id}` | `venue` | `id` |  | ✓ | — |
 | PUT | `/organization/{id}` | `venue` | `id` |  | ✓ | — |
 | PUT | `/organization/{id}/channels` | `venue` | `id` |  | ✓ | — |
+| GET | `/organization/{id}/delivery-area` | `venue` | `id` |  | ✓ | — |
+| PUT | `/organization/{id}/delivery-area` | `venue` | `id` |  | ✓ | — |
 | GET | `/organization/{id}/domains` | `venue` | `id` |  | ✓ | — |
 | POST | `/organization/{id}/domains` | `venue` | `id` |  | ✓ | — |
 | DELETE | `/organization/{id}/domains/{domainId}` | `venue` | `id` |  | ✓ | — |
@@ -663,7 +667,7 @@ activeOrders, cash: { deliveries, due, card, received, discrepancy }, reconciled
   "description": "текст на языке ответа", "foundedYear": null,
   "theme": { "background": "#FFFFFF", "foreground": "#1A1A1A", "surface": "#FFFFFF", "mutedSurface": "#F4F4F4",
              "muted": "#6B6B6B", "brand": "#EE2E17", "brandForeground": "#FFFFFF", "danger": "#B42318",
-             "serviceArea": "#4A6FA5" },
+             "serviceArea": "#EE2E17" },
   "locale": { "defaultLanguage": "ru", "languages": ["ru", "uz", "en"], "currency": "UZS" },
   "contacts": { "phone": null, "telegramUsername": null, "workingHours": null, "address": null },
   "channels": { "qr": true, "auth": { "sms": true, "telegram": false }, "delivery": { "enabled": true, "mode": "site", "published": true, "miniApp": false, "botUsername": null } },
@@ -723,9 +727,12 @@ activeOrders, cash: { deliveries, due, card, received, discrepancy }, reconciled
   филиал 16); сохранённый центр без zoom остаётся с `zoom: null`. Чеклист публикации вид карты не требует.
 - В OpenAPI `theme` (всегда полный, не `null`), `platformTheme` и `effectiveTheme` описаны схемой `FullThemeDto`
   со всеми 9 ключами.
-- `map.bounds` `[[юго-запад], [северо-восток]]`. `map.deliveryZones`: зоны активных филиалов с доставкой
-  `[[[lat, lng], ...], ...]` только для отрисовки (правило по расстоянию не рисуется, цену и филиал для адреса даёт
-  `GET /delivery/quote`); `[]`, если зон нет.
+- `map.bounds` `[[юго-запад], [северо-восток]]`. `map.deliveryZones` (**устарело**: клиент переходит на
+  `GET /delivery/area`, поле уберут после этого): зоны активных филиалов с доставкой `[[[lat, lng], ...], ...]`
+  только для отрисовки (правило по расстоянию не рисуется, цену и филиал для адреса даёт `GET /delivery/quote`);
+  `[]`, если зон нет. Общей зоны заведения в конфиге нет (раздел «Стоимость доставки», «Зона на карте гостя»).
+- `fulfillment`: доставка в `modes` (и `deliveryAvailable`), если есть филиал с доставкой и цена: общая зона
+  заведения задана или у доставляющего филиала свои правила.
 - Поля `contacts.country` пока нет.
 
 **Язык и валюта клиентских ответов** (`/menu`, `/branches`, `/orders`, `/tenant/config`): `?lang=`, если он есть в
@@ -936,7 +943,7 @@ activeOrders, cash: { deliveries, due, card, received, discrepancy }, reconciled
 | `brand` | `#2B2B2B` | акцент (кнопки, ссылки) |
 | `brandForeground` | `#FFFFFF` | текст на акценте |
 | `danger` | `#B42318` | ошибки (смысловой цвет, не бренд) |
-| `serviceArea` | `#4A6FA5` | зона доставки на карте |
+| `serviceArea` | `#2B2B2B` | зона доставки на карте гостя; пока владелец не задал свой цвет, берётся его `brand` (`resolveTheme`), без него `brand` платформы; `null` или отсутствие ключа в `PUT` сбрасывает к этому значению |
 
 ## Настройки заведения (владелец)
 
@@ -953,10 +960,10 @@ activeOrders, cash: { deliveries, due, card, received, discrepancy }, reconciled
   "mapBounds": [[41.15, 69.0], [41.45, 69.45]],
   "effectiveTheme": { "background": "#FFFFFF", "foreground": "#1A1A1A", "surface": "#FFFFFF", "mutedSurface": "#F4F4F4",
                       "muted": "#4B494380", "brand": "#EE2E17", "brandForeground": "#FFFFFF", "danger": "#B42318",
-                      "serviceArea": "#4A6FA5" },
+                      "serviceArea": "#EE2E17" },
   "platformTheme": { "background": "#FFFFFF", "foreground": "#1A1A1A", "surface": "#FFFFFF", "mutedSurface": "#F4F4F4",
                       "muted": "#6B6B6B", "brand": "#2B2B2B", "brandForeground": "#FFFFFF", "danger": "#B42318",
-                      "serviceArea": "#4A6FA5" }
+                      "serviceArea": "#2B2B2B" }
 }
 ```
 
@@ -1043,8 +1050,112 @@ invalid_settings`, `fields: [{ field: "deliveryPayment", code: "delivery_payment
 
 ## Стоимость доставки
 
-Правила цены у каждого филиала; гость видит цену и минимум для своего адреса в корзине, заказ создаётся с той же ценой.
-Спецификация: `../../docs/DELIVERY.md`, «Стоимость доставки и выбор филиала».
+Общая зона доставки заведения с ценой по умолчанию и правила цены у филиалов; гость видит цену и минимум для своего
+адреса в корзине, заказ создаётся с той же ценой. Спецификация: `../../docs/DELIVERY.md`, «Общая зона доставки
+заведения» и «Стоимость доставки и выбор филиала».
+
+### Общая зона доставки заведения (владелец, право `venue`, step-up не нужен)
+
+Зона = список частей. Часть — область из справочника (`source: "region"`, только удаляется) или нарисованный контур
+(`source: "custom"`). Геометрия части — кольца `[[[lat, lng], ...], ...]`, разомкнутые; точка внутри части по правилу
+even-odd по всем её кольцам (так описываются дыры и эксклавы; Яндекс `Polygon` заливает так же). Адрес в зоне, если
+он внутри хотя бы одной части; части не склеиваются.
+
+| Запрос | Что делает |
+|---|---|
+| `GET /delivery/regions` | справочник областей: `{ version, attribution, license, regions: [{ code, name, bbox }] }` |
+| `GET /delivery/regions/:code` | одна область с геометрией; неизвестный код → `404 not_found` |
+| `GET /organization/:id/delivery-area` | зона заведения и цена по умолчанию |
+| `PUT /organization/:id/delivery-area` | заменяет целиком, отвечает тем же видом, что `GET`; тело до 256 КБ (остальные маршруты 100 КБ) |
+
+`GET /delivery/regions` →
+
+```json
+{
+  "version": "osm-2026-11-23", "attribution": "© OpenStreetMap contributors", "license": "ODbL-1.0",
+  "regions": [
+    { "code": "UZ-AN", "name": { "uz": "Andijon viloyati", "ru": "Андижанская область", "en": "Andijan Region" },
+      "bbox": [[40.401239, 71.495283], [41.060351, 73.214773]] }
+  ]
+}
+```
+
+- 14 областей ISO 3166-2:UZ: `UZ-AN`, `UZ-BU`, `UZ-FA`, `UZ-JI`, `UZ-NG`, `UZ-NW`, `UZ-QA`, `UZ-QR`, `UZ-SA`, `UZ-SI`,
+  `UZ-SU`, `UZ-TK` (город Ташкент), `UZ-TO` (Ташкентская область, город вырезан дырой), `UZ-XO`; по коду.
+  `bbox` `[[юг, запад], [север, восток]]`. `attribution` показывается рядом с картой, где рисуются области (ODbL).
+- Границы упрощены с общими границами соседей (топология): соседние области сходятся точно, без щелей и наложений; город
+  Ташкент до 30 м, остальные области до 150 м, общая граница города и области 30 м. `version` меняется при каждой
+  пересборке (`osm-ГГГГ-ММ-ДД`, вторая сборка за день `.2`).
+- `GET /delivery/regions/UZ-FA` → `{ code, name, bbox, version, rings }`; `rings` — все кольца области (основной
+  контур, эксклавы Сох и Шахимардан; у `UZ-TO` контур и две дыры на месте города).
+
+`PUT /organization/:id/delivery-area`:
+
+```json
+{
+  "parts": [
+    { "source": "region", "code": "UZ-TK" },
+    { "source": "custom", "polygon": [[41.35, 69.2], [41.35, 69.35], [41.25, 69.3]] }
+  ],
+  "defaultRule": { "basePrice": 10000, "includedKm": 3, "pricePerKm": 2000, "minOrder": 50000, "freeFrom": null }
+}
+```
+
+Ответ `GET` и `PUT`:
+
+```json
+{
+  "parts": [
+    { "source": "region", "code": "UZ-TK", "name": { "uz": "Toshkent shahri", "ru": "Ташкент", "en": "Tashkent City" },
+      "catalogVersion": "osm-2026-11-23", "rings": [[[41.266261, 69.121797], "…"], [[41.404804, 69.463845], "…"]] },
+    { "source": "custom", "code": null, "name": null, "catalogVersion": null,
+      "rings": [[[41.35, 69.2], [41.35, 69.35], [41.25, 69.3]]] }
+  ],
+  "defaultRule": { "basePrice": 10000, "includedKm": 3, "pricePerKm": 2000, "minOrder": 50000, "freeFrom": null }
+}
+```
+
+- Область: клиент передаёт только `code`; сервер копирует в зону геометрию и `catalogVersion` справочника.
+  Обновление справочника сохранённые зоны не меняет (копия остаётся до следующего сохранения части).
+- Нарисованная часть: один внешний контур, 3–200 точек, без дыр; координаты округляются до 6 знаков.
+- Лимиты: до 14 областей (каждая один раз) и до 10 нарисованных частей; порядок частей сохраняется.
+- `parts: []`: зоны нет, цена по умолчанию удаляется (`defaultRule: null` в ответе). Непустые `parts` требуют `defaultRule`.
+- `defaultRule`: `basePrice` до `includedKm` км, плюс `pricePerKm` за каждый начатый км сверх них, по прямой от
+  выбранного филиала, без предельного расстояния (его задаёт зона); `minOrder`, `freeFrom` (необязательно, `null`)
+  как у правил филиала; округление до шага заведения.
+- Ошибки: `400 validation_error` (форма: `parts[0].source` `is_in`, `parts[1].polygon` `array_min_size`,
+  `defaultRule.basePrice` `min`…); `400 invalid_settings` с `fields[]`:
+
+| `field` | `code` | Когда |
+|---|---|---|
+| `parts[i].code` | `unknown_region` | кода нет в справочнике |
+| `parts[i].code` | `duplicate` | область указана дважды |
+| `parts[i].polygon` | `polygon` | не список пар `[lat, lng]` или не 3–200 точек |
+| `parts[i].polygon` | `outside_bounds` | точка вне Узбекистана с запасом (lat 36–46,5, lng 55–74,5): чаще всего перепутаны lat и lng |
+| `parts[i].polygon` | `self_intersection` | контур пересекает или касается сам себя (в том числе повтор точки после округления) |
+| `parts` | `array_max_size` | больше 14 областей или 10 нарисованных частей |
+| `defaultRule` | `required` | есть части, нет цены по умолчанию |
+
+  Тело больше 256 КБ: `413 payload_too_large`.
+- Сохранение ревалидацию не ставит: гость читает зону из `GET /delivery/area` (кэш 5 минут).
+
+### Зона на карте гостя
+
+`GET /delivery/area` (гость, `X-Tenant-Id`, без токена клиента) → `200`:
+
+```json
+{ "parts": [ [ [[41.35, 69.2], [41.35, 69.35], [41.25, 69.3]] ] ], "attribution": "© OpenStreetMap contributors" }
+```
+
+- `parts`: части зоны, каждая — список колец (even-odd), координаты округлены до 5 знаков; `{ "parts": null,
+  "attribution": null }`, если зоны нет. Цен и кодов областей нет.
+- `attribution`: подпись, которую карта показывает рядом с зоной (ODbL), если хотя бы одна часть — область из
+  справочника; только нарисованные владельцем части или нет зоны → `null`.
+- `Cache-Control: public, max-age=300`, `Vary: X-Tenant-Id` (адрес один на все заведения, а поддомены одного сайта
+  делят кэш браузера) и `ETag` (слабый, считает Express): с `If-None-Match` неизменный ответ → `304`.
+- Цвет на карте: `theme.serviceArea` из `GET /tenant/config` (по умолчанию цвет бренда заведения).
+
+### Правила филиала
 
 **Правила филиала** (владелец, токен, только свои филиалы; чужой или несуществующий id → `404`):
 
@@ -1052,7 +1163,7 @@ invalid_settings`, `fields: [{ field: "deliveryPayment", code: "delivery_payment
 |---|---|
 | `GET /branch/:id/delivery-pricing` | правила филиала |
 | `PUT /branch/:id/delivery-pricing` | заменяет правила целиком, отвечает тем же видом |
-| `GET /branch/:id/delivery-pricing/check?lat=&lng=&subtotal=` | цена от этого филиала до точки по сохранённым правилам и шагу заведения, без учёта часов и публикации |
+| `GET /branch/:id/delivery-pricing/check?lat=&lng=&subtotal=` | цена от этого филиала до точки так, как её получил бы гость от этого филиала: общая зона заведения, правила филиала, цена по умолчанию; без учёта часов, публикации и других филиалов |
 
 ```json
 {
@@ -1073,8 +1184,15 @@ invalid_settings`, `fields: [{ field: "deliveryPayment", code: "delivery_payment
 - Ошибки: `400 validation_error` (форма, `fields[]`: `zones[0].price`…), `400 invalid_settings` (`zones[1].polygon` /
   `polygon`: точки не `[lat, lng]` на карте; `distance.maxKm` / `min`: меньше `includedKm`).
 - Сохранение ставит ревалидацию `route: 'branches'` (доступность доставки и зоны на карте в `/tenant/config`).
-- `check` → `{ covered, rule: "zone" | "distance" | null, zoneIndex, distanceKm, deliveryFee, freeFrom, minOrder, shortBy }`;
-  вне правил `covered: false`, цены `null`, `distanceKm` всё равно посчитан.
+- `check` → `{ covered, inArea, reason, rule: "zone" | "distance" | "default" | null, zoneIndex, distanceKm, deliveryFee,
+  freeFrom, minOrder, shortBy }` (`branchRateFor` в `order/domain/branch-choice.ts`, те же правила, что выбор филиала):
+  - филиал не принимает доставку (`accepts_delivery: false`): `covered: false`, `reason: "fulfillment_unavailable"` (тот же код, что у гостя), правила не смотрятся;
+  - `inArea`: адрес в общей зоне заведения; `null`, если зона не задана;
+  - зона задана, адрес вне её: `covered: false`, `reason: "out_of_delivery_zone"`, даже если правило филиала дотягивается;
+  - правило филиала покрывает адрес: `rule: "zone"` (`zoneIndex`) или `"distance"`;
+  - иначе при заданной зоне: `rule: "default"`, цена по умолчанию заведения, расстояние от этого филиала;
+  - иначе `covered: false`, `reason: "out_of_delivery_zone"`;
+  - не покрыт: цены `null`, `distanceKm` всё равно посчитан; покрыт: `reason: null`.
 
 **Как считается цена для адреса** (одна функция для корзины, заказа и проверки владельца,
 `branch/domain/delivery-pricing.ts`):
@@ -1087,13 +1205,22 @@ invalid_settings`, `fields: [{ field: "deliveryPayment", code: "delivery_payment
 
 Итоговая цена округляется вверх до шага заведения (`deliveryPriceStep`); `0` остаётся `0`.
 
-**Выбор филиала**: из активных филиалов, которые сейчас открыты, принимают доставку и доставляют на адрес по своим
-правилам, ближайший по прямой (при равенстве — по порядку филиалов). `branchId` в заказе доставки не учитывается.
-Причины, по которым доставки нет, коды из реестра в таком порядке: `ordering_channel_disabled` /
-`ordering_not_published` → `fulfillment_unavailable` (нет филиала с доставкой) → `delivery_not_configured` (ни у
-одного нет правил) → `out_of_delivery_zone` (ни один не доставляет на адрес, или у адреса нет координат) →
-`branch_hours_not_set` (у покрывающих нет расписания) / `branch_closed` (`opensAt`: ближайшее открытие среди
-покрывающих).
+**Выбор филиала и цены** (`order/domain/branch-choice.ts`, одна функция для `GET /delivery/quote` и `POST /orders`;
+`branchId` в заказе доставки не учитывается):
+
+1. Зона заведения задана, а адрес вне её (или без координат) → `out_of_delivery_zone`; правила филиалов за зоной не
+   действуют.
+2. Филиалы, чьи правила (зоны, расстояние) покрывают адрес: из открытых ближайший по прямой (при равенстве — по
+   порядку филиалов), `rule` `zone` или `distance`. Покрывают только закрытые → `branch_hours_not_set` /
+   `branch_closed`, без перехода к цене по умолчанию.
+3. Ни один не покрывает, зона задана → ближайший открытый филиал с доставкой (свои правила не нужны) по цене по
+   умолчанию, `rule: "default"`; открытых нет → `branch_hours_not_set` / `branch_closed`.
+4. Зоны нет → как раньше: ни один не покрывает → `out_of_delivery_zone`.
+
+Коды в порядке проверки: `ordering_channel_disabled` / `ordering_not_published` → `fulfillment_unavailable` (нет
+филиала с доставкой) → `out_of_delivery_zone` (вне зоны заведения) → `delivery_not_configured` (зоны нет и ни у
+одного филиала нет правил) → `out_of_delivery_zone` (никто не покрывает, зоны нет) → `branch_hours_not_set` /
+`branch_closed` (`opensAt`: ближайшее открытие среди тех, из кого выбирали).
 
 **Расчёт для корзины** `GET /delivery/quote?lat=&lng=&subtotal=` (гость, `X-Tenant-Id`, без токена клиента;
 `Cache-Control: no-store`; `subtotal` — сумма блюд без доставки, по умолчанию 0) → `200`:
@@ -1106,6 +1233,8 @@ invalid_settings`, `fields: [{ field: "deliveryPayment", code: "delivery_payment
 }
 ```
 
+- `rule`: `zone` / `distance` — правило выбранного филиала, `default` — цена по умолчанию заведения (адрес в зоне,
+  правила филиалов его не покрывают).
 - `available`: какой-то филиал доставляет на адрес сейчас; `canOrder`: ещё и сумма не меньше минимума.
 - `reason`: `null`, если `canOrder`; иначе код из списка выше или `min_order_not_reached` (тогда цена и филиал есть).
   При `available: false` `branch`, `rule`, `distanceKm`, `deliveryFee`, `freeFrom`, `minOrder` равны `null`,
@@ -1184,7 +1313,7 @@ invalid_settings`, `fields: [{ field: "deliveryPayment", code: "delivery_payment
     { "id": "menu_category", "status": "done", "hint": null },
     { "id": "menu_product", "status": "todo", "hint": "Добавьте хотя бы одно активное блюдо в активную категорию" },
     { "id": "branch", "status": "todo", "hint": "Укажите у филиала часы работы (или «круглосуточно»)" },
-    { "id": "delivery_pricing", "status": "todo", "hint": "Задайте стоимость доставки (зону или расстояние) хотя бы у одного филиала с доставкой или отключите доставку в филиалах" },
+    { "id": "delivery_pricing", "status": "todo", "hint": "Задайте зону доставки заведения и цену доставки по умолчанию или отключите доставку в филиалах" },
     { "id": "delivery_payment", "status": "done", "hint": null },
     { "id": "telegram_bot", "status": "not_required", "hint": null }
   ],
@@ -1210,7 +1339,7 @@ invalid_settings`, `fields: [{ field: "deliveryPayment", code: "delivery_payment
 | `menu_category` | есть активная категория |
 | `menu_product` | есть активное блюдо в активной категории |
 | `branch` | есть активный филиал, у которого одновременно: часы работы хотя бы в один день (`is24h` подходит, `isClosed` нет), точка на карте (не `0, 0`), самовывоз или доставка |
-| `delivery_pricing` | у активного филиала с доставкой есть правила стоимости (зона или расстояние, `PUT /branch/:id/delivery-pricing`); `not_required`, если ни один активный филиал не принимает доставку |
+| `delivery_pricing` | задана общая зона доставки заведения: хотя бы одна часть и цена по умолчанию (`PUT /organization/:id/delivery-area`); зоны филиалов не обязательны; `not_required`, если ни один активный филиал не принимает доставку. Уже опубликованное заведение без зоны не снимается и считает цену по правилам филиалов |
 | `delivery_payment` | у гостя есть хотя бы один способ оплаты доставки (`fulfillment.deliveryPaymentMethods` не пуст: наличные или карта курьеру не при `courierMode: external`, онлайн с включённым провайдером); `not_required`, если ни один активный филиал не принимает доставку |
 | `telegram_bot` | бот заведения подключён и включён (`/telegram-bot`); `not_required` в режиме `site` |
 
@@ -1633,6 +1762,9 @@ posNumber, posStatus, courierName, attempts, sentAt, manualAt, deliveredPush }`.
 `GET /tenant/by-host/:host` (новый) отдаёт по списку полей `{ id, slug, name, primaryDomain }`.
 
 `GET /delivery/quote` (новый) отдаёт DTO `DeliveryQuoteDto`: филиал только `{ id, title, address }`.
+
+`GET /delivery/area` (новый) отдаёт DTO `PublicDeliveryAreaDto`: только кольца частей и подпись OSM, без цен и кодов
+областей.
 
 Уже были на мапперах и не менялись: `GET /tenant/by-slug/:slug`, `GET /tenant/config`, `GET /menu`, `GET /branches`,
 `GET /checkout-config`, `/orders*`, `/auth/customer/*`. Вебхуки Click, Payme и Telegram отвечают в формате
