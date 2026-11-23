@@ -7,16 +7,25 @@
  * --refresh downloads the OSM relations again (otherwise the files in .cache/ are reused).
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
-import { join } from 'path';
-import polygonClipping, { MultiPolygon } from 'polygon-clipping';
+import { dirname, join } from 'path';
 import {
   LatLng,
   Ring,
+  pointInRing,
   ringsBbox,
   ringsIntersect,
   roundRing,
   selfIntersects,
 } from '../../src/modules/delivery/domain/geometry';
+
+// mapshaper ships no types: only applyCommands is used
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const mapshaper = require('mapshaper') as {
+  applyCommands(
+    cmd: string,
+    input: Record<string, unknown>,
+  ): Promise<Record<string, string | Buffer>>;
+};
 
 /** ISO 3166-2:UZ code → OSM relation and names (uz in Latin script). */
 const REGIONS: {
@@ -148,12 +157,19 @@ const REGIONS: {
   },
 ];
 
-/** Simplification tolerance in metres: the city is drawn closer than the regions. */
+/**
+ * Simplification tolerance in metres: the city is drawn closer than the regions. A border shared by two regions is
+ * one arc of the topology and gets the smaller tolerance of the two (the city/region border: the city's 30 m).
+ */
 const TOLERANCE_M: Record<string, number> = { 'UZ-TK': 30 };
 const DEFAULT_TOLERANCE_M = 150;
-/** Pieces left over from the city cut that are smaller than this are noise, not land. */
+/** mapshaper measures on the sphere, the check below on a local plane: a metre of slack covers the difference. */
+const CHECK_SLACK_M = 1;
+/** Rings of the source smaller than this are noise, not land. */
 const MIN_RING_AREA_M2 = 10_000;
 const DIGITS = 6;
+const CITY = 'UZ-TK';
+const CITY_REGION = 'UZ-TO';
 
 const ATTRIBUTION = '© OpenStreetMap contributors';
 const LICENSE = 'ODbL-1.0';
@@ -161,6 +177,11 @@ const LICENSE = 'ODbL-1.0';
 const HERE = __dirname;
 const CACHE = join(HERE, '.cache');
 const OUT = join(HERE, '../../src/modules/delivery/regions/uz-regions.json');
+/** The unsimplified city border, for the tests of the shared city/region border (not shipped with the build). */
+const BORDER_FIXTURE = join(
+  HERE,
+  '../../src/modules/delivery/regions/fixtures/uz-tk-osm-border.json',
+);
 const UA = 'xmenu-delivery-regions/1.0 (build script)';
 
 async function fetchText(url: string): Promise<string> {
@@ -169,11 +190,15 @@ async function fetchText(url: string): Promise<string> {
   return res.text();
 }
 
+type Position = [number, number];
+type Polygon = Position[][];
+type GeoJson = { type: string; coordinates?: unknown; geometries?: GeoJson[] };
+
 /** The relation assembled into polygons (polygons.openstreetmap.fr, params=0: not simplified). */
 async function relationGeometry(
   relation: number,
   refresh: boolean,
-): Promise<MultiPolygon> {
+): Promise<Polygon[]> {
   const file = join(CACHE, `${relation}.geojson`);
   if (refresh || !existsSync(file)) {
     const text = await fetchText(
@@ -181,16 +206,14 @@ async function relationGeometry(
     );
     writeFileSync(file, text);
   }
-  return multiPolygonOf(JSON.parse(readFileSync(file, 'utf8')) as GeoJson);
+  return polygonsOf(JSON.parse(readFileSync(file, 'utf8')) as GeoJson);
 }
 
-type GeoJson = { type: string; coordinates?: unknown; geometries?: GeoJson[] };
-
-function multiPolygonOf(g: GeoJson): MultiPolygon {
+function polygonsOf(g: GeoJson): Polygon[] {
   if (g.type === 'GeometryCollection')
-    return (g.geometries ?? []).flatMap(multiPolygonOf);
-  if (g.type === 'MultiPolygon') return g.coordinates as MultiPolygon;
-  if (g.type === 'Polygon') return [g.coordinates as MultiPolygon[number]];
+    return (g.geometries ?? []).flatMap(polygonsOf);
+  if (g.type === 'MultiPolygon') return g.coordinates as Polygon[];
+  if (g.type === 'Polygon') return [g.coordinates as Polygon];
   return [];
 }
 
@@ -229,50 +252,6 @@ function segmentDistanceM(p: LatLng, a: LatLng, b: LatLng, kx: number) {
   return Math.hypot(px - t * bx, py - t * by);
 }
 
-/** Douglas–Peucker of an open ring: every dropped point is within tolerance of the kept outline. */
-function simplifyRing(ring: Ring, toleranceM: number): Ring {
-  if (toleranceM <= 0 || ring.length <= 4) return ring;
-  const kx = metresPerDegLng(ring[0][0]);
-  // Split at the first point and the farthest from it, so the closed outline is two open chains
-  let far = 0;
-  let farD = -1;
-  ring.forEach((p, i) => {
-    const d = Math.hypot(
-      (p[1] - ring[0][1]) * kx,
-      (p[0] - ring[0][0]) * metresPerDegLat,
-    );
-    if (d > farD) {
-      farD = d;
-      far = i;
-    }
-  });
-  const keep = new Array<boolean>(ring.length + 1).fill(false);
-  const pts = [...ring, ring[0]];
-  keep[0] = keep[far] = keep[pts.length - 1] = true;
-  const stack: [number, number][] = [
-    [0, far],
-    [far, pts.length - 1],
-  ];
-  while (stack.length) {
-    const [from, to] = stack.pop()!;
-    let index = -1;
-    let max = toleranceM;
-    for (let i = from + 1; i < to; i++) {
-      const d = segmentDistanceM(pts[i], pts[from], pts[to], kx);
-      if (d > max) {
-        max = d;
-        index = i;
-      }
-    }
-    if (index >= 0) {
-      keep[index] = true;
-      stack.push([from, index], [index, to]);
-    }
-  }
-  const out = pts.slice(0, -1).filter((_, i) => keep[i]);
-  return out.length >= 4 ? out : ring;
-}
-
 /** Shoelace area in m². */
 function ringAreaM2(ring: Ring): number {
   const kx = metresPerDegLng(ring[0][0]);
@@ -284,16 +263,16 @@ function ringAreaM2(ring: Ring): number {
   return Math.abs(sum / 2);
 }
 
-/** GeoJSON rings ([lng, lat], closed) → open [lat, lng] rings; tiny pieces dropped. */
-function toRings(mp: MultiPolygon, code: string): Ring[] {
+/** GeoJSON polygons ([lng, lat], closed) → open [lat, lng] rings (even-odd); tiny pieces dropped. */
+function toRings(polygons: Polygon[], code: string): Ring[] {
   const rings: Ring[] = [];
-  for (const polygon of mp)
+  for (const polygon of polygons)
     for (const closed of polygon) {
       const ring: Ring = closed.map(([lng, lat]) => [lat, lng]);
       const [first, last] = [ring[0], ring[ring.length - 1]];
       if (first[0] === last[0] && first[1] === last[1]) ring.pop();
-      const area = ringAreaM2(ring);
-      if (ring.length < 3 || area < MIN_RING_AREA_M2) {
+      const area = ring.length < 3 ? 0 : ringAreaM2(ring);
+      if (area < MIN_RING_AREA_M2) {
         console.warn(`${code}: dropped a ring of ${Math.round(area)} m²`);
         continue;
       }
@@ -303,75 +282,211 @@ function toRings(mp: MultiPolygon, code: string): Ring[] {
 }
 
 /**
- * Simplifies every ring, then checks the result: no ring crosses itself or another ring of the region (after
- * rounding). A ring that fails is simplified again with half the tolerance; below 1 m the source itself is broken.
+ * OSM draws Tashkent Region over the city. Every city ring must lie strictly inside one ring of the region and cross
+ * none: then the city rings themselves are the holes (even-odd), vertex for vertex, and the border is one shared arc.
  */
-function simplifyRegion(code: string, rings: Ring[], toleranceM: number) {
-  const tolerance = rings.map(() => toleranceM);
-  for (;;) {
-    const out = rings.map((r, i) =>
-      roundRing(simplifyRing(r, tolerance[i]), DIGITS),
-    );
-    const bad = new Set<number>();
-    out.forEach((r, i) => {
-      if (selfIntersects(r)) bad.add(i);
-      for (let j = i + 1; j < out.length; j++)
-        if (ringsIntersect(r, out[j])) bad.add(i).add(j);
-    });
-    if (bad.size === 0) return { rings: out, tolerance };
-    for (const i of bad) {
-      if (tolerance[i] < 1)
-        throw new Error(`${code}: ring ${i} is invalid even unsimplified`);
-      tolerance[i] = tolerance[i] < 2 ? 0 : tolerance[i] / 2;
-    }
+function cutCity(region: Ring[], city: Ring[]): Ring[] {
+  for (const c of city) {
+    if (region.some((r) => ringsIntersect(c, r)))
+      throw new Error(`${CITY} crosses the outline of ${CITY_REGION}`);
+    if (!region.some((r) => pointInRing(c[0][0], c[0][1], r)))
+      throw new Error(`${CITY} is not inside ${CITY_REGION}`);
   }
+  return [...region, ...city];
+}
+
+/** Even-odd rings → GeoJSON polygons: a ring inside an odd number of others is a hole of its nearest container. */
+function toGeoJsonPolygons(rings: Ring[]): Polygon[] {
+  const close = (r: Ring): Position[] =>
+    [...r, r[0]].map(([lat, lng]) => [lng, lat]);
+  const containers = rings.map((r, i) =>
+    rings
+      .map((_, j) => j)
+      .filter((j) => j !== i && pointInRing(r[0][0], r[0][1], rings[j])),
+  );
+  const polygons = new Map<number, Polygon>();
+  rings.forEach((r, i) => {
+    if (containers[i].length % 2 === 0) polygons.set(i, [close(r)]);
+  });
+  rings.forEach((r, i) => {
+    if (containers[i].length % 2 === 0) return;
+    // the nearest container is the one inside the most others
+    const parent = containers[i].reduce((a, b) =>
+      containers[a].length >= containers[b].length ? a : b,
+    );
+    polygons.get(parent)!.push(close(r));
+  });
+  return [...polygons.values()];
+}
+
+/**
+ * Simplifies all regions as one topology (mapshaper): a border shared by neighbours is a single arc, simplified once,
+ * so neighbours keep meeting exactly, without gaps or overlaps. Douglas–Peucker on the sphere; the tolerance of an arc
+ * is the smallest of the regions using it (mapshaper `variable`); mapshaper repairs crossings it introduces.
+ */
+async function simplifyAll(
+  raw: Map<string, Ring[]>,
+  tolerance: Record<string, number>,
+): Promise<Map<string, Ring[]>> {
+  const collection = {
+    type: 'FeatureCollection',
+    features: [...raw].map(([code, rings]) => ({
+      type: 'Feature',
+      properties: { code },
+      geometry: { type: 'MultiPolygon', coordinates: toGeoJsonPolygons(rings) },
+    })),
+  };
+  const interval =
+    Object.entries(tolerance)
+      .map(([code, m]) => `code=='${code}'?${m}:`)
+      .join('') + `${DEFAULT_TOLERANCE_M}`;
+  const out = await mapshaper.applyCommands(
+    `-i in.json -simplify dp variable interval="${interval}" keep-shapes -o out.json format=geojson`,
+    { 'in.json': collection },
+  );
+  const result = JSON.parse(out['out.json'].toString()) as {
+    features: { properties: { code: string }; geometry: GeoJson }[];
+  };
+  return new Map(
+    result.features.map((f) => [
+      f.properties.code,
+      toRings(polygonsOf(f.geometry), f.properties.code).map((r) =>
+        roundRing(r, DIGITS),
+      ),
+    ]),
+  );
+}
+
+/** Farthest distance in metres from a source point to the simplified outline of the region. */
+function maxDeviationM(source: Ring[], simplified: Ring[]): number {
+  let worst = 0;
+  for (const ring of source)
+    for (const p of ring) {
+      const kx = metresPerDegLng(p[0]);
+      let best = Infinity;
+      for (const r of simplified)
+        for (let i = 0; i < r.length && best > worst; i++)
+          best = Math.min(
+            best,
+            segmentDistanceM(p, r[i], r[(i + 1) % r.length], kx),
+          );
+      worst = Math.max(worst, best);
+    }
+  return worst;
+}
+
+/** A ring as a comparable key: same points from the smallest one, in the smaller of the two directions. */
+function ringKey(ring: Ring): string {
+  const rotate = (r: Ring) => {
+    let k = 0;
+    r.forEach((p, i) => {
+      const q = r[k];
+      if (p[0] < q[0] || (p[0] === q[0] && p[1] < q[1])) k = i;
+    });
+    return [...r.slice(k), ...r.slice(0, k)];
+  };
+  const a = JSON.stringify(rotate(ring));
+  const b = JSON.stringify(rotate([...ring].reverse()));
+  return a < b ? a : b;
+}
+
+/** What is wrong with a simplified region; empty when it is fine. */
+function problems(
+  code: string,
+  source: Ring[],
+  rings: Ring[],
+  toleranceM: number,
+): string[] {
+  const found: string[] = [];
+  if (!rings.length) found.push('no rings left');
+  rings.forEach((r, i) => {
+    if (r.length < 4) found.push(`ring ${i} has ${r.length} points`);
+    if (selfIntersects(r)) found.push(`ring ${i} crosses itself`);
+    for (let j = i + 1; j < rings.length; j++)
+      if (ringsIntersect(r, rings[j])) found.push(`rings ${i} and ${j} cross`);
+  });
+  const deviation = maxDeviationM(source, rings);
+  if (deviation > toleranceM + CHECK_SLACK_M)
+    found.push(`a source point is ${deviation.toFixed(1)} m off`);
+  return found.map((p) => `${code}: ${p}`);
+}
+
+/** The city rings and the holes of the region are the very same rings: the border has no gap and no overlap. */
+function sharedBorderProblems(simplified: Map<string, Ring[]>): string[] {
+  const region = new Set(simplified.get(CITY_REGION)!.map(ringKey));
+  return simplified
+    .get(CITY)!
+    .filter((r) => !region.has(ringKey(r)))
+    .map(() => `${CITY}: a ring is not a hole of ${CITY_REGION}`);
+}
+
+/** `osm-<build date>`; a second build on the same day gets `.2`, `.3`… so saved zones can tell them apart. */
+function nextVersion(): string {
+  const base = `osm-${new Date().toISOString().slice(0, 10)}`;
+  if (!existsSync(OUT)) return base;
+  const current = (JSON.parse(readFileSync(OUT, 'utf8')) as { version: string })
+    .version;
+  if (current !== base && !current.startsWith(`${base}.`)) return base;
+  const n = current === base ? 1 : Number(current.slice(base.length + 1));
+  return `${base}.${n + 1}`;
 }
 
 async function main() {
   const refresh = process.argv.includes('--refresh');
   mkdirSync(CACHE, { recursive: true });
   const meta = await relationMeta(REGIONS.map((r) => r.relation));
-  const raw = new Map<string, MultiPolygon>();
+  const raw = new Map<string, Ring[]>();
   for (const r of REGIONS)
-    raw.set(r.code, await relationGeometry(r.relation, refresh));
-  // OSM draws Tashkent Region over the city: cut the city out (a hole)
-  raw.set(
-    'UZ-TO',
-    polygonClipping.difference(raw.get('UZ-TO')!, raw.get('UZ-TK')!),
-  );
-
-  const regions: {
-    code: string;
-    name: { uz: string; ru: string; en: string };
-    bbox: [LatLng, LatLng];
-    rings: Ring[];
-  }[] = [];
-  const report: string[] = [];
-  for (const r of REGIONS) {
-    const rings = toRings(raw.get(r.code)!, r.code);
-    const before = rings.reduce((n, ring) => n + ring.length, 0);
-    const toleranceM = TOLERANCE_M[r.code] ?? DEFAULT_TOLERANCE_M;
-    const simplified = simplifyRegion(r.code, rings, toleranceM);
-    const after = simplified.rings.reduce((n, ring) => n + ring.length, 0);
-    const tightened = simplified.tolerance.filter((t) => t < toleranceM).length;
-    report.push(
-      `${r.code}  rings ${rings.length}  points ${before} → ${after}  tolerance ${toleranceM} m` +
-        (tightened ? `  (${tightened} ring(s) tightened)` : ''),
+    raw.set(
+      r.code,
+      toRings(await relationGeometry(r.relation, refresh), r.code),
     );
-    regions.push({
+  raw.set(CITY_REGION, cutCity(raw.get(CITY_REGION)!, raw.get(CITY)!));
+
+  // A region that fails its checks is simplified again with half the tolerance (its shared arcs too)
+  const tolerance: Record<string, number> = { ...TOLERANCE_M };
+  const toleranceOf = (code: string) => tolerance[code] ?? DEFAULT_TOLERANCE_M;
+  let simplified: Map<string, Ring[]>;
+  for (;;) {
+    simplified = await simplifyAll(raw, tolerance);
+    const border = sharedBorderProblems(simplified);
+    if (border.length) throw new Error(border.join('\n'));
+    const bad = REGIONS.map((r) => ({
       code: r.code,
-      name: r.name,
-      bbox: ringsBbox(simplified.rings),
-      rings: simplified.rings,
-    });
+      found: problems(
+        r.code,
+        raw.get(r.code)!,
+        simplified.get(r.code) ?? [],
+        toleranceOf(r.code),
+      ),
+    })).filter((r) => r.found.length);
+    if (!bad.length) break;
+    for (const r of bad) {
+      console.warn(r.found.join('\n'));
+      if (toleranceOf(r.code) < 1)
+        throw new Error(`${r.code} is invalid even unsimplified`);
+      tolerance[r.code] = toleranceOf(r.code) / 2;
+    }
   }
+
+  const report: string[] = [];
+  const regions = REGIONS.map((r) => {
+    const rings = simplified.get(r.code)!;
+    const before = raw.get(r.code)!.reduce((n, ring) => n + ring.length, 0);
+    const after = rings.reduce((n, ring) => n + ring.length, 0);
+    report.push(
+      `${r.code}  rings ${rings.length}  points ${before} → ${after}  tolerance ${toleranceOf(r.code)} m`,
+    );
+    return { code: r.code, name: r.name, bbox: ringsBbox(rings), rings };
+  });
 
   const latest = [...meta.values()]
     .map((m) => m.timestamp)
     .sort()
     .pop();
+  const city = REGIONS.find((r) => r.code === CITY)!;
   const catalog = {
-    version: `osm-${new Date().toISOString().slice(0, 10)}`,
+    version: nextVersion(),
     license: LICENSE,
     attribution: ATTRIBUTION,
     source: REGIONS.map((r) => ({
@@ -382,11 +497,27 @@ async function main() {
     })),
     regions,
   };
-  const json = JSON.stringify(catalog);
-  writeFileSync(OUT, json + '\n');
+  const json = JSON.stringify(catalog) + '\n';
+  writeFileSync(OUT, json);
+  mkdirSync(dirname(BORDER_FIXTURE), { recursive: true });
+  writeFileSync(
+    BORDER_FIXTURE,
+    JSON.stringify({
+      license: LICENSE,
+      attribution: ATTRIBUTION,
+      code: CITY,
+      relation: city.relation,
+      osmVersion: meta.get(city.relation)?.version ?? null,
+      rings: raw.get(CITY)!.map((r) => roundRing(r, DIGITS)),
+    }) + '\n',
+  );
+  const points = regions.reduce(
+    (n, r) => n + r.rings.reduce((m, ring) => m + ring.length, 0),
+    0,
+  );
   console.log(report.join('\n'));
   console.log(
-    `latest relation edit ${latest}; ${OUT}: ${(json.length / 1024).toFixed(0)} KB`,
+    `${catalog.version}; latest relation edit ${latest}; ${points} points; ${Buffer.byteLength(json)} bytes`,
   );
 }
 
