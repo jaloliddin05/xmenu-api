@@ -1144,12 +1144,15 @@ even-odd по всем её кольцам (так описываются дыр
 `GET /delivery/area` (гость, `X-Tenant-Id`, без токена клиента) → `200`:
 
 ```json
-{ "parts": [ [ [[41.35, 69.2], [41.35, 69.35], [41.25, 69.3]] ] ] }
+{ "parts": [ [ [[41.35, 69.2], [41.35, 69.35], [41.25, 69.3]] ] ], "attribution": "© OpenStreetMap contributors" }
 ```
 
-- `parts`: части зоны, каждая — список колец (even-odd), координаты округлены до 5 знаков; `{ "parts": null }`, если
-  зоны нет. Цен и кодов областей нет.
-- `Cache-Control: public, max-age=300` и `ETag` (слабый, считает Express): с `If-None-Match` неизменный ответ → `304`.
+- `parts`: части зоны, каждая — список колец (even-odd), координаты округлены до 5 знаков; `{ "parts": null,
+  "attribution": null }`, если зоны нет. Цен и кодов областей нет.
+- `attribution`: подпись, которую карта показывает рядом с зоной (ODbL), если хотя бы одна часть — область из
+  справочника; только нарисованные владельцем части или нет зоны → `null`.
+- `Cache-Control: public, max-age=300`, `Vary: X-Tenant-Id` (адрес один на все заведения, а поддомены одного сайта
+  делят кэш браузера) и `ETag` (слабый, считает Express): с `If-None-Match` неизменный ответ → `304`.
 - Цвет на карте: `theme.serviceArea` из `GET /tenant/config` (по умолчанию цвет бренда заведения).
 
 ### Правила филиала
@@ -1759,7 +1762,8 @@ posNumber, posStatus, courierName, attempts, sentAt, manualAt, deliveredPush }`.
 
 `GET /delivery/quote` (новый) отдаёт DTO `DeliveryQuoteDto`: филиал только `{ id, title, address }`.
 
-`GET /delivery/area` (новый) отдаёт DTO `PublicDeliveryAreaDto`: только кольца частей, без цен и кодов областей.
+`GET /delivery/area` (новый) отдаёт DTO `PublicDeliveryAreaDto`: только кольца частей и подпись OSM, без цен и кодов
+областей.
 
 Уже были на мапперах и не менялись: `GET /tenant/by-slug/:slug`, `GET /tenant/config`, `GET /menu`, `GET /branches`,
 `GET /checkout-config`, `/orders*`, `/auth/customer/*`. Вебхуки Click, Payme и Telegram отвечают в формате

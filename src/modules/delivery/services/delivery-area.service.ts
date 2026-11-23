@@ -138,14 +138,23 @@ export class DeliveryAreaService {
     return deliveryAreaIsSet(this.prisma, organizationId);
   }
 
-  /** GET /delivery/area: the parts the guest map draws, 5 decimals; null without an area. */
+  /**
+   * GET /delivery/area: the parts the guest map draws, 5 decimals; null without an area (as forPricing). The OSM
+   * attribution only when a part was copied from the region catalog (ODbL); drawn parts are the owner's own.
+   */
   async forGuest(organizationId: string): Promise<PublicDeliveryAreaDto> {
-    const area = await this.forPricing(organizationId);
+    const [area, rows] = await this.rows(organizationId);
+    const parts = rows.flatMap((p) => {
+      const rings = parseRings(p.geometry);
+      return rings ? [{ source: p.source, rings }] : [];
+    });
+    if (!area || parts.length === 0) return { parts: null, attribution: null };
     return {
-      parts: area
-        ? area.parts.map((rings: Ring[]) =>
-            rings.map((ring) => roundRing(ring, PUBLIC_DIGITS)),
-          )
+      parts: parts.map((p) =>
+        p.rings.map((ring: Ring) => roundRing(ring, PUBLIC_DIGITS)),
+      ),
+      attribution: parts.some((p) => p.source === 'region')
+        ? this.catalog.attribution
         : null,
     };
   }

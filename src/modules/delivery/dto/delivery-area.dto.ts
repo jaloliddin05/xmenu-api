@@ -251,4 +251,12 @@ export class PublicDeliveryAreaDto {
       'Parts, each a list of rings [[lat, lng], ...] (5 decimals, open, even-odd); null: the venue has no area',
   })
   parts: number[][][][] | null;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    example: '© OpenStreetMap contributors',
+    description:
+      'Show next to the map when not null: some part is a region from the catalog (ODbL); null for drawn parts only or no area',
+  })
+  attribution: string | null;
 }

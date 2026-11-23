@@ -166,7 +166,8 @@ test, `npm run openapi` + `git diff --exit-code docs/`, `format:check`, `lint` �
   скрипта справочника); правила и проверки частей `delivery/domain/delivery-area.ts`. Зоны филиалов остаются одним
   кольцом на старом `pointInPolygon`. `DeliveryAreaService`: `GET/PUT /organization/:id/delivery-area` (замена
   целиком под `FOR UPDATE` строки заведения, проверки `invalid_settings`), `forPricing`, `GET /delivery/area` гостю
-  (5 знаков, `Cache-Control: public, max-age=300`, ETag Express; ревалидацию сохранение не ставит). JSON до 1 МБ
+  (5 знаков, `attribution` OSM при части-области, `Cache-Control: public, max-age=300`, `Vary: X-Tenant-Id`, ETag
+  Express; ревалидацию сохранение не ставит). JSON до 1 МБ
   только на этом пути (`delivery/delivery-area.body.ts`, парсер в `infra/errors/configure.ts`).
 - Справочник областей: `delivery/regions/uz-regions.json` (14 областей ISO 3166-2:UZ, OSM, ODbL; `RegionCatalog`
   читает при первом обращении, в сборку его кладёт `assets` в `nest-cli.json`). Область в зоне — копия геометрии с

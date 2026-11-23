@@ -30,6 +30,8 @@ export class DeliveryAreaPublicController {
 
   @Get('area')
   @Header('Cache-Control', 'public, max-age=300')
+  // One URL for every venue: a browser shares its cache across the subdomains of one site
+  @Header('Vary', 'X-Tenant-Id')
   @ApiOperation({
     summary:
       'Venue delivery area for the map: parts as rings (5 decimals, even-odd), or null when the venue has none',
@@ -38,6 +40,7 @@ export class DeliveryAreaPublicController {
     type: PublicDeliveryAreaDto,
     headers: {
       'Cache-Control': { description: 'public, max-age=300' },
+      Vary: { description: 'X-Tenant-Id' },
       ETag: {
         description: 'Send it back as If-None-Match: 304 while unchanged',
       },

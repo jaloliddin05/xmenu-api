@@ -408,10 +408,11 @@ describe('Venue delivery area: owner, region catalog, guest map and quote', () =
         .get('/delivery/area')
         .set('X-Tenant-Id', ORG_A);
 
-    it('no area: parts null, cached publicly with an ETag', async () => {
+    it('no area: parts null, cached publicly with an ETag per venue', async () => {
       const res = await guest().expect(200);
-      expect(res.body).toEqual({ parts: null });
+      expect(res.body).toEqual({ parts: null, attribution: null });
       expect(res.headers['cache-control']).toBe('public, max-age=300');
+      expect(res.headers.vary).toMatch(/X-Tenant-Id/i);
       expect(res.headers.etag).toEqual(expect.any(String));
     });
 
@@ -434,8 +435,26 @@ describe('Venue delivery area: owner, region catalog, guest map and quote', () =
             ],
           ],
         ],
+        // Drawn by the owner: nothing from OpenStreetMap
+        attribution: null,
       });
       await guest().set('If-None-Match', res.headers.etag).expect(304);
+    });
+
+    it('a region from the catalog: the OpenStreetMap attribution', async () => {
+      await owner('put', AREA)
+        .send({
+          parts: [
+            { source: 'custom', polygon: TRIANGLE },
+            { source: 'region', code: 'UZ-TK' },
+          ],
+          defaultRule: DEFAULT_RULE,
+        })
+        .expect(200);
+      const res = await guest().expect(200);
+      expect(res.body.parts).toHaveLength(2);
+      expect(res.body.attribution).toBe(catalog.attribution);
+      expect(res.body.attribution).toBe('© OpenStreetMap contributors');
     });
 
     it('needs X-Tenant-Id', async () => {
