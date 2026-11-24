@@ -655,6 +655,7 @@ activeOrders, cash: { deliveries, due, card, received, discrepancy }, reconciled
 ```json
 {
   "serverTime": "2026-11-24T12:00:00.000Z",
+  "trackPreparation": false,
   "items": [
     {
       "id": "0b6f8a52-3c1d-4e7f-9a2b-5c6d7e8f9a0b",
@@ -672,6 +673,9 @@ activeOrders, cash: { deliveries, due, card, received, discrepancy }, reconciled
       "paymentMethod": "cash",
       "cashChangeFrom": 200000,
       "courier": null,
+      "posControlled": false,
+      "courierMode": "xmenu",
+      "queuePosition": null,
       "attention": [],
       "version": 1
     }
@@ -693,6 +697,14 @@ activeOrders, cash: { deliveries, due, card, received, discrepancy }, reconciled
 - `shortAddress`: строка адреса доставки без подъезда, этажа, квартиры и комментария; самовывоз `null`.
 - `itemsCount`: сумма количеств; `itemsPreview`: первые 4 позиции `{ name, quantity }`.
 - `courier`: `{ id, name } | null` (без телефона). `version`: версия заказа, растёт с каждой сменой статуса.
+- `trackPreparation` (в ответе): действующая очередь кухни заведения (настройка или подключённый iiko): доставка идёт
+  `accepted → preparing → ready`; иначе `accepted → ready`. Статус элемента приходит как есть (`accepted` и `preparing`
+  доска раскладывает по колонкам «Приняты» и «Готовятся»).
+- `queuePosition`: место в очереди кухни среди `accepted` по времени принятия (1 = первый), только при
+  `trackPreparation`; иначе `null`.
+- `posControlled`: заказ ведёт iiko (интеграция подключена и заказ передан, `pos.state = sent`): шаги кухни оператор
+  отмечает только с `override` (ниже). Заказ с застрявшей передачей (`pos_needs_action`) или «внесённый вручную» — `false`.
+- `courierMode`: `pos`, если курьеры заведения в iiko (назначение и снятие курьера → `409 pos_couriers_managed`), иначе `xmenu`.
 - Таймеры на экране считаются от `serverTime`, не от часов устройства.
 - `today` по суткам Asia/Tashkent: `ordersCount` дошедшие до заведения (вошли в `pending_acceptance`), `completedCount`
   завершённые, `revenue` сумма `total` завершённых; с учётом `branchId`. `completedTodayCount` = `today.completedCount`.
@@ -722,6 +734,16 @@ activeOrders, cash: { deliveries, due, card, received, discrepancy }, reconciled
 Самовывоз: `POST /order/{id}/status { status: "ready" }` из `accepted` проводит `accepted → preparing → ready` в одной
 транзакции (перетаскивание «Готовятся → Готовы» одним запросом); в журнале оба шага, гость получает одно уведомление.
 `advance` остаётся одним шагом.
+
+Очередь кухни (`trackPreparation`): `advance` из `accepted` у доставки ведёт в `preparing`, затем в `ready`; прямой
+`accepted → ready` доставки → `409 order_status_conflict`. Без очереди `preparing` у доставки недоступен; заказ, уже
+оказавшийся в `preparing` (очередь выключили), доходит до `ready` как обычно.
+
+Заказ под iiko (`posControlled`): шаги кухни (`accepted|preparing → preparing|ready`, у самовывоза и «Готов к выдаче») без
+`override: true` → `409 pos_status_managed`, `details.status`. С `override: true` (тело `advance` и `status`) шаг
+выполняется, в журнале `note: pos_override`, в ops-чат платформы строка с заведением и номером заказа (без данных
+гостя). Принять, отклонить, отменить, «Выдан» и решения у двери не меняются. Статусы iiko двигают заказ сами (актор
+`pos`, `docs/IIKO.md`; `CookingStarted` → `preparing`). Кнопок кухни у такого заказа нет и в чате филиала.
 
 ## Web push сотрудникам (владелец и оператор)
 
@@ -1132,7 +1154,9 @@ QR-меню и сайта доставки (`REVALIDATE.md`).
 доставки вверх, по умолчанию `100`), `courierMode` (`own`, `external`, `both`; по умолчанию `own`; при `external`
 наличные и карта курьеру при доставке не принимаются), `deliveryPayment { cash, card, online }` (способы оплаты при
 доставке, все три сразу; по умолчанию только наличные), тайм-ауты и лимит активных заказов; для доставки `pickupReminderMinutes`,
-`onTheWayAlertMinutes`, `doorWaitMinutes` и ставка оплаты курьерам `courierPay` (раздел «Курьеры»). Цены, минимумы и
+`onTheWayAlertMinutes`, `doorWaitMinutes`, ставка оплаты курьерам `courierPay` (раздел «Курьеры») и очередь кухни
+`trackPreparation` (`false` по умолчанию: доставка проходит «Принят → Готовится → Готов»; при подключённом iiko
+действует как `true`, в ответе сохранённое значение, действующее отдаёт `GET /order/board`). Цены, минимумы и
 зоны доставки задаются у филиалов (раздел «Стоимость доставки»). Примерного времени доставки в API нет.
 
 `deliveryPayment`: `online: true` без подключённого провайдера (`/payment-provider`) → `400 invalid_settings`,

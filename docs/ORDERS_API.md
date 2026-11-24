@@ -134,7 +134,8 @@ Webhook'и Click/Payme переводят заказ `awaiting_payment → pendi
   "currency": "UZS", "subtotal": 97000, "deliveryFee": 16000, "discount": 0, "total": 113000,
   "cashChangeFrom": null,
   "cancelledBy": null, "cancelReason": null,
-  "courier": null, "doorProblem": null, "externalService": null
+  "courier": null, "doorProblem": null, "externalService": null,
+  "trackPreparation": false
 }
 ```
 
@@ -143,7 +144,8 @@ Webhook'и Click/Payme переводят заказ `awaiting_payment → pendi
 телефона курьера гость не получает. `doorProblem`: `no_answer` (курьер у двери и не может дозвониться; таймлайн:
 «Курьер у двери и не может до вас дозвониться») или `refused` (гость отказался; решает оператор), иначе `null`.
 `externalService`: название службы у заказа `handed_to_external` («Передан в службу доставки <название>»), иначе
-`null`.
+`null`. `trackPreparation`: показывать ли на таймлайне шаг «Готовится»: у самовывоза всегда `true`; у доставки при
+очереди кухни заведения (настройка или подключённый iiko) или когда заказ уже `preparing`.
 
 Позиции, адрес, `branch`, названия и цены — **снимок на момент заказа**: заказ не
 должен меняться, если меню или адрес потом отредактируют.
@@ -246,8 +248,8 @@ external`, `click`/`payme` при включённом онлайне и клю�
 | GET | `/order/:id` | детали + клиент + курьер + журнал статусов |
 | POST | `/order/:id/accept` `{expectedStatus?}` | принять |
 | POST | `/order/:id/reject` `{reason?, expectedStatus?}` | отменить с причиной на любом шаге до конечного (оплаченный — возврат) |
-| POST | `/order/:id/advance` `{expectedStatus?}` | следующий этап по типу заказа; доставка: `accepted` → `ready`, дальше двигает курьер |
-| POST | `/order/:id/status` `{status, expectedStatus?}` | `accepted`, `preparing`, `ready`, `completed` (самовывоз), `returned_to_restaurant` (решение по проблеме у двери), если машина состояний разрешает; самовывоз `ready` из `accepted` проходит `preparing` в той же транзакции (два шага в журнале) |
+| POST | `/order/:id/advance` `{expectedStatus?, override?}` | следующий этап по типу заказа; доставка: `accepted` → `ready` (с очередью кухни `accepted` → `preparing` → `ready`), дальше двигает курьер; заказ под iiko без `override` → `409 pos_status_managed` (`API.md`, «Доска заказов») |
+| POST | `/order/:id/status` `{status, expectedStatus?, override?}` | `accepted`, `preparing`, `ready`, `completed` (самовывоз), `returned_to_restaurant` (решение по проблеме у двери), если машина состояний разрешает; самовывоз `ready` из `accepted` проходит `preparing` в той же транзакции (два шага в журнале) |
 | PUT | `/order/:id/courier` `{courierId}` | назначить или переназначить курьера на смене до «Забрал» (`docs/API.md`, «Курьеры») |
 | DELETE | `/order/:id/courier` | снять курьера до «Забрал» |
 | GET/PUT | `/order-settings` | минимум самовывоза, шаг округления цены доставки, способ доставки, таймауты, напоминания доставки, ставка курьерам |

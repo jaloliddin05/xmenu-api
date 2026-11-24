@@ -58,6 +58,25 @@ export class BoardItemDto {
   @ApiProperty({ type: BoardCourierDto, nullable: true })
   courier: BoardCourierDto | null;
   @ApiProperty({
+    description:
+      'iiko leads the kitchen steps (the order reached iiko, the integration is connected): marking them needs override: true',
+  })
+  posControlled: boolean;
+  @ApiProperty({
+    enum: ['xmenu', 'pos'],
+    description:
+      'pos: couriers of the venue work in iiko (assigning is refused)',
+  })
+  courierMode: 'xmenu' | 'pos';
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    example: 2,
+    description:
+      'accepted only, with the kitchen queue on: place in the queue by acceptance time (1 = first); otherwise null',
+  })
+  queuePosition: number | null;
+  @ApiProperty({
     enum: ATTENTION_CODES,
     isArray: true,
     description:
@@ -101,6 +120,11 @@ export class OrderBoardDto {
     description: 'Count the timers from this, not from the device clock',
   })
   serverTime: string;
+  @ApiProperty({
+    description:
+      'Kitchen queue in effect (the venue setting, or iiko connected): deliveries pass preparing',
+  })
+  trackPreparation: boolean;
   @ApiProperty({ type: [BoardItemDto] }) items: BoardItemDto[];
   @ApiProperty({ type: BoardThresholdsDto }) thresholds: BoardThresholdsDto;
   @ApiProperty({ type: BoardTodayDto }) today: BoardTodayDto;

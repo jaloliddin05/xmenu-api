@@ -60,6 +60,11 @@ describe('order state machine', () => {
         'accepted -> cancelled by restaurant',
         'accepted -> cancelled by payment',
         'accepted -> handed_to_external by restaurant',
+        // Очередь кухни (trackPreparation): Принят → Готовится → Готов; включён ли режим, решает kitchenCheck
+        'accepted -> preparing by restaurant',
+        'preparing -> ready by restaurant',
+        'preparing -> cancelled by restaurant',
+        'preparing -> handed_to_external by restaurant',
         // Готов → В пути: курьер «Забрал»
         'ready -> on_the_way by courier',
         'ready -> handed_to_external by restaurant',
@@ -79,6 +84,10 @@ describe('order state machine', () => {
         // iiko statuses (docs/IIKO.md, "Путь заказа и статусы"): cooked, on the way, delivered or closed, cancelled
         'accepted -> ready by pos',
         'accepted -> cancelled by pos',
+        // iiko «начали готовить» (CookingStarted)
+        'accepted -> preparing by pos',
+        'preparing -> ready by pos',
+        'preparing -> cancelled by pos',
         'ready -> on_the_way by pos',
         'ready -> cancelled by pos',
         'on_the_way -> completed by pos',
@@ -109,10 +118,10 @@ describe('order state machine', () => {
     );
   });
 
-  it('delivery has no "preparing"; the restaurant does not move a delivery past "ready"', () => {
+  it('the restaurant does not move a delivery past "ready"; "preparing" depends on the venue (kitchen.spec.ts)', () => {
     expect(
       checkTransition('accepted', 'preparing', 'restaurant', 'delivery'),
-    ).toEqual({ ok: false, reason: 'wrong_fulfillment' });
+    ).toEqual({ ok: true });
     expect(ok('ready', 'on_the_way', 'restaurant')).toBe(false);
     expect(ok('on_the_way', 'completed', 'restaurant')).toBe(false);
     expect(ok('problem_at_door', 'completed', 'restaurant')).toBe(false);

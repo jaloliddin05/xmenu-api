@@ -51,6 +51,8 @@ describe('GET /order/board', () => {
   let rows: Record<string, unknown>[];
   let findMany: jest.Mock;
   let placedWhere: unknown;
+  let trackPreparation: boolean;
+  let integration: { status: string; courier_mode: string } | null;
 
   beforeAll(async () => {
     findMany = jest.fn(async () => rows);
@@ -74,7 +76,7 @@ describe('GET /order/board', () => {
         })),
       },
       pos_order: { count: jest.fn(async () => 0) },
-      pos_integration: { findUnique: jest.fn(async () => null) },
+      pos_integration: { findUnique: jest.fn(async () => integration) },
     };
     app = await createHttpApp(
       {
@@ -91,6 +93,7 @@ describe('GET /order/board', () => {
                 pickupReminderMinutes: 5,
                 onTheWayAlertMinutes: 60,
                 doorWaitMinutes: 10,
+                trackPreparation,
               }),
             },
           },
@@ -108,6 +111,8 @@ describe('GET /order/board', () => {
     jest.useFakeTimers({ now, doNotFake: ['nextTick', 'setImmediate'] });
     findMany.mockClear();
     rows = [];
+    trackPreparation = false;
+    integration = null;
   });
   afterEach(() => jest.useRealTimers());
 
@@ -175,6 +180,9 @@ describe('GET /order/board', () => {
       paymentMethod: 'cash',
       cashChangeFrom: 200_000,
       courier: null,
+      posControlled: false,
+      courierMode: 'xmenu',
+      queuePosition: null,
       attention: ['no_courier'],
       version: 2,
     });
@@ -227,6 +235,53 @@ describe('GET /order/board', () => {
       organization_id: ORG,
       placed_at: { gte: new Date('2026-11-23T19:00:00.000Z') },
     });
+  });
+
+  it('the kitchen queue: trackPreparation in the answer, accepted orders numbered by acceptance time', async () => {
+    trackPreparation = true;
+    rows = [
+      row({ id: 'second', number: 1002, accepted_at: ago(5) }),
+      row({ id: 'first', number: 1001, accepted_at: ago(9) }),
+      row({
+        id: 'cooking',
+        number: 1003,
+        status: 'preparing',
+        accepted_at: ago(12),
+      }),
+    ];
+    const res = await get().expect(200);
+    expect(res.body.trackPreparation).toBe(true);
+    const position = (id: string) =>
+      res.body.items.find((o: { id: string }) => o.id === id).queuePosition;
+    expect([
+      position('first'),
+      position('second'),
+      position('cooking'),
+    ]).toEqual([1, 2, null]);
+    // A delivery preparing without a courier still waits for one
+    expect(
+      res.body.items.find((o: { id: string }) => o.id === 'cooking').attention,
+    ).toEqual(['no_courier']);
+  });
+
+  it('iiko connected: the queue is on, an order that reached iiko is led by it, couriers in iiko', async () => {
+    integration = { status: 'active', courier_mode: 'iiko' };
+    rows = [
+      row({ id: 'sent', pos_order: { state: 'sent' } }),
+      row({ id: 'stuck', number: 1002, pos_order: { state: 'failed' } }),
+      row({ id: 'manual', number: 1003, pos_order: { state: 'manual' } }),
+    ];
+    const res = await get().expect(200);
+    expect(res.body.trackPreparation).toBe(true);
+    const item = (id: string) =>
+      res.body.items.find((o: { id: string }) => o.id === id);
+    expect([
+      item('sent').posControlled,
+      item('stuck').posControlled,
+      item('manual').posControlled,
+    ]).toEqual([true, false, false]);
+    expect(item('sent').courierMode).toBe('pos');
+    expect(item('stuck').attention).toEqual(['pos_needs_action']);
   });
 
   it('a branch of this venue narrows the board', async () => {

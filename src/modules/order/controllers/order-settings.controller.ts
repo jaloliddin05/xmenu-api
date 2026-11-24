@@ -62,6 +62,7 @@ export class OrderSettingsController {
       pickup_reminder_minutes: dto.pickupReminderMinutes,
       on_the_way_alert_minutes: dto.onTheWayAlertMinutes,
       door_wait_minutes: dto.doorWaitMinutes,
+      track_preparation: dto.trackPreparation,
       // undefined: unchanged; null: no rate
       ...(dto.courierPay !== undefined && {
         courier_pay_per_delivery: dto.courierPay?.perDelivery ?? null,

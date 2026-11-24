@@ -146,6 +146,11 @@ export class OrderViewDto {
       'handed_to_external: the name of the external delivery service',
   })
   externalService: string | null;
+  @ApiProperty({
+    description:
+      'The timeline shows the "preparing" step: always for pickup; for delivery when the venue tracks its kitchen (or the order is preparing)',
+  })
+  trackPreparation: boolean;
 }
 
 class OrderExternalDto {

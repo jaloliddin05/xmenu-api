@@ -139,6 +139,13 @@ export class UpdateOrderSettingsDto {
   @Max(60)
   readonly doorWaitMinutes?: number;
   @ApiPropertyOptional({
+    description:
+      'Kitchen queue: deliveries pass "preparing" (accepted → preparing → ready). Counted as true while iiko is connected',
+  })
+  @IsOptional()
+  @IsBoolean()
+  readonly trackPreparation?: boolean;
+  @ApiPropertyOptional({
     type: PayRateDto,
     nullable: true,
     description:
@@ -163,6 +170,11 @@ export class OrderSettingsViewDto {
   @ApiProperty() readonly pickupReminderMinutes: number;
   @ApiProperty() readonly onTheWayAlertMinutes: number;
   @ApiProperty() readonly doorWaitMinutes: number;
+  @ApiProperty({
+    description:
+      'As saved; the order board answers the effective value (true while iiko is connected)',
+  })
+  readonly trackPreparation: boolean;
   @ApiProperty({ type: PayRateDto, nullable: true })
   readonly courierPay: PayRateDto | null;
 }

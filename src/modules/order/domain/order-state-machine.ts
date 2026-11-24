@@ -9,13 +9,15 @@
  * Pickup:   accepted ▶ preparing ▶ ready ▶ completed (all by the restaurant)
  *
  * Delivery (docs/DELIVERY.md, "Статусы заказа"; the courier is assigned on "accepted", not a status):
+ *   accepted ─operator─▶ preparing ─operator─▶ ready, only with the venue's kitchen queue (trackPreparation,
+ *     order/domain/kitchen.ts; the mode rules for the operator live there), otherwise
  *   accepted ─operator─▶ ready ─courier "picked up"─▶ on_the_way ─courier "delivered"─▶ completed
  *   on_the_way ─courier "cannot deliver"─▶ ready (no courier)
  *   on_the_way | problem_at_door ─system (the courier was disabled)─▶ ready (no courier)
  *   on_the_way ─courier "no answer" / "refused"─▶ problem_at_door
  *   problem_at_door ─courier "delivered" (no answer only)─▶ completed
  *   problem_at_door ─operator─▶ returned_to_restaurant | cancelled
- *   accepted | ready ─operator─▶ handed_to_external (closed at once)
+ *   accepted | preparing | ready ─operator─▶ handed_to_external (closed at once)
  *
  * POS (iiko, docs/IIKO.md "Путь заказа и статусы"): actor `pos` moves an order sent to iiko forward along
  * the same path (cooked → ready; with iiko couriers on the way and delivered; closed → completed) and
@@ -75,7 +77,8 @@ const RULES: Record<OrderStatusName, Rule[]> = {
     },
   ],
   accepted: [
-    { to: 'preparing', actors: ['restaurant', 'pos'], only: 'pickup' },
+    // Delivery only with the kitchen queue: kitchenCheck (order/domain/kitchen.ts)
+    { to: 'preparing', actors: ['restaurant', 'pos'] },
     { to: 'ready', actors: ['restaurant', 'pos'], only: 'delivery' },
     { to: 'handed_to_external', actors: ['restaurant'], only: 'delivery' },
     // 'payment' — provayder (Payme) to'lovni o'zi qaytarganda
@@ -83,8 +86,9 @@ const RULES: Record<OrderStatusName, Rule[]> = {
     { to: 'cancelled', actors: ['restaurant', 'payment', 'pos'] },
   ],
   preparing: [
-    { to: 'ready', actors: ['restaurant', 'pos'], only: 'pickup' },
-    { to: 'cancelled', actors: ['restaurant', 'pos'], only: 'pickup' },
+    { to: 'ready', actors: ['restaurant', 'pos'] },
+    { to: 'handed_to_external', actors: ['restaurant'], only: 'delivery' },
+    { to: 'cancelled', actors: ['restaurant', 'pos'] },
   ],
   ready: [
     { to: 'completed', actors: ['restaurant', 'pos'], only: 'pickup' },
@@ -174,6 +178,7 @@ export const ACTIVE_STATUSES: readonly OrderStatusName[] = [
 /** Delivery statuses in which an order holds its courier (not finished yet). */
 export const COURIER_HELD_STATUSES: readonly OrderStatusName[] = [
   'accepted',
+  'preparing',
   'ready',
   'on_the_way',
   'problem_at_door',
@@ -187,19 +192,22 @@ export const COURIER_LOCKED_STATUSES: readonly OrderStatusName[] = [
 
 /**
  * The next step the restaurant takes itself ("advance"). Delivery stops at "ready": from there the courier
- * moves the order (picked up, delivered).
+ * moves the order (picked up, delivered). A delivery passes "preparing" only with the venue's kitchen queue.
  */
 export function nextRestaurantStatus(
   from: OrderStatusName,
   fulfillment: FulfillmentName,
+  trackPreparation = false,
 ): OrderStatusName | null {
   switch (from) {
     case 'pending_acceptance':
       return 'accepted';
     case 'accepted':
-      return fulfillment === 'delivery' ? 'ready' : 'preparing';
+      return fulfillment === 'delivery' && !trackPreparation
+        ? 'ready'
+        : 'preparing';
     case 'preparing':
-      return fulfillment === 'pickup' ? 'ready' : null;
+      return 'ready';
     case 'ready':
       return fulfillment === 'pickup' ? 'completed' : null;
     default:

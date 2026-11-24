@@ -622,6 +622,12 @@ export const ERROR_CODES = spec({
     message: 'Couriers of this venue are managed in the POS',
     when: 'Курьерская функция Xmenu (курьеры, смены, назначение, внешняя служба, отчёт по курьерам) у заведения в режиме «курьеры iiko»',
   },
+  pos_status_managed: {
+    status: 409,
+    message: 'The status of this order is managed by the POS',
+    when: 'Оператор отмечает шаг кухни («Готовится», «Готов») у заказа, переданного в iiko, без `override: true`; `details.status`',
+    details: ['status'],
+  },
   pos_menu_locked: {
     status: 409,
     message: 'The menu comes from the POS',

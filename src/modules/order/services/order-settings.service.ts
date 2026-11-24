@@ -27,6 +27,8 @@ export interface OrderSettings {
   onTheWayAlertMinutes: number;
   /** Wait at the door after "no answer", then the operator decides */
   doorWaitMinutes: number;
+  /** Deliveries pass "preparing" (the venue's kitchen queue); the setting as saved, see order/domain/kitchen.ts */
+  trackPreparation: boolean;
   /** The venue's courier pay rate; null: no pay is accrued (unless a courier has an own rate) */
   courierPay: PayRate | null;
 }
@@ -71,6 +73,7 @@ export class OrderSettingsService {
       pickupReminderMinutes: row.pickup_reminder_minutes,
       onTheWayAlertMinutes: row.on_the_way_alert_minutes,
       doorWaitMinutes: row.door_wait_minutes,
+      trackPreparation: row.track_preparation,
       courierPay: payRateOf({
         perDelivery: row.courier_pay_per_delivery,
         includedKm: row.courier_pay_included_km,

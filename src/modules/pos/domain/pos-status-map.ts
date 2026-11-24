@@ -18,9 +18,12 @@ const POS_RANK: Record<PosDeliveryStatus, number> = {
   Cancelled: 8,
 };
 
-/** The path an order of each kind takes after "accepted" (order-state-machine.ts). */
+/**
+ * The path an order of each kind takes after "accepted" (order-state-machine.ts). A delivery of a venue with iiko
+ * passes "preparing": iiko connected turns the kitchen queue on (order/domain/kitchen.ts).
+ */
 const PATH: Record<'delivery' | 'pickup', OrderStatusName[]> = {
-  delivery: ['accepted', 'ready', 'on_the_way', 'completed'],
+  delivery: ['accepted', 'preparing', 'ready', 'on_the_way', 'completed'],
   pickup: ['accepted', 'preparing', 'ready', 'completed'],
 };
 
@@ -82,6 +85,9 @@ export function decidePosStatus(input: PosStatusInput): PosStatusDecision {
   switch (status) {
     case 'Unconfirmed':
       return none({ confirm: true });
+    case 'CookingStarted':
+      target = 'preparing';
+      break;
     case 'CookingCompleted':
       target = 'ready';
       break;
@@ -98,7 +104,7 @@ export function decidePosStatus(input: PosStatusInput): PosStatusDecision {
         target = 'completed';
       break;
     default:
-      // WaitCooking, ReadyForCooking, CookingStarted, Waiting: journal only
+      // WaitCooking, ReadyForCooking, Waiting: journal only
       break;
   }
   if (!target) return none();

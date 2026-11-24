@@ -134,6 +134,51 @@ describe('restaurant keyboard', () => {
       buildRestaurantKeyboard(order({ status: 'awaiting_payment' })),
     ).toBeNull();
   });
+
+  it('the kitchen queue: a delivery gets "started cooking", then "ready"; the button carries its status', () => {
+    const queue = { trackPreparation: true, posControlled: false };
+    const accepted = buildRestaurantKeyboard(
+      order({ status: 'accepted', fulfillment: 'delivery' }),
+      queue,
+    )!.inline_keyboard[0][0];
+    expect(accepted.text).toContain('Начали готовить');
+    expect(accepted.callback_data.startsWith('o:n:accepted:')).toBe(true);
+    const preparing = buildRestaurantKeyboard(
+      order({ status: 'preparing', fulfillment: 'delivery' }),
+      queue,
+    )!.inline_keyboard[0][0];
+    expect(preparing.text).toContain('Готов');
+    expect(preparing.callback_data.startsWith('o:n:preparing:')).toBe(true);
+    // Turned off while the order was cooking: it still gets "ready"
+    expect(
+      buildRestaurantKeyboard(
+        order({ status: 'preparing', fulfillment: 'delivery' }),
+      )!.inline_keyboard[0][0].callback_data.startsWith('o:n:preparing:'),
+    ).toBe(true);
+  });
+
+  it('an order iiko leads has no kitchen button; accept, reject and "handed over" stay', () => {
+    const iiko = { trackPreparation: true, posControlled: true };
+    for (const [status, fulfillment] of [
+      ['accepted', 'delivery'],
+      ['preparing', 'delivery'],
+      ['accepted', 'pickup'],
+      ['preparing', 'pickup'],
+    ] as const)
+      expect(
+        buildRestaurantKeyboard(order({ status, fulfillment }), iiko),
+      ).toBeNull();
+    expect(
+      buildRestaurantKeyboard(order({ status: 'pending_acceptance' }), iiko)!
+        .inline_keyboard[0],
+    ).toHaveLength(2);
+    expect(
+      buildRestaurantKeyboard(
+        order({ status: 'ready', fulfillment: 'pickup' }),
+        iiko,
+      ),
+    ).not.toBeNull();
+  });
 });
 
 describe('customer message languages', () => {
@@ -208,6 +253,13 @@ describe('customer message for delivery steps', () => {
   it('ready: "waiting for the courier" once, not again after "cannot deliver"', () => {
     expect(buildCustomerText(delivery('ready'), 'accepted')).toBe(
       '📦 Заказ №1042 готов и ждёт курьера',
+    );
+    // With the kitchen queue the order comes from "preparing"
+    expect(buildCustomerText(delivery('ready'), 'preparing')).toBe(
+      '📦 Заказ №1042 готов и ждёт курьера',
+    );
+    expect(buildCustomerText(delivery('preparing'), 'accepted')).toBe(
+      '👨‍🍳 Заказ №1042 готовится',
     );
     expect(buildCustomerText(delivery('ready'), 'on_the_way')).toBeNull();
     expect(

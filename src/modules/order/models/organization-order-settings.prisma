@@ -29,6 +29,9 @@ model organization_order_settings {
   pickup_reminder_minutes    Int
   on_the_way_alert_minutes   Int
   door_wait_minutes          Int
+  // Kitchen queue: deliveries pass "preparing" (accepted -> preparing -> ready); counted as true while iiko is
+  // connected (order/domain/kitchen.ts). Pickup always has the step
+  track_preparation          Boolean @default(false)
   // Courier pay per delivery plus per started kilometre (straight line) over the included distance.
   // All three null: no pay is accrued. A courier may have an own rate (courier.pay_*).
   courier_pay_per_delivery   Int?

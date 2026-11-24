@@ -33,6 +33,9 @@ function setup() {
     },
   ];
   const prisma = {
+    // Buttons of the card: no kitchen queue, no iiko
+    organization_order_settings: { findUnique: jest.fn(async () => null) },
+    pos_integration: { findUnique: jest.fn(async () => null) },
     branch: {
       updateMany: jest.fn(async ({ where, data }: any) => {
         const hit = branches.filter(

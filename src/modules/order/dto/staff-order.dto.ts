@@ -1,5 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsIn,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from 'class-validator';
 import { ORDER_STATUSES } from '../domain/order-state-machine';
 
 /**
@@ -15,6 +21,17 @@ export class ExpectedStatusDto {
   @IsOptional()
   @IsIn(ORDER_STATUSES)
   readonly expectedStatus?: (typeof ORDER_STATUSES)[number];
+}
+
+/** A kitchen step ("advance", a status): with iiko leading the order only with override (docs/IIKO.md). */
+export class KitchenStepDto extends ExpectedStatusDto {
+  @ApiPropertyOptional({
+    description:
+      'Mark a kitchen step (preparing, ready) of an order iiko leads anyway; without it 409 pos_status_managed. Written to the history',
+  })
+  @IsOptional()
+  @IsBoolean()
+  readonly override?: boolean;
 }
 
 export class RejectOrderDto extends ExpectedStatusDto {
@@ -39,7 +56,7 @@ const STAFF_SETTABLE = [
   'returned_to_restaurant',
 ] as const;
 
-export class SetOrderStatusDto extends ExpectedStatusDto {
+export class SetOrderStatusDto extends KitchenStepDto {
   @ApiProperty({ enum: STAFF_SETTABLE })
   @IsIn(STAFF_SETTABLE)
   readonly status: (typeof STAFF_SETTABLE)[number];

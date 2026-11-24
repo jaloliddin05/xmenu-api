@@ -20,6 +20,8 @@ export interface OrderViewOptions {
   /** Faqat awaiting_payment holatida beriladi (to'lov havolasi) */
   paymentUrl?: string | null;
   failReason?: 'declined' | 'expired' | 'cancelled' | null;
+  /** The venue's kitchen queue in effect (order/domain/kitchen.ts): a delivery shows "preparing" */
+  trackPreparation?: boolean;
 }
 
 /**
@@ -94,6 +96,12 @@ export function toOrderView(
           ? { name: order.pos_order.courier_name }
           : null
       : null,
+    // The timeline shows "preparing": always for pickup; for delivery with the kitchen queue (or when the order is
+    // in it already, though the venue turned the queue off meanwhile)
+    trackPreparation:
+      order.fulfillment !== 'delivery' ||
+      order.status === 'preparing' ||
+      opts.trackPreparation === true,
     // At the door: no_answer is shown to the guest ("the courier cannot reach you"); refused goes to the operator
     doorProblem: order.door_problem,
     // "Handed to the delivery service <name>" (the cost is for the staff only)

@@ -25,6 +25,7 @@ import { ORDER_STATUSES, OrderStatusName } from '../domain/order-state-machine';
 import { POS_ORDER_STATES } from '../services/order-view';
 import {
   ExpectedStatusDto,
+  KitchenStepDto,
   RejectOrderDto,
   SetOrderStatusDto,
 } from '../dto/staff-order.dto';
@@ -176,7 +177,7 @@ export class StaffOrderController {
   advance(
     @Req() req: StaffRequest,
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: ExpectedStatusDto,
+    @Body() dto: KitchenStepDto,
   ) {
     return this.staff.act(
       requireStaffOrganizationId(req),
@@ -184,6 +185,7 @@ export class StaffOrderController {
       { type: 'next' },
       req.user.id,
       dto.expectedStatus,
+      dto.override,
     );
   }
 
@@ -206,6 +208,7 @@ export class StaffOrderController {
       { type: 'set', status: dto.status },
       req.user.id,
       dto.expectedStatus,
+      dto.override,
     );
   }
 }

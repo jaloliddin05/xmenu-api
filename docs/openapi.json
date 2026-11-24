@@ -4954,7 +4954,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ExpectedStatusDto"
+                "$ref": "#/components/schemas/KitchenStepDto"
               }
             }
           }
@@ -8602,6 +8602,7 @@
           "pos_courier_mode_locked",
           "pos_order_state_conflict",
           "pos_couriers_managed",
+          "pos_status_managed",
           "pos_menu_locked",
           "pos_busy"
         ],
@@ -12517,6 +12518,10 @@
             "nullable": true,
             "description": "handed_to_external: the name of the external delivery service"
           },
+          "trackPreparation": {
+            "type": "boolean",
+            "description": "The timeline shows the \"preparing\" step: always for pickup; for delivery when the venue tracks its kitchen (or the order is preparing)"
+          },
           "customer": {
             "$ref": "#/components/schemas/OrderCustomerDto"
           },
@@ -12608,6 +12613,7 @@
           "courier",
           "doorProblem",
           "externalService",
+          "trackPreparation",
           "customer",
           "courierAssignedAt",
           "doorProblemReason",
@@ -12913,6 +12919,10 @@
             "type": "string",
             "nullable": true,
             "description": "handed_to_external: the name of the external delivery service"
+          },
+          "trackPreparation": {
+            "type": "boolean",
+            "description": "The timeline shows the \"preparing\" step: always for pickup; for delivery when the venue tracks its kitchen (or the order is preparing)"
           }
         },
         "required": [
@@ -12940,7 +12950,8 @@
           "cancelReason",
           "courier",
           "doorProblem",
-          "externalService"
+          "externalService",
+          "trackPreparation"
         ]
       },
       "OrderRemindersDto": {
@@ -13140,6 +13151,24 @@
               }
             ]
           },
+          "posControlled": {
+            "type": "boolean",
+            "description": "iiko leads the kitchen steps (the order reached iiko, the integration is connected): marking them needs override: true"
+          },
+          "courierMode": {
+            "type": "string",
+            "enum": [
+              "xmenu",
+              "pos"
+            ],
+            "description": "pos: couriers of the venue work in iiko (assigning is refused)"
+          },
+          "queuePosition": {
+            "type": "number",
+            "nullable": true,
+            "example": 2,
+            "description": "accepted only, with the kitchen queue on: place in the queue by acceptance time (1 = first); otherwise null"
+          },
           "attention": {
             "type": "array",
             "description": "What needs the operator (docs/API.md, \"Доска заказов\"); courier codes only for deliveries with Xmenu couriers",
@@ -13177,6 +13206,9 @@
           "paymentMethod",
           "cashChangeFrom",
           "courier",
+          "posControlled",
+          "courierMode",
+          "queuePosition",
           "attention",
           "version"
         ]
@@ -13261,6 +13293,10 @@
             "format": "date-time",
             "description": "Count the timers from this, not from the device clock"
           },
+          "trackPreparation": {
+            "type": "boolean",
+            "description": "Kitchen queue in effect (the venue setting, or iiko connected): deliveries pass preparing"
+          },
           "items": {
             "type": "array",
             "items": {
@@ -13281,6 +13317,7 @@
         },
         "required": [
           "serverTime",
+          "trackPreparation",
           "items",
           "thresholds",
           "today",
@@ -13337,6 +13374,33 @@
           }
         }
       },
+      "KitchenStepDto": {
+        "type": "object",
+        "properties": {
+          "expectedStatus": {
+            "type": "string",
+            "enum": [
+              "awaiting_payment",
+              "payment_failed",
+              "pending_acceptance",
+              "accepted",
+              "preparing",
+              "on_the_way",
+              "ready",
+              "problem_at_door",
+              "completed",
+              "cancelled",
+              "returned_to_restaurant",
+              "handed_to_external"
+            ],
+            "description": "The status the operator acted on; another current status → 409 order_status_conflict"
+          },
+          "override": {
+            "type": "boolean",
+            "description": "Mark a kitchen step (preparing, ready) of an order iiko leads anyway; without it 409 pos_status_managed. Written to the history"
+          }
+        }
+      },
       "SetOrderStatusDto": {
         "type": "object",
         "properties": {
@@ -13357,6 +13421,10 @@
               "handed_to_external"
             ],
             "description": "The status the operator acted on; another current status → 409 order_status_conflict"
+          },
+          "override": {
+            "type": "boolean",
+            "description": "Mark a kitchen step (preparing, ready) of an order iiko leads anyway; without it 409 pos_status_managed. Written to the history"
           },
           "status": {
             "type": "string",
@@ -13438,6 +13506,10 @@
           "doorWaitMinutes": {
             "type": "number"
           },
+          "trackPreparation": {
+            "type": "boolean",
+            "description": "As saved; the order board answers the effective value (true while iiko is connected)"
+          },
           "courierPay": {
             "nullable": true,
             "type": "object",
@@ -13459,6 +13531,7 @@
           "pickupReminderMinutes",
           "onTheWayAlertMinutes",
           "doorWaitMinutes",
+          "trackPreparation",
           "courierPay"
         ]
       },
@@ -13516,6 +13589,10 @@
           "doorWaitMinutes": {
             "type": "number",
             "description": "Wait at the door after \"no answer\", then the operator decides (minutes), 1..60"
+          },
+          "trackPreparation": {
+            "type": "boolean",
+            "description": "Kitchen queue: deliveries pass \"preparing\" (accepted → preparing → ready). Counted as true while iiko is connected"
           },
           "courierPay": {
             "nullable": true,

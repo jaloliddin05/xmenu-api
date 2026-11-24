@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import type { OrderStatus } from '@prisma/client';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
 import { TelegramApiService } from '../services/telegram-api.service';
 import type { DeliveryTimerKind } from '../domain/delivery-timers';
@@ -14,6 +15,7 @@ import {
 } from './order-messages';
 import type { OrderWithItems } from '../services/order-view';
 import { FINAL_STATUSES } from '../domain/order-state-machine';
+import { isPosControlled, kitchenModeOf } from '../domain/kitchen';
 
 const include = {
   items: { include: { options: true } },
@@ -26,6 +28,7 @@ const include = {
       phone: true,
     },
   },
+  pos_order: { select: { state: true } },
 } as const;
 
 /** A reply to the order card that still goes out when the card is gone (the chat moved to a supergroup). */
@@ -51,6 +54,37 @@ export class RestaurantNotifierService {
     private readonly telegram: TelegramApiService,
   ) {}
 
+  /**
+   * Buttons of the order card: the kitchen step follows the venue's kitchen queue, and an order iiko leads has no
+   * kitchen button (order/domain/kitchen.ts).
+   */
+  private async keyboard(order: {
+    id: string;
+    status: OrderStatus;
+    fulfillment: 'delivery' | 'pickup';
+    organization_id: string;
+    pos_order: { state: string } | null;
+  }) {
+    const [settings, integration] = await Promise.all([
+      this.prisma.organization_order_settings.findUnique({
+        where: { organization_id: order.organization_id },
+        select: { track_preparation: true },
+      }),
+      this.prisma.pos_integration.findUnique({
+        where: { organization_id: order.organization_id },
+        select: { status: true, courier_mode: true },
+      }),
+    ]);
+    const mode = kitchenModeOf(
+      settings?.track_preparation ?? false,
+      integration,
+    );
+    return buildRestaurantKeyboard(order, {
+      trackPreparation: mode.trackPreparation,
+      posControlled: isPosControlled(mode.posLive, order.pos_order?.state),
+    });
+  }
+
   private load(orderId: string) {
     return this.prisma.customer_order.findUnique({
       where: { id: orderId },
@@ -74,7 +108,7 @@ export class RestaurantNotifierService {
       chatId,
       buildRestaurantText(order as OrderWithItems),
       {
-        reply_markup: buildRestaurantKeyboard(order),
+        reply_markup: await this.keyboard(order),
       },
     );
     if (!sent) return false;
@@ -97,7 +131,7 @@ export class RestaurantNotifierService {
       order.tg_chat_id,
       order.tg_message_id,
       buildRestaurantText(order as OrderWithItems),
-      buildRestaurantKeyboard(order),
+      await this.keyboard(order),
     );
     // The chat became a supergroup: migrateChat posts the cards of unfinished orders there afresh
     if (outcome.migrateToChatId)
@@ -136,7 +170,7 @@ export class RestaurantNotifierService {
       const sent = await this.telegram.sendMessage(
         newChatId,
         buildRestaurantText(order as OrderWithItems),
-        { reply_markup: buildRestaurantKeyboard(order) },
+        { reply_markup: await this.keyboard(order) },
       );
       if (!sent) continue;
       await this.prisma.customer_order.update({

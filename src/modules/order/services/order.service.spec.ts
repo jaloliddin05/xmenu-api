@@ -42,6 +42,8 @@ describe('OrderService.create: ordering channel and publication', () => {
     organization: { findUnique: jest.fn(async () => org) },
     order_status_event: { findFirst: jest.fn() },
     product: { findMany: findProducts },
+    // The guest's view asks whether the venue tracks its kitchen: no iiko here
+    pos_integration: { findUnique: jest.fn(async () => null) },
   };
   const service = new OrderService(
     prisma as any,

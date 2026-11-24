@@ -6,6 +6,7 @@ import {
   attention,
   byStatusSince,
   itemsSummary,
+  queuePositions,
   shortAddress,
   statusEntry,
   tashkentDayStart,
@@ -14,6 +15,7 @@ import {
 import { LIVE_STATUSES, OrderStatusName } from '../domain/order-state-machine';
 import { OrderSettingsService } from './order-settings.service';
 import { posReminders } from './pos-reminders';
+import { isPosControlled, loadKitchenMode } from '../domain/kitchen';
 
 /**
  * GET /order/board (docs/API.md, "Доска заказов"): every live order of the venue (or one branch) without
@@ -42,10 +44,11 @@ export class OrderBoardService {
     };
     const dayStart = tashkentDayStart(now);
 
-    const [settings, pos, rows, placedToday, completedToday] =
+    const [settings, pos, kitchen, rows, placedToday, completedToday] =
       await Promise.all([
         this.settings.get(organizationId),
         posReminders(this.prisma, organizationId),
+        loadKitchenMode(this.prisma, this.settings, organizationId),
         this.prisma.customer_order.findMany({
           where: { ...scope, status: { in: [...LIVE_STATUSES] } },
           select: {
@@ -61,6 +64,7 @@ export class OrderBoardService {
             payment_method: true,
             cash_change_from: true,
             courier_id: true,
+            accepted_at: true,
             ready_at: true,
             picked_up_at: true,
             courier: { select: { id: true, name: true } },
@@ -94,6 +98,17 @@ export class OrderBoardService {
       ...pos,
     };
 
+    const queue = kitchen.trackPreparation
+      ? queuePositions(
+          rows
+            .filter((o) => o.status === 'accepted')
+            .map((o) => ({
+              id: o.id,
+              acceptedAt: o.accepted_at ?? o.created_at,
+            })),
+        )
+      : new Map<string, number>();
+
     const items = rows
       .map((o) => {
         const status = o.status as OrderStatusName;
@@ -119,6 +134,12 @@ export class OrderBoardService {
           paymentMethod: o.payment_method,
           cashChangeFrom: o.cash_change_from,
           courier: o.courier,
+          // iiko leads its kitchen steps: the board offers them only as a manual mark (override)
+          posControlled: isPosControlled(kitchen.posLive, o.pos_order?.state),
+          courierMode: kitchen.posCouriers
+            ? ('pos' as const)
+            : ('xmenu' as const),
+          queuePosition: queue.get(o.id) ?? null,
           attention: attention(
             {
               status,
@@ -141,6 +162,8 @@ export class OrderBoardService {
     const completedCount = completedToday._count._all;
     return {
       serverTime: now.toISOString(),
+      // Effective: the venue's setting or iiko connected; deliveries then pass "preparing"
+      trackPreparation: kitchen.trackPreparation,
       items,
       thresholds,
       today: {

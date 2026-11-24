@@ -9,6 +9,7 @@ import {
 import {
   InvalidTransitionError,
   OrderNotFoundError,
+  PosControlledError,
   OrderTransitionService,
 } from './order-transition.service';
 import { OrderWithItems, toOrderView, toPosView } from './order-view';
@@ -19,6 +20,7 @@ import {
 } from '../domain/delivery-timers';
 import { AppException } from 'src/infra/errors/app-exception';
 import { posReminders } from './pos-reminders';
+import { loadKitchenMode } from '../domain/kitchen';
 
 const INCLUDE = {
   items: { include: { options: true } },
@@ -200,7 +202,9 @@ export class OrderStaffService {
           ? {
               fulfillment: 'delivery' as const,
               courier_id: null,
-              status: { in: ['accepted', 'ready'] as OrderStatusName[] },
+              status: {
+                in: ['accepted', 'preparing', 'ready'] as OrderStatusName[],
+              },
             }
           : {}),
         ...(q.posStates?.length
@@ -258,6 +262,7 @@ export class OrderStaffService {
     action: RestaurantAction,
     actorId: string,
     expectedStatus?: OrderStatusName,
+    override = false,
   ) {
     const result = await this.perform(
       organizationId,
@@ -265,7 +270,14 @@ export class OrderStaffService {
       action,
       actorId,
       expectedStatus,
+      override,
     );
+    // iiko leads the order's kitchen steps: the operator confirms a manual mark (override)
+    if (!result.changed && result.posControlled) {
+      throw new AppException('pos_status_managed', {
+        details: { status: result.status },
+      });
+    }
     if (!result.changed && result.conflict) {
       throw new AppException('order_status_conflict', {
         details: { status: result.status },
@@ -278,7 +290,8 @@ export class OrderStaffService {
    * Telegram tugmasi uchun: takror bosish xato emas (changed=false). `organizationId`
    * berilsa buyurtma o'sha tenantga tegishli bo'lishi shart. `expectedStatus` (the status a Telegram button
    * was drawn for): the target is counted from it and the order moves only while it is still in it, so a
-   * repeated delivery or a second press of "next" never takes one more step.
+   * repeated delivery or a second press of "next" never takes one more step. "next" follows the venue's kitchen
+   * queue (order/domain/kitchen.ts); override marks a kitchen step of an order iiko leads.
    */
   async perform(
     organizationId: string | null,
@@ -286,13 +299,14 @@ export class OrderStaffService {
     action: RestaurantAction,
     actorId: string,
     expectedStatus?: OrderStatusName,
-  ): Promise<ActionResult & { conflict: boolean }> {
+    override = false,
+  ): Promise<ActionResult & { conflict: boolean; posControlled?: boolean }> {
     const order = await this.prisma.customer_order.findFirst({
       where: {
         id,
         ...(organizationId ? { organization_id: organizationId } : {}),
       },
-      select: { status: true, fulfillment: true },
+      select: { status: true, fulfillment: true, organization_id: true },
     });
     if (!order)
       throw new AppException('not_found', { message: 'Order not found' });
@@ -301,7 +315,17 @@ export class OrderStaffService {
     if (expectedStatus && current !== expectedStatus)
       return { changed: false, status: current, conflict: true };
     const from = expectedStatus ?? current;
-    const to = this.target(action, from, order.fulfillment);
+    const trackPreparation =
+      action.type === 'next'
+        ? (
+            await loadKitchenMode(
+              this.prisma,
+              this.settings,
+              order.organization_id,
+            )
+          ).trackPreparation
+        : false;
+    const to = this.target(action, from, order.fulfillment, trackPreparation);
     if (!to) return { changed: false, status: from, conflict: true };
 
     const input = {
@@ -311,6 +335,7 @@ export class OrderStaffService {
       expectedFrom: expectedStatus,
       reason:
         action.type === 'reject' ? (action.reason ?? 'declined') : undefined,
+      override,
     };
     try {
       // A pickup marked ready straight from accepted passes preparing in the same transaction
@@ -329,6 +354,13 @@ export class OrderStaffService {
     } catch (e) {
       if (e instanceof OrderNotFoundError)
         throw new AppException('not_found', { message: 'Order not found' });
+      if (e instanceof PosControlledError)
+        return {
+          changed: false,
+          status: e.from,
+          conflict: true,
+          posControlled: true,
+        };
       if (e instanceof InvalidTransitionError) {
         // Allaqachon shu holatda — takror bosish; boshqa holatda — haqiqiy konflikt. With an expected status
         // the caller saw a state that is gone: a conflict even when someone else did the same thing.
@@ -346,6 +378,7 @@ export class OrderStaffService {
     action: RestaurantAction,
     from: OrderStatusName,
     fulfillment: string,
+    trackPreparation: boolean,
   ): OrderStatusName | null {
     switch (action.type) {
       case 'accept':
@@ -355,7 +388,11 @@ export class OrderStaffService {
       case 'set':
         return action.status;
       case 'next':
-        return nextRestaurantStatus(from, fulfillment as 'delivery' | 'pickup');
+        return nextRestaurantStatus(
+          from,
+          fulfillment as 'delivery' | 'pickup',
+          trackPreparation,
+        );
     }
   }
 }

@@ -8,7 +8,7 @@ import type { OrderStatusName } from './order-state-machine';
 
 /** Why an order on the board needs the operator (several may hold at once). */
 export const ATTENTION_CODES = [
-  /** A delivery accepted or ready, nobody assigned */
+  /** A delivery accepted, preparing or ready, nobody assigned */
   'no_courier',
   /** Ready with a courier, "picked up" not pressed for pickupReminderMinutes */
   'not_picked_up',
@@ -149,6 +149,7 @@ export function attention(
       }
       break;
     case 'accepted':
+    case 'preparing':
       if (!order.courier_id) out.push('no_courier');
       break;
   }
@@ -164,4 +165,19 @@ export const byStatusSince = (
 /** Start of the current calendar day in Tashkent. */
 export function tashkentDayStart(now: Date): Date {
   return new Date(`${tashkentDay(now.getTime())}T00:00:00+05:00`);
+}
+
+/**
+ * Place of each accepted order in the kitchen queue (1 = accepted first), with the venue's kitchen queue on. The
+ * acceptance time decides; the id settles a tie.
+ */
+export function queuePositions(
+  accepted: readonly { id: string; acceptedAt: Date }[],
+): Map<string, number> {
+  const sorted = [...accepted].sort(
+    (a, b) =>
+      a.acceptedAt.getTime() - b.acceptedAt.getTime() ||
+      a.id.localeCompare(b.id),
+  );
+  return new Map(sorted.map((o, i) => [o.id, i + 1]));
 }

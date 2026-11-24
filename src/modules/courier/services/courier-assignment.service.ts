@@ -15,7 +15,11 @@ import {
 } from 'src/modules/order/services/order-transition.service';
 
 /** Statuses in which the operator may assign, reassign or take off the courier (before "picked up"). */
-const ASSIGNABLE: readonly OrderStatusName[] = ['accepted', 'ready'];
+const ASSIGNABLE: readonly OrderStatusName[] = [
+  'accepted',
+  'preparing',
+  'ready',
+];
 
 class Conflict extends Error {}
 

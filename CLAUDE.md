@@ -209,7 +209,8 @@ test, `npm run openapi` + `git diff --exit-code docs/`, `format:check`, `lint` �
 Оплату подтверждает только вебхук провайдера. Эскалация: 45 с повтор в Telegram, 120 с SMS, 300 с авто-отмена и
 возврат. Робозвонка в цепочке нет: задачи `esc-call`, оставшиеся в Redis, молча пропускаются. Click возвращает автоматически,
 Payme вручную через ops-чат.
-- Автомат различает тип заказа (`only` в правилах `order-state-machine.ts`): у доставки нет `preparing`, «В пути» и
+- Автомат различает тип заказа (`only` в правилах `order-state-machine.ts`): у доставки `preparing` только при очереди
+  кухни (`kitchenCheck`, ниже), «В пути» и
   «Доставлен» ставит исполнитель `courier` (`transitionInTx` проверяет, что это назначенный заказу курьер,
   `CourierNotAssignedError`) или `pos` (статусы iiko, раздел «Интеграция с кассой»). Тест сверяет весь список переходов со схемой `../docs/DELIVERY.md`.
 - Действия без смены статуса (назначение, снятие курьера) пишутся в журнал `recordInTx` (`from = to`, `note`).
@@ -225,6 +226,11 @@ Payme вручную через ops-чат.
   проигравший гонку получают `409 order_status_conflict`; без поля повтор отвечает 200. Самовывоз `ready` из `accepted`
   проходит `preparing` в одной транзакции (`OrderTransitionService.transitionChain`, эффекты шагов склеивает
   `mergeStepEffects`).
+- Очередь кухни и iiko (`order/domain/kitchen.ts`): настройка `trackPreparation` (при подключённом iiko считается
+  `true`) пускает доставку через `preparing`; режимные правила оператора (`kitchenCheck`) проверяет `transitionInTx` для
+  `actor = restaurant`, автомат (`RULES`) только разрешает пары. Заказ, переданный в iiko (`pos_order.state = sent`), ведёт
+  касса: шаги кухни оператора без `override` → `409 pos_status_managed`, с `override` журнал `pos_override` и строка в
+  ops-чат. Новый шаг кухни: правило в `kitchenCheck`, а не исключения в сервисах.
 - Web push сотрудникам (модуль `push`, `docs/API.md`, «Web push сотрудникам»): эффект `placed` (новый заказ) и
   `staff_push` (проблема у двери; «Не могу доставить» только от курьера) → `StaffPushService.notify` → очередь
   `staff-push` (`BullStaffPushQueue`, библиотека `web-push`). В payload только номер, тип, число позиций, сумма и id
@@ -310,7 +316,8 @@ Payme вручную через ops-чат.
   цены меню) уходит в `deliveries/create`. Адрес не `city`: улица и дом сначала сопоставляются со строкой адреса (`domain/street-match.ts`
   по справочнику `PosStreetsCache`: города и улицы организации в Redis на сутки), иначе `needs_street`. Действия
   оператора `PosOrderController` (`/order/:id/pos/*`, право `orders`).
-- Статусы: чистая таблица `domain/pos-status-map.ts` (только вперёд, противоречие → журнал и тревога),
+- Статусы: чистая таблица `domain/pos-status-map.ts` (только вперёд, противоречие → журнал и тревога; `CookingStarted`
+  → `preparing`, `CookingCompleted` → `ready`, доставка тоже проходит `preparing`),
   `PosOrderStatusService.apply` для вебхука (`DeliveryOrderUpdate/Error` в `PosWebhookService`) и опроса (задание
   `poll` каждые 5 минут, расписание `pos-poll-<id>` ставит и снимает `PosSyncQueue` вместе с импортом меню); последний
   статус iiko меняется условным `updateMany` (одно событие учитывается один раз). Исполнитель `pos` в автомате заказа.
