@@ -232,4 +232,61 @@ describeDb('guest anonymization and retention (PostgreSQL)', () => {
     await prisma.staff_auth_event.deleteMany({ where: { type: marker } });
     await prisma.application.deleteMany({ where: { description: marker } });
   });
+
+  it('retention deletes dead push subscriptions only: 10 failures, or failing 30+ days without a success', async () => {
+    const now = new Date();
+    const day = 24 * 60 * 60 * 1000;
+    const ago = (d: number, extraMs = 0) =>
+      new Date(now.getTime() - d * day - extraMs);
+    const v = await venue();
+    const user = await prisma.user.create({
+      data: {
+        phone: `+99894${String(Date.now()).slice(-7)}`,
+        isActive: true,
+      },
+    });
+    const marker = randomUUID();
+    const make = (
+      name: string,
+      failures: number,
+      lastSuccess: Date | null,
+      created: Date,
+    ) =>
+      prisma.staff_push_subscription.create({
+        data: {
+          user_id: user.id,
+          organization_id: v.orgId,
+          endpoint: `https://fcm.googleapis.com/fcm/send/${marker}-${name}`,
+          p256dh: 'p',
+          auth: 'a',
+          failure_count: failures,
+          last_success_at: lastSuccess,
+          created_at: created,
+        },
+      });
+    await make('f10', 10, ago(1), ago(90));
+    await make('f9', 9, ago(1), ago(90));
+    await make('stale', 1, ago(30, 1), ago(90));
+    await make('edge', 1, ago(30), ago(90));
+    await make('never-old', 2, null, ago(30, 1));
+    await make('never-new', 2, null, ago(29));
+    await make('healthy-old', 0, ago(200), ago(300));
+    await make('healthy-never', 0, null, ago(300));
+
+    const result = await retention.run(now, {});
+
+    expect(result.pushSubscriptions).toBeGreaterThanOrEqual(3);
+    const left = await prisma.staff_push_subscription.findMany({
+      where: { endpoint: { contains: marker } },
+      select: { endpoint: true },
+    });
+    expect(left.map((r) => r.endpoint.split(`${marker}-`)[1]).sort()).toEqual([
+      'edge',
+      'f9',
+      'healthy-never',
+      'healthy-old',
+      'never-new',
+    ]);
+    await prisma.user.delete({ where: { id: user.id } });
+  });
 });

@@ -2474,6 +2474,16 @@
               }
             }
           },
+          "404": {
+            "description": "not_found: a branch in branchIds is not the venue's",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "default": {
             "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
             "content": {
@@ -10606,6 +10616,13 @@
           "userAgent": {
             "type": "string",
             "description": "navigator.userAgent, to tell the devices apart (up to 300 characters are kept)"
+          },
+          "branchIds": {
+            "description": "Branches of the venue whose orders this device gets; empty or absent = all branches. The list replaces the device's previous choice (a repeated POST with the same endpoint without the field resets it to all). A branch of another venue: 404 not_found",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [

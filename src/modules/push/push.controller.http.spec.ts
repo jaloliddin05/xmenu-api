@@ -17,6 +17,11 @@ const KEYS = {
   auth: 'BTBZMqHH6r4Tts7J_aSIgg',
 };
 
+const BRANCH_A = '22222222-2222-4222-8222-222222222222';
+const BRANCH_B = '33333333-3333-4333-8333-333333333333';
+const FOREIGN_BRANCH = '44444444-4444-4444-8444-444444444444';
+const OWN_BRANCHES = [BRANCH_A, BRANCH_B];
+
 type Row = Record<string, any>;
 
 describe('web push routes', () => {
@@ -26,6 +31,13 @@ describe('web push routes', () => {
 
   beforeAll(async () => {
     const prisma = {
+      branch: {
+        count: jest.fn(
+          async ({ where }) =>
+            where.id.in.filter((id: string) => OWN_BRANCHES.includes(id))
+              .length,
+        ),
+      },
       staff_push_subscription: {
         upsert: jest.fn(async ({ where, create, update }) => {
           const found = rows.find((r) => r.endpoint === where.endpoint);
@@ -115,6 +127,74 @@ describe('web push routes', () => {
         failure_count: 0,
       }),
     ]);
+  });
+
+  it('branchIds: the device follows the chosen branches; a repeat replaces the choice, none resets it to all', async () => {
+    await subscribe('operator', {
+      endpoint: ENDPOINT,
+      keys: KEYS,
+      branchIds: [BRANCH_A],
+    }).expect(204);
+    expect(rows[0].branch_ids).toEqual([BRANCH_A]);
+    await subscribe('operator', {
+      endpoint: ENDPOINT,
+      keys: KEYS,
+      branchIds: [BRANCH_A, BRANCH_B],
+    }).expect(204);
+    expect(rows[0].branch_ids).toEqual([BRANCH_A, BRANCH_B]);
+    await subscribe('operator', { endpoint: ENDPOINT, keys: KEYS }).expect(204);
+    expect(rows[0].branch_ids).toEqual([]);
+    await subscribe('operator', {
+      endpoint: ENDPOINT,
+      keys: KEYS,
+      branchIds: [],
+    }).expect(204);
+    expect(rows[0].branch_ids).toEqual([]);
+  });
+
+  it('a branch of another venue: 404 not_found, nothing saved or changed', async () => {
+    const res = await subscribe('operator', {
+      endpoint: ENDPOINT,
+      keys: KEYS,
+      branchIds: [BRANCH_A, FOREIGN_BRANCH],
+    });
+    expect(res.status).toBe(404);
+    expect(res.body.code).toBe('not_found');
+    expect(rows).toEqual([]);
+    await subscribe('operator', {
+      endpoint: ENDPOINT,
+      keys: KEYS,
+      branchIds: [BRANCH_A],
+    }).expect(204);
+    await subscribe('operator', {
+      endpoint: ENDPOINT,
+      keys: KEYS,
+      branchIds: [FOREIGN_BRANCH],
+    }).expect(404);
+    expect(rows[0].branch_ids).toEqual([BRANCH_A]);
+  });
+
+  it('branchIds that are not UUIDs, duplicates in bulk or too many: 400', async () => {
+    const res = await subscribe('operator', {
+      endpoint: ENDPOINT,
+      keys: KEYS,
+      branchIds: ['not-a-uuid'],
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('validation_error');
+    await subscribe('operator', {
+      endpoint: ENDPOINT,
+      keys: KEYS,
+      branchIds: [BRANCH_A, BRANCH_A],
+    }).expect(400);
+    await subscribe('operator', {
+      endpoint: ENDPOINT,
+      keys: KEYS,
+      branchIds: Array.from(
+        { length: 51 },
+        (_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`,
+      ),
+    }).expect(400);
   });
 
   it('another staff member signing in on the browser takes the endpoint over', async () => {

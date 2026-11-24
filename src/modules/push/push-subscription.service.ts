@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { AppException } from 'src/infra/errors/app-exception';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
 
 export interface PushSubscriptionInput {
@@ -6,6 +7,8 @@ export interface PushSubscriptionInput {
   p256dh: string;
   auth: string;
   userAgent?: string | null;
+  /** Branches of the venue the device follows; empty or missing = all */
+  branchIds?: string[];
 }
 
 /**
@@ -18,13 +21,22 @@ export class PushSubscriptionService {
 
   /**
    * Saves the browser's subscription for this user. The same endpoint again (keys renewed, or another staff
-   * member signed in on that browser) takes the row over: the browser notifies whoever is signed in now.
+   * member signed in on that browser) takes the row over: the browser notifies whoever is signed in now. The
+   * branch choice is the device's whole state: a repeat replaces it.
    */
   async subscribe(
     userId: string,
     organizationId: string,
     input: PushSubscriptionInput,
   ): Promise<void> {
+    const branchIds = [...new Set(input.branchIds ?? [])];
+    if (branchIds.length > 0) {
+      const own = await this.prisma.branch.count({
+        where: { id: { in: branchIds }, organization_id: organizationId },
+      });
+      if (own !== branchIds.length)
+        throw new AppException('not_found', { message: 'Branch not found' });
+    }
     const data = {
       user_id: userId,
       organization_id: organizationId,
@@ -32,6 +44,7 @@ export class PushSubscriptionService {
       auth: input.auth,
       user_agent: input.userAgent?.slice(0, 300) || null,
       failure_count: 0,
+      branch_ids: branchIds,
     };
     await this.prisma.staff_push_subscription.upsert({
       where: { endpoint: input.endpoint },

@@ -118,13 +118,9 @@ describe('StaffPasswordService', () => {
       jest
         .spyOn(deps.sms, 'send')
         .mockReturnValue(new Promise(() => undefined));
+      // A send that never ends: if forgot() waited for it, the call would never resolve
       await expect(
-        Promise.race([
-          service.forgot({ phone: PHONE }, CTX),
-          new Promise((_, rej) =>
-            setTimeout(() => rej(new Error('hung')), 500),
-          ),
-        ]),
+        service.forgot({ phone: PHONE }, CTX),
       ).resolves.toMatchObject({ resendAfter: 60 });
     });
 

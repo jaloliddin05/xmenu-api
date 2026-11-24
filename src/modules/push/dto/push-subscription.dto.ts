@@ -1,9 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  ArrayUnique,
+  IsArray,
   IsDefined,
   IsOptional,
   IsString,
+  IsUUID,
   IsUrl,
   Matches,
   MaxLength,
@@ -53,6 +57,18 @@ export class PushSubscribeDto {
   @IsString()
   @MaxLength(1000)
   readonly userAgent?: string;
+
+  @ApiPropertyOptional({
+    type: [String],
+    description:
+      "Branches of the venue whose orders this device gets; empty or absent = all branches. The list replaces the device's previous choice (a repeated POST with the same endpoint without the field resets it to all). A branch of another venue: 404 not_found",
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(50)
+  @ArrayUnique()
+  @IsUUID('all', { each: true })
+  readonly branchIds?: string[];
 }
 
 export class PushUnsubscribeDto {

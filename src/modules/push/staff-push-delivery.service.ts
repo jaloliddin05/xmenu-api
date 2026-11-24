@@ -8,6 +8,8 @@ export interface StaffPushJob {
   organizationId: string;
   orderId: string;
   event: StaffPushEvent;
+  /** Branch of the order; devices that follow other branches skip it */
+  branchId: string;
   title: string;
   body: string;
   /** A retry: only these subscriptions failed temporarily last time (the others got the message) */
@@ -45,7 +47,7 @@ const endpointHost = (endpoint: string) => {
 
 /**
  * Sends one notification to every subscribed browser of the venue's active owners and operators (operators are
- * not bound to branches: everyone of the venue gets it). 404/410 removes the subscription; any other failure
+ * not bound to branches: a device gets the orders of the branches it follows, all when it chose none). 404/410 removes the subscription; any other failure
  * counts in failure_count, and the temporary ones are returned for a retry.
  */
 @Injectable()
@@ -63,6 +65,11 @@ export class StaffPushDelivery {
       where: {
         organization_id: job.organizationId,
         ...(job.pending ? { id: { in: job.pending } } : {}),
+        // A device follows chosen branches (branch_ids), empty = all of them
+        OR: [
+          { branch_ids: { isEmpty: true } },
+          { branch_ids: { has: job.branchId } },
+        ],
         user: {
           isActive: true,
           membership: {

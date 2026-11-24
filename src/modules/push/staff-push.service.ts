@@ -48,6 +48,7 @@ export class StaffPushService {
         where: { id: orderId },
         select: {
           organization_id: true,
+          branch_id: true,
           number: true,
           status: true,
           fulfillment: true,
@@ -75,7 +76,13 @@ export class StaffPushService {
         doorProblem: order.door_problem,
       });
       await this.queue.enqueue(
-        { organizationId: order.organization_id, orderId, event, ...text },
+        {
+          organizationId: order.organization_id,
+          branchId: order.branch_id,
+          orderId,
+          event,
+          ...text,
+        },
         `staffpush-${episode}`,
       );
     } catch (e) {

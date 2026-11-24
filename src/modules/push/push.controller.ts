@@ -13,6 +13,7 @@ import {
   ApiBadRequestResponse,
   ApiBearerAuth,
   ApiNoContentResponse,
+  ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiServiceUnavailableResponse,
@@ -74,6 +75,10 @@ export class PushController {
     type: ErrorResponse,
     description: 'validation_error',
   })
+  @ApiNotFoundResponse({
+    type: ErrorResponse,
+    description: "not_found: a branch in branchIds is not the venue's",
+  })
   async subscribe(
     @Req() req: StaffRequest,
     @Body() dto: PushSubscribeDto,
@@ -86,6 +91,7 @@ export class PushController {
         p256dh: dto.keys.p256dh,
         auth: dto.keys.auth,
         userAgent: dto.userAgent,
+        branchIds: dto.branchIds,
       },
     );
   }

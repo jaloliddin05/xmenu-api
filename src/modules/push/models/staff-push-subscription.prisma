@@ -18,6 +18,8 @@ model staff_push_subscription {
   last_success_at DateTime?
   // Failed sends in a row (not 404/410: those remove the row)
   failure_count   Int          @default(0)
+  // Branches whose orders this device gets (ids of the venue's branches, no foreign key); empty = all branches
+  branch_ids      String[]     @default([])
 
   @@index([organization_id])
   @@index([user_id])

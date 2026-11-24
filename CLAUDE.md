@@ -236,7 +236,9 @@ Payme вручную через ops-чат.
   `staff-push` (`BullStaffPushQueue`, библиотека `web-push`). В payload только номер, тип, число позиций, сумма и id
   заказа, никаких ПДн гостя (уведомления идут через Google, Mozilla, Apple). Дедупликация по событию и `version` заказа
   (SET NX). Подписки удаляют 404/410 push-сервиса, сброс пароля и отключение сотрудника
-  (`PushSubscriptionService.removeAllForUser`), выход: дашборд (`DELETE /push/subscriptions`).
+  (`PushSubscriptionService.removeAllForUser`), выход: дашборд (`DELETE /push/subscriptions`) и задача сроков хранения
+  (мёртвые: 10 неудач или 30 дней без успеха при ошибках; 403 считается ошибкой, не удалением). Филиал устройства:
+  `staff_push_subscription.branch_ids` (пусто = все), заказ филиала X получают подписки с пустым списком или с X.
 - Брошенный `payment_failed`: ежечасная задача `payment-failed-expiry` (`queue/payment-failed-expiry.*`) отменяет
   (`system`, `cancel_reason = payment_expired`) заказ, у которого последняя запись журнала в `payment_failed` старше
   `PAYMENT_FAILED_TTL_HOURS` (24); гостю не пишет, видно на таймлайне. Почему сканирование, а не задание на заказ: в
@@ -655,7 +657,7 @@ Asia/Tashkent. `SMS_PROVIDER` отдаёт `BudgetedSmsProvider` поверх в
   (по умолчанию пробный запуск, `--apply` пишет). Состав, суммы, статусы и даты заказа остаются.
 - Ежедневная задача `privacy-retention` (`modules/privacy`, 03:00 `Asia/Tashkent`, `upsertJobScheduler` с `pattern` и
   `tz`): завершённые заказы старше `ORDER_PII_RETENTION_DAYS`, `staff_auth_event` старше 90 дней, истёкшие
-  `staff_session` (7 дней), `application` старше `APPLICATION_RETENTION_DAYS`; пакетами, идемпотентно.
+  `staff_session` (7 дней), `application` старше `APPLICATION_RETENTION_DAYS`, мёртвые `staff_push_subscription`; пакетами, идемпотентно.
 - Правило: новое поле с ПДн = обезличивание в `CustomerAnonymizerService` (список `ORDER_PII_CLEARED`/`ORDER_HAS_PII`
   или сервис гостя) **и** срок хранения в `privacy`, в том же PR. Читатели таких полей допускают `null`.
 - Отметку о согласии с политикой бэкенд не хранит (ждёт решения юриста).

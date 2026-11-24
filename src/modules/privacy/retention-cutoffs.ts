@@ -6,6 +6,9 @@ export const APPLICATION_RETENTION_DEFAULT_DAYS = 365;
 /** Fixed periods (docs/PRIVACY-FACTS.md). */
 export const STAFF_AUTH_EVENT_RETENTION_DAYS = 90;
 export const STAFF_SESSION_EXPIRED_GRACE_DAYS = 7;
+/** Web push subscriptions: this many failed sends in a row, or this many days without a success while failing */
+export const PUSH_SUBSCRIPTION_DEAD_FAILURES = 10;
+export const PUSH_SUBSCRIPTION_STALE_DAYS = 30;
 
 export interface RetentionCutoffs {
   /** Orders created before this lose the guest's personal data */
@@ -16,6 +19,8 @@ export interface RetentionCutoffs {
   staffSessions: Date;
   /** Landing applications created before this are deleted */
   applications: Date;
+  /** Push subscriptions that keep failing and have had no success since this are deleted */
+  pushSubscriptions: Date;
 }
 
 function days(raw: string | undefined, fallback: number): number {
@@ -38,5 +43,6 @@ export function retentionCutoffs(
     applications: before(
       days(env.APPLICATION_RETENTION_DAYS, APPLICATION_RETENTION_DEFAULT_DAYS),
     ),
+    pushSubscriptions: before(PUSH_SUBSCRIPTION_STALE_DAYS),
   };
 }

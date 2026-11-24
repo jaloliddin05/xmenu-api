@@ -5,7 +5,10 @@ import {
   ORDER_HAS_PII,
   ORDER_PII_CLEARED,
 } from 'src/modules/customer/services/customer-anonymizer.service';
-import { retentionCutoffs } from './retention-cutoffs';
+import {
+  PUSH_SUBSCRIPTION_DEAD_FAILURES,
+  retentionCutoffs,
+} from './retention-cutoffs';
 
 export const RETENTION_BATCH = 500;
 
@@ -14,10 +17,11 @@ export interface RetentionResult {
   staffAuthEvents: number;
   staffSessions: number;
   applications: number;
+  pushSubscriptions: number;
 }
 
 /**
- * Daily retention: anonymizes old orders and deletes old audit rows and landing applications.
+ * Daily retention: anonymizes old orders and deletes old audit rows, landing applications and dead push subscriptions.
  * In batches and idempotent: a repeated or interrupted run just finds less to do.
  */
 @Injectable()
@@ -82,10 +86,39 @@ export class PrivacyRetentionService {
         (ids) =>
           this.prisma.application.deleteMany({ where: { id: { in: ids } } }),
       ),
+      // A browser that keeps failing: too many failures in a row, or failing with no success for a month
+      // (a subscription that never succeeded counts from its creation)
+      pushSubscriptions: await this.inBatches(
+        (take) =>
+          this.prisma.staff_push_subscription.findMany({
+            where: {
+              OR: [
+                { failure_count: { gte: PUSH_SUBSCRIPTION_DEAD_FAILURES } },
+                {
+                  failure_count: { gt: 0 },
+                  OR: [
+                    { last_success_at: { lt: cut.pushSubscriptions } },
+                    {
+                      last_success_at: null,
+                      created_at: { lt: cut.pushSubscriptions },
+                    },
+                  ],
+                },
+              ],
+            },
+            select: { id: true },
+            take,
+          }),
+        (ids) =>
+          this.prisma.staff_push_subscription.deleteMany({
+            where: { id: { in: ids } },
+          }),
+      ),
     };
     this.logger.log(
       `retention: orders anonymized=${result.orders} staff_auth_event deleted=${result.staffAuthEvents} ` +
-        `staff_session deleted=${result.staffSessions} application deleted=${result.applications}`,
+        `staff_session deleted=${result.staffSessions} application deleted=${result.applications} ` +
+        `push_subscription deleted=${result.pushSubscriptions}`,
     );
     return result;
   }

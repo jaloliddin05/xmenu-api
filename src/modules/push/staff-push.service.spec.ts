@@ -14,6 +14,7 @@ import { pushResult, type PushSendResult } from './web-push.sender';
 
 /** Web push to the venue staff (docs/API.md, "Web push сотрудникам"). */
 const ORG = 'org-1';
+const BRANCH = 'branch-1';
 const ORDER = '0b6f8a52-3c1d-4e7f-9a2b-5c6d7e8f9a0b';
 const PUBLIC_KEY =
   'BHP4ACfXvV8uE98UzA2N97fUQokHUFjIH9YMs-wGIJjhDLfhzTOLV8e4LZsClOcegRgYICe55ZmwcHYN-fHhc4Y';
@@ -35,6 +36,7 @@ afterAll(() => jest.restoreAllMocks());
 
 const orderRow = (extra: Record<string, unknown> = {}) => ({
   organization_id: ORG,
+  branch_id: BRANCH,
   number: 1042,
   status: 'pending_acceptance',
   fulfillment: 'delivery',
@@ -71,6 +73,7 @@ describe('StaffPushService.notify', () => {
     expect(s.queue.enqueue).toHaveBeenCalledWith(
       {
         organizationId: ORG,
+        branchId: BRANCH,
         orderId: ORDER,
         event: 'new_order',
         title: 'Новый заказ №1042',
@@ -175,6 +178,7 @@ describe('staffPushText', () => {
 describe('StaffPushDelivery', () => {
   const job: StaffPushJob = {
     organizationId: ORG,
+    branchId: BRANCH,
     orderId: ORDER,
     event: 'new_order',
     title: 'Новый заказ №1042',
@@ -187,12 +191,34 @@ describe('StaffPushDelivery', () => {
     auth: 'a',
   });
 
-  function setup(results: Record<string, PushSendResult>) {
-    const subs = Object.keys(results).map(sub);
+  function setup(
+    results: Record<string, PushSendResult>,
+    branches: Record<string, string[]> = {},
+  ) {
+    const subs = Object.keys(results).map((id) => ({
+      ...sub(id),
+      branch_ids: branches[id] ?? [],
+    }));
+    // The branch condition of the query, evaluated the way the database does
+    const follows = (
+      s: { branch_ids: string[] },
+      or: (
+        | { branch_ids: { isEmpty: true } }
+        | { branch_ids: { has: string } }
+      )[],
+    ) =>
+      or.some((c) =>
+        'isEmpty' in c.branch_ids
+          ? s.branch_ids.length === 0
+          : s.branch_ids.includes(c.branch_ids.has),
+      );
     const prisma = {
       staff_push_subscription: {
         findMany: jest.fn(async ({ where }) =>
-          where.id ? subs.filter((s) => where.id.in.includes(s.id)) : subs,
+          subs
+            .filter((s) => !where.id || where.id.in.includes(s.id))
+            .filter((s) => follows(s, where.OR))
+            .map(({ branch_ids: _b, ...rest }) => rest),
         ),
         updateMany: jest.fn(async () => ({ count: 1 })),
         deleteMany: jest.fn(async () => ({ count: 1 })),
@@ -219,6 +245,7 @@ describe('StaffPushDelivery', () => {
       s.prisma.staff_push_subscription.findMany.mock.calls[0][0].where,
     ).toEqual({
       organization_id: ORG,
+      OR: [{ branch_ids: { isEmpty: true } }, { branch_ids: { has: BRANCH } }],
       user: {
         isActive: true,
         membership: {
@@ -258,6 +285,33 @@ describe('StaffPushDelivery', () => {
       .filter((c) => c[0].data.failure_count?.increment === 1)
       .map((c) => c[0].where.id);
     expect(counted).toEqual(['bad', 'busy']);
+  });
+
+  it('a device gets the orders of the branches it follows; one that chose none gets all', async () => {
+    const s = setup(
+      {
+        all: { kind: 'sent' },
+        here: { kind: 'sent' },
+        elsewhere: { kind: 'sent' },
+        both: { kind: 'sent' },
+      },
+      {
+        here: [BRANCH],
+        elsewhere: ['branch-2'],
+        both: ['branch-2', BRANCH],
+      },
+    );
+    await s.delivery.deliver(job);
+    const sent = s.sender.send.mock.calls.map((c) =>
+      c[0].endpoint.split('/').pop(),
+    );
+    expect(sent).toEqual(['all', 'here', 'both']);
+    s.sender.send.mockClear();
+    await s.delivery.deliver({ ...job, branchId: 'branch-2' });
+    const other = s.sender.send.mock.calls.map((c) =>
+      c[0].endpoint.split('/').pop(),
+    );
+    expect(other).toEqual(['all', 'elsewhere', 'both']);
   });
 
   it('a retry sends only to the subscriptions that failed', async () => {
@@ -319,6 +373,8 @@ describe('web push request', () => {
     [404, 'gone'],
     [410, 'gone'],
     [400, 'rejected'],
+    // RFC 8292: 403 = the VAPID token is refused (the platform's keys), not that the subscription is gone;
+    // such a subscription is counted and removed by the retention task after repeated failures
     [403, 'rejected'],
     [429, 'retry'],
     [503, 'retry'],

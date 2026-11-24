@@ -45,8 +45,29 @@ describe('StaffService', () => {
 
   describe('invite', () => {
     it('creates an open invitation for 72 hours and writes the audit event', async () => {
-      const before = Date.now();
-      const member = await invite();
+      // Frozen clock: the expiry is exactly the TTL after the invitation, however slow the machine is
+      const before = Date.UTC(2026, 10, 24, 12, 0, 0);
+      jest.useFakeTimers({
+        now: before,
+        doNotFake: [
+          'nextTick',
+          'setImmediate',
+          'setTimeout',
+          'setInterval',
+          'clearTimeout',
+          'clearInterval',
+          'clearImmediate',
+          'queueMicrotask',
+          'hrtime',
+          'performance',
+        ],
+      });
+      let member: Awaited<ReturnType<typeof invite>>;
+      try {
+        member = await invite();
+      } finally {
+        jest.useRealTimers();
+      }
 
       expect(member).toMatchObject({
         role: 'operator',
@@ -57,8 +78,7 @@ describe('StaffService', () => {
         activatedAt: null,
       });
       const expires = member.inviteExpiresAt!.getTime() - before;
-      expect(expires).toBeGreaterThanOrEqual(INVITATION_TTL_MS - 1000);
-      expect(expires).toBeLessThanOrEqual(INVITATION_TTL_MS + 1000);
+      expect(expires).toBe(INVITATION_TTL_MS);
       expect(deps.db.events.map((e) => e.type)).toContain('staff_invited');
       expect(JSON.stringify(deps.db.events)).not.toContain(OP_PHONE);
     });
