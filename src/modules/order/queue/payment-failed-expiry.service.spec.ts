@@ -133,6 +133,7 @@ describe('OrderTransitionService expectedFrom', () => {
       { refreshMessage: jest.fn(async () => undefined) } as any,
       { notifyStatus: jest.fn(async () => undefined) } as any,
       {} as any,
+      { notify: jest.fn(async () => undefined) } as any,
     );
     jest.spyOn(service, 'dispatchEffects').mockImplementation(() => undefined);
     return { service, tx };

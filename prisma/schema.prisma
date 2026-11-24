@@ -665,6 +665,7 @@ model organization {
 
   // Owner and operators (organization-member.prisma); the owner is the row with role = owner
   members      organization_member[]
+  push_subscriptions staff_push_subscription[]
   couriers     courier[]
   courier_shifts courier_shift[]
 
@@ -998,6 +999,7 @@ model user {
   // The venue this staff user works in, with the role (one venue per user for now)
   membership   organization_member?
   sessions     staff_session[]
+  push_subscriptions staff_push_subscription[]
   avatar_id    String?      @unique
   avatar       file?        @relation(fields: [avatar_id], references: [id])
 }
@@ -1382,4 +1384,28 @@ model delivery_area_part {
 enum DeliveryAreaSource {
   region
   custom
+}
+// Web push subscription of a staff member's browser (docs/API.md, "Web push сотрудникам"). One row per push
+// endpoint: the browser that subscribes again (or another staff member signing in on it) takes the row over.
+// Removed on sign-out (by the dashboard), on 404/410 from the push service, on a password reset, when the staff
+// member is disabled, and with the user or the venue.
+model staff_push_subscription {
+  id              String       @id @default(uuid())
+  user_id         String
+  user            user         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  organization_id String
+  organization    organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  // The push service URL of the browser (Google, Mozilla, Apple); it is the subscription's identity
+  endpoint        String       @unique
+  // Keys of the browser for the payload encryption (base64url)
+  p256dh          String
+  auth            String
+  user_agent      String?
+  created_at      DateTime     @default(now())
+  last_success_at DateTime?
+  // Failed sends in a row (not 404/410: those remove the row)
+  failure_count   Int          @default(0)
+
+  @@index([organization_id])
+  @@index([user_id])
 }

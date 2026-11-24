@@ -35,7 +35,7 @@ Env: см. `.env.example` (полный; тест сверяет его со с�
 `/translation` → `503 platform_misconfigured`, `feature: translation`), `NEXT_PUBLIC_URL` + `REVALIDATE_SECRET` (QR),
 `CLIENT_REVALIDATE_URL` + `CLIENT_REVALIDATE_SECRET` (сайт доставки), `DELIVERY_URL_TEMPLATE` (адрес Mini App для кнопки бота),
 `PLATFORM_DOMAIN` (`xmenu.uz`; в dev `localhost`), `DOMAIN_VERIFY_SKIP` (только dev), `DOMAIN_VERIFY_DNS_SERVERS` (DNS проверки доменов, фейк в e2e), `STAFF_REFRESH_TTL_DAYS`,
-`STAFF_SESSION_ABSOLUTE_DAYS`, `STAFF_STEP_UP_SECRET` (step-up, в production ≥ 32 символа и не равен другим секретам), `PUBLIC_POST_RATE_*`, `APPLICATION_RATE_*`, `TRANSLATION_IP_RATE_*` (лимиты по IP). Окончания строк LF (`.gitattributes`, `.editorconfig`).
+`STAFF_SESSION_ABSOLUTE_DAYS`, `STAFF_STEP_UP_SECRET` (step-up, в production ≥ 32 символа и не равен другим секретам), `WEB_PUSH_VAPID_PUBLIC_KEY` + `WEB_PUSH_VAPID_PRIVATE_KEY` + `WEB_PUSH_SUBJECT` (web push сотрудникам, `push/push.config.ts`; в production обязательны), `PUBLIC_POST_RATE_*`, `APPLICATION_RATE_*`, `TRANSLATION_IP_RATE_*` (лимиты по IP). Окончания строк LF (`.gitattributes`, `.editorconfig`).
 
 ## Схема Prisma
 Не правь `prisma/schema.prisma` руками: он собирается из `src/modules/*/models/*.prisma` командой
@@ -55,7 +55,7 @@ Env: см. `.env.example` (полный; тест сверяет его со с�
 `sms` (провайдеры eskiz, telegram, console), `telegram` (боты заведений: `TelegramBotService`, `TelegramClient`,
 `/telegram-bot`), `tenant-domain` (свои домены заведения, `/organization/:id/domains`), `file`, `translation`, `application`,
 `health` (`GET /health`, `/health/ready`), `csp-report` (`POST /csp-report`, приёмник отчётов CSP фронтов, `docs/API.md`, «Отчёты CSP»), `revalidate-queue` (`RevalidateModule`: ревалидация QR-меню и сайта доставки, `docs/REVALIDATE.md`), `guest-login` (способы входа
-клиентов заведения: `GuestLoginService`), `privacy` (ежедневная очистка по срокам хранения, раздел «Персональные данные»), `pos` (интеграция с кассой iiko: подключение, меню, стоп-лист, вебхук, отправка заказов и статусы; раздел
+клиентов заведения: `GuestLoginService`), `push` (web push сотрудникам: подписки браузеров и уведомления о заказах, раздел «Заказы»), `privacy` (ежедневная очистка по срокам хранения, раздел «Персональные данные»), `pos` (интеграция с кассой iiko: подключение, меню, стоп-лист, вебхук, отправка заказов и статусы; раздел
 «Интеграция с кассой»).
 
 ## Контракт API
@@ -217,6 +217,20 @@ Payme вручную через ops-чат.
   (срочное сообщение в чат филиала, `RestaurantNotifierService.alertDeliveryProblem`), `pos_job` и `pos_alert` (iiko).
 - `expectedFrom` во входе перехода: статус, который видел вызывающий (кнопка Telegram, сканирование); заказ в другом
   статусе не двигается, даже если цель достижима и оттуда.
+- Доска оператора `GET /order/board` (`OrderBoardService`, чистая логика `order/domain/order-board.ts`): только живые
+  заказы, облегчённо, без имени и телефона гостя, комментария и журнала (детали в `GET /order/:id`). Признаки внимания
+  (`attention`), срок автоотмены (`acceptDeadlineAt`) и вход в статус считает сервер, фронты их сами не выводят; новое
+  поле доски не несёт ПДн гостя. Контракт: `docs/API.md`, «Доска заказов».
+- Действия оператора принимают `expectedStatus` (`OrderStaffService.act` → `perform`): заказ в другом статусе и
+  проигравший гонку получают `409 order_status_conflict`; без поля повтор отвечает 200. Самовывоз `ready` из `accepted`
+  проходит `preparing` в одной транзакции (`OrderTransitionService.transitionChain`, эффекты шагов склеивает
+  `mergeStepEffects`).
+- Web push сотрудникам (модуль `push`, `docs/API.md`, «Web push сотрудникам»): эффект `placed` (новый заказ) и
+  `staff_push` (проблема у двери; «Не могу доставить» только от курьера) → `StaffPushService.notify` → очередь
+  `staff-push` (`BullStaffPushQueue`, библиотека `web-push`). В payload только номер, тип, число позиций, сумма и id
+  заказа, никаких ПДн гостя (уведомления идут через Google, Mozilla, Apple). Дедупликация по событию и `version` заказа
+  (SET NX). Подписки удаляют 404/410 push-сервиса, сброс пароля и отключение сотрудника
+  (`PushSubscriptionService.removeAllForUser`), выход: дашборд (`DELETE /push/subscriptions`).
 - Брошенный `payment_failed`: ежечасная задача `payment-failed-expiry` (`queue/payment-failed-expiry.*`) отменяет
   (`system`, `cancel_reason = payment_expired`) заказ, у которого последняя запись журнала в `payment_failed` старше
   `PAYMENT_FAILED_TTL_HOURS` (24); гостю не пишет, видно на таймлайне. Почему сканирование, а не задание на заказ: в
@@ -497,7 +511,7 @@ App (`instant`) нового номера кладёт Telegram-id в `registrat
 - Роли сотрудников для отдельного приложения (курьеры, официанты, менеджеры). Таблица `employee` есть, не используется
   (операторы админки живут в `organization_member`, раздел «Сотрудники и права»).
 - Касса iiko: проверка на живом iiko (`../docs/IIKO.md`, «Перед пилотом»). Другие кассы позже.
-- Позже: Web Push/WebSocket для админки, фискальные чеки, промокоды (поле `discount` всегда 0), заказ ко
+- Позже: WebSocket для админки, фискальные чеки, промокоды (поле `discount` всегда 0), заказ ко
   времени, меню по филиалам, ротация `PAYMENT_CONFIG_KEY` (принятый риск S-12, `../audit/SECURITY.md`, раздел 7).
 
 ## Известные долги
@@ -587,7 +601,7 @@ Docker Compose на одном сервере, снаружи Caddy (TLS, `api.x
   `PLATFORM_DOMAIN`, с `TELEGRAM_API_BASE_URL` не на `https://api.telegram.org`, без https `PUBLIC_API_URL` и
   `DELIVERY_URL_TEMPLATE` (с `{slug}`), без годного `PAYMENT_CONFIG_KEY`, с неразбираемым `TRUST_PROXY`, без учётных
   данных выбранного SMS-провайдера, без `SMS_DAILY_LIMIT_PLATFORM` и `SMS_DAILY_LIMIT_TENANT`, с коротким
-  `JWT_ACCESS_TOKEN_SECRET` (`validateEnv`). `/docs` в production не публикуется без `SWAGGER_ENABLED=true`. Перед первым запуском: staging, бэкапы по расписанию, чек-лист
+  `JWT_ACCESS_TOKEN_SECRET`, без ключей VAPID `WEB_PUSH_*` (`validateEnv`). `/docs` в production не публикуется без `SWAGGER_ENABLED=true`. Перед первым запуском: staging, бэкапы по расписанию, чек-лист
   безопасности (корневой `CLAUDE.md`, очередь, п. 6).
 
 ## Ошибки

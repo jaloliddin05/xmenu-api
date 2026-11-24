@@ -64,6 +64,7 @@ function setup(order: Record<string, unknown>) {
     restaurant as any,
     { notifyStatus: jest.fn(async () => undefined) } as any,
     queues as any,
+    { notify: jest.fn(async () => undefined) } as any,
   );
   return { service, tx, queues, restaurant };
 }

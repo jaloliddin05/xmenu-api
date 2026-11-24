@@ -52,6 +52,7 @@ model organization {
 
   // Owner and operators (organization-member.prisma); the owner is the row with role = owner
   members      organization_member[]
+  push_subscriptions staff_push_subscription[]
   couriers     courier[]
   courier_shifts courier_shift[]
 

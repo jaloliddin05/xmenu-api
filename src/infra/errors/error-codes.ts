@@ -87,7 +87,7 @@ export const ERROR_CODES = spec({
   platform_misconfigured: {
     status: 503,
     message: 'This feature is not configured on the platform',
-    when: 'Функция выключена настройкой платформы (не заведения); `details.feature`: `telegram_bot`, `delivery_link`, `sms`, `domains`, `payments`, `translation`, `order_notifications`, `pos`',
+    when: 'Функция выключена настройкой платформы (не заведения); `details.feature`: `telegram_bot`, `delivery_link`, `sms`, `domains`, `payments`, `translation`, `order_notifications`, `pos`, `web_push`',
     details: ['feature'],
   },
 
@@ -647,7 +647,8 @@ export type MisconfiguredFeature =
   | 'payments'
   | 'translation'
   | 'order_notifications'
-  | 'pos';
+  | 'pos'
+  | 'web_push';
 
 export const isErrorCode = (code: unknown): code is ErrorCode =>
   typeof code === 'string' && Object.hasOwn(ERROR_CODES, code);

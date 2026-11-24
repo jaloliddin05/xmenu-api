@@ -19,7 +19,7 @@
 | `rate_limited` | 429 | Превышен лимит запросов (по IP, номеру или пользователю; заказов гостя за час) | `retryAfter` |
 | `internal_error` | 500 | Непредвиденная ошибка сервера; подробности только в логе по `requestId` | — |
 | `unavailable` | 503 | Временный сбой (очередь, база); повторить позже | — |
-| `platform_misconfigured` | 503 | Функция выключена настройкой платформы (не заведения); `details.feature`: `telegram_bot`, `delivery_link`, `sms`, `domains`, `payments`, `translation`, `order_notifications`, `pos` | `details.feature` |
+| `platform_misconfigured` | 503 | Функция выключена настройкой платформы (не заведения); `details.feature`: `telegram_bot`, `delivery_link`, `sms`, `domains`, `payments`, `translation`, `order_notifications`, `pos`, `web_push` | `details.feature` |
 | `tenant_required` | 400 | Клиентский запрос без заголовка `X-Tenant-Id` | — |
 | `tenant_not_found` | 404 | Нет активного заведения с таким id (или передан slug вместо id) | — |
 | `tenant_inactive` | 403 | Заведение отключено | — |

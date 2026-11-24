@@ -49,6 +49,7 @@ function setup(cfg = staffTestConfig) {
     deps.sms,
     cfg,
     deps.smsBudget,
+    { removeAllForUser: jest.fn() } as any,
   );
   const addOwner = (phone: string) =>
     deps.db.user.create({ data: { phone, isActive: true, password: 'x' } });

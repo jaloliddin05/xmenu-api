@@ -25,6 +25,7 @@ import { TenantConfigModule } from './modules/tenant/tenant-config.module';
 import { TelegramModule } from './modules/telegram/telegram.module';
 import { TenantDomainModule } from './modules/tenant-domain/tenant-domain.module';
 import { StaffModule } from './modules/staff/staff.module';
+import { PushModule } from './modules/push/push.module';
 import { ReportModule } from './modules/report/report.module';
 import { PosModule } from './modules/pos/pos.module';
 import { PrivacyModule } from './modules/privacy/privacy.module';
@@ -60,6 +61,7 @@ import { CspReportModule } from './modules/csp-report/csp-report.module';
     TenantConfigModule,
     TenantDomainModule,
     StaffModule,
+    PushModule,
     ReportModule,
     TranslationModule,
     UserModule,

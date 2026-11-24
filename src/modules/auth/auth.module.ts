@@ -55,6 +55,7 @@ import {
   OwnerNotificationSender,
 } from './step-up/owner-notification.queue';
 import { OwnerSecurityNotifier } from './step-up/owner-security-notifier.service';
+import { PushModule } from '../push/push.module';
 
 @Module({
   imports: [
@@ -68,6 +69,7 @@ import { OwnerSecurityNotifier } from './step-up/owner-security-notifier.service
     MiniAppModule,
     GuestLoginModule,
     PrismaModule,
+    PushModule,
     JwtModule.registerAsync({
       useFactory: (configService: ConfigService) => {
         const jwtConfig = configService.getOrThrow<IConfig['jwt']>('jwt');

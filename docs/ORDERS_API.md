@@ -242,18 +242,19 @@ external`, `click`/`payme` при включённом онлайне и клю�
 | Метод | Путь | |
 |---|---|---|
 | GET | `/order?status=a,b&branchId=&courierId=&unassigned=true&cursor=&limit=` | `{ items, nextCursor, reminders }`: новые первыми; `unassigned=true`: доставка в `accepted`/`ready` без курьера; `reminders` — пороги напоминаний заведения в минутах (`API.md`, «Напоминания») |
+| GET | `/order/board?branchId=` | доска оператора: все живые заказы без пагинации, облегчённо (без имени, телефона гостя и журнала), признаки внимания, срок автоотмены, итоги дня (`API.md`, «Доска заказов») |
 | GET | `/order/:id` | детали + клиент + курьер + журнал статусов |
-| POST | `/order/:id/accept` | принять |
-| POST | `/order/:id/reject` `{reason?}` | отменить с причиной на любом шаге до конечного (оплаченный — возврат) |
-| POST | `/order/:id/advance` | следующий этап по типу заказа; доставка: `accepted` → `ready`, дальше двигает курьер |
-| POST | `/order/:id/status` `{status}` | `accepted`, `preparing`, `ready`, `completed` (самовывоз), `returned_to_restaurant` (решение по проблеме у двери), если машина состояний разрешает |
+| POST | `/order/:id/accept` `{expectedStatus?}` | принять |
+| POST | `/order/:id/reject` `{reason?, expectedStatus?}` | отменить с причиной на любом шаге до конечного (оплаченный — возврат) |
+| POST | `/order/:id/advance` `{expectedStatus?}` | следующий этап по типу заказа; доставка: `accepted` → `ready`, дальше двигает курьер |
+| POST | `/order/:id/status` `{status, expectedStatus?}` | `accepted`, `preparing`, `ready`, `completed` (самовывоз), `returned_to_restaurant` (решение по проблеме у двери), если машина состояний разрешает; самовывоз `ready` из `accepted` проходит `preparing` в той же транзакции (два шага в журнале) |
 | PUT | `/order/:id/courier` `{courierId}` | назначить или переназначить курьера на смене до «Забрал» (`docs/API.md`, «Курьеры») |
 | DELETE | `/order/:id/courier` | снять курьера до «Забрал» |
 | GET/PUT | `/order-settings` | минимум самовывоза, шаг округления цены доставки, способ доставки, таймауты, напоминания доставки, ставка курьерам |
 | GET/PUT | `/branch/:id/delivery-pricing` | правила цены доставки филиала (`API.md`, «Стоимость доставки») |
 | GET/PUT | `/payment-provider[/:provider]` | ключи Click/Payme (хранятся зашифрованно) |
 
-Запрещённый переход → `409`. Тот же путь используют кнопки в Telegram-группе
+Запрещённый переход → `409 order_status_conflict` (`details.status` — текущий статус). `expectedStatus`: статус, который\nвидел оператор (карточка доски); заказ в другом статусе не двигается → `409`, в том числе когда другой оператор\nуже сделал то же самое. Без поля повтор того же действия отвечает `200` (старый дашборд). Тот же путь используют кнопки в Telegram-группе
 филиала (`POST /telegram/orders/webhook`); у доставки там одна кнопка «Готов».
 
 В ответе персоналу дополнительно: `courier` `{ id, name, phone } | null` (назначенный сейчас, в любом статусе),

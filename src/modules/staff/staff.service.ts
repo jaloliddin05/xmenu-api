@@ -7,6 +7,7 @@ import { RateLimitService } from 'src/modules/auth/services/rate-limit.service';
 import { StaffAuthEventService } from 'src/modules/auth/services/staff-auth-event.service';
 import { StaffSessionService } from 'src/modules/auth/services/staff-session.service';
 import { openInvitationWhere } from 'src/modules/auth/services/staff-invitation.service';
+import { PushSubscriptionService } from 'src/modules/push/push-subscription.service';
 import type { InviteStaffDto } from './dto/staff-member.dto';
 import {
   byRoleThenAdded,
@@ -28,6 +29,7 @@ export class StaffService {
     private readonly rateLimit: RateLimitService,
     private readonly events: StaffAuthEventService,
     private readonly sessions: StaffSessionService,
+    private readonly pushSubscriptions: PushSubscriptionService,
   ) {}
 
   async list(organizationId: string) {
@@ -141,7 +143,10 @@ export class StaffService {
         });
     });
     // After the commit: the access tokens of the ended logins stop at once (sid denylist)
-    if (member.user_id) await this.sessions.revokeAllForUser(member.user_id);
+    if (member.user_id) {
+      await this.sessions.revokeAllForUser(member.user_id);
+      await this.pushSubscriptions.removeAllForUser(member.user_id);
+    }
 
     await this.events.log('staff_disabled', ctx, {
       userId: member.user_id ?? undefined,

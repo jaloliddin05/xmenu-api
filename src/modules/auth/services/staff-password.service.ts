@@ -25,6 +25,7 @@ import { RateLimitService } from './rate-limit.service';
 import { StaffAuthEventService } from './staff-auth-event.service';
 import { StaffLoginThrottleService } from './staff-login-throttle.service';
 import { StaffSessionService } from './staff-session.service';
+import { PushSubscriptionService } from 'src/modules/push/push-subscription.service';
 
 const OTP_BRAND = 'Xmenu';
 /** Subject of reset codes: the code is bound to the phone, and cannot be mixed up with a registration code. */
@@ -51,6 +52,7 @@ export class StaffPasswordService {
     @Inject(SMS_PROVIDER) private readonly sms: SmsProvider,
     @Inject(CUSTOMER_AUTH_CONFIG) private readonly cfg: CustomerAuthConfig,
     private readonly smsBudget: SmsBudgetService,
+    private readonly pushSubscriptions: PushSubscriptionService,
   ) {}
 
   // ================= POST /auth/password/forgot =================
@@ -153,6 +155,8 @@ export class StaffPasswordService {
       data: { password: await hashPassword(dto.newPassword) },
     });
     await this.sessions.revokeAllForUser(user.id);
+    // Whoever reset the password owns the account now: the old browsers stop getting order notifications
+    await this.pushSubscriptions.removeAllForUser(user.id);
     await this.throttle.reset(phone);
     await this.events.log('staff_password_reset', ctx, {
       userId: user.id,

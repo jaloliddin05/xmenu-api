@@ -23,7 +23,13 @@ import {
 } from 'src/infra/http/request-helpers';
 import { ORDER_STATUSES, OrderStatusName } from '../domain/order-state-machine';
 import { POS_ORDER_STATES } from '../services/order-view';
-import { RejectOrderDto, SetOrderStatusDto } from '../dto/staff-order.dto';
+import {
+  ExpectedStatusDto,
+  RejectOrderDto,
+  SetOrderStatusDto,
+} from '../dto/staff-order.dto';
+import { OrderBoardDto } from '../dto/order-board.dto';
+import { OrderBoardService } from '../services/order-board.service';
 import { OrderStaffService } from '../services/order-staff.service';
 import { StaffAccess } from 'src/modules/auth/access/staff-access.decorator';
 
@@ -31,7 +37,10 @@ import { StaffAccess } from 'src/modules/auth/access/staff-access.decorator';
 @ApiTags('Orders (staff)')
 @Controller('order')
 export class StaffOrderController {
-  constructor(private readonly staff: OrderStaffService) {}
+  constructor(
+    private readonly staff: OrderStaffService,
+    private readonly boards: OrderBoardService,
+  ) {}
 
   @StaffAccess('orders')
   @Get()
@@ -89,6 +98,27 @@ export class StaffOrderController {
     });
   }
 
+  // Declared before :id, whose ParseUUIDPipe would refuse "board"
+  @StaffAccess('orders')
+  @Get('board')
+  @ApiOperation({
+    summary:
+      'Order board: every live order of the venue or a branch, light (no guest name, phone or history), with attention codes, the acceptance deadline and today totals',
+  })
+  @ApiOkResponse({ type: OrderBoardDto })
+  @ApiQuery({
+    name: 'branchId',
+    required: false,
+    description:
+      'One branch (another venue’s branch: 404); all branches without it',
+  })
+  board(
+    @Req() req: StaffRequest,
+    @Query('branchId', new ParseUUIDPipe({ optional: true })) branchId?: string,
+  ) {
+    return this.boards.board(requireStaffOrganizationId(req), branchId);
+  }
+
   @StaffAccess('orders')
   @Get(':id')
   @ApiOperation({ summary: 'Buyurtma tafsiloti (mijoz, status tarixi bilan)' })
@@ -102,12 +132,17 @@ export class StaffOrderController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Qabul qilish' })
   @ApiOkResponse({ type: StaffOrderViewDto })
-  accept(@Req() req: StaffRequest, @Param('id', ParseUUIDPipe) id: string) {
+  accept(
+    @Req() req: StaffRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ExpectedStatusDto,
+  ) {
     return this.staff.act(
       requireStaffOrganizationId(req),
       id,
       { type: 'accept' },
       req.user.id,
+      dto.expectedStatus,
     );
   }
 
@@ -126,6 +161,7 @@ export class StaffOrderController {
       id,
       { type: 'reject', reason: dto.reason },
       req.user.id,
+      dto.expectedStatus,
     );
   }
 
@@ -137,12 +173,17 @@ export class StaffOrderController {
       "Keyingi bosqichga o'tkazish (tayyorlanmoqda → yo'lda/tayyor → yakunlandi)",
   })
   @ApiOkResponse({ type: StaffOrderViewDto })
-  advance(@Req() req: StaffRequest, @Param('id', ParseUUIDPipe) id: string) {
+  advance(
+    @Req() req: StaffRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ExpectedStatusDto,
+  ) {
     return this.staff.act(
       requireStaffOrganizationId(req),
       id,
       { type: 'next' },
       req.user.id,
+      dto.expectedStatus,
     );
   }
 
@@ -164,6 +205,7 @@ export class StaffOrderController {
       id,
       { type: 'set', status: dto.status },
       req.user.id,
+      dto.expectedStatus,
     );
   }
 }

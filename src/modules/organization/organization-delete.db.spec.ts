@@ -332,6 +332,19 @@ describeDb(
           pos_order: { create: { integration_id: pos.id } },
         },
       });
+      // A staff browser subscribed to the venue's order notifications (the user itself outlives the venue)
+      const staffUser = await prisma.user.create({
+        data: { phone: `+99893${digits()}`, isActive: true },
+      });
+      await prisma.staff_push_subscription.create({
+        data: {
+          user_id: staffUser.id,
+          organization_id: orgId,
+          endpoint: `https://fcm.googleapis.com/fcm/send/${uniq()}`,
+          p256dh: 'p',
+          auth: 'a',
+        },
+      });
 
       return {
         orgId,
@@ -369,6 +382,9 @@ describeDb(
           where: byOrg,
         }),
         employee: await prisma.employee.count({ where: byOrg }),
+        staff_push_subscription: await prisma.staff_push_subscription.count({
+          where: byOrg,
+        }),
         organization_payment_provider:
           await prisma.organization_payment_provider.count({ where: byOrg }),
         organization_telegram_bot: await prisma.organization_telegram_bot.count(

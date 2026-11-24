@@ -60,6 +60,7 @@ production `/docs` открыт только при `SWAGGER_ENABLED=true`, по
 | `domains` | добавление своего домена без `PLATFORM_DOMAIN` (только development: production без него не стартует) |
 | `translation` | `/translation` без ключа OpenAI |
 | `order_notifications` | вебхук платформенного бота заказов без секрета |
+| `web_push` | `GET /push/public-key` без ключей VAPID (только development: production без них не стартует) |
 | `delivery_link` | не ошибка запроса: пункт синхронизации кнопки меню бота `{ status: "skipped", code: "platform_misconfigured", feature: "delivery_link" }` без адреса сайта доставки |
 
 Какие функции выключены и почему, бэкенд печатает при старте (development) или не стартует (production);
@@ -400,6 +401,7 @@ IP берётся из `X-Forwarded-For` только от доверенног�
 | GET | `/order/{id}/pos/streets` | `orders` |  |  | ✓ | ✓ |
 | POST | `/order/{id}/reject` | `orders` |  |  | ✓ | ✓ |
 | POST | `/order/{id}/status` | `orders` |  |  | ✓ | ✓ |
+| GET | `/order/board` | `orders` |  |  | ✓ | ✓ |
 | DELETE | `/organization/{id}` | `venue` | `id` | step-up | ✓ | — |
 | GET | `/organization/{id}` | `venue` | `id` |  | ✓ | — |
 | PUT | `/organization/{id}` | `venue` | `id` |  | ✓ | — |
@@ -431,6 +433,9 @@ IP берётся из `X-Forwarded-For` только от доверенног�
 | PATCH | `/product/{id}/images` | `venue` |  |  | ✓ | — |
 | DELETE | `/product/image/{id}` | `venue` |  |  | ✓ | — |
 | PATCH | `/product/index` | `venue` |  |  | ✓ | — |
+| GET | `/push/public-key` | `orders` |  |  | ✓ | ✓ |
+| DELETE | `/push/subscriptions` | `orders` |  |  | ✓ | ✓ |
+| POST | `/push/subscriptions` | `orders` |  |  | ✓ | ✓ |
 | GET | `/reports/couriers` | `reports` |  |  | ✓ | — |
 | GET | `/reports/external` | `reports` |  |  | ✓ | — |
 | GET | `/reports/problems` | `reports` |  |  | ✓ | — |
@@ -558,7 +563,7 @@ activeOrders, cash: { deliveries, due, card, received, discrepancy }, reconciled
 
 Значения в `GET/PUT /order-settings` (минуты): `pickupReminderMinutes` (5, 1–60), `onTheWayAlertMinutes` (60,
 10–480), `doorWaitMinutes` (10, 1–60). Оператор настроек не читает: те же три значения приходят в `GET /order` полем
-`reminders { pickupReminderMinutes, onTheWayAlertMinutes, doorWaitMinutes }` (для подсветки опаздывающих заказов). Сообщения оператору идут в чат филиала (тот же бот, что и заказы), курьеру в
+`reminders { pickupReminderMinutes, onTheWayAlertMinutes, doorWaitMinutes }` (для подсветки опаздывающих заказов) и в `GET /order/board` полем `thresholds`. Сообщения оператору идут в чат филиала (тот же бот, что и заказы), курьеру в
 бот заведения. Каждый таймер срабатывает один раз; смена статуса снимает его.
 
 | Когда | Таймер от | Кому |
@@ -638,6 +643,132 @@ activeOrders, cash: { deliveries, due, card, received, discrepancy }, reconciled
 - Язык сообщений: `language_code` Telegram курьера (`ru`, `uz`, `en`; иное → `ru`), обновляется при каждом апдейте.
 - Карточки уходят через очередь `courier-cards` (5 попыток); без очереди (`ORDER_QUEUES=off`) карточки не приходят.
 
+## Доска заказов (владелец и оператор)
+
+`GET /order/board?branchId=<uuid>` (право `orders`, как у `GET /order`): окно оператора (дашборд, `../docs/DELIVERY.md`,
+«Окно оператора»). Все живые заказы (`pending_acceptance`, `accepted`, `preparing`, `on_the_way`, `ready`,
+`problem_at_door`) заведения или одного филиала, без пагинации. Операторы к филиалам не привязаны: без `branchId` все
+филиалы. `branchId` не UUID → `400`, филиал другого заведения → `404 not_found`.
+
+Элемент облегчённый: без имени и телефона гостя, комментария, полного адреса и журнала; детали в `GET /order/{id}`.
+
+```json
+{
+  "serverTime": "2026-11-24T12:00:00.000Z",
+  "items": [
+    {
+      "id": "0b6f8a52-3c1d-4e7f-9a2b-5c6d7e8f9a0b",
+      "number": 1042,
+      "status": "pending_acceptance",
+      "fulfillmentMode": "delivery",
+      "createdAt": "2026-11-24T11:51:00.000Z",
+      "statusSince": "2026-11-24T11:58:00.000Z",
+      "acceptDeadlineAt": "2026-11-24T12:03:00.000Z",
+      "shortAddress": "Amir Temur ko‘chasi, 15",
+      "itemsCount": 5,
+      "itemsPreview": [{ "name": "Плов", "quantity": 2 }, { "name": "Самса", "quantity": 3 }],
+      "total": 125000,
+      "currency": "UZS",
+      "paymentMethod": "cash",
+      "cashChangeFrom": 200000,
+      "courier": null,
+      "attention": [],
+      "version": 1
+    }
+  ],
+  "thresholds": {
+    "pickupReminderMinutes": 5, "onTheWayAlertMinutes": 60, "doorWaitMinutes": 10,
+    "acceptanceTimeoutSeconds": 300, "posFailed": 0, "posReconnect": false, "posCouriers": false
+  },
+  "today": { "ordersCount": 37, "completedCount": 30, "revenue": 3450000 },
+  "completedTodayCount": 30
+}
+```
+
+- Порядок: по `statusSince` (дольше всех в своём статусе первым), при равенстве по номеру.
+- `statusSince`: вход в текущий статус по журналу (записи без смены статуса, например назначение курьера, не считаются);
+  нет записи → `createdAt`.
+- `acceptDeadlineAt`: только у `pending_acceptance`: вход в `pending_acceptance` + `acceptanceTimeoutSeconds` (у онлайн-заказа
+  ожидание начинается после оплаты, не с `createdAt`); в этот момент заказ отменяется автоматически. Иначе `null`.
+- `shortAddress`: строка адреса доставки без подъезда, этажа, квартиры и комментария; самовывоз `null`.
+- `itemsCount`: сумма количеств; `itemsPreview`: первые 4 позиции `{ name, quantity }`.
+- `courier`: `{ id, name } | null` (без телефона). `version`: версия заказа, растёт с каждой сменой статуса.
+- Таймеры на экране считаются от `serverTime`, не от часов устройства.
+- `today` по суткам Asia/Tashkent: `ordersCount` дошедшие до заведения (вошли в `pending_acceptance`), `completedCount`
+  завершённые, `revenue` сумма `total` завершённых; с учётом `branchId`. `completedTodayCount` = `today.completedCount`.
+
+`attention[]` (несколько сразу возможны; курьерские коды только у доставки и только если курьеры не у iiko,
+`thresholds.posCouriers: false`):
+
+| Код | Когда |
+|---|---|
+| `no_courier` | доставка `accepted` или `ready` без курьера |
+| `not_picked_up` | `ready` с курьером, «Забрал» не нажат `pickupReminderMinutes` после `readyAt` |
+| `long_on_the_way` | `on_the_way` дольше `onTheWayAlertMinutes` от «Забрал» |
+| `at_door` | `problem_at_door` |
+| `courier_returned` | `ready` без курьера после поездки (вход в `ready` из `on_the_way` или `problem_at_door`: «Не могу доставить» или курьера отключили); вместе с `no_courier` |
+| `pos_needs_action` | передача в iiko застряла (`failed`, `needs_street`), любой тип заказа |
+
+Признаки пересчитываются при каждом запросе (тикер в окне их не пересчитывает: обновление приходит с опросом).
+
+### Действия с ожидаемым статусом
+
+`POST /order/{id}/accept`, `/advance`, `/reject`, `/status` принимают в теле `expectedStatus` (необязательно): статус, в
+котором оператор видел заказ (карточка, колонка доски). Заказ в другом статусе не двигается: `409 order_status_conflict`,
+`details.status` = текущий статус. Это касается и гонки: два оператора одновременно жмут «Принять» с
+`expectedStatus: pending_acceptance` → один получает заказ, второй `409`. Без `expectedStatus` всё как раньше (повтор
+того же действия отвечает `200`; старый дашборд и кнопки Telegram).
+
+Самовывоз: `POST /order/{id}/status { status: "ready" }` из `accepted` проводит `accepted → preparing → ready` в одной
+транзакции (перетаскивание «Готовятся → Готовы» одним запросом); в журнале оба шага, гость получает одно уведомление.
+`advance` остаётся одним шагом.
+
+## Web push сотрудникам (владелец и оператор)
+
+Уведомления о заказах в браузер или PWA дашборда, когда окно закрыто. Telegram-чат филиала остаётся запасным каналом.
+
+| Метод | Путь | Ответ |
+|---|---|---|
+| GET | `/push/public-key` | `{ publicKey }` (VAPID, base64url) для `pushManager.subscribe({ applicationServerKey })`; без ключей на платформе `503 platform_misconfigured`, `details.feature: web_push` |
+| POST | `/push/subscriptions` `{ endpoint, keys: { p256dh, auth }, userAgent? }` | `204`; тело = `PushSubscription.toJSON()` + `navigator.userAgent` |
+| DELETE | `/push/subscriptions` `{ endpoint }` | `204` |
+
+- Право `orders` (владелец и оператор). `endpoint` только `https`, до 1000 символов; ключи base64url; лишние поля → `400`.
+- Подписка одна на `endpoint`: повторная подписка обновляет ключи; другой сотрудник, вошедший в том же браузере,
+  забирает её себе (уведомления получает тот, кто вошёл сейчас).
+- `DELETE` удаляет только свою подписку; чужой или неизвестный `endpoint` отвечает тем же `204`, ничего не удаляя.
+- Выход: дашборд сам вызывает `DELETE /push/subscriptions` до `POST /auth/logout`. Сброс пароля, отключение сотрудника,
+  удаление пользователя или заведения удаляют подписки на сервере.
+
+Когда приходит (получатели: все активные владельцы и операторы заведения, у кого есть подписка):
+
+| Событие | Заголовок | Текст |
+|---|---|---|
+| заказ вошёл в `pending_acceptance` (`new_order`) | «Новый заказ №1042» | «Доставка · 5 позиций · 125 000 сум» или «Самовывоз · …» |
+| курьер отметил проблему у двери (`at_door`) | «№1042: курьер у двери, гость не отвечает»; при отказе «№1042: гость отказался от заказа» | что сделать |
+| курьер нажал «Не могу доставить» (`cannot_deliver`) | «№1042: курьер не может доставить» | «Заказ снова готов, назначьте другого курьера» |
+
+Отключение курьера владельцем (заказ возвращается в `ready` от системы) push не шлёт, только сообщение в чат филиала.
+
+Payload (что получает service worker; без телефона, адреса, имени и состава: уведомления идут через серверы Google,
+Mozilla и Apple):
+
+```json
+{
+  "title": "Новый заказ №1042",
+  "body": "Доставка · 5 позиций · 125 000 сум",
+  "tag": "order-0b6f8a52-3c1d-4e7f-9a2b-5c6d7e8f9a0b",
+  "data": { "url": "/order?o=0b6f8a52-3c1d-4e7f-9a2b-5c6d7e8f9a0b", "orderId": "0b6f8a52-3c1d-4e7f-9a2b-5c6d7e8f9a0b", "event": "new_order" }
+}
+```
+
+- Отправка: `TTL` 300 с, `Urgency: high`, `Topic` = id заказа без дефисов (непоказанное сообщение о заказе заменяется
+  новым); `tag` для `showNotification` сворачивает уведомления одного заказа.
+- Очередь `staff-push` (3 попытки, backoff от 5 с), переход заказа её не ждёт; повтор только для подписок с временной
+  ошибкой. Одно событие одной версии заказа рассылается один раз (Redis); событие, устаревшее к моменту отправки
+  (заказ уже принят), не шлётся.
+- Ответ push-сервиса `404`/`410` удаляет подписку; другие ошибки увеличивают `failure_count`, в лог только хост
+  push-сервиса. При `ORDER_QUEUES=off` отправка сразу, без повторов.
 ## Тенант: адрес → id → конфиг
 
 Клиентские фронты (QR-меню, доставка) определяют заведение так:

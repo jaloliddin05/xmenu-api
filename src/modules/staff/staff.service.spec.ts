@@ -15,6 +15,7 @@ beforeAll(() => {
 describe('StaffService', () => {
   let deps: ReturnType<typeof makeStaffAuthDeps>;
   let sessions: { revokeAllForUser: jest.Mock };
+  let push: { removeAllForUser: jest.Mock };
   let service: StaffService;
   let orgId: string;
   let ownerId: string;
@@ -22,11 +23,13 @@ describe('StaffService', () => {
   beforeEach(async () => {
     deps = makeStaffAuthDeps();
     sessions = { revokeAllForUser: jest.fn(async () => 2) };
+    push = { removeAllForUser: jest.fn(async () => 1) };
     service = new StaffService(
       deps.db as any,
       deps.rateLimit,
       deps.events,
       sessions as any,
+      push as any,
     );
     const owner = await deps.db.user.create({
       data: { phone: OWNER_PHONE, first_name: 'Aziz', isActive: true },
@@ -164,7 +167,7 @@ describe('StaffService', () => {
       return { member, user };
     }
 
-    it('switches the account off and ends every login at once', async () => {
+    it('switches the account off, ends every login at once and drops its push subscriptions', async () => {
       const { member, user } = await activeOperator();
       await service.disable(orgId, member.id, CTX);
 
@@ -173,6 +176,7 @@ describe('StaffService', () => {
         status: 'disabled',
       });
       expect(sessions.revokeAllForUser).toHaveBeenCalledWith(user.id);
+      expect(push.removeAllForUser).toHaveBeenCalledWith(user.id);
       expect(deps.db.events.map((e) => e.type)).toContain('staff_disabled');
     });
 
@@ -181,6 +185,7 @@ describe('StaffService', () => {
       await service.disable(orgId, member.id, CTX);
       expect((await service.list(orgId))[1].status).toBe('disabled');
       expect(sessions.revokeAllForUser).not.toHaveBeenCalled();
+      expect(push.removeAllForUser).not.toHaveBeenCalled();
     });
 
     it('is idempotent', async () => {

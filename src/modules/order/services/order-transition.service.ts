@@ -23,6 +23,7 @@ import { RestaurantNotifierService } from '../notifications/restaurant-notifier.
 import { OrderQueueService } from '../queue/order-queue.service';
 import { OrderSettingsService } from './order-settings.service';
 import { isPosLive } from 'src/modules/pos/domain/pos-steps';
+import { StaffPushService } from 'src/modules/push/staff-push.service';
 
 export class InvalidTransitionError extends Error {
   constructor(
@@ -83,7 +84,32 @@ export type Effect =
   /** The order goes to the POS (accepted) or the POS hears that an own courier delivered it */
   | { type: 'pos_job'; name: 'push' | 'delivered' }
   /** A message to the branch chat about the order in the POS */
-  | { type: 'pos_alert'; alert: PosAlert };
+  | { type: 'pos_alert'; alert: PosAlert }
+  /** Web push to the venue staff (the new order is sent on placed) */
+  | { type: 'staff_push'; event: 'at_door' | 'cannot_deliver' };
+
+/**
+ * Effects of the steps of one chain: a single status change (first from → last to) and every other effect
+ * once. A single step comes back unchanged.
+ */
+export function mergeStepEffects(
+  effects: readonly Effect[],
+  from: OrderStatusName,
+  to: OrderStatusName,
+): Effect[] {
+  const changes = effects.filter((e) => e.type === 'status_changed');
+  if (changes.length <= 1) return [...effects];
+  const seen = new Set<string>();
+  const out: Effect[] = [{ type: 'status_changed', from, to }];
+  for (const e of effects) {
+    if (e.type === 'status_changed') continue;
+    const key = JSON.stringify(e);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(e);
+  }
+  return out;
+}
 
 export interface TransitionResult {
   order: customer_order;
@@ -117,6 +143,7 @@ export class OrderTransitionService {
     private readonly restaurant: RestaurantNotifierService,
     private readonly customer: CustomerNotifierService,
     private readonly queues: OrderQueueService,
+    private readonly staffPush: StaffPushService,
   ) {}
 
   async transitionInTx(
@@ -213,6 +240,9 @@ export class OrderTransitionService {
           data.door_problem = null;
           data.door_problem_reason = null;
           effects.push({ type: 'operator_alert', kind: 'cannot_deliver' });
+          // The courier said so; a disabled courier (system) is the owner's own doing, the chat alert is enough
+          if (input.actor === 'courier')
+            effects.push({ type: 'staff_push', event: 'cannot_deliver' });
         }
         break;
       case 'problem_at_door': {
@@ -221,6 +251,7 @@ export class OrderTransitionService {
         data.door_problem_reason = input.doorProblem?.reason ?? null;
         data.door_problem_at = now;
         effects.push({ type: 'operator_alert', kind });
+        effects.push({ type: 'staff_push', event: 'at_door' });
         break;
       }
       case 'payment_failed':
@@ -384,12 +415,51 @@ export class OrderTransitionService {
   }
 
   /** Alohida tranzaksiyada o'tkazadi; versiya to'qnashuvida qayta o'qib urinadi. */
-  async transition(input: TransitionInput): Promise<TransitionResult> {
+  transition(input: TransitionInput): Promise<TransitionResult> {
+    return this.commit(input, [input.to]);
+  }
+
+  /**
+   * Several steps in one transaction, each checked by the state machine and written to the journal: a pickup
+   * marked ready straight from accepted passes preparing (one drag on the operator's board). The first step
+   * starts from `expectedFrom`, each next one from the step before. The effects of the steps are merged: the
+   * guest hears one status change, from the first status to the last.
+   */
+  transitionChain(
+    input: Omit<TransitionInput, 'to'>,
+    steps: readonly OrderStatusName[],
+  ): Promise<TransitionResult> {
+    return this.commit({ ...input, to: steps[steps.length - 1] }, steps);
+  }
+
+  private async commit(
+    input: TransitionInput,
+    steps: readonly OrderStatusName[],
+  ): Promise<TransitionResult> {
     for (let attempt = 1; ; attempt++) {
       try {
-        const result = await this.prisma.$transaction((tx) =>
-          this.transitionInTx(tx, input),
-        );
+        const result = await this.prisma.$transaction(async (tx) => {
+          const results: TransitionResult[] = [];
+          for (const [i, to] of steps.entries())
+            results.push(
+              await this.transitionInTx(tx, {
+                ...input,
+                to,
+                expectedFrom: i === 0 ? input.expectedFrom : steps[i - 1],
+              }),
+            );
+          const first = results[0];
+          const last = results[results.length - 1];
+          return {
+            order: last.order,
+            from: first.from,
+            effects: mergeStepEffects(
+              results.flatMap((r) => r.effects),
+              first.from,
+              last.order.status as OrderStatusName,
+            ),
+          };
+        });
         this.dispatchEffects(result.order, result.effects);
         return result;
       } catch (e) {
@@ -403,7 +473,7 @@ export class OrderTransitionService {
           if (!now) throw new OrderNotFoundError(input.orderId);
           const check = checkTransition(
             now.status as OrderStatusName,
-            input.to,
+            steps[0],
             input.actor,
             now.fulfillment as FulfillmentName,
           );
@@ -435,6 +505,7 @@ export class OrderTransitionService {
       try {
         switch (effect.type) {
           case 'placed': {
+            await this.staffPush.notify(order.id, 'new_order', order.version);
             const notified = await this.restaurant.notifyNewOrder(order.id);
             if (!notified)
               this.logger.warn(
@@ -472,6 +543,9 @@ export class OrderTransitionService {
             break;
           case 'pos_alert':
             await this.restaurant.alertPos(order.id, effect.alert);
+            break;
+          case 'staff_push':
+            await this.staffPush.notify(order.id, effect.event, order.version);
             break;
           case 'delivery_timers': {
             const s = await this.settings.get(order.organization_id);

@@ -2398,6 +2398,154 @@
         "x-permission": "venue"
       }
     },
+    "/push/public-key": {
+      "get": {
+        "operationId": "PushController_publicKey",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushPublicKeyDto"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "platform_misconfigured, details.feature = web_push: no VAPID keys on the platform",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "VAPID public key for pushManager.subscribe",
+        "tags": [
+          "Web push (staff)"
+        ],
+        "x-permission": "orders"
+      }
+    },
+    "/push/subscriptions": {
+      "post": {
+        "operationId": "PushController_subscribe",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushSubscribeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "400": {
+            "description": "validation_error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Save the browser subscription for the signed-in staff member (upsert by endpoint: the same endpoint moves to this user)",
+        "tags": [
+          "Web push (staff)"
+        ],
+        "x-permission": "orders"
+      },
+      "delete": {
+        "operationId": "PushController_unsubscribe",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushUnsubscribeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "400": {
+            "description": "validation_error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Remove this user's subscription by endpoint (another user's or an unknown endpoint: the same 204, nothing removed)",
+        "tags": [
+          "Web push (staff)"
+        ],
+        "x-permission": "orders"
+      }
+    },
     "/integrations/iiko": {
       "get": {
         "operationId": "PosIikoController_status",
@@ -4599,6 +4747,49 @@
         "x-permission": "orders"
       }
     },
+    "/order/board": {
+      "get": {
+        "operationId": "StaffOrderController_board",
+        "parameters": [
+          {
+            "name": "branchId",
+            "required": false,
+            "in": "query",
+            "description": "One branch (another venue’s branch: 404); all branches without it",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderBoardDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Order board: every live order of the venue or a branch, light (no guest name, phone or history), with attention codes, the acceptance deadline and today totals",
+        "tags": [
+          "Orders (staff)"
+        ],
+        "x-permission": "orders"
+      }
+    },
     "/order/{id}": {
       "get": {
         "operationId": "StaffOrderController_get",
@@ -4654,6 +4845,16 @@
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpectedStatusDto"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "",
@@ -4748,6 +4949,16 @@
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpectedStatusDto"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "",
@@ -10350,6 +10561,69 @@
           "leftOnBot"
         ]
       },
+      "PushPublicKeyDto": {
+        "type": "object",
+        "properties": {
+          "publicKey": {
+            "type": "string",
+            "description": "VAPID public key (base64url) for pushManager.subscribe({ applicationServerKey })",
+            "example": "BHP4ACfXvV8uE98UzA2N97fUQokHUFjIH9YMs-wGIJjhDLfhzTOLV8e4LZsClOcegRgYICe55ZmwcHYN-fHhc4Y"
+          }
+        },
+        "required": [
+          "publicKey"
+        ]
+      },
+      "PushSubscriptionKeysDto": {
+        "type": "object",
+        "properties": {
+          "p256dh": {
+            "type": "string",
+            "example": "BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QTpQtUbVlUls0VJXg7A8u-Ts1XbjhazAkj7I99e8QcYP7DkM"
+          },
+          "auth": {
+            "type": "string",
+            "example": "tBHItJI5svbpez7KI4CCXg"
+          }
+        },
+        "required": [
+          "p256dh",
+          "auth"
+        ]
+      },
+      "PushSubscribeDto": {
+        "type": "object",
+        "properties": {
+          "endpoint": {
+            "type": "string",
+            "description": "PushSubscription.endpoint (https URL of the push service)",
+            "example": "https://fcm.googleapis.com/fcm/send/dpH5lCsTSSM:APA91bH..."
+          },
+          "keys": {
+            "$ref": "#/components/schemas/PushSubscriptionKeysDto"
+          },
+          "userAgent": {
+            "type": "string",
+            "description": "navigator.userAgent, to tell the devices apart (up to 300 characters are kept)"
+          }
+        },
+        "required": [
+          "endpoint",
+          "keys"
+        ]
+      },
+      "PushUnsubscribeDto": {
+        "type": "object",
+        "properties": {
+          "endpoint": {
+            "type": "string",
+            "example": "https://fcm.googleapis.com/fcm/send/dpH5lCsTSSM:APA91bH..."
+          }
+        },
+        "required": [
+          "endpoint"
+        ]
+      },
       "PosAlertDto": {
         "type": "object",
         "properties": {
@@ -12739,9 +13013,324 @@
           "nextCursor"
         ]
       },
+      "BoardItemPreviewDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Плов"
+          },
+          "quantity": {
+            "type": "number",
+            "example": 2
+          }
+        },
+        "required": [
+          "name",
+          "quantity"
+        ]
+      },
+      "BoardCourierDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "example": "Bekzod"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "BoardItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "number": {
+            "type": "number",
+            "example": 1042
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending_acceptance",
+              "accepted",
+              "preparing",
+              "on_the_way",
+              "ready",
+              "problem_at_door"
+            ]
+          },
+          "fulfillmentMode": {
+            "type": "string",
+            "enum": [
+              "delivery",
+              "pickup"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "statusSince": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Entered the current status (journal); the board sorts by it, oldest first"
+          },
+          "acceptDeadlineAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "pending_acceptance only: auto-cancel moment = entering pending_acceptance (after the payment for online orders) + acceptanceTimeoutSeconds"
+          },
+          "shortAddress": {
+            "type": "string",
+            "nullable": true,
+            "example": "Amir Temur ko‘chasi, 15",
+            "description": "Street line of the delivery address (no entrance, floor, flat or comment); null for pickup"
+          },
+          "itemsCount": {
+            "type": "number",
+            "example": 5,
+            "description": "Sum of quantities"
+          },
+          "itemsPreview": {
+            "description": "First 4 positions",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BoardItemPreviewDto"
+            }
+          },
+          "total": {
+            "type": "number",
+            "example": 125000
+          },
+          "currency": {
+            "type": "string",
+            "example": "UZS"
+          },
+          "paymentMethod": {
+            "type": "string",
+            "enum": [
+              "cash",
+              "card",
+              "click",
+              "payme"
+            ]
+          },
+          "cashChangeFrom": {
+            "type": "number",
+            "nullable": true,
+            "example": 200000
+          },
+          "courier": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BoardCourierDto"
+              }
+            ]
+          },
+          "attention": {
+            "type": "array",
+            "description": "What needs the operator (docs/API.md, \"Доска заказов\"); courier codes only for deliveries with Xmenu couriers",
+            "items": {
+              "type": "string",
+              "enum": [
+                "no_courier",
+                "not_picked_up",
+                "long_on_the_way",
+                "at_door",
+                "courier_returned",
+                "pos_needs_action"
+              ]
+            }
+          },
+          "version": {
+            "type": "number",
+            "example": 3,
+            "description": "Order version (changes with every status change)"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "status",
+          "fulfillmentMode",
+          "createdAt",
+          "statusSince",
+          "acceptDeadlineAt",
+          "shortAddress",
+          "itemsCount",
+          "itemsPreview",
+          "total",
+          "currency",
+          "paymentMethod",
+          "cashChangeFrom",
+          "courier",
+          "attention",
+          "version"
+        ]
+      },
+      "BoardThresholdsDto": {
+        "type": "object",
+        "properties": {
+          "pickupReminderMinutes": {
+            "type": "number",
+            "example": 5,
+            "description": "\"Picked up\" not pressed this long after \"ready\""
+          },
+          "onTheWayAlertMinutes": {
+            "type": "number",
+            "example": 60,
+            "description": "On the way longer than this"
+          },
+          "doorWaitMinutes": {
+            "type": "number",
+            "example": 10,
+            "description": "Wait at the door after \"no answer\""
+          },
+          "posFailed": {
+            "type": "number",
+            "example": 0,
+            "description": "Unfinished orders not sent to iiko or waiting for a street (0 without iiko)"
+          },
+          "posReconnect": {
+            "type": "boolean",
+            "description": "iiko does not take the venue key: the owner reconnects iiko"
+          },
+          "posCouriers": {
+            "type": "boolean",
+            "description": "Couriers of the venue work in iiko: courier functions of Xmenu answer 409 pos_couriers_managed"
+          },
+          "acceptanceTimeoutSeconds": {
+            "type": "number",
+            "example": 300,
+            "description": "Unanswered orders are cancelled after this"
+          }
+        },
+        "required": [
+          "pickupReminderMinutes",
+          "onTheWayAlertMinutes",
+          "doorWaitMinutes",
+          "posFailed",
+          "posReconnect",
+          "posCouriers",
+          "acceptanceTimeoutSeconds"
+        ]
+      },
+      "BoardTodayDto": {
+        "type": "object",
+        "properties": {
+          "ordersCount": {
+            "type": "number",
+            "example": 37,
+            "description": "Orders that reached the venue today (entered pending_acceptance), Asia/Tashkent day"
+          },
+          "completedCount": {
+            "type": "number",
+            "example": 30,
+            "description": "Orders completed today"
+          },
+          "revenue": {
+            "type": "number",
+            "example": 3450000,
+            "description": "Sum of totals of the orders completed today"
+          }
+        },
+        "required": [
+          "ordersCount",
+          "completedCount",
+          "revenue"
+        ]
+      },
+      "OrderBoardDto": {
+        "type": "object",
+        "properties": {
+          "serverTime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Count the timers from this, not from the device clock"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BoardItemDto"
+            }
+          },
+          "thresholds": {
+            "$ref": "#/components/schemas/BoardThresholdsDto"
+          },
+          "today": {
+            "$ref": "#/components/schemas/BoardTodayDto"
+          },
+          "completedTodayCount": {
+            "type": "number",
+            "example": 30,
+            "description": "Same as today.completedCount"
+          }
+        },
+        "required": [
+          "serverTime",
+          "items",
+          "thresholds",
+          "today",
+          "completedTodayCount"
+        ]
+      },
+      "ExpectedStatusDto": {
+        "type": "object",
+        "properties": {
+          "expectedStatus": {
+            "type": "string",
+            "enum": [
+              "awaiting_payment",
+              "payment_failed",
+              "pending_acceptance",
+              "accepted",
+              "preparing",
+              "on_the_way",
+              "ready",
+              "problem_at_door",
+              "completed",
+              "cancelled",
+              "returned_to_restaurant",
+              "handed_to_external"
+            ],
+            "description": "The status the operator acted on; another current status → 409 order_status_conflict"
+          }
+        }
+      },
       "RejectOrderDto": {
         "type": "object",
         "properties": {
+          "expectedStatus": {
+            "type": "string",
+            "enum": [
+              "awaiting_payment",
+              "payment_failed",
+              "pending_acceptance",
+              "accepted",
+              "preparing",
+              "on_the_way",
+              "ready",
+              "problem_at_door",
+              "completed",
+              "cancelled",
+              "returned_to_restaurant",
+              "handed_to_external"
+            ],
+            "description": "The status the operator acted on; another current status → 409 order_status_conflict"
+          },
           "reason": {
             "type": "string",
             "example": "out_of_stock"
@@ -12751,6 +13340,24 @@
       "SetOrderStatusDto": {
         "type": "object",
         "properties": {
+          "expectedStatus": {
+            "type": "string",
+            "enum": [
+              "awaiting_payment",
+              "payment_failed",
+              "pending_acceptance",
+              "accepted",
+              "preparing",
+              "on_the_way",
+              "ready",
+              "problem_at_door",
+              "completed",
+              "cancelled",
+              "returned_to_restaurant",
+              "handed_to_external"
+            ],
+            "description": "The status the operator acted on; another current status → 409 order_status_conflict"
+          },
           "status": {
             "type": "string",
             "enum": [

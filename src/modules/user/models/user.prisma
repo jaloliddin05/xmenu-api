@@ -11,6 +11,7 @@ model user {
   // The venue this staff user works in, with the role (one venue per user for now)
   membership   organization_member?
   sessions     staff_session[]
+  push_subscriptions staff_push_subscription[]
   avatar_id    String?      @unique
   avatar       file?        @relation(fields: [avatar_id], references: [id])
 }
