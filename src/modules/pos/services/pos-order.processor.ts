@@ -3,6 +3,7 @@ import {
   Logger,
   OnModuleDestroy,
   OnModuleInit,
+  Optional,
 } from '@nestjs/common';
 import { Job, Worker } from 'bullmq';
 import { errorMessage } from 'src/infra/helper/error-text';
@@ -16,6 +17,7 @@ import {
 import type { PosOrderInfo } from '../provider/pos-provider';
 import { PosOrderStatusService } from './pos-order-status.service';
 import { PosOrderService } from './pos-order.service';
+import { LiveOrderNotifier } from 'src/modules/live/live-order-notifier';
 
 /** Worker of the pos-orders queue (order-queue.service.ts): sending, checking, statuses. */
 @Injectable()
@@ -27,6 +29,7 @@ export class PosOrderProcessor implements OnModuleInit, OnModuleDestroy {
     private readonly orders: PosOrderService,
     private readonly statuses: PosOrderStatusService,
     private readonly queues: OrderQueueService,
+    @Optional() private readonly live?: LiveOrderNotifier,
   ) {}
 
   onModuleInit() {
@@ -47,7 +50,17 @@ export class PosOrderProcessor implements OnModuleInit, OnModuleDestroy {
     await this.worker?.close();
   }
 
-  process(job: Pick<Job<PosOrderJob>, 'name' | 'data'>): Promise<void> {
+  /** Runs a job; the POS state of its order may have changed, so the open screens hear about it. */
+  async process(job: Pick<Job<PosOrderJob>, 'name' | 'data'>): Promise<void> {
+    try {
+      await this.run(job);
+    } finally {
+      const event = job.data.event as PosOrderInfo | undefined;
+      await this.live?.changed(job.data.orderId ?? event?.id);
+    }
+  }
+
+  private run(job: Pick<Job<PosOrderJob>, 'name' | 'data'>): Promise<void> {
     const { orderId, integrationId, correlationId, polls } = job.data;
     switch (job.name as PosOrderJobName) {
       case 'push':

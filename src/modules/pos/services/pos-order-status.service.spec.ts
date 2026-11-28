@@ -53,19 +53,25 @@ describe('PosOrderStatusService', () => {
 
   const alerts = () => t.restaurant.alertPos.mock.calls.map((c: any[]) => c[1]);
 
-  it('CookingCompleted: "ready" by actor pos; the same event again changes nothing', async () => {
+  it('CookingStarted: "preparing", CookingCompleted: "ready" by actor pos; the same event again changes nothing', async () => {
     await service.apply(INTEGRATION, info('CookingStarted'));
     await service.apply(INTEGRATION, info('CookingCompleted'));
     await service.apply(INTEGRATION, info('CookingCompleted'));
-    expect(t.transitions.transition).toHaveBeenCalledTimes(1);
-    expect(t.transitions.transition).toHaveBeenCalledWith({
+    expect(t.transitions.transition).toHaveBeenCalledTimes(2);
+    expect(t.transitions.transition).toHaveBeenNthCalledWith(1, {
+      orderId: ORDER,
+      to: 'preparing',
+      actor: 'pos',
+      note: 'iiko:CookingStarted',
+    });
+    expect(t.transitions.transition).toHaveBeenNthCalledWith(2, {
       orderId: ORDER,
       to: 'ready',
       actor: 'pos',
       note: 'iiko:CookingCompleted',
     });
     expect(t.journal).toEqual([
-      'iiko:CookingStarted',
+      'preparing:iiko:CookingStarted',
       'ready:iiko:CookingCompleted',
     ]);
     expect(t.world.pos.pos_status).toBe('CookingCompleted');

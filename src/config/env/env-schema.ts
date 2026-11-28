@@ -9,6 +9,10 @@ import { platformDomainFrom } from 'src/modules/tenant/host';
 import { trustProxyEnvIssues } from 'src/infra/http/trust-proxy';
 import { staffAuthEnvIssues } from '../index';
 import { stepUpEnvIssues } from 'src/modules/auth/step-up/step-up.config';
+import {
+  webPushEnvIssues,
+  webPushOffReason,
+} from 'src/modules/push/push.config';
 import { Env, EnvIssues, isProduction, isSet } from './env-issues';
 
 type Kind =
@@ -154,6 +158,10 @@ export const ENV_SCHEMA: readonly EnvVarSpec[] = [
   int('STAFF_REFRESH_TTL_DAYS'),
   int('STAFF_SESSION_ABSOLUTE_DAYS'),
   int('STAFF_REFRESH_REUSE_LEEWAY_SECONDS'),
+  // Web push to staff; required in production, format: webPushEnvIssues
+  str('WEB_PUSH_VAPID_PUBLIC_KEY'),
+  secret('WEB_PUSH_VAPID_PRIVATE_KEY'),
+  str('WEB_PUSH_SUBJECT'),
   // Misc
   // /docs in production only when true (always on outside production): swagger.ts
   bool('SWAGGER_ENABLED'),
@@ -266,6 +274,7 @@ export type FeatureName =
   | 'revalidation'
   | 'order_notifications'
   | 'pos'
+  | 'web_push'
   | 'queues';
 
 export interface FeatureStatus {
@@ -356,6 +365,7 @@ export function featureStatus(env: Env): FeatureStatus[] {
       (!isSet(env, 'IIKO_APP_ID') || !isSet(env, 'IIKO_CLIENT_SECRET')) &&
         'IIKO_APP_ID and IIKO_CLIENT_SECRET are not set',
     ]),
+    feature('web_push', [webPushOffReason(env) ?? false]),
     feature('queues', [
       env.ORDER_QUEUES === 'off' &&
         'ORDER_QUEUES=off: no escalation or refund workers',
@@ -385,6 +395,7 @@ export function validateEnv(env: Env = process.env): EnvReport {
     domainEnvIssues(env),
     revalidateEnvIssues(env),
     trustProxyEnvIssues(env),
+    webPushEnvIssues(env),
   ];
   return {
     production: isProduction(env),

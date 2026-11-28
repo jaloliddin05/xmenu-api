@@ -65,7 +65,10 @@ Webhook и секрет ставятся автоматически, рукам�
 
 ### `POST /auth/customer/telegram/status`
 
-Тело: `{ sessionId }`. Опрашивай раз в 2 секунды, пока `expiresIn` не истёк. Ответы:
+Тело: `{ sessionId }`. Не опрашивай по таймеру: держи открытым поток `GET /events/telegram-verification` (заголовки
+`X-Tenant-Id` и `X-Verification-Session: <sessionId>`, `docs/API.md`, «События (SSE)») и вызывай `status` один раз на
+каждое событие `verification.changed`, при возврате на страницу и после переподключения потока. Поток закрывается сам,
+когда истекает сессия (`bye`). Ответы:
 
 | `status` | Значение | Что делать клиенту |
 |---|---|---|
@@ -86,7 +89,7 @@ Webhook и секрет ставятся автоматически, рукам�
 **Mini App (`instant`):**
 1. `telegram/start` с `initData`, затем `Telegram.WebApp.requestContact()`; если не поддерживается, открыть `deepLink`.
 2. Пользователь делится контактом; бот отвечает «Номер подтверждён».
-3. Опрос `telegram/status` вернёт `verified` с готовым входом. Telegram-пользователь привязывается к клиенту. Новый
+3. После события `verification.changed` `telegram/status` вернёт `verified` с готовым входом. Telegram-пользователь привязывается к клиенту. Новый
    номер получает `registrationToken`, в нём уже лежит Telegram-пользователь: `register` (имя) привязывает его без
    повторного `initData`.
 4. Следующие открытия Mini App: `POST /auth/customer/login { initData }` впускает сразу, без телефона.

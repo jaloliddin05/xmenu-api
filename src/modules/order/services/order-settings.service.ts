@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { LiveEventBus } from 'src/modules/live/live-event-bus';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
 import { AppException } from 'src/infra/errors/app-exception';
 import { PayRate, payRateOf } from 'src/modules/courier/domain/courier-pay';
@@ -27,6 +28,8 @@ export interface OrderSettings {
   onTheWayAlertMinutes: number;
   /** Wait at the door after "no answer", then the operator decides */
   doorWaitMinutes: number;
+  /** Deliveries pass "preparing" (the venue's kitchen queue); the setting as saved, see order/domain/kitchen.ts */
+  trackPreparation: boolean;
   /** The venue's courier pay rate; null: no pay is accrued (unless a courier has an own rate) */
   courierPay: PayRate | null;
 }
@@ -38,7 +41,13 @@ export class OrderSettingsService {
   private readonly logger = new Logger(OrderSettingsService.name);
   private cache = new Map<string, { at: number; value: OrderSettings }>();
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly live?: LiveEventBus,
+  ) {
+    // Another API process changed the venue: this copy of the cache is stale too
+    live?.onInvalidate((orgId) => this.cache.delete(orgId));
+  }
 
   async get(organizationId: string): Promise<OrderSettings> {
     const hit = this.cache.get(organizationId);
@@ -71,6 +80,7 @@ export class OrderSettingsService {
       pickupReminderMinutes: row.pickup_reminder_minutes,
       onTheWayAlertMinutes: row.on_the_way_alert_minutes,
       doorWaitMinutes: row.door_wait_minutes,
+      trackPreparation: row.track_preparation,
       courierPay: payRateOf({
         perDelivery: row.courier_pay_per_delivery,
         includedKm: row.courier_pay_included_km,
@@ -85,5 +95,6 @@ export class OrderSettingsService {
 
   invalidate(organizationId: string) {
     this.cache.delete(organizationId);
+    void this.live?.invalidate(organizationId);
   }
 }

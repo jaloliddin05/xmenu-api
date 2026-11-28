@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { Prisma, type PosDeliveredPush } from '@prisma/client';
 import { AppException } from 'src/infra/errors/app-exception';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
@@ -34,6 +34,8 @@ import type {
 import { PosAlertService } from './pos-alert.service';
 import { PosKeyring } from './pos-keyring';
 import { PosOrderQueue } from './pos-order.queue';
+import { PosSyncQueue } from './pos-sync.queue';
+import { errorMessage } from 'src/infra/helper/error-text';
 import { PosStreetsCache } from './pos-streets.cache';
 
 /** Questions about one deliveries/create command before the attempt counts as failed (~1 minute) */
@@ -91,6 +93,7 @@ export class PosOrderService {
     private readonly queue: PosOrderQueue,
     private readonly alerts: PosAlertService,
     private readonly streetsCache: PosStreetsCache,
+    @Optional() private readonly sync?: PosSyncQueue,
   ) {}
 
   private load(orderId: string): Promise<PosOrderRow | null> {
@@ -466,6 +469,24 @@ export class PosOrderService {
       });
     }
     await this.integrationProblem(row, failure.reason);
+    await this.refreshFromPos(row.integration_id, failure.reason);
+  }
+
+  /**
+   * iiko refused the order over a price or the stop list: the menu (or the stop list) in Xmenu is behind the cash
+   * desk, so it is fetched now instead of on a timer; the next guest sees the cash desk's prices.
+   */
+  private async refreshFromPos(integrationId: string, reason: PosOrderReason) {
+    try {
+      if (reason === 'pos_rejected_price')
+        await this.sync?.enqueue('menu', integrationId);
+      if (reason === 'pos_rejected_stop_list')
+        await this.sync?.enqueue('stop-list', integrationId);
+    } catch (e) {
+      this.logger.warn(
+        `refresh of integration ${integrationId} after ${reason} not queued: ${errorMessage(e)}`,
+      );
+    }
   }
 
   /**

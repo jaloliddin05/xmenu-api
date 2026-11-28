@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { PrismaModule } from '../_prisma/prisma.module';
 import { SmsModule } from '../sms/sms.module';
 import { TelegramModule } from '../telegram/telegram.module';
+import { PushModule } from '../push/push.module';
 import { CustomerNotifierService } from './notifications/customer-notifier.service';
 import { OpsNotifierService } from './notifications/ops-notifier.service';
 import { RestaurantNotifierService } from './notifications/restaurant-notifier.service';
@@ -20,7 +21,7 @@ import { TelegramApiService } from './services/telegram-api.service';
  * uchun OrderModule ham, PaymentModule ham uni sikllarsiz ishlata oladi.
  */
 @Module({
-  imports: [PrismaModule, SmsModule, TelegramModule],
+  imports: [PrismaModule, SmsModule, TelegramModule, PushModule],
   providers: [
     TelegramApiService,
     OrderSettingsService,

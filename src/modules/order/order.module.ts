@@ -15,6 +15,7 @@ import { RateLimitService } from '../auth/services/rate-limit.service';
 import { OrderCoreModule } from './order-core.module';
 import { RevalidateModule } from '../revalidate-queue/revalidate.module';
 import { OrderStaffService } from './services/order-staff.service';
+import { OrderBoardService } from './services/order-board.service';
 import { OrderService } from './services/order.service';
 import { DeliveryModule } from '../delivery/delivery.module';
 
@@ -41,6 +42,7 @@ import { DeliveryModule } from '../delivery/delivery.module';
   providers: [
     OrderService,
     OrderStaffService,
+    OrderBoardService,
     BranchChatBindingService,
     RateLimitService,
   ],

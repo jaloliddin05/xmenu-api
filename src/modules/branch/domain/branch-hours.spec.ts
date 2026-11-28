@@ -1,6 +1,7 @@
 import {
   BranchSchedule,
   branchStatus,
+  closesAtIso,
   DayHours,
   evaluateOpenState,
   formatHours,
@@ -52,15 +53,18 @@ describe('evaluateOpenState', () => {
         day(w, '00:00', '00:00', { is24h: true }),
       ),
     });
-    for (const t of [
-      '2026-10-12T00:00:00',
-      '2026-10-14T13:37:00',
-      '2026-10-18T23:59:00',
+    for (const [t, next] of [
+      ['2026-10-12T00:00:00', '2026-10-13'],
+      ['2026-10-14T13:37:00', '2026-10-15'],
+      ['2026-10-18T23:59:00', '2026-10-19'],
     ]) {
+      // the end of the day is the moment to read the state again: the next day continues it
       expect(evaluateOpenState(s, tashkent(t))).toEqual({
         isOpen: true,
         opensAt: null,
         opensDate: null,
+        closesAt: '00:00',
+        closesDate: next,
       });
     }
     expect(formatHours(s.days)).toBe('Круглосуточно');
@@ -69,7 +73,37 @@ describe('evaluateOpenState', () => {
   it('is open inside the interval', () => {
     expect(
       evaluateOpenState(schedule(), tashkent('2026-10-12T12:00:00')),
-    ).toEqual({ isOpen: true, opensAt: null, opensDate: null });
+    ).toEqual({
+      isOpen: true,
+      opensAt: null,
+      opensDate: null,
+      closesAt: '23:00',
+      closesDate: '2026-10-12',
+    });
+  });
+
+  it('an overnight shift ends tomorrow, and after midnight it ends this morning', () => {
+    const night = schedule({ days: everyDay('18:00', '03:00') });
+    expect(evaluateOpenState(night, tashkent('2026-10-12T20:00:00'))).toEqual(
+      expect.objectContaining({ closesAt: '03:00', closesDate: '2026-10-13' }),
+    );
+    const after = evaluateOpenState(night, tashkent('2026-10-13T01:00:00'));
+    expect(after).toEqual(
+      expect.objectContaining({
+        isOpen: true,
+        closesAt: '03:00',
+        closesDate: '2026-10-13',
+      }),
+    );
+    expect(closesAtIso(after, 'Asia/Tashkent')).toBe(
+      '2026-10-13T03:00:00+05:00',
+    );
+    expect(
+      closesAtIso(
+        evaluateOpenState(night, tashkent('2026-10-13T10:00:00')),
+        'Asia/Tashkent',
+      ),
+    ).toBeNull();
   });
 
   it("is closed before opening and reports today's opening time", () => {

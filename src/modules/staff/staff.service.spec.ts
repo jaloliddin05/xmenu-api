@@ -15,6 +15,7 @@ beforeAll(() => {
 describe('StaffService', () => {
   let deps: ReturnType<typeof makeStaffAuthDeps>;
   let sessions: { revokeAllForUser: jest.Mock };
+  let push: { removeAllForUser: jest.Mock };
   let service: StaffService;
   let orgId: string;
   let ownerId: string;
@@ -22,11 +23,13 @@ describe('StaffService', () => {
   beforeEach(async () => {
     deps = makeStaffAuthDeps();
     sessions = { revokeAllForUser: jest.fn(async () => 2) };
+    push = { removeAllForUser: jest.fn(async () => 1) };
     service = new StaffService(
       deps.db as any,
       deps.rateLimit,
       deps.events,
       sessions as any,
+      push as any,
     );
     const owner = await deps.db.user.create({
       data: { phone: OWNER_PHONE, first_name: 'Aziz', isActive: true },
@@ -42,8 +45,29 @@ describe('StaffService', () => {
 
   describe('invite', () => {
     it('creates an open invitation for 72 hours and writes the audit event', async () => {
-      const before = Date.now();
-      const member = await invite();
+      // Frozen clock: the expiry is exactly the TTL after the invitation, however slow the machine is
+      const before = Date.UTC(2026, 10, 24, 12, 0, 0);
+      jest.useFakeTimers({
+        now: before,
+        doNotFake: [
+          'nextTick',
+          'setImmediate',
+          'setTimeout',
+          'setInterval',
+          'clearTimeout',
+          'clearInterval',
+          'clearImmediate',
+          'queueMicrotask',
+          'hrtime',
+          'performance',
+        ],
+      });
+      let member: Awaited<ReturnType<typeof invite>>;
+      try {
+        member = await invite();
+      } finally {
+        jest.useRealTimers();
+      }
 
       expect(member).toMatchObject({
         role: 'operator',
@@ -54,8 +78,7 @@ describe('StaffService', () => {
         activatedAt: null,
       });
       const expires = member.inviteExpiresAt!.getTime() - before;
-      expect(expires).toBeGreaterThanOrEqual(INVITATION_TTL_MS - 1000);
-      expect(expires).toBeLessThanOrEqual(INVITATION_TTL_MS + 1000);
+      expect(expires).toBe(INVITATION_TTL_MS);
       expect(deps.db.events.map((e) => e.type)).toContain('staff_invited');
       expect(JSON.stringify(deps.db.events)).not.toContain(OP_PHONE);
     });
@@ -164,7 +187,7 @@ describe('StaffService', () => {
       return { member, user };
     }
 
-    it('switches the account off and ends every login at once', async () => {
+    it('switches the account off, ends every login at once and drops its push subscriptions', async () => {
       const { member, user } = await activeOperator();
       await service.disable(orgId, member.id, CTX);
 
@@ -173,6 +196,7 @@ describe('StaffService', () => {
         status: 'disabled',
       });
       expect(sessions.revokeAllForUser).toHaveBeenCalledWith(user.id);
+      expect(push.removeAllForUser).toHaveBeenCalledWith(user.id);
       expect(deps.db.events.map((e) => e.type)).toContain('staff_disabled');
     });
 
@@ -181,6 +205,7 @@ describe('StaffService', () => {
       await service.disable(orgId, member.id, CTX);
       expect((await service.list(orgId))[1].status).toBe('disabled');
       expect(sessions.revokeAllForUser).not.toHaveBeenCalled();
+      expect(push.removeAllForUser).not.toHaveBeenCalled();
     });
 
     it('is idempotent', async () => {

@@ -1,6 +1,7 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import type Redis from 'ioredis';
-import { randomBytes } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
+import { LiveEventBus } from 'src/modules/live/live-event-bus';
 import { REDIS } from 'src/infra/redis/redis.module';
 import { isValidPhone } from 'src/infra/helper/auth/customer-validators';
 import type { Tenant } from 'src/modules/tenant/tenant.service';
@@ -74,6 +75,9 @@ const MAX_CONTACT_ATTEMPTS = 3;
 const REMOVE_KEYBOARD = { remove_keyboard: true };
 
 const sKey = (sid: string) => `tgv:s:${sid}`;
+/** The routing key of a session in the venue event log: never the session id itself. */
+export const verificationStreamKey = (sid: string) =>
+  createHash('sha256').update(sid).digest('hex');
 const uKey = (botKey: string, tgUserId: string) =>
   `tgv:u:${botKey}:${tgUserId}`;
 const updKey = (botKey: string, updateId: number) =>
@@ -108,6 +112,7 @@ export class TelegramVerificationService {
     private readonly events: CustomerAuthEventService,
     private readonly auth: CustomerAuthService,
     private readonly botProfile: TelegramBotProfileService,
+    @Optional() private readonly live?: LiveEventBus,
   ) {}
 
   // ================= POST auth/customer/telegram/start =================
@@ -331,6 +336,7 @@ export class TelegramVerificationService {
     const attempts = await this.redis.hincrby(sKey(sid), 'attempts', 1);
     if (attempts > MAX_CONTACT_ATTEMPTS) {
       await this.redis.del(sKey(sid));
+      await this.moved(session.tenantId, sid);
       return this.say(bot, chatId, t.tooMany, REMOVE_KEYBOARD);
     }
 
@@ -347,6 +353,7 @@ export class TelegramVerificationService {
       if (session.tgUserId !== fromId)
         return this.say(bot, chatId, t.wrongAccount, REMOVE_KEYBOARD);
       await this.redis.hset(sKey(sid), { status: 'verified', phone });
+      await this.moved(session.tenantId, sid);
       await this.events.log('telegram_verified', ctx, {
         tenantId: session.tenantId,
         phone,
@@ -379,10 +386,37 @@ export class TelegramVerificationService {
       return this.say(bot, chatId, rateLimited ? t.tooMany : t.failed);
     }
     await this.redis.hset(sKey(sid), { status: 'code_sent', phone });
+    await this.moved(session.tenantId, sid);
     await this.events.log('telegram_verified', ctx, {
       tenantId: session.tenantId,
       phone,
       meta: { mode: 'code' },
+    });
+  }
+
+  // ================= GET events/telegram-verification =================
+
+  /**
+   * When the session of this venue ends (ms since epoch), null when there is none: the stream of its changes
+   * stays open until then.
+   */
+  async sessionEndsAt(
+    tenantId: string,
+    sessionId: string,
+  ): Promise<number | null> {
+    const session = await this.load(sessionId);
+    if (!session || session.tenantId !== tenantId) return null;
+    const ttl = await this.redis.pttl(sKey(sessionId));
+    return ttl > 0 ? Date.now() + ttl : null;
+  }
+
+  /** The phase of a session changed: its open stream asks for the status once (no polling). */
+  private async moved(tenantId: string, sessionId: string) {
+    await this.live?.publish(tenantId, {
+      type: 'verification.changed',
+      data: {},
+      to: ['verification'],
+      session: verificationStreamKey(sessionId),
     });
   }
 

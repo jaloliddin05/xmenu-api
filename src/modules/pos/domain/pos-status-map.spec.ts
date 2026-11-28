@@ -26,23 +26,37 @@ describe('decidePosStatus (docs/IIKO.md, "Путь заказа и статус�
     });
   });
 
-  it.each<PosDeliveryStatus>([
-    'WaitCooking',
-    'ReadyForCooking',
-    'CookingStarted',
-    'Waiting',
-  ])('%s: journal only', (status) => {
-    expect(decide(status, 'accepted')).toEqual({
-      repeat: false,
-      steps: [],
-      cancel: false,
-      confirm: false,
-      alert: null,
-    });
+  it.each<PosDeliveryStatus>(['WaitCooking', 'ReadyForCooking', 'Waiting'])(
+    '%s: journal only',
+    (status) => {
+      expect(decide(status, 'accepted')).toEqual({
+        repeat: false,
+        steps: [],
+        cancel: false,
+        confirm: false,
+        alert: null,
+      });
+    },
+  );
+
+  it('CookingStarted: "preparing" for delivery and pickup, only forward', () => {
+    expect(steps('CookingStarted', 'accepted')).toEqual(['preparing']);
+    expect(
+      steps('CookingStarted', 'accepted', {
+        order: { status: 'accepted', fulfillment: 'pickup' },
+      }),
+    ).toEqual(['preparing']);
+    // Already there or further (the operator marked it, or iiko reported ready first): nothing moves
+    expect(steps('CookingStarted', 'preparing')).toEqual([]);
+    expect(steps('CookingStarted', 'ready')).toEqual([]);
   });
 
-  it('CookingCompleted: "ready" instead of the operator; pickup goes through "preparing"', () => {
-    expect(steps('CookingCompleted', 'accepted')).toEqual(['ready']);
+  it('CookingCompleted: "ready" instead of the operator, through "preparing" when it was skipped', () => {
+    expect(steps('CookingCompleted', 'accepted')).toEqual([
+      'preparing',
+      'ready',
+    ]);
+    expect(steps('CookingCompleted', 'preparing')).toEqual(['ready']);
     expect(
       steps('CookingCompleted', 'accepted', {
         order: { status: 'accepted', fulfillment: 'pickup' },
@@ -61,7 +75,11 @@ describe('decidePosStatus (docs/IIKO.md, "Путь заказа и статус�
     const iiko = { courierMode: 'iiko' as const };
     it('OnWay → on the way, Delivered → delivered, through the steps missed', () => {
       expect(steps('OnWay', 'ready', iiko)).toEqual(['on_the_way']);
-      expect(steps('OnWay', 'accepted', iiko)).toEqual(['ready', 'on_the_way']);
+      expect(steps('OnWay', 'accepted', iiko)).toEqual([
+        'preparing',
+        'ready',
+        'on_the_way',
+      ]);
       expect(steps('Delivered', 'on_the_way', iiko)).toEqual(['completed']);
       expect(steps('Delivered', 'ready', iiko)).toEqual([
         'on_the_way',

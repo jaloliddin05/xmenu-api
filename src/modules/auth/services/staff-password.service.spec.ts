@@ -14,6 +14,7 @@ async function expectCode(p: Promise<unknown>, code: string) {
 describe('StaffPasswordService', () => {
   let deps: ReturnType<typeof makeStaffAuthDeps>;
   let sessions: { revokeAllForUser: jest.Mock };
+  let push: { removeAllForUser: jest.Mock };
   let service: StaffPasswordService;
 
   const addOwner = async (phone = PHONE, isActive = true) =>
@@ -28,6 +29,7 @@ describe('StaffPasswordService', () => {
   beforeEach(() => {
     deps = makeStaffAuthDeps();
     sessions = { revokeAllForUser: jest.fn(async () => 2) };
+    push = { removeAllForUser: jest.fn(async () => 1) };
     service = new StaffPasswordService(
       deps.db as any,
       deps.otp,
@@ -38,6 +40,7 @@ describe('StaffPasswordService', () => {
       deps.sms,
       staffTestConfig,
       deps.smsBudget,
+      push as any,
     );
   });
 
@@ -115,13 +118,9 @@ describe('StaffPasswordService', () => {
       jest
         .spyOn(deps.sms, 'send')
         .mockReturnValue(new Promise(() => undefined));
+      // A send that never ends: if forgot() waited for it, the call would never resolve
       await expect(
-        Promise.race([
-          service.forgot({ phone: PHONE }, CTX),
-          new Promise((_, rej) =>
-            setTimeout(() => rej(new Error('hung')), 500),
-          ),
-        ]),
+        service.forgot({ phone: PHONE }, CTX),
       ).resolves.toMatchObject({ resendAfter: 60 });
     });
 
@@ -211,6 +210,7 @@ describe('StaffPasswordService', () => {
       expect(await bcrypt.compare(NEW_PASSWORD, row.password!)).toBe(true);
       expect(await bcrypt.compare(OLD_PASSWORD, row.password!)).toBe(false);
       expect(sessions.revokeAllForUser).toHaveBeenCalledWith(user.id);
+      expect(push.removeAllForUser).toHaveBeenCalledWith(user.id);
       expect(reset).toHaveBeenCalledWith(PHONE);
       expect(deps.db.events.map((e) => e.type)).toContain(
         'staff_password_reset',

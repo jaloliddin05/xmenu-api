@@ -331,10 +331,13 @@ export class StaffAuthService {
           });
           return user.id;
         });
-        return await this.prisma.user.findUniqueOrThrow({
+        const created = await this.prisma.user.findUniqueOrThrow({
           where: { id: userId },
           include: USER_WITH_ORGANIZATION,
         });
+        const orgId = created.membership?.organization_id;
+        if (orgId) await this.organizations.announceCreated(orgId);
+        return created;
       } catch (err) {
         if (
           !(err instanceof Prisma.PrismaClientKnownRequestError) ||

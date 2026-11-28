@@ -1,3 +1,4 @@
+import { isKitchenStep } from '../domain/kitchen';
 import { isOnlineMethod, paidAtDoor } from '../domain/delivery-payment';
 import type { Lang } from 'src/infra/http/request-helpers';
 import { CUSTOMER_TEXTS } from './customer-messages';
@@ -133,21 +134,33 @@ export const callbackData = (
   orderId: string,
 ) => `${prefix}${status}:${orderId}`;
 
-/** Button for the restaurant's next step; a delivery stops at "ready" (the courier moves it on). */
+/**
+ * Button for the restaurant's next step, by the status it leads to; a delivery stops at "ready" (the courier moves it
+ * on) and passes "preparing" with the venue's kitchen queue.
+ */
 const NEXT_LABEL: Record<
   'delivery' | 'pickup',
   Partial<Record<OrderStatusName, string>>
 > = {
-  delivery: { accepted: '📦 Готов' },
+  delivery: { preparing: '👨‍🍳 Начали готовить', ready: '📦 Готов' },
   pickup: {
-    accepted: '👨‍🍳 Начали готовить',
-    preparing: '🛍 Готов к выдаче',
-    ready: '🏁 Выдан клиенту',
+    preparing: '👨‍🍳 Начали готовить',
+    ready: '🛍 Готов к выдаче',
+    completed: '🏁 Выдан клиенту',
   },
 };
 
+/** What the card buttons depend on besides the order (order/domain/kitchen.ts). */
+export interface KeyboardContext {
+  /** The venue's kitchen queue in effect: a delivery passes "preparing" */
+  trackPreparation: boolean;
+  /** iiko leads the kitchen steps: no kitchen button (the dashboard marks them by hand if needed) */
+  posControlled: boolean;
+}
+
 export function buildRestaurantKeyboard(
   order: Pick<OrderWithItems, 'id' | 'status' | 'fulfillment'>,
+  ctx: KeyboardContext = { trackPreparation: false, posControlled: false },
 ): InlineKeyboard | null {
   const status = order.status as OrderStatusName;
   if (status === 'pending_acceptance') {
@@ -166,8 +179,13 @@ export function buildRestaurantKeyboard(
       ],
     };
   }
-  const label = NEXT_LABEL[order.fulfillment][status];
-  if (nextRestaurantStatus(status, order.fulfillment) && label) {
+  const next = nextRestaurantStatus(
+    status,
+    order.fulfillment,
+    ctx.trackPreparation,
+  );
+  const label = next ? NEXT_LABEL[order.fulfillment][next] : undefined;
+  if (next && label && !(ctx.posControlled && isKitchenStep(status, next))) {
     return {
       inline_keyboard: [
         [
@@ -210,7 +228,9 @@ export function buildCustomerText(
     case 'ready':
       if (order.fulfillment !== 'delivery') return t.ready(n);
       // "Cannot deliver" puts the order back to ready: the guest does not need that step again
-      return from === 'accepted' ? t.readyForCourier(n) : null;
+      return from === 'accepted' || from === 'preparing'
+        ? t.readyForCourier(n)
+        : null;
     case 'problem_at_door':
       return order.door_problem === 'no_answer' ? t.courierAtDoor(n) : null;
     case 'returned_to_restaurant':

@@ -30,6 +30,14 @@ export class BranchViewDto implements BranchView {
   })
   opensAt: string | null;
   @ApiProperty({
+    type: String,
+    nullable: true,
+    example: '2026-11-11T22:00:00+05:00',
+    description:
+      'An open branch: when its current interval ends (ISO 8601 with the branch UTC offset; midnight for a round-the-clock day). The client reads the list again at that moment instead of polling; null when closed',
+  })
+  closesAt: string | null;
+  @ApiProperty({
     enum: ['open', 'closed_now', 'no_schedule', 'closed_all_days'],
     description:
       'open; closed_now (closed, opensAt says when it opens); no_schedule (owner never entered hours); closed_all_days (hours exist but nothing opens in the next 7 days)',

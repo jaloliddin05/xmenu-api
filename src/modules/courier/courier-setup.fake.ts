@@ -24,6 +24,7 @@ export const ORDER_SETTINGS: OrderSettings = {
   pickupReminderMinutes: 5,
   onTheWayAlertMinutes: 60,
   doorWaitMinutes: 10,
+  trackPreparation: false,
   courierPay: null,
 };
 export const STAFF = 'staff-user-1';
@@ -59,12 +60,16 @@ export async function setup() {
   const orderSettings = { ...ORDER_SETTINGS };
   const settings = { get: jest.fn(async () => orderSettings) };
   const customer = { notifyStatus: jest.fn(async () => undefined) };
+  const staffPush = { notify: jest.fn(async (..._a: unknown[]) => undefined) };
+  const ops = { alert: jest.fn(async (_text: string) => undefined) };
   const transitions = new OrderTransitionService(
     db as any,
     settings as any,
     restaurant as any,
     customer as any,
     queues as any,
+    staffPush as any,
+    ops as any,
   );
   const bots = {
     forTenant: jest.fn(async (id: string) =>
@@ -145,6 +150,8 @@ export async function setup() {
     cards,
     queues,
     restaurant,
+    staffPush,
+    ops,
     orderSettings,
     transitions,
     shifts,

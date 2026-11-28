@@ -72,8 +72,11 @@ function setup(status = 'accepted', fulfillment = 'pickup') {
       findFirst: jest.fn(async () => ({
         status: order.status,
         fulfillment: order.fulfillment,
+        organization_id: 'org-1',
       })),
     },
+    // No iiko: the venue's own kitchen queue decides "next"
+    pos_integration: { findUnique: jest.fn(async () => null) },
   };
   const { InvalidTransitionError } = jest.requireActual(
     '../services/order-transition.service',
@@ -89,7 +92,9 @@ function setup(status = 'accepted', fulfillment = 'pickup') {
   const staff = new OrderStaffService(
     prisma as any,
     transitions as any,
-    {} as any,
+    {
+      get: async () => ({ trackPreparation: false }),
+    } as any,
   );
   const telegram = {
     answerCallbackQuery: jest.fn(async (): Promise<unknown> => true),

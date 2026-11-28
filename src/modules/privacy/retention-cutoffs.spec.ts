@@ -10,6 +10,7 @@ describe('retentionCutoffs', () => {
     expect(c.applications.getTime()).toBe(now.getTime() - 365 * DAY);
     expect(c.staffAuthEvents.getTime()).toBe(now.getTime() - 90 * DAY);
     expect(c.staffSessions.getTime()).toBe(now.getTime() - 7 * DAY);
+    expect(c.pushSubscriptions.getTime()).toBe(now.getTime() - 30 * DAY);
   });
 
   it('reads the periods from the environment', () => {

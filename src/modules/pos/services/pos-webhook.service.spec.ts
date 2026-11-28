@@ -63,9 +63,8 @@ describe('PosWebhookService', () => {
     orderQueue.event.mockResolvedValue(true);
     // A slow iiko (confirm hangs): handling would never finish in the request
     statuses.apply.mockImplementation(() => new Promise(() => undefined));
-    const started = Date.now();
+    // Awaiting it is the check: if the answer waited for the hung call, this would never return
     await service.receive(ID, SECRET, [orderUpdate, orderUpdate]);
-    expect(Date.now() - started).toBeLessThan(1000);
     expect(statuses.apply).not.toHaveBeenCalled();
     // Recorded once (the repeat is skipped), with its dedup key for the job id
     expect(orderQueue.event).toHaveBeenCalledTimes(1);

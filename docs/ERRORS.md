@@ -19,7 +19,7 @@
 | `rate_limited` | 429 | Превышен лимит запросов (по IP, номеру или пользователю; заказов гостя за час) | `retryAfter` |
 | `internal_error` | 500 | Непредвиденная ошибка сервера; подробности только в логе по `requestId` | — |
 | `unavailable` | 503 | Временный сбой (очередь, база); повторить позже | — |
-| `platform_misconfigured` | 503 | Функция выключена настройкой платформы (не заведения); `details.feature`: `telegram_bot`, `delivery_link`, `sms`, `domains`, `payments`, `translation`, `order_notifications`, `pos` | `details.feature` |
+| `platform_misconfigured` | 503 | Функция выключена настройкой платформы (не заведения); `details.feature`: `telegram_bot`, `delivery_link`, `sms`, `domains`, `payments`, `translation`, `order_notifications`, `pos`, `web_push` | `details.feature` |
 | `tenant_required` | 400 | Клиентский запрос без заголовка `X-Tenant-Id` | — |
 | `tenant_not_found` | 404 | Нет активного заведения с таким id (или передан slug вместо id) | — |
 | `tenant_inactive` | 403 | Заведение отключено | — |
@@ -117,5 +117,6 @@
 | `pos_courier_mode_locked` | 409 | Смена режима курьеров при незавершённых заказах доставки | — |
 | `pos_order_state_conflict` | 409 | Действие с передачей заказа в iiko не подходит к её состоянию: «Повторить» не для `failed`, «Внесён вручную» для уже переданного, улица для заказа, который её не ждёт, или заказ уже завершён | — |
 | `pos_couriers_managed` | 409 | Курьерская функция Xmenu (курьеры, смены, назначение, внешняя служба, отчёт по курьерам) у заведения в режиме «курьеры iiko» | — |
+| `pos_status_managed` | 409 | Оператор отмечает шаг кухни («Готовится», «Готов») у заказа, переданного в iiko, без `override: true`; `details.status` | `details.status` |
 | `pos_menu_locked` | 409 | Создание блюда, категории, группы допов или опции в группе из iiko, пока iiko подключён (включён или ждёт переподключения): меню приходит из iiko | — |
 | `pos_busy` | 409 | Отключение iiko, пока идёт импорт меню или обновление стоп-листа и он не закончился за 10 с | — |

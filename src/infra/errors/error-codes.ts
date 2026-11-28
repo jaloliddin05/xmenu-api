@@ -87,7 +87,7 @@ export const ERROR_CODES = spec({
   platform_misconfigured: {
     status: 503,
     message: 'This feature is not configured on the platform',
-    when: 'Функция выключена настройкой платформы (не заведения); `details.feature`: `telegram_bot`, `delivery_link`, `sms`, `domains`, `payments`, `translation`, `order_notifications`, `pos`',
+    when: 'Функция выключена настройкой платформы (не заведения); `details.feature`: `telegram_bot`, `delivery_link`, `sms`, `domains`, `payments`, `translation`, `order_notifications`, `pos`, `web_push`',
     details: ['feature'],
   },
 
@@ -622,6 +622,12 @@ export const ERROR_CODES = spec({
     message: 'Couriers of this venue are managed in the POS',
     when: 'Курьерская функция Xmenu (курьеры, смены, назначение, внешняя служба, отчёт по курьерам) у заведения в режиме «курьеры iiko»',
   },
+  pos_status_managed: {
+    status: 409,
+    message: 'The status of this order is managed by the POS',
+    when: 'Оператор отмечает шаг кухни («Готовится», «Готов») у заказа, переданного в iiko, без `override: true`; `details.status`',
+    details: ['status'],
+  },
   pos_menu_locked: {
     status: 409,
     message: 'The menu comes from the POS',
@@ -647,7 +653,8 @@ export type MisconfiguredFeature =
   | 'payments'
   | 'translation'
   | 'order_notifications'
-  | 'pos';
+  | 'pos'
+  | 'web_push';
 
 export const isErrorCode = (code: unknown): code is ErrorCode =>
   typeof code === 'string' && Object.hasOwn(ERROR_CODES, code);

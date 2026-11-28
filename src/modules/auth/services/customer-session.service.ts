@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import type Redis from 'ioredis';
 import { createHash, randomBytes, randomUUID } from 'crypto';
 import { Prisma } from '@prisma/client';
@@ -12,6 +12,7 @@ import {
   RequestCtx,
 } from './customer-auth-event.service';
 import { AppException } from 'src/infra/errors/app-exception';
+import { LiveEventBus } from 'src/modules/live/live-event-bus';
 
 type Db = Prisma.TransactionClient | PrismaService;
 
@@ -33,6 +34,7 @@ export class CustomerSessionService {
     private readonly events: CustomerAuthEventService,
     @Inject(REDIS) private readonly redis: Redis,
     @Inject(CUSTOMER_AUTH_CONFIG) private readonly cfg: CustomerAuthConfig,
+    @Optional() private readonly live?: LiveEventBus,
   ) {}
 
   // ---------- denylist (access'ni darhol bekor qilish) ----------
@@ -44,6 +46,7 @@ export class CustomerSessionService {
       'EX',
       this.cfg.accessTtlSeconds,
     );
+    await this.live?.revoke('guest', sid);
   }
 
   async isSidDenied(sid: string): Promise<boolean> {

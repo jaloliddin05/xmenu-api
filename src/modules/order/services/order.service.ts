@@ -1,3 +1,4 @@
+import { loadKitchenMode } from '../domain/kitchen';
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { Lang } from 'src/infra/http/request-helpers';
@@ -415,8 +416,15 @@ export class OrderService {
       take: 50,
       include: ORDER_INCLUDE,
     });
+    const { trackPreparation } = await loadKitchenMode(
+      this.prisma,
+      this.settings,
+      principal.tenantId,
+    );
     // Ro'yxatda to'lov havolasi qurilmaydi (har buyurtma uchun sozlamani ochish kerak bo'lardi).
-    return rows.map((o) => toOrderView(o as OrderWithItems));
+    return rows.map((o) =>
+      toOrderView(o as OrderWithItems, { trackPreparation }),
+    );
   }
 
   async get(principal: CustomerPrincipal, id: string, lang: Lang) {
@@ -585,7 +593,12 @@ export class OrderService {
           ? event.note
           : 'declined';
     }
-    return toOrderView(order, { paymentUrl, failReason });
+    const { trackPreparation } = await loadKitchenMode(
+      this.prisma,
+      this.settings,
+      order.organization_id,
+    );
+    return toOrderView(order, { paymentUrl, failReason, trackPreparation });
   }
 
   private loadProducts(

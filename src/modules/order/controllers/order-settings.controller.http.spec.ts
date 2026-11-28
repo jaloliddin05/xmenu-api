@@ -179,4 +179,22 @@ describe('GET/PUT /order-settings: payment methods at delivery (W13-05, W13F-04)
     const res = await put({ deliveryPayment: { cash: true } }).expect(400);
     expect(res.body.code).toBe('validation_error');
   });
+
+  it('the kitchen queue: off for a new venue, switched on and off, a boolean only', async () => {
+    const get = () =>
+      request(app.getHttpServer())
+        .get('/order-settings')
+        .set('Authorization', owner)
+        .expect(200);
+    expect((await get()).body.trackPreparation).toBe(false);
+    expect(
+      (await put({ trackPreparation: true }).expect(200)).body,
+    ).toMatchObject({
+      trackPreparation: true,
+    });
+    expect(row.track_preparation).toBe(true);
+    await put({ trackPreparation: false }).expect(200);
+    expect((await get()).body.trackPreparation).toBe(false);
+    expect((await put({ trackPreparation: 'yes' })).status).toBe(400);
+  });
 });

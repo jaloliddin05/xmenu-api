@@ -197,3 +197,22 @@ describe('courier in the guest view', () => {
       expect(toOrderView(base({ status, courier })).courier).toBeNull();
   });
 });
+
+describe('trackPreparation in the guest view', () => {
+  it('pickup always shows preparing; delivery with the kitchen queue or when the order is preparing', () => {
+    expect(toOrderView(base({ fulfillment: 'pickup' })).trackPreparation).toBe(
+      true,
+    );
+    expect(toOrderView(base({ status: 'accepted' })).trackPreparation).toBe(
+      false,
+    );
+    expect(
+      toOrderView(base({ status: 'accepted' }), { trackPreparation: true })
+        .trackPreparation,
+    ).toBe(true);
+    // The venue turned the queue off while this order was cooking: its timeline keeps the step
+    expect(toOrderView(base({ status: 'preparing' })).trackPreparation).toBe(
+      true,
+    );
+  });
+});

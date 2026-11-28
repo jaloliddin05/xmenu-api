@@ -31,6 +31,8 @@ describeDb('payment_failed expiry (PostgreSQL)', () => {
       { refreshMessage: jest.fn(async () => undefined) } as any,
       { notifyStatus: jest.fn(async () => undefined) } as any,
       {} as any,
+      { notify: jest.fn(async () => undefined) } as any,
+      { alert: jest.fn(async () => undefined) } as any,
     );
     jest
       .spyOn(transitions, 'dispatchEffects')

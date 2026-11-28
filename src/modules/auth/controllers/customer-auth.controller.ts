@@ -202,7 +202,7 @@ export class AuthCustomerController {
   @HttpCode(200)
   @ApiOperation({
     summary:
-      'Poll the Telegram verification session every 2 s (the login result is returned once)',
+      'Status of the Telegram verification session, asked after verification.changed or on return to the page (the login result is returned once)',
   })
   @ApiOkResponse({ type: CustomerTelegramStatusResponseDto })
   telegramStatus(

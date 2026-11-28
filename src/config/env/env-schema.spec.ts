@@ -33,6 +33,10 @@ const prodOk = {
   TELEGRAM_BOT_TOKEN: 't',
   IIKO_APP_ID: 'app',
   IIKO_CLIENT_SECRET: 'cs',
+  WEB_PUSH_VAPID_PUBLIC_KEY:
+    'BHP4ACfXvV8uE98UzA2N97fUQokHUFjIH9YMs-wGIJjhDLfhzTOLV8e4LZsClOcegRgYICe55ZmwcHYN-fHhc4Y',
+  WEB_PUSH_VAPID_PRIVATE_KEY: 'hYZ22uh4yiji8kAy5MF8YSP4EIoJytarY2LHj-o0NwM',
+  WEB_PUSH_SUBJECT: 'mailto:ops@xmenu.uz',
 };
 
 /** The smallest development environment that starts. */
@@ -76,6 +80,9 @@ describe('validateEnv', () => {
     ['SWAGGER_ENABLED', 'yes', /true or false/],
     ['SMS_DAILY_LIMIT_TENANT', '0', /integer/],
     ['REVALIDATE_SECRET', '', /REVALIDATE_SECRET/],
+    ['WEB_PUSH_VAPID_PUBLIC_KEY', 'not-a-key', /65 bytes/],
+    ['WEB_PUSH_VAPID_PRIVATE_KEY', 'c2hvcnQ', /32 bytes/],
+    ['WEB_PUSH_SUBJECT', 'ops@xmenu.uz', /mailto/],
   ])('production refuses %s=%s', (name, value, error) => {
     const report = validateEnv({ ...prodOk, [name]: value });
     expect(report.errors).toEqual(
@@ -91,10 +98,23 @@ describe('validateEnv', () => {
     'ESKIZ_PASSWORD',
     'SMS_DAILY_LIMIT_PLATFORM',
     'SMS_DAILY_LIMIT_TENANT',
+    'WEB_PUSH_VAPID_PUBLIC_KEY',
+    'WEB_PUSH_VAPID_PRIVATE_KEY',
+    'WEB_PUSH_SUBJECT',
   ])('production requires %s', (name) => {
     const env: Record<string, string> = { ...prodOk };
     delete env[name];
     expect(validateEnv(env).errors).not.toEqual([]);
+  });
+
+  it('production without any web push key does not start', () => {
+    const env: Record<string, string> = { ...prodOk };
+    delete env.WEB_PUSH_VAPID_PUBLIC_KEY;
+    delete env.WEB_PUSH_VAPID_PRIVATE_KEY;
+    delete env.WEB_PUSH_SUBJECT;
+    expect(validateEnv(env).errors).toEqual([
+      expect.stringContaining('web push'),
+    ]);
   });
 
   it('development starts with the minimum and lists what is off and why', () => {
@@ -106,7 +126,10 @@ describe('validateEnv', () => {
       domains: expect.stringContaining('PLATFORM_DOMAIN'),
       payments: expect.stringContaining('PUBLIC_API_URL is not https'),
       translation: 'OPENAI_API_KEY is not set',
+      web_push: expect.stringContaining('WEB_PUSH_VAPID_PUBLIC_KEY'),
     });
+    // All three keys missing is a normal development setup: push is off without a warning
+    expect(report.warnings.join(' ')).not.toContain('WEB_PUSH');
     // console needs nothing outside production
     expect(off(devMin).sms).toBeUndefined();
   });

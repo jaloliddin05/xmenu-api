@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { LiveEventBus } from 'src/modules/live/live-event-bus';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { isLang, Lang } from 'src/infra/http/request-helpers';
 import { PrismaService } from '../_prisma/prisma.service';
 import { isValidSlug } from '../organization/domain/slug';
@@ -49,7 +50,13 @@ export class TenantService {
     { at: number; found: boolean; active: boolean; tenant: Tenant | null }
   >();
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly live?: LiveEventBus,
+  ) {
+    // Another API process changed the venue: this copy of the cache is stale too
+    live?.onInvalidate((orgId) => this.cache.delete(orgId));
+  }
 
   async resolve(key: string): Promise<Tenant> {
     const id = parseTenantId(key);
@@ -161,5 +168,6 @@ export class TenantService {
   /** Drops the cached entry after the owner changes something the tenant carries. */
   invalidate(id: string) {
     this.cache.delete(id);
+    void this.live?.invalidate(id);
   }
 }

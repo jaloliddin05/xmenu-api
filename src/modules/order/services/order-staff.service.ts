@@ -3,13 +3,13 @@ import { Injectable } from '@nestjs/common';
 import { PosOrderState, Prisma } from '@prisma/client';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
 import {
-  LIVE_STATUSES,
   nextRestaurantStatus,
   OrderStatusName,
 } from '../domain/order-state-machine';
 import {
   InvalidTransitionError,
   OrderNotFoundError,
+  PosControlledError,
   OrderTransitionService,
 } from './order-transition.service';
 import { OrderWithItems, toOrderView, toPosView } from './order-view';
@@ -19,7 +19,8 @@ import {
   doorWaitEndsAt,
 } from '../domain/delivery-timers';
 import { AppException } from 'src/infra/errors/app-exception';
-import { isPosLive } from 'src/modules/pos/domain/pos-steps';
+import { posReminders } from './pos-reminders';
+import { loadKitchenMode } from '../domain/kitchen';
 
 const INCLUDE = {
   items: { include: { options: true } },
@@ -201,7 +202,9 @@ export class OrderStaffService {
           ? {
               fulfillment: 'delivery' as const,
               courier_id: null,
-              status: { in: ['accepted', 'ready'] as OrderStatusName[] },
+              status: {
+                in: ['accepted', 'preparing', 'ready'] as OrderStatusName[],
+              },
             }
           : {}),
         ...(q.posStates?.length
@@ -220,7 +223,7 @@ export class OrderStaffService {
     const page = rows.slice(0, limit);
     const [actors, pos] = await Promise.all([
       this.eventActors(organizationId, page),
-      this.posReminders(organizationId),
+      posReminders(this.prisma, organizationId),
     ]);
     return {
       items: page.map((o) => this.toStaffView(o, timers, actors)),
@@ -232,37 +235,6 @@ export class OrderStaffService {
         doorWaitMinutes: timers.doorWaitMinutes,
         ...pos,
       },
-    };
-  }
-
-  /**
-   * iiko (docs/IIKO.md, "Ошибки и сбои"): unfinished orders the operator has to act on (not sent, a
-   * street to pick) and whether the owner has to reconnect iiko; zeros and false without iiko.
-   */
-  private async posReminders(organizationId: string) {
-    const [posFailed, integration] = await Promise.all([
-      this.prisma.pos_order.count({
-        where: {
-          state: { in: ['failed', 'needs_street'] },
-          // A disconnected POS no longer takes these orders: nothing to retry
-          integration: { status: { in: ['active', 'needs_reconnect'] } },
-          order: {
-            organization_id: organizationId,
-            status: { in: [...LIVE_STATUSES] },
-          },
-        },
-      }),
-      this.prisma.pos_integration.findUnique({
-        where: { organization_id: organizationId },
-        select: { status: true, courier_mode: true },
-      }),
-    ]);
-    return {
-      posFailed,
-      posReconnect: integration?.status === 'needs_reconnect',
-      // Courier functions of Xmenu are off: the dashboard hides them (docs/IIKO.md, "Курьеры")
-      posCouriers:
-        isPosLive(integration?.status) && integration?.courier_mode === 'iiko',
     };
   }
 
@@ -280,14 +252,32 @@ export class OrderStaffService {
     return this.toStaffView(order, timers, actors);
   }
 
-  /** Panel uchun: natijada yangilangan buyurtma. Ruxsat etilmagan o'tish — 409. */
+  /**
+   * Panel uchun: natijada yangilangan buyurtma. Ruxsat etilmagan o'tish — 409. With `expectedStatus` (the board)
+   * the order must still be in it, and a repeat of the same action is a conflict too, not a quiet 200.
+   */
   async act(
     organizationId: string,
     id: string,
     action: RestaurantAction,
     actorId: string,
+    expectedStatus?: OrderStatusName,
+    override = false,
   ) {
-    const result = await this.perform(organizationId, id, action, actorId);
+    const result = await this.perform(
+      organizationId,
+      id,
+      action,
+      actorId,
+      expectedStatus,
+      override,
+    );
+    // iiko leads the order's kitchen steps: the operator confirms a manual mark (override)
+    if (!result.changed && result.posControlled) {
+      throw new AppException('pos_status_managed', {
+        details: { status: result.status },
+      });
+    }
     if (!result.changed && result.conflict) {
       throw new AppException('order_status_conflict', {
         details: { status: result.status },
@@ -300,7 +290,8 @@ export class OrderStaffService {
    * Telegram tugmasi uchun: takror bosish xato emas (changed=false). `organizationId`
    * berilsa buyurtma o'sha tenantga tegishli bo'lishi shart. `expectedStatus` (the status a Telegram button
    * was drawn for): the target is counted from it and the order moves only while it is still in it, so a
-   * repeated delivery or a second press of "next" never takes one more step.
+   * repeated delivery or a second press of "next" never takes one more step. "next" follows the venue's kitchen
+   * queue (order/domain/kitchen.ts); override marks a kitchen step of an order iiko leads.
    */
   async perform(
     organizationId: string | null,
@@ -308,13 +299,14 @@ export class OrderStaffService {
     action: RestaurantAction,
     actorId: string,
     expectedStatus?: OrderStatusName,
-  ): Promise<ActionResult & { conflict: boolean }> {
+    override = false,
+  ): Promise<ActionResult & { conflict: boolean; posControlled?: boolean }> {
     const order = await this.prisma.customer_order.findFirst({
       where: {
         id,
         ...(organizationId ? { organization_id: organizationId } : {}),
       },
-      select: { status: true, fulfillment: true },
+      select: { status: true, fulfillment: true, organization_id: true },
     });
     if (!order)
       throw new AppException('not_found', { message: 'Order not found' });
@@ -323,26 +315,60 @@ export class OrderStaffService {
     if (expectedStatus && current !== expectedStatus)
       return { changed: false, status: current, conflict: true };
     const from = expectedStatus ?? current;
-    const to = this.target(action, from, order.fulfillment);
+    const trackPreparation =
+      action.type === 'next'
+        ? (
+            await loadKitchenMode(
+              this.prisma,
+              this.settings,
+              order.organization_id,
+            )
+          ).trackPreparation
+        : false;
+    const to = this.target(action, from, order.fulfillment, trackPreparation);
     if (!to) return { changed: false, status: from, conflict: true };
 
+    const input = {
+      orderId: id,
+      actor: 'restaurant' as const,
+      actorId,
+      expectedFrom: expectedStatus,
+      reason:
+        action.type === 'reject' ? (action.reason ?? 'declined') : undefined,
+      override,
+    };
     try {
-      await this.transitions.transition({
-        orderId: id,
-        to,
-        actor: 'restaurant',
-        actorId,
-        expectedFrom: expectedStatus,
-        reason:
-          action.type === 'reject' ? (action.reason ?? 'declined') : undefined,
-      });
+      // A pickup marked ready straight from accepted passes preparing in the same transaction
+      if (
+        action.type === 'set' &&
+        to === 'ready' &&
+        from === 'accepted' &&
+        order.fulfillment === 'pickup'
+      )
+        await this.transitions.transitionChain(
+          { ...input, expectedFrom: from },
+          ['preparing', 'ready'],
+        );
+      else await this.transitions.transition({ ...input, to });
       return { changed: true, status: to, conflict: false };
     } catch (e) {
       if (e instanceof OrderNotFoundError)
         throw new AppException('not_found', { message: 'Order not found' });
+      if (e instanceof PosControlledError)
+        return {
+          changed: false,
+          status: e.from,
+          conflict: true,
+          posControlled: true,
+        };
       if (e instanceof InvalidTransitionError) {
-        // Allaqachon shu holatda — takror bosish; boshqa holatda — haqiqiy konflikt.
-        return { changed: false, status: e.from, conflict: e.from !== to };
+        // Allaqachon shu holatda — takror bosish; boshqa holatda — haqiqiy konflikt. With an expected status
+        // the caller saw a state that is gone: a conflict even when someone else did the same thing.
+        return {
+          changed: false,
+          status: e.from,
+          conflict: expectedStatus !== undefined || e.from !== to,
+        };
       }
       throw e;
     }
@@ -352,6 +378,7 @@ export class OrderStaffService {
     action: RestaurantAction,
     from: OrderStatusName,
     fulfillment: string,
+    trackPreparation: boolean,
   ): OrderStatusName | null {
     switch (action.type) {
       case 'accept':
@@ -361,7 +388,11 @@ export class OrderStaffService {
       case 'set':
         return action.status;
       case 'next':
-        return nextRestaurantStatus(from, fulfillment as 'delivery' | 'pickup');
+        return nextRestaurantStatus(
+          from,
+          fulfillment as 'delivery' | 'pickup',
+          trackPreparation,
+        );
     }
   }
 }

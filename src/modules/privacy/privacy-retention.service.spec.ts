@@ -30,6 +30,7 @@ function setup(c: Partial<Record<string, number[]>> = {}) {
     staff_auth_event: table(c.events ?? []),
     staff_session: table(c.sessions ?? []),
     application: table(c.applications ?? []),
+    staff_push_subscription: table(c.pushSubscriptions ?? []),
   };
   return { prisma, service: new PrivacyRetentionService(prisma as never) };
 }
@@ -90,6 +91,32 @@ describe('PrivacyRetentionService.run', () => {
     );
   });
 
+  it('deletes dead push subscriptions: 10 failures, or failing for over 30 days without a success', async () => {
+    const { prisma, service } = setup({ pushSubscriptions: [3] });
+    const r = await service.run(now, {});
+    expect(r.pushSubscriptions).toBe(3);
+    const cutoff = new Date(now.getTime() - 30 * DAY);
+    expect(
+      (prisma.staff_push_subscription.findMany.mock.calls[0] as unknown[])[0],
+    ).toMatchObject({
+      where: {
+        OR: [
+          { failure_count: { gte: 10 } },
+          {
+            failure_count: { gt: 0 },
+            OR: [
+              { last_success_at: { lt: cutoff } },
+              { last_success_at: null, created_at: { lt: cutoff } },
+            ],
+          },
+        ],
+      },
+    });
+    expect(prisma.staff_push_subscription.deleteMany).toHaveBeenCalledWith({
+      where: { id: { in: ['id0', 'id1', 'id2'] } },
+    });
+  });
+
   it('works in batches until a batch comes back short', async () => {
     const { prisma, service } = setup({
       events: [RETENTION_BATCH, RETENTION_BATCH, 7],
@@ -108,6 +135,7 @@ describe('PrivacyRetentionService.run', () => {
       staffAuthEvents: 0,
       staffSessions: 0,
       applications: 0,
+      pushSubscriptions: 0,
     });
     expect(prisma.customer_order.updateMany).not.toHaveBeenCalled();
     expect(prisma.staff_auth_event.deleteMany).not.toHaveBeenCalled();
@@ -126,5 +154,6 @@ describe('PrivacyRetentionService.run', () => {
     expect(log.mock.calls[0]).toEqual([
       expect.stringContaining('orders anonymized=1'),
     ]);
+    expect(log.mock.calls[0][0]).toContain('push_subscription deleted=0');
   });
 });

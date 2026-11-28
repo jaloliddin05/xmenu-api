@@ -42,6 +42,8 @@ describe('OrderService.create: ordering channel and publication', () => {
     organization: { findUnique: jest.fn(async () => org) },
     order_status_event: { findFirst: jest.fn() },
     product: { findMany: findProducts },
+    // The guest's view asks whether the venue tracks its kitchen: no iiko here
+    pos_integration: { findUnique: jest.fn(async () => null) },
   };
   const service = new OrderService(
     prisma as any,
@@ -376,7 +378,15 @@ describe('OrderService.create: delivery price, payment and change', () => {
 
   describe('per-guest limits (S-19)', () => {
     const env = { ...process.env };
+    // The service and the fake's "oldest order" both read Date.now(): one frozen instant, so the wait is exact
+    let clock: jest.SpyInstance;
+    beforeEach(() => {
+      clock = jest
+        .spyOn(Date, 'now')
+        .mockReturnValue(Date.UTC(2026, 10, 24, 12, 0, 0));
+    });
     afterEach(() => {
+      clock.mockRestore();
       process.env = { ...env };
     });
 
@@ -400,8 +410,7 @@ describe('OrderService.create: delivery price, payment and change', () => {
       const r = await run(order());
       expect(r).toMatchObject({ code: 'rate_limited', status: 429 });
       // the oldest order is 50 minutes old: about 10 minutes to wait
-      expect(r?.body.retryAfter).toBeGreaterThan(590);
-      expect(r?.body.retryAfter).toBeLessThanOrEqual(600);
+      expect(r?.body.retryAfter).toBe(600);
       expect(created).toBeUndefined();
       counts.lastHour = 19;
       expect(await run(order())).toBeNull();

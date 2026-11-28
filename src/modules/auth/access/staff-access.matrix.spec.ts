@@ -1,4 +1,5 @@
 import { INestApplication, Logger } from '@nestjs/common';
+import { IncomingMessage, ServerResponse } from 'http';
 import { NestFactory } from '@nestjs/core';
 import request from 'supertest';
 import { AppModule } from 'src/app.module';
@@ -26,6 +27,11 @@ const EXPECTED: Record<string, string> = {
   'POST /additional-product/group': 'venue',
   'DELETE /additional-product/group/:id': 'venue',
   'PUT /additional-product/group/:id': 'venue',
+  'GET /events/guest': 'public',
+  'GET /events/ping': 'public',
+  'GET /events/public': 'public',
+  'GET /events/staff': 'orders',
+  'GET /events/telegram-verification': 'public',
   'GET /application': 'platform-admin',
   'POST /application': 'public',
   'POST /auth/check-code': 'public',
@@ -105,6 +111,7 @@ const EXPECTED: Record<string, string> = {
   'GET /order': 'orders',
   'GET /order-settings': 'venue',
   'PUT /order-settings': 'venue',
+  'GET /order/board': 'orders',
   'GET /order/:id': 'orders',
   'POST /order/:id/accept': 'orders',
   'POST /order/:id/advance': 'orders',
@@ -117,6 +124,9 @@ const EXPECTED: Record<string, string> = {
   'GET /orders': 'public',
   'POST /orders': 'public',
   'GET /orders/:id': 'public',
+  'GET /push/public-key': 'orders',
+  'POST /push/subscriptions': 'orders',
+  'DELETE /push/subscriptions': 'orders',
   'POST /orders/:id/cancel': 'public',
   'POST /orders/:id/payment/retry': 'public',
   'DELETE /organization/:id': 'venue@id',
@@ -232,6 +242,16 @@ const USERS: FakeStaffUser[] = [
     organization: { id: OTHER_ORG, slug: 'other' },
   },
 ];
+
+/**
+ * The recorded calls as text. A stream route hands its request and response to the stream service: they are
+ * written as a marker (they are circular, and the venue in them comes from the token, which the check is about).
+ */
+function serialized(value: unknown): string {
+  return JSON.stringify(value, (_key, v: unknown) =>
+    v instanceof IncomingMessage || v instanceof ServerResponse ? '[http]' : v,
+  );
+}
 
 /** Every provider the controllers need: functions that resolve to an empty object, calls recorded. */
 const calls: unknown[][] = [];
@@ -425,7 +445,7 @@ describe('staff access matrix', () => {
             false,
           ]);
           // The venue comes from the token: this venue's id never reaches a service
-          expect([label(r), JSON.stringify(calls).includes(ORG)]).toEqual([
+          expect([label(r), serialized(calls).includes(ORG)]).toEqual([
             label(r),
             false,
           ]);

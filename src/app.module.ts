@@ -25,11 +25,13 @@ import { TenantConfigModule } from './modules/tenant/tenant-config.module';
 import { TelegramModule } from './modules/telegram/telegram.module';
 import { TenantDomainModule } from './modules/tenant-domain/tenant-domain.module';
 import { StaffModule } from './modules/staff/staff.module';
+import { PushModule } from './modules/push/push.module';
 import { ReportModule } from './modules/report/report.module';
 import { PosModule } from './modules/pos/pos.module';
 import { PrivacyModule } from './modules/privacy/privacy.module';
 import { HealthModule } from './modules/health/health.module';
 import { CspReportModule } from './modules/csp-report/csp-report.module';
+import { LiveModule } from './modules/live/live.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -46,6 +48,7 @@ import { CspReportModule } from './modules/csp-report/csp-report.module';
     CustomerModule,
     FileModule,
     HealthModule,
+    LiveModule,
     MenuModule,
     OrderModule,
     DeliveryModule,
@@ -60,6 +63,7 @@ import { CspReportModule } from './modules/csp-report/csp-report.module';
     TenantConfigModule,
     TenantDomainModule,
     StaffModule,
+    PushModule,
     ReportModule,
     TranslationModule,
     UserModule,

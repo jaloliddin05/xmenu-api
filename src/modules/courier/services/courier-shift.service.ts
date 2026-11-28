@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { CourierShiftStatus, Prisma } from '@prisma/client';
 import { AppException } from 'src/infra/errors/app-exception';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
@@ -13,6 +13,7 @@ import {
   shiftCash,
 } from '../domain/shift-cash';
 import { CourierCardService } from './courier-card.service';
+import { LiveEventBus } from 'src/modules/live/live-event-bus';
 
 export interface ShiftView {
   id: string;
@@ -54,6 +55,7 @@ export class CourierShiftService {
     private readonly prisma: PrismaService,
     private readonly bots: TelegramBotService,
     private readonly cards: CourierCardService,
+    @Optional() private readonly live?: LiveEventBus,
   ) {}
 
   async start(organizationId: string, courierId: string): Promise<ShiftStart> {
@@ -61,6 +63,7 @@ export class CourierShiftService {
       const shift = await this.prisma.courier_shift.create({
         data: { organization_id: organizationId, courier_id: courierId },
       });
+      await this.changed(organizationId);
       return { kind: 'started', shiftId: shift.id };
     } catch (e) {
       // courier_shift_one_open_per_courier: a second press, or two presses at once
@@ -256,7 +259,22 @@ export class CourierShiftService {
         ended_by_user_id: by.userId ?? null,
       },
     });
-    return updated.count ? { kind: 'ended' } : { kind: 'not_open' };
+    if (!updated.count) return { kind: 'not_open' };
+    const shift = await this.prisma.courier_shift.findUnique({
+      where: { id: shiftId },
+      select: { organization_id: true },
+    });
+    if (shift) await this.changed(shift.organization_id);
+    return { kind: 'ended' };
+  }
+
+  /** Shifts started and ended in the courier bot reach the open dashboard (docs/API.md, "События (SSE)"). */
+  private async changed(organizationId: string) {
+    await this.live?.publish(organizationId, {
+      type: 'courier.changed',
+      data: {},
+      to: ['staff'],
+    });
   }
 }
 

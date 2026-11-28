@@ -3,6 +3,7 @@ import {
   Logger,
   OnModuleDestroy,
   OnModuleInit,
+  Optional,
 } from '@nestjs/common';
 import { Queue, Worker } from 'bullmq';
 import { bullConnection } from 'src/infra/redis/bull-connection';
@@ -12,6 +13,7 @@ import { PosMenuImportService } from './pos-menu-import.service';
 import { PosOrderQueue } from './pos-order.queue';
 import { PosStopListService } from './pos-stop-list.service';
 import { isPosLive } from '../domain/pos-steps';
+import { LiveEventBus } from 'src/modules/live/live-event-bus';
 
 export const POS_SYNC_QUEUE = 'pos-sync';
 /** Menu import interval by default, minutes (docs/IIKO.md: no webhook announces a changed menu) */
@@ -54,6 +56,7 @@ export class PosSyncQueue implements OnModuleInit, OnModuleDestroy {
     private readonly menu: PosMenuImportService,
     private readonly stopList: PosStopListService,
     private readonly orders: PosOrderQueue,
+    @Optional() private readonly live?: LiveEventBus,
   ) {}
 
   private get q(): Queue<PosSyncJob> {
@@ -116,8 +119,13 @@ export class PosSyncQueue implements OnModuleInit, OnModuleDestroy {
     });
     // Removed or not enabled yet: a leftover scheduled job does nothing
     if (!row || !isPosLive(row.status)) return;
-    await this.menu.import(row);
-    await this.stopList.refresh(integrationId);
+    try {
+      await this.menu.import(row);
+      await this.stopList.refresh(integrationId);
+    } finally {
+      // The iiko screen and the menu show the result (or the import error) when it is there, without a timer
+      await this.live?.orgChanged(row.organization_id, ['pos', 'menu']);
+    }
   }
 
   async enqueue(name: PosSyncJobName, integrationId: string): Promise<void> {
