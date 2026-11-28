@@ -163,6 +163,8 @@ describe('StaffAuthService (signup)', () => {
         user_id: user.id,
         status: 'active',
       });
+      // a visit to the address before the signup cached "venue unavailable": refreshed after the commit
+      expect(deps.organizations.announced).toEqual([deps.db.orgs[0].id]);
 
       expect(res.success).toBe(true);
       expect(res.accessToken).toBe(`access:${user.id}`);

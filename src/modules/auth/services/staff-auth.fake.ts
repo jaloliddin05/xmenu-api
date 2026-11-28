@@ -239,7 +239,15 @@ export class FakeStaffPrisma {
 
 /** OrganizationService.create stand-in: upsert by the owner's membership, slug from the name. */
 export class FakeOrganizations {
+  /** Venues whose guest pages were refreshed after the registration (announceCreated) */
+  readonly announced: string[] = [];
+
   constructor(private readonly db: FakeStaffPrisma) {}
+
+  announceCreated(id: string) {
+    this.announced.push(id);
+    return Promise.resolve();
+  }
 
   async create(
     data: { name: string; type: string },

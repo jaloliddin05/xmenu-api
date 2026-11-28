@@ -44,6 +44,21 @@ export class OrganizationService {
   ) {}
 
   /** Creates the venue with its owner row in organization_member (role owner, active). */
+  /**
+   * A venue was just registered (after the commit). Guest pages are cached without a time limit, so a visit to its
+   * address before the registration (a cached "venue unavailable") is dropped now (docs/REVALIDATE.md).
+   */
+  async announceCreated(id: string): Promise<void> {
+    try {
+      await this.revalidateService.addRevalidationJob({
+        tenantId: id,
+        route: 'organization',
+      });
+    } catch {
+      // the queue is down: the next change of the venue refreshes its pages
+    }
+  }
+
   async create(
     data: CreateOrganizationDto,
     owner: StaffOwner,
