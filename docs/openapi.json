@@ -959,7 +959,7 @@
             }
           }
         },
-        "summary": "Poll the Telegram verification session every 2 s (the login result is returned once)",
+        "summary": "Status of the Telegram verification session, asked after verification.changed or on return to the page (the login result is returned once)",
         "tags": [
           "Auth-Customer"
         ]
@@ -1233,6 +1233,57 @@
         },
         "tags": [
           "Auth-Customer"
+        ]
+      }
+    },
+    "/events/telegram-verification": {
+      "get": {
+        "operationId": "TelegramVerificationEventsController_stream",
+        "parameters": [
+          {
+            "name": "x-verification-session",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Verification-Session",
+            "in": "header",
+            "description": "sessionId from POST /auth/customer/telegram/start",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Stream of one Telegram verification session: verification.changed, then one status call (text/event-stream)",
+        "tags": [
+          "Events (SSE)"
         ]
       }
     },
@@ -6752,6 +6803,186 @@
         "summary": "Readiness: the database and Redis answer. 503 with the same body when one of them does not",
         "tags": [
           "Health"
+        ]
+      }
+    },
+    "/events/staff": {
+      "get": {
+        "operationId": "LiveEventsController_staff",
+        "parameters": [
+          {
+            "name": "branchId",
+            "required": false,
+            "in": "query",
+            "description": "Only events of this branch (and events of the whole venue)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "last-event-id",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Last-Event-ID",
+            "in": "header",
+            "description": "Id of the last event the client got: missed events are replayed (up to 5 minutes), older ids get `resync`",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Stream of the venue for the dashboard: orders, couriers, venue data, iiko (text/event-stream)",
+        "tags": [
+          "Events (SSE)"
+        ],
+        "x-permission": "orders"
+      }
+    },
+    "/events/guest": {
+      "get": {
+        "operationId": "LiveEventsController_guest",
+        "parameters": [
+          {
+            "name": "last-event-id",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Last-Event-ID",
+            "in": "header",
+            "description": "Id of the last event the client got: missed events are replayed (up to 5 minutes), older ids get `resync`",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Stream of the guest's own orders in this venue (text/event-stream)",
+        "tags": [
+          "Events (SSE)"
+        ]
+      }
+    },
+    "/events/public": {
+      "get": {
+        "operationId": "LiveEventsController_publicStream",
+        "parameters": [
+          {
+            "name": "last-event-id",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Last-Event-ID",
+            "in": "header",
+            "description": "Id of the last event the client got: missed events are replayed (up to 5 minutes), older ids get `resync`",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Stream of public venue data for open guest pages: menu, settings, branches (text/event-stream)",
+        "tags": [
+          "Events (SSE)"
+        ]
+      }
+    },
+    "/events/ping": {
+      "get": {
+        "operationId": "LiveEventsController_ping",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "default": {
+            "description": "Error: one shape for every endpoint (docs/ERRORS.md)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Two ping comments two seconds apart, then the end (proxy check)",
+        "tags": [
+          "Events (SSE)"
         ]
       }
     },

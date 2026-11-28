@@ -13,6 +13,9 @@ import { StepUpAuditInterceptor } from './modules/auth/step-up/step-up-audit.int
 import { OwnerSecurityNotifier } from './modules/auth/step-up/owner-security-notifier.service';
 import { checkEnvAtStartup } from './config/env/startup-check';
 import { parseTrustProxy } from './infra/http/trust-proxy';
+import { LiveMutationInterceptor } from './modules/live/live-mutation.interceptor';
+import { LiveEventBus } from './modules/live/live-event-bus';
+import { RevalidateService } from './modules/revalidate-queue/revalidate.service';
 
 async function bootstrap() {
   // Production refuses to start with a bad configuration; development prints what is switched off
@@ -53,8 +56,14 @@ async function bootstrap() {
     new StaffAccessGuard(reflector),
     new StepUpGuard(reflector, app.get(StepUpTokenService)),
   );
+  // After a successful staff change the venue stream says what changed (org.changed): no screen polls
   app.useGlobalInterceptors(
     new StepUpAuditInterceptor(reflector, app.get(OwnerSecurityNotifier)),
+    new LiveMutationInterceptor(
+      reflector,
+      app.get(LiveEventBus),
+      app.get(RevalidateService, { strict: false }),
+    ),
   );
 
   // The contract lives in the repository (docs/openapi.json); production serves /docs only on request

@@ -1,6 +1,7 @@
 import { Worker } from 'bullmq';
 import axios from 'axios';
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, Optional } from '@nestjs/common';
+import { LiveEventBus } from '../live/live-event-bus';
 import { PrismaService } from '../_prisma/prisma.service';
 import { redisConfig } from './bull.config';
 import {
@@ -9,7 +10,18 @@ import {
   describeRevalidate,
   ResolvedChange,
   RevalidateJob,
+  RevalidateRoute,
 } from './revalidate-job';
+
+/** What an open guest page refetches after a change of this kind (content.changed). */
+export const CONTENT_SCOPES: Record<RevalidateRoute, string[]> = {
+  menu: ['menu'],
+  organization: ['config'],
+  settings: ['config'],
+  branches: ['branches'],
+  channels: ['config'],
+  domains: [],
+};
 
 /** Where a job goes and what it sends; null when the target has nothing to do. */
 export function revalidateRequest(
@@ -31,7 +43,10 @@ export class RevalidateProcessor implements OnModuleDestroy {
   private readonly logger = new Logger('Revalidate');
   private worker: Worker;
 
-  constructor(private readonly prisma: PrismaService) {
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly live?: LiveEventBus,
+  ) {
     this.worker = new Worker(
       'revalidate-queue',
       async (job) => {
@@ -40,6 +55,7 @@ export class RevalidateProcessor implements OnModuleDestroy {
         const request = await this.requestFor(data);
         if (!request) {
           this.logger.log(`Skipped: ${what}`);
+          await this.refreshed(data);
           return { success: true, skipped: true };
         }
 
@@ -47,6 +63,7 @@ export class RevalidateProcessor implements OnModuleDestroy {
           const response = await axios.post(request.url, request.body);
           if (response.status !== 200)
             throw new Error(`Unexpected status: ${response.status}`);
+          await this.refreshed(data);
           return { success: true };
         } catch (error) {
           this.logger.error(`Failed: ${what}: ${(error as Error).message}`);
@@ -80,6 +97,20 @@ export class RevalidateProcessor implements OnModuleDestroy {
     return revalidateRequest({
       ...data,
       change: { ...data.change, slug: org.slug ?? null },
+    });
+  }
+
+  /**
+   * The cached pages of this front-end are fresh now: its open pages refetch (an earlier event would make them
+   * refetch the old page). docs/API.md, "События (SSE)".
+   */
+  private async refreshed(data: RevalidateJob) {
+    const scopes = CONTENT_SCOPES[data.change.route] ?? [];
+    if (!scopes.length || !data.change.tenantId) return;
+    await this.live?.publish(data.change.tenantId, {
+      type: 'content.changed',
+      data: { scopes, target: data.target },
+      to: ['public'],
     });
   }
 

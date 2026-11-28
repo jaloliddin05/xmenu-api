@@ -370,6 +370,7 @@ IP берётся из `X-Forwarded-For` только от доверенног�
 | GET | `/couriers/pay-rates` | `venue` |  |  | ✓ | — |
 | GET | `/delivery/regions` | `venue` |  |  | ✓ | — |
 | GET | `/delivery/regions/{code}` | `venue` |  |  | ✓ | — |
+| GET | `/events/staff` | `orders` |  |  | ✓ | ✓ |
 | GET | `/external-services` | `orders` |  |  | ✓ | ✓ |
 | POST | `/file/upload` | `profile` |  |  | ✓ | ✓ |
 | DELETE | `/integrations/iiko` | `venue` |  | step-up | ✓ | — |
@@ -798,6 +799,75 @@ Mozilla и Apple):
   push-сервиса. `403` не удаляет сразу: по RFC 8292 так отвечают на отклонённый токен VAPID (ключи платформы), а не на
   исчезнувшую подписку. Мёртвые подписки убирает ежедневная задача сроков хранения: `failure_count` ≥ 10, либо ошибки и
   больше 30 дней без успешной отправки (`last_success_at`, а если его не было, `created_at`). При `ORDER_QUEUES=off` отправка сразу, без повторов.
+
+## События (SSE)
+
+Живые данные на экранах меняются по событиям, а не по опросу: ни один фронт не повторяет запросы по таймеру, в том
+числе при обрыве связи. Событие тонкое (что изменилось и какой id), без данных гостя; клиент по нему перечитывает то,
+что показывает. Модуль `live` (`src/modules/live`).
+
+| Метод | Путь | Кто | Что приходит |
+|---|---|---|---|
+| GET | `/events/staff?branchId=` | владелец и оператор (`orders`), `Authorization: Bearer` | заказы, курьеры, данные заведения, iiko, привязка чата |
+| GET | `/events/guest` | гость (`Authorization` токена гостя, `X-Tenant-Id`) | `order.changed` своих заказов |
+| GET | `/events/public` | без входа, `X-Tenant-Id` | `content.changed` (меню, настройки, филиалы) |
+| GET | `/events/telegram-verification` | без входа, `X-Tenant-Id`, `X-Verification-Session: <sessionId>` | `verification.changed` одной сессии подтверждения |
+| GET | `/events/ping` | без входа | два комментария `: ping` с паузой 2 с и конец (проверка прокси в `smoke.sh`) |
+
+Поток читается через `fetch` и `ReadableStream` (не `EventSource`): токен и id сессии идут в заголовках и не попадают в
+URL и логи. Ответ `text/event-stream`, `Cache-Control: no-store`, `X-Accel-Buffering: no`.
+
+```text
+retry: 3000
+
+id: 1764300000000-0
+event: ready
+data: {}
+
+id: 1764300004211-0
+event: order.created
+data: {"orderId":"0b6f8a52-3c1d-4e7f-9a2b-5c6d7e8f9a0b","status":"pending_acceptance","version":1,"branchId":"6f1c…"}
+
+: hb
+
+event: bye
+data: {"reason":"token_expired"}
+```
+
+- `ready` (или `resync`) приходит после открытия: клиент перечитывает всё живое, что на экране (так закрывается
+  разрыв). `id` у каждого события; переподключение с заголовком `Last-Event-ID` сначала отдаёт пропущенные события
+  (буфер 5 минут, до 500 событий), затем `ready`. Id старше буфера, неразборчивый или пропущено больше 500 → `resync`
+  вместо повтора.
+- Сердцебиение — комментарий `: hb` каждые 25 с (не запрос клиента; без него прокси и мобильные сети рвут тихое
+  соединение).
+- `bye { reason }`: `token_expired` — истёк access-токен (для потока проверки — истекла сессия), клиент обновляет токен
+  и переподключается; `revoked` — вход завершён (выход, завершение сессии, сброс пароля, отключение сотрудника), поток
+  закрывается сразу, без проверки по таймеру.
+- Ошибки до открытия потока — обычные JSON-ошибки: `401`, `404 not_found` (филиал другого заведения, неизвестная или
+  истёкшая сессия проверки), `400 validation_error` (`branchId` не UUID), `429 rate_limited` с `retryAfter`.
+- Лимиты на процесс API: 5 потоков на сотрудника, 3 на гостя заведения, 50 на IP.
+- Поток не держит транзакций и соединений с БД; после открытия ничего не читает.
+
+| Событие | Поток | `data` | Когда |
+|---|---|---|---|
+| `order.created` | staff, guest | `{ orderId, status, version, branchId }` (гостю без `branchId`) | заказ дошёл до заведения (`pending_acceptance`) |
+| `order.changed` | staff, guest | то же | любое изменение заказа после коммита: статус, курьер, состояние передачи в iiko |
+| `order.attention` | staff | `{ orderId, status, version, branchId, code }` | признак по времени: `not_picked_up`, `long_on_the_way`, `at_door` (таймеры доставки) |
+| `courier.changed` | staff | `{}` | смена открыта или закрыта (бот курьера, дашборд), назначение и снятие курьера |
+| `branch.chat_bound` | staff | `{ branchId }` | чат филиала привязан командой `/bind` |
+| `org.changed` | staff | `{ resources, origin? }` | успешная мутация сотрудника (`LiveMutationInterceptor`); `origin` — заголовок `X-Live-Origin` вкладки, которая её сделала |
+| `content.changed` | public | `{ scopes: [menu\|config\|branches], target: qr\|client }` | кэш страниц цели (`target`) уже сброшен после изменения публичных данных |
+| `verification.changed` | verification | `{}` | контакт принят, код отправлен или попытки кончились: клиент один раз зовёт `POST /auth/customer/telegram/status` |
+
+- Публикация только после коммита: эффекты перехода заказа (`OrderTransitionService.dispatchEffects`), назначение
+  курьера, задания iiko, таймеры доставки, смены, привязка чата, ревалидация. Откат транзакции события не даёт.
+- `org.changed`: каждый мутирующий маршрут сотрудника отнесён к ресурсу (`live/live-resources.ts`; тест обходит все
+  маршруты). Ресурсы, которые видят гости (`menu`, `branches`, `venue`, `settings`, `pos`), ставят и сброс кэша страниц.
+- Канал заведения в Redis: журнал `live:log:<orgId>` (Stream, 5 минут) и раздача `live:org:<orgId>` всем процессам API;
+  отзыв входа и сброс кэшей тенанта и настроек заказа (`live:ctl:*`) тоже идут всем процессам.
+- Наблюдаемость: раз в 5 минут строка в лог `live streams staff=N guest=N public=N verification=N events_5m=N
+  resyncs_5m=N failed_5m=N` (на процесс).
+
 ## Тенант: адрес → id → конфиг
 
 Клиентские фронты (QR-меню, доставка) определяют заведение так:

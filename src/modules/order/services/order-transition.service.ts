@@ -1,6 +1,6 @@
 import { paidAtDoor } from '../domain/delivery-payment';
 import { errorMessage } from 'src/infra/helper/error-text';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { Prisma, customer_order } from '@prisma/client';
 import { AppException } from 'src/infra/errors/app-exception';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
@@ -31,6 +31,7 @@ import {
   loadKitchenMode,
 } from '../domain/kitchen';
 import { OpsNotifierService } from '../notifications/ops-notifier.service';
+import { LiveEventBus } from 'src/modules/live/live-event-bus';
 
 /** Journal note of a kitchen step marked by hand while iiko leads the order */
 export const POS_OVERRIDE_NOTE = 'pos_override';
@@ -168,6 +169,7 @@ export class OrderTransitionService {
     private readonly queues: OrderQueueService,
     private readonly staffPush: StaffPushService,
     private readonly ops: OpsNotifierService,
+    @Optional() private readonly live?: LiveEventBus,
   ) {}
 
   async transitionInTx(
@@ -556,6 +558,13 @@ export class OrderTransitionService {
    * timeout bor) kechikmaydi. Xato — faqat log (runEffects ichida).
    */
   dispatchEffects(order: customer_order, effects: Effect[]): void {
+    // Every committed change of an order reaches the open screens (docs/API.md, "События (SSE)")
+    void this.live?.order(
+      order,
+      effects.some((e) => e.type === 'placed')
+        ? 'order.created'
+        : 'order.changed',
+    );
     void this.runEffects(order, effects);
   }
 

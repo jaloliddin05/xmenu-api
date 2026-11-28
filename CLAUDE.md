@@ -55,7 +55,7 @@ Env: см. `.env.example` (полный; тест сверяет его со с�
 `sms` (провайдеры eskiz, telegram, console), `telegram` (боты заведений: `TelegramBotService`, `TelegramClient`,
 `/telegram-bot`), `tenant-domain` (свои домены заведения, `/organization/:id/domains`), `file`, `translation`, `application`,
 `health` (`GET /health`, `/health/ready`), `csp-report` (`POST /csp-report`, приёмник отчётов CSP фронтов, `docs/API.md`, «Отчёты CSP»), `revalidate-queue` (`RevalidateModule`: ревалидация QR-меню и сайта доставки, `docs/REVALIDATE.md`), `guest-login` (способы входа
-клиентов заведения: `GuestLoginService`), `push` (web push сотрудникам: подписки браузеров и уведомления о заказах, раздел «Заказы»), `privacy` (ежедневная очистка по срокам хранения, раздел «Персональные данные»), `pos` (интеграция с кассой iiko: подключение, меню, стоп-лист, вебхук, отправка заказов и статусы; раздел
+клиентов заведения: `GuestLoginService`), `push` (web push сотрудникам: подписки браузеров и уведомления о заказах, раздел «Заказы»), `privacy` (ежедневная очистка по срокам хранения, раздел «Персональные данные»), `live` (события SSE для экранов: раздел «Живые данные»), `pos` (интеграция с кассой iiko: подключение, меню, стоп-лист, вебхук, отправка заказов и статусы; раздел
 «Интеграция с кассой»).
 
 ## Контракт API
@@ -255,6 +255,25 @@ Payme вручную через ops-чат.
   карточки незавершённых заказов публикуются в новом чате заново; повторный вызов ничего не делает). Всё, что пишет в
   чат филиала, идёт через `sendToChat` этого сервиса.
 
+## Живые данные (SSE)
+Контракт: `docs/API.md`, «События (SSE)». Модуль `live` (глобальный): `LiveEventBus` (журнал заведения в Redis Stream на
+5 минут + раздача всем процессам через pub/sub, транспорт `LIVE_TRANSPORT`: `RedisLiveTransport`, в спеках
+`FakeLiveTransport`), `LiveStreamService` (поток: `ready`/`resync`, `Last-Event-ID`, сердцебиение 25 с, `bye`), потоки
+`/events/staff`, `/events/guest`, `/events/public`, `/events/ping` (`LiveEventsController`) и
+`/events/telegram-verification` (в `auth`).
+- Экраны не опрашивают API: всё, что меняет данные, публикует событие **после коммита**. Заказ: `dispatchEffects`
+  (`order.created`/`order.changed`); мимо него — явно (`CourierAssignmentService`, `PosOrderProcessor` через
+  `LiveOrderNotifier`, `DeliveryTimerProcessor` `order.attention`, `CourierShiftService`, `BranchChatBindingService`,
+  `TelegramVerificationService`, `RevalidateProcessor` `content.changed`). Новый путь записи вне этих мест публикует сам.
+- Мутации сотрудников публикует `LiveMutationInterceptor` (глобальный, `main.ts`): ресурс по первому сегменту пути
+  (`live/live-resources.ts`); новый мутирующий маршрут без строки там роняет `live-mutation.interceptor.spec.ts`.
+  Публичные ресурсы (`PUBLIC_RESOURCES`) ставят и сброс ISR.
+- События тонкие, без ПДн гостя: id, статус, версия. `customerId` и ключ сессии проверки — только поля маршрутизации, наружу не уходят.
+- Отзыв входа (`denySid` staff и гостя) закрывает потоки событием `live:ctl:revoke`, по таймеру поток ничего не проверяет.
+  Сброс кэшей тенанта и настроек заказа (`invalidate`) расходится по всем процессам.
+- Сервисы получают `LiveEventBus` через `@Optional()`: спеки со старыми конструкторами не меняются; без шины события не шлются.
+- Лимиты потоков на процесс (`LIVE_LIMITS`): 5 на сотрудника, 3 на гостя, 50 на IP. Раз в 5 минут строка `live streams …` в лог.
+
 ## Интеграция с кассой (iiko)
 Контракт: `docs/API.md`, «Интеграция с кассой (iiko)» и «Передача заказа в iiko»; спецификация `../docs/IIKO.md`.
 Модуль `pos`: подключение, связи, меню, стоп-лист, вебхук, отправка принятых заказов, статусы iiko, режим курьеров.
@@ -318,6 +337,8 @@ Payme вручную через ops-чат.
   цены меню) уходит в `deliveries/create`. Адрес не `city`: улица и дом сначала сопоставляются со строкой адреса (`domain/street-match.ts`
   по справочнику `PosStreetsCache`: города и улицы организации в Redis на сутки), иначе `needs_street`. Действия
   оператора `PosOrderController` (`/order/:id/pos/*`, право `orders`).
+- Отказ iiko по цене (`pos_rejected_price`) ставит импорт меню сразу, по стоп-листу (`pos_rejected_stop_list`) — обновление
+  стоп-листа (`PosOrderService.refreshFromPos`): касса впереди Xmenu, следующий гость увидит её цены.
 - Статусы: чистая таблица `domain/pos-status-map.ts` (только вперёд, противоречие → журнал и тревога; `CookingStarted`
   → `preparing`, `CookingCompleted` → `ready`, доставка тоже проходит `preparing`),
   `PosOrderStatusService.apply` для вебхука (`DeliveryOrderUpdate/Error` в `PosWebhookService`) и опроса (задание
@@ -520,7 +541,7 @@ App (`instant`) нового номера кладёт Telegram-id в `registrat
 - Роли сотрудников для отдельного приложения (курьеры, официанты, менеджеры). Таблица `employee` есть, не используется
   (операторы админки живут в `organization_member`, раздел «Сотрудники и права»).
 - Касса iiko: проверка на живом iiko (`../docs/IIKO.md`, «Перед пилотом»). Другие кассы позже.
-- Позже: WebSocket для админки, фискальные чеки, промокоды (поле `discount` всегда 0), заказ ко
+- Позже: фискальные чеки, промокоды (поле `discount` всегда 0), заказ ко
   времени, меню по филиалам, ротация `PAYMENT_CONFIG_KEY` (принятый риск S-12, `../audit/SECURITY.md`, раздел 7).
 
 ## Известные долги

@@ -44,6 +44,7 @@ import {
 } from './services/telegram-update.queue';
 import { TelegramUpdateProcessor } from './services/telegram-update.processor';
 import { TelegramBotWebhookController } from './controllers/telegram-bot-webhook.controller';
+import { TelegramVerificationEventsController } from './controllers/telegram-verification-events.controller';
 import { CustomerAccessTokenStrategy } from './passport-strategies/customer-access-token/customer-access-token.strategy';
 import { NoStoreMiddleware } from './middleware/no-store.middleware';
 import { loadStepUpSecret } from './step-up/step-up.config';
@@ -121,6 +122,7 @@ import { PushModule } from '../push/push.module';
     StaffSessionsController,
     AuthCustomerController,
     TelegramBotWebhookController,
+    TelegramVerificationEventsController,
   ],
   exports: [
     AuthService,

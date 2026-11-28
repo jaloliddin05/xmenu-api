@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { createHash, randomInt } from 'crypto';
 import Redis from 'ioredis';
 import { REDIS } from 'src/infra/redis/redis.module';
@@ -6,6 +6,7 @@ import { AppException } from 'src/infra/errors/app-exception';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
 import { RateLimitService } from 'src/modules/auth/services/rate-limit.service';
 import { TelegramApiService } from './telegram-api.service';
+import { LiveEventBus } from 'src/modules/live/live-event-bus';
 
 export const BIND_CODE_LENGTH = 8;
 export const BIND_CODE_TTL_SECONDS = 600;
@@ -54,6 +55,7 @@ export class BranchChatBindingService {
     private readonly rateLimit: RateLimitService,
     private readonly telegram: TelegramApiService,
     @Inject(REDIS) private readonly redis: Redis,
+    @Optional() private readonly live?: LiveEventBus,
   ) {}
 
   async createCode(
@@ -107,7 +109,7 @@ export class BranchChatBindingService {
 
     const branch = await this.prisma.branch.findUnique({
       where: { id: branchId },
-      select: { id: true, title: true },
+      select: { id: true, title: true, organization_id: true },
     });
     if (!branch) return { status: 'invalid' };
     await this.prisma.branch.update({
@@ -115,6 +117,12 @@ export class BranchChatBindingService {
       data: { telegram_chat_id: chatId },
     });
     this.logger.log(`branch ${branch.id} bound to chat ${chatId}`);
+    // The dashboard shows the code until this event comes (no polling of the branch list)
+    await this.live?.publish(branch.organization_id, {
+      type: 'branch.chat_bound',
+      data: { branchId: branch.id },
+      to: ['staff'],
+    });
     return { status: 'bound', branchTitle: branch.title };
   }
 

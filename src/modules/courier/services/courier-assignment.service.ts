@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { AppException } from 'src/infra/errors/app-exception';
 import { errorMessage } from 'src/infra/helper/error-text';
@@ -13,6 +13,7 @@ import {
   InvalidTransitionError,
   OrderTransitionService,
 } from 'src/modules/order/services/order-transition.service';
+import { LiveEventBus } from 'src/modules/live/live-event-bus';
 
 /** Statuses in which the operator may assign, reassign or take off the courier (before "picked up"). */
 const ASSIGNABLE: readonly OrderStatusName[] = [
@@ -37,6 +38,7 @@ export class CourierAssignmentService {
     private readonly prisma: PrismaService,
     private readonly transitions: OrderTransitionService,
     private readonly queues: OrderQueueService,
+    @Optional() private readonly live?: LiveEventBus,
   ) {}
 
   async assign(
@@ -79,6 +81,7 @@ export class CourierAssignmentService {
     );
     if (!result.changed) return;
     const version = result.order.version + 1;
+    await this.published(organizationId, result.order, version);
     await this.queues.enqueueCourierCard(orderId, courierId, version);
     if (result.previous)
       await this.queues.enqueueCourierCard(orderId, result.previous, version);
@@ -105,9 +108,15 @@ export class CourierAssignmentService {
           actorId: staffUserId,
           note: `courier_unassigned:${order.courier_id}`,
         });
-        return { courierId: order.courier_id, version: order.version + 1 };
+        return {
+          courierId: order.courier_id,
+          version: order.version + 1,
+          order,
+        };
       }),
     );
+    if (result)
+      await this.published(organizationId, result.order, result.version);
     if (result)
       await this.queues.enqueueCourierCard(
         orderId,
@@ -169,6 +178,8 @@ export class CourierAssignmentService {
         fulfillment: true,
         courier_id: true,
         version: true,
+        branch_id: true,
+        customer_id: true,
       },
     });
     if (!order) throw new AppException('order_not_found');
@@ -180,6 +191,29 @@ export class CourierAssignmentService {
     if (!ASSIGNABLE.includes(status))
       throw new AppException('order_status_conflict', { details: { status } });
     return order;
+  }
+
+  /** After the commit: the board and the guest see the courier, the couriers list sees the load (docs/API.md, "События (SSE)"). */
+  private async published(
+    organizationId: string,
+    order: {
+      id: string;
+      status: string;
+      branch_id: string | null;
+      customer_id: string | null;
+    },
+    version: number,
+  ) {
+    await this.live?.order({
+      ...order,
+      organization_id: organizationId,
+      version,
+    });
+    await this.live?.publish(organizationId, {
+      type: 'courier.changed',
+      data: {},
+      to: ['staff'],
+    });
   }
 
   /** Optimistic locking: the row must still be at the version read in this transaction. */

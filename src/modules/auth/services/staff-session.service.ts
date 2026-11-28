@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import type Redis from 'ioredis';
@@ -11,6 +11,7 @@ import { StaffAuthEventService } from './staff-auth-event.service';
 import { AppException } from 'src/infra/errors/app-exception';
 import { REDIS } from 'src/infra/redis/redis.module';
 import { maskIp, parseUserAgent } from 'src/infra/helper/auth/user-agent';
+import { LiveEventBus } from 'src/modules/live/live-event-bus';
 
 type Db = Prisma.TransactionClient | PrismaService;
 
@@ -78,7 +79,8 @@ export class StaffSessionService {
     private readonly jwt: JwtTokenService,
     private readonly events: StaffAuthEventService,
     @Inject(REDIS) private readonly redis: Redis,
-    config?: ConfigService,
+    @Optional() config?: ConfigService,
+    @Optional() private readonly live?: LiveEventBus,
   ) {
     this.accessTtl = accessTtlSeconds(
       config?.get<{ accessTokenExpiration?: string }>('jwt')
@@ -143,6 +145,8 @@ export class StaffSessionService {
 
   private async denySid(sid: string): Promise<void> {
     await this.redis.set(`staff:sid:revoked:${sid}`, '1', 'EX', this.accessTtl);
+    // Open event streams of this login close now (they are not checked again on a timer)
+    await this.live?.revoke('staff', sid);
   }
 
   /** True once the login behind an access token was revoked. */

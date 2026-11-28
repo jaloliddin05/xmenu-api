@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { LiveEventBus } from 'src/modules/live/live-event-bus';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { PrismaService } from 'src/modules/_prisma/prisma.service';
 import { AppException } from 'src/infra/errors/app-exception';
 import { PayRate, payRateOf } from 'src/modules/courier/domain/courier-pay';
@@ -40,7 +41,13 @@ export class OrderSettingsService {
   private readonly logger = new Logger(OrderSettingsService.name);
   private cache = new Map<string, { at: number; value: OrderSettings }>();
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly live?: LiveEventBus,
+  ) {
+    // Another API process changed the venue: this copy of the cache is stale too
+    live?.onInvalidate((orgId) => this.cache.delete(orgId));
+  }
 
   async get(organizationId: string): Promise<OrderSettings> {
     const hit = this.cache.get(organizationId);
@@ -88,5 +95,6 @@ export class OrderSettingsService {
 
   invalidate(organizationId: string) {
     this.cache.delete(organizationId);
+    void this.live?.invalidate(organizationId);
   }
 }
