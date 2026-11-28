@@ -855,7 +855,7 @@ data: {"reason":"token_expired"}
 | `order.attention` | staff | `{ orderId, status, version, branchId, code }` | признак по времени: `not_picked_up`, `long_on_the_way`, `at_door` (таймеры доставки) |
 | `courier.changed` | staff | `{}` | смена открыта или закрыта (бот курьера, дашборд), назначение и снятие курьера |
 | `branch.chat_bound` | staff | `{ branchId }` | чат филиала привязан командой `/bind` |
-| `org.changed` | staff | `{ resources, origin? }` | успешная мутация сотрудника (`LiveMutationInterceptor`); `origin` — заголовок `X-Live-Origin` вкладки, которая её сделала |
+| `org.changed` | staff | `{ resources, origin? }` | успешная мутация сотрудника (`LiveMutationInterceptor`); `origin` — заголовок `X-Live-Origin` вкладки, которая её сделала; без `origin` — изменение платформы (конец импорта меню iiko: `resources: [pos, menu]`) |
 | `content.changed` | public | `{ scopes: [menu\|config\|branches], target: qr\|client }` | кэш страниц цели (`target`) уже сброшен после изменения публичных данных |
 | `verification.changed` | verification | `{}` | контакт принят, код отправлен или попытки кончились: клиент один раз зовёт `POST /auth/customer/telegram/status` |
 
