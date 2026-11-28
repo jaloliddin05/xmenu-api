@@ -13980,6 +13980,12 @@
             "example": "2026-11-11T09:00:00+05:00",
             "description": "ISO 8601 date and time with the branch UTC offset when a closed branch opens next, e.g. 2026-11-11T09:00:00+05:00"
           },
+          "closesAt": {
+            "type": "string",
+            "nullable": true,
+            "example": "2026-11-11T22:00:00+05:00",
+            "description": "An open branch: when its current interval ends (ISO 8601 with the branch UTC offset; midnight for a round-the-clock day). The client reads the list again at that moment instead of polling; null when closed"
+          },
           "status": {
             "type": "string",
             "enum": [
@@ -14001,6 +14007,7 @@
           "phone",
           "isOpen",
           "opensAt",
+          "closesAt",
           "status"
         ]
       },

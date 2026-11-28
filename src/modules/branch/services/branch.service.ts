@@ -7,6 +7,7 @@ import {
   evaluateOpenState,
   formatHours,
   hasSchedule,
+  closesAtIso,
   opensAtIso,
   OpenState,
 } from '../domain/branch-hours';
@@ -40,6 +41,8 @@ export interface BranchView {
   isOpen: boolean;
   /** ISO 8601 with the branch's UTC offset, e.g. 2026-11-11T09:00:00+05:00 */
   opensAt: string | null;
+  /** Open: the end of the current interval (ISO 8601, branch offset); the client reads the list again then */
+  closesAt: string | null;
   status: BranchStatus;
 }
 
@@ -60,6 +63,7 @@ export function toBranchView(
     phone: b.phone,
     isOpen: state.isOpen,
     opensAt: opensAtIso(state, schedule.timezone),
+    closesAt: closesAtIso(state, schedule.timezone),
     status: branchStatus(schedule, state),
   };
 }

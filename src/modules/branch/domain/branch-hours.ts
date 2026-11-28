@@ -41,6 +41,12 @@ export interface OpenState {
   opensAt: string | null;
   /** YYYY-MM-DD in the branch time zone: the day of that opening (today or a later day) */
   opensDate: string | null;
+  /**
+   * Open: when the current interval ends ("HH:mm" on closesDate). Round the clock it is midnight: the state is read
+   * again then and the next interval may simply continue. A client sets one timer to this moment instead of polling.
+   */
+  closesAt?: string | null;
+  closesDate?: string | null;
 }
 
 export type HoursLang = 'ru' | 'uz' | 'en';
@@ -150,7 +156,14 @@ export function evaluateOpenState(
     today.minutes >= todayInterval.start &&
     today.minutes < Math.min(todayInterval.end, DAY)
   ) {
-    return { isOpen: true, opensAt: null, opensDate: null };
+    const end = todayInterval.end;
+    return {
+      isOpen: true,
+      opensAt: null,
+      opensDate: null,
+      closesAt: formatMinutes(end >= DAY ? end - DAY : end),
+      closesDate: end >= DAY ? addDays(today.date, 1) : today.date,
+    };
   }
 
   // Kechagi tungi smena bugun ertalab davom etishi mumkin.
@@ -164,7 +177,13 @@ export function evaluateOpenState(
     yesterdayInterval.end > DAY &&
     today.minutes < yesterdayInterval.end - DAY
   ) {
-    return { isOpen: true, opensAt: null, opensDate: null };
+    return {
+      isOpen: true,
+      opensAt: null,
+      opensDate: null,
+      closesAt: formatMinutes(yesterdayInterval.end - DAY),
+      closesDate: today.date,
+    };
   }
 
   // Yopiq: keyingi ochilish.
@@ -210,6 +229,15 @@ export function opensAtIso(state: OpenState, timeZone: string): string | null {
   // The offset is looked up at the local wall time read as UTC: exact except within an hour of a DST switch
   const guess = new Date(`${state.opensDate}T${state.opensAt}:00Z`);
   return `${state.opensDate}T${state.opensAt}:00${zoneOffset(guess, timeZone)}`;
+}
+
+/** The end of the current interval as ISO 8601 in the branch time zone (like opensAtIso); null when closed. */
+export function closesAtIso(state: OpenState, timeZone: string): string | null {
+  if (!state.isOpen || !state.closesAt || !state.closesDate) return null;
+  return opensAtIso(
+    { isOpen: false, opensAt: state.closesAt, opensDate: state.closesDate },
+    timeZone,
+  );
 }
 
 export type BranchStatus =
